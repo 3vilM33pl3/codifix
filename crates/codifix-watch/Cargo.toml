@@ -1,0 +1,29 @@
+[package]
+name = "codifix-watch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+autobins = false
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+codifix-config = { path = "../codifix-config" }
+codifix-record = { path = "../codifix-record" }
+codifix-platform = { path = "../codifix-platform" }
+notify.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
+
+[lints]
+workspace = true

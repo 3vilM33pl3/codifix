@@ -10,7 +10,7 @@ import { resolve, join } from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
 
-const binary = resolve(process.argv[2] ?? 'target/debug/memory');
+const binary = resolve(process.argv[2] ?? 'target/debug/codifix');
 const directory = mkdtempSync(join(tmpdir(), 'memory-r1-process-'));
 const container = `memory-r1-process-${randomUUID()}`;
 const image = 'pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f';

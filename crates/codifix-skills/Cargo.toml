@@ -1,0 +1,19 @@
+[package]
+name = "codifix-skills"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+codifix-config = { path = "../codifix-config" }
+codifix-platform = { path = "../codifix-platform" }
+reqwest.workspace = true
+semver.workspace = true
+serde.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

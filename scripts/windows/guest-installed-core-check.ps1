@@ -30,7 +30,7 @@ if($old.service_name -cne $name -or $preview.plan.service_name -cne $name){throw
 $release='C:\Program Files\Memory Layer\releases\windows-v2.1.0-rc.5-build.'+$old.installer_build
 $config='C:\ProgramData\MemoryLayer\configurations\'+$preview.plan.name+'\memory-layer.toml'
 if((Get-CoreInstallHash $config) -cne $old.config_sha256 -or
-    (Get-CoreInstallHash "$release\bin\memory.exe") -cne $core.binary_sha256){throw 'Installed configuration or executable differs'}
+    (Get-CoreInstallHash "$release\bin\codifix.exe") -cne $core.binary_sha256){throw 'Installed configuration or executable differs'}
 $binding=Get-CoreInstallBinding ([IO.File]::ReadAllText($config)) ([guid]$old.core_operation_id) ([guid]$old.instance)
 $binding.password=$null
 $account='NT SERVICE\'+$name
@@ -68,7 +68,7 @@ try{
         $wrapper=Get-CimInstance Win32_Process -Filter "ProcessId=$($scm.ProcessId)"
         $owner=Invoke-CimMethod -InputObject $wrapper -MethodName GetOwnerSid
         if($owner.ReturnValue -ne 0 -or $owner.Sid -cne $sid){throw 'Wrapper identity differs'}
-        $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($scm.ProcessId)" | Where-Object ExecutablePath -ieq "$release\bin\memory.exe")
+        $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($scm.ProcessId)" | Where-Object ExecutablePath -ieq "$release\bin\codifix.exe")
         if($children.Count -ne 1){throw 'Exact installed Memory child required'}
         $owner=Invoke-CimMethod -InputObject $children[0] -MethodName GetOwnerSid
         if($owner.ReturnValue -ne 0 -or $owner.Sid -cne $sid){throw 'Memory identity differs'}

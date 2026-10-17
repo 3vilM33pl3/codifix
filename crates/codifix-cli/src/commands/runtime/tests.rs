@@ -1,0 +1,3393 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+#[cfg(test)]
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+    time::Duration,
+};
+
+use clap::{Command, CommandFactory, Parser, error::ErrorKind};
+use serde::Deserialize;
+use uuid::Uuid;
+
+use crate::commands::eval_support::{
+    EvalRunContext, ExternalRetrieverResponse, agent_build_prompt,
+    build_external_retriever_request, chat_completion_content, ensure_direct_llm_eval_config,
+    ensure_eval_retriever_allowed, ensure_eval_shell_allowed, external_retriever_failure_result,
+    external_retriever_response_to_query_response, parse_no_memory_grounded_answer,
+    run_external_retriever, run_external_retriever_for_retrieval_item, token_usage_from_chat_body,
+    token_usage_from_json_value, validate_agent_build_memory_evidence,
+};
+use crate::commands::{
+    init_support::{initialize_dev_overlay, initialize_repo},
+    memory_ops::{
+        PlanExecutionFinishReport, build_finish_execution_implementation_request,
+        build_plan_execution_finish_report, build_plan_execution_request, build_remember_request,
+        build_task_start_request, parse_memory_type_arg, resolve_project_slug,
+    },
+    output::write_headers,
+    service_support::{
+        TuiRestartMarker, newest_tui_restart_notice, restart_marker_requires_restart,
+        set_cluster_enabled_in_shared_config,
+    },
+    skill_support::{
+        MEMORY_SKILL_NAMES, SkillBundleStatus, SkillUpgradeAction, SkillVersionStatus,
+        download_github_skill_template, github_skill_version_report,
+        project_skill_inventory_with_template, read_skill_version, render_agent_project_config,
+        render_claude_md_memory_section, render_toml_string, resolve_repo_root,
+        upgrade_project_skills_with_template,
+    },
+    status_support::{
+        DoctorStatus, is_placeholder_database_url, llm_doctor_statuses, mask_database_url,
+        repair_repo_bootstrap, root_gitignore_contains_mem,
+    },
+    watch_support::{
+        effective_watcher_manager_config_path, resolve_agent_repo_root, should_start_agent_watcher,
+        watcher_command_requires_config_load, watcher_manager_config_matches_repo,
+        watcher_repo_needs_bootstrap, write_file_if_changed,
+    },
+};
+
+#[cfg(target_os = "windows")]
+use crate::commands::{
+    service_support::{preview_disable_backend_service, preview_enable_backend_service},
+    watch_support::{preview_disable_watch_service, preview_enable_watch_service},
+};
+
+use crate::plan_execution::{
+    derive_plan_thread_key, derive_plan_title, durable_plan_source_path, ensure_checkbox_plan,
+    parse_plan_checkboxes,
+};
+use crate::writer_identity::{WriterIdentity, resolve_writer_identity};
+
+use super::{
+    Cli, DEV_API_TOKEN, RememberArgs, SERVICE_API_TOKEN_KEY, ServiceApiTokenAction, WatcherCommand,
+    WatcherManagerArgs, WatcherManagerCommand, ensure_shared_service_api_token, shared_env_lookup,
+};
+use codifix_config::{AppConfig, Profile};
+use codifix_skills::{
+    SkillSourceKind as SharedSkillSourceKind, SkillUpgradeAction as SharedSkillUpgradeAction,
+    SkillVersionStatus as SharedSkillVersionStatus,
+    visible_skill_inventory_with_template as visible_shared_skill_inventory_with_template,
+};
+use zip::{ZipWriter, write::SimpleFileOptions};
+
+#[cfg(not(target_os = "windows"))]
+use chrono::{TimeZone, Utc};
+#[cfg(not(target_os = "windows"))]
+use codifix_agenttop::LightweightAgentSession;
+
+#[cfg(target_os = "macos")]
+use super::default_global_config_path;
+
+#[cfg(target_os = "macos")]
+use crate::commands::watch_support::{
+    backend_launch_agent_label, managed_watch_launch_agent_label, render_backend_launch_agent,
+    render_managed_watch_launch_agent, render_watch_launch_agent,
+    render_watch_manager_launch_agent, sanitize_service_fragment, watch_launch_agent_label,
+    watch_manager_launch_agent_label,
+};
+
+#[cfg(all(unix, not(target_os = "macos")))]
+use crate::commands::service_support::parse_systemd_unit_names;
+
+#[cfg(all(unix, not(target_os = "macos")))]
+use crate::commands::watch_support::{
+    ManagedWatcherSession, managed_watch_service_name, render_watch_manager_unit,
+    render_watch_unit, resolve_managed_agent_sessions_by_repo, select_managed_agent_session,
+    watch_unit_name,
+};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+fn restore_env_var(key: &str, value: Option<String>) {
+    unsafe {
+        match value {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+    }
+}
+
+#[test]
+fn doctor_skips_llm_requirements_when_curation_is_disabled() {
+    assert_eq!(
+        llm_doctor_statuses(false, false, true, false),
+        (DoctorStatus::Skipped, DoctorStatus::Skipped)
+    );
+    assert_eq!(
+        llm_doctor_statuses(true, false, true, false),
+        (DoctorStatus::Fail, DoctorStatus::Fail)
+    );
+}
+
+#[test]
+fn project_flag_wins() {
+    let cwd = PathBuf::from("/tmp/example");
+    assert_eq!(
+        resolve_project_slug(Some("override".to_string()), &cwd).unwrap(),
+        "override"
+    );
+}
+
+#[test]
+fn project_defaults_to_cwd_name() {
+    let cwd = PathBuf::from("/tmp/memory");
+    assert_eq!(resolve_project_slug(None, &cwd).unwrap(), "memory");
+}
+
+fn redirect_test_local_app_data(root: &Path) -> Option<String> {
+    let previous = std::env::var("LOCALAPPDATA").ok();
+    unsafe {
+        std::env::set_var("LOCALAPPDATA", root.join("local-app-data"));
+    }
+    previous
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_service_dry_runs_describe_task_scheduler_actions() {
+    let config = Path::new(r"C:\Users\tester\AppData\Local\memory-layer\memory-layer.toml");
+    assert!(preview_enable_backend_service(config).contains("MemoryLayer-Backend"));
+    assert!(preview_disable_backend_service(config).contains("stop and delete"));
+
+    let repo = Path::new(r"C:\src\memory");
+    assert!(
+        preview_enable_watch_service(repo, "memory")
+            .unwrap()
+            .contains("MemoryLayer-Watch-memory")
+    );
+    assert!(
+        preview_disable_watch_service("memory")
+            .unwrap()
+            .contains("stop and delete")
+    );
+}
+
+#[test]
+fn project_defaults_to_repo_metadata_when_present() {
+    let repo_root = unique_temp_dir("mem-cli-project-slug");
+    fs::create_dir_all(repo_root.join(".mem")).unwrap();
+    fs::write(
+        repo_root.join(".mem").join("project.toml"),
+        "slug = \"sctp\"\nrepo_root = \"/tmp/sctp-conformance\"\n",
+    )
+    .unwrap();
+
+    assert_eq!(resolve_project_slug(None, &repo_root).unwrap(), "sctp");
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[test]
+fn bundle_import_rejects_preview_flag() {
+    let result = Cli::try_parse_from([
+        "memory",
+        "bundle",
+        "import",
+        "--project",
+        "memory",
+        "bundle.zip",
+        "--preview",
+    ]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn init_rejects_print_flag() {
+    let result = Cli::try_parse_from(["memory", "init", "--print"]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn auth_token_create_parses_scoped_role_and_ttl() {
+    let cli = Cli::parse_from([
+        "memory",
+        "auth",
+        "token",
+        "create",
+        "--name",
+        "hermes",
+        "--project",
+        "memory",
+        "--role",
+        "writer",
+        "--ttl",
+        "30d",
+        "--json",
+    ]);
+    let super::Command::Auth(args) = cli.command else {
+        panic!("expected auth command");
+    };
+    let super::AuthCommand::Token(args) = args.command else {
+        panic!("expected auth token command");
+    };
+    let super::AuthTokenCommand::Create(args) = args.command else {
+        panic!("expected auth token create command");
+    };
+    assert_eq!(args.name, "hermes");
+    assert_eq!(args.project, "memory");
+    assert_eq!(args.ttl, Duration::from_secs(30 * 24 * 60 * 60));
+    assert!(args.json);
+}
+
+fn rendered_help(args: &[&str]) -> String {
+    let err = Cli::try_parse_from(args).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::DisplayHelp);
+    err.to_string()
+}
+
+#[test]
+fn expertise_answerer_requires_stable_ids_and_defaults_to_preview() {
+    let args = [
+        "memory",
+        "auth",
+        "expertise-answerer",
+        "--request-id",
+        "00000000-0000-4000-8000-000000000001",
+        "--principal",
+        "00000000-0000-4000-8000-000000000002",
+        "--project",
+        "homelab",
+        "--name",
+        "Homelab answerer",
+    ];
+    let cli = Cli::try_parse_from(args).unwrap();
+    let super::Command::Auth(auth) = cli.command else {
+        panic!("auth")
+    };
+    let super::AuthCommand::ExpertiseAnswerer(request) = auth.command else {
+        panic!("answerer")
+    };
+    assert!(!request.confirm);
+    assert_eq!(request.project, "homelab");
+    let mut confirmed = args.to_vec();
+    confirmed.push("--confirm");
+    assert!(Cli::try_parse_from(confirmed).is_ok());
+    assert!(Cli::try_parse_from(["memory", "auth", "expertise-answerer", "--confirm"]).is_err());
+}
+
+#[test]
+fn urls_supports_global_area_json_and_completion_metadata() {
+    let parsed = Cli::try_parse_from(["memory", "urls", "--area", "workshop", "--json"]).unwrap();
+    assert_eq!(parsed.area.as_deref(), Some("workshop"));
+    let super::Command::Urls(args) = parsed.command else {
+        panic!("urls command");
+    };
+    assert!(args.json);
+    let mut command = Cli::command();
+    let urls = command.find_subcommand_mut("urls").unwrap();
+    assert_command_metadata(urls, "memory urls");
+}
+
+fn assert_command_metadata(cmd: &Command, path: &str) {
+    if cmd.get_name() != "help" {
+        let about = cmd
+            .get_about()
+            .map(|value| value.to_string())
+            .or_else(|| cmd.get_long_about().map(|value| value.to_string()));
+        assert!(
+            about
+                .as_deref()
+                .map(|value| !value.trim().is_empty())
+                .unwrap_or(false),
+            "command {path} is missing help metadata"
+        );
+        let after_help = cmd
+            .get_after_help()
+            .map(|value| value.to_string())
+            .or_else(|| cmd.get_after_long_help().map(|value| value.to_string()));
+        assert!(
+            after_help
+                .as_deref()
+                .map(|value| value.contains("Agent notes:") || value.contains("Agent contract:"))
+                .unwrap_or(false),
+            "command {path} is missing agent-oriented after_help"
+        );
+    }
+    for subcommand in cmd.get_subcommands() {
+        let sub_path = if path.is_empty() {
+            subcommand.get_name().to_string()
+        } else {
+            format!("{path} {}", subcommand.get_name())
+        };
+        assert_command_metadata(subcommand, &sub_path);
+    }
+}
+
+#[test]
+fn all_public_commands_have_help_metadata() {
+    let command = Cli::command();
+    assert_eq!(command.get_name(), "codifix");
+    assert_command_metadata(&command, "codifix");
+}
+
+#[test]
+fn supervisor_help_and_read_only_arguments_are_explicit() {
+    let help = rendered_help(&["memory", "supervisor", "--help"]);
+    assert!(help.contains("instance") && help.contains("global memory_read"));
+    assert!(help.contains("--after") && help.contains("--limit") && help.contains("--json"));
+    assert!(
+        Cli::try_parse_from([
+            "memory",
+            "supervisor",
+            "--after",
+            "9007199254740993",
+            "--json"
+        ])
+        .is_ok()
+    );
+    assert!(Cli::try_parse_from(["memory", "supervisor", "--enable"]).is_err());
+    let id = "00000000-0000-0000-0000-000000000001";
+    assert!(Cli::try_parse_from(["memory", "supervisor", "resume"]).is_err());
+    for action in ["pause", "resume"] {
+        assert!(
+            Cli::try_parse_from([
+                "memory",
+                "supervisor",
+                action,
+                "--instance",
+                id,
+                "--policy",
+                id,
+                "--request-id",
+                id
+            ])
+            .is_ok()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "memory",
+                "supervisor",
+                action,
+                "--instance",
+                id,
+                "--policy",
+                id,
+                "--request-id",
+                id,
+                "--confirm"
+            ])
+            .is_ok()
+        );
+    }
+}
+
+fn repo_root_for_tests() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+}
+
+fn root_command_doc_name(command_name: &str) -> Option<String> {
+    // Convention: docs/user/cli/<command>.md, dashes preserved. Exceptions
+    // are pluralized doc pages; new commands should follow the convention
+    // instead of extending this list.
+    match command_name {
+        "help" => None,
+        "agent" => Some("agents.md".to_string()),
+        "bundle" => Some("bundles.md".to_string()),
+        "watcher" => Some("watchers.md".to_string()),
+        other => Some(format!("{other}.md")),
+    }
+}
+
+#[test]
+fn root_commands_have_user_cli_reference_pages() {
+    let docs_dir = repo_root_for_tests().join("docs").join("user").join("cli");
+    for command in Cli::command().get_subcommands() {
+        let Some(doc_name) = root_command_doc_name(command.get_name()) else {
+            continue;
+        };
+        assert!(
+            docs_dir.join(&doc_name).is_file(),
+            "missing docs/user/cli/{doc_name} for root command {}",
+            command.get_name()
+        );
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CliCommandInventory {
+    visible_root_commands: Vec<String>,
+    groups: Vec<CliCommandInventoryGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CliCommandInventoryGroup {
+    commands: Vec<String>,
+}
+
+#[test]
+fn docs_site_command_inventory_matches_visible_root_commands() {
+    let manifest_path = repo_root_for_tests()
+        .join("docs-site")
+        .join("data")
+        .join("cli-command-inventory.json");
+    let manifest: CliCommandInventory = serde_json::from_str(
+        &fs::read_to_string(&manifest_path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", manifest_path.display())),
+    )
+    .unwrap_or_else(|error| panic!("parse {}: {error}", manifest_path.display()));
+
+    let actual = Cli::command()
+        .get_subcommands()
+        .filter(|command| command.get_name() != "help" && !command.is_hide_set())
+        .map(|command| command.get_name().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(manifest.visible_root_commands, actual);
+
+    let mut grouped = manifest
+        .groups
+        .iter()
+        .flat_map(|group| group.commands.iter().cloned())
+        .collect::<Vec<_>>();
+    grouped.sort();
+    grouped.dedup();
+
+    let mut expected = actual;
+    expected.sort();
+    assert_eq!(
+        grouped, expected,
+        "each visible root command needs one website group"
+    );
+
+    let reference_path = repo_root_for_tests()
+        .join("docs-site")
+        .join("content")
+        .join("docs")
+        .join("reference")
+        .join("cli")
+        .join("index.mdx");
+    let reference = fs::read_to_string(&reference_path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", reference_path.display()));
+    assert!(
+        reference.contains("<CliCommandInventory />"),
+        "the CLI reference must render the checked command inventory"
+    );
+}
+
+fn collect_markdown_files(root: &Path, files: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(root).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            collect_markdown_files(&path, files);
+        } else if path.extension().and_then(|value| value.to_str()) == Some("md") {
+            files.push(path);
+        }
+    }
+}
+
+fn markdown_link_targets(content: &str) -> Vec<String> {
+    let mut links = Vec::new();
+    let bytes = content.as_bytes();
+    let mut cursor = 0;
+    while let Some(open_rel) = content[cursor..].find("](") {
+        let target_start = cursor + open_rel + 2;
+        if target_start >= bytes.len() {
+            break;
+        }
+        let Some(close_rel) = content[target_start..].find(')') else {
+            break;
+        };
+        let target = &content[target_start..target_start + close_rel];
+        links.push(target.to_string());
+        cursor = target_start + close_rel + 1;
+    }
+    links
+}
+
+#[test]
+fn markdown_local_links_and_images_resolve() {
+    let repo_root = repo_root_for_tests();
+    let mut markdown_files = Vec::new();
+    collect_markdown_files(&repo_root.join("docs"), &mut markdown_files);
+    markdown_files.push(repo_root.join("README.md"));
+
+    for file in markdown_files {
+        let content = fs::read_to_string(&file).unwrap();
+        // Archived execution evidence records the actual host paths used at
+        // the time. User/developer docs must remain portable, but rewriting
+        // historical review artifacts would make the evidence inaccurate.
+        if !file.starts_with(repo_root.join("docs/reviews")) {
+            assert!(
+                !content.contains("/home/olivier/"),
+                "{} contains a machine-local absolute path",
+                file.display()
+            );
+        }
+        for raw_target in markdown_link_targets(&content) {
+            let target = raw_target.trim();
+            if target.is_empty()
+                || target.starts_with('#')
+                || target.starts_with("http://")
+                || target.starts_with("https://")
+                || target.starts_with("mailto:")
+                || target.contains("://")
+            {
+                continue;
+            }
+            let path_part = target.split('#').next().unwrap_or_default();
+            if path_part.is_empty() {
+                continue;
+            }
+            let resolved = file.parent().unwrap().join(path_part);
+            assert!(
+                resolved.exists(),
+                "{} links to missing target {}",
+                file.display(),
+                target
+            );
+        }
+    }
+}
+
+fn rendered_completion(shell: clap_complete::Shell) -> String {
+    let mut command = Cli::command();
+    let mut output = Vec::new();
+    clap_complete::generate(shell, &mut command, "codifix", &mut output);
+    String::from_utf8(output).unwrap()
+}
+
+#[test]
+fn completions_include_root_and_nested_commands() {
+    let bash = rendered_completion(clap_complete::Shell::Bash);
+    assert!(bash.contains("wizard"));
+    assert!(bash.contains("completion"));
+    assert!(bash.contains("proposals"));
+    assert!(bash.contains("watcher"));
+    assert!(bash.contains("manager"));
+    assert!(bash.contains("--project"));
+
+    let zsh = rendered_completion(clap_complete::Shell::Zsh);
+    assert!(zsh.contains("_codifix"));
+    assert!(zsh.contains("proposals"));
+    assert!(zsh.contains("watcher"));
+    assert!(zsh.contains("manager"));
+    assert!(zsh.contains("completion"));
+
+    let fish = rendered_completion(clap_complete::Shell::Fish);
+    assert!(fish.contains("complete -c codifix"));
+    assert!(fish.contains("proposals"));
+    assert!(fish.contains("watcher"));
+    assert!(fish.contains("manager"));
+    assert!(fish.contains("completion"));
+}
+
+#[test]
+fn root_help_includes_examples_and_docs_hint() {
+    let output = rendered_help(&["memory", "--help"]);
+    assert!(output.contains("Project memory CLI"));
+    assert!(output.contains("Agent contract:"));
+    assert!(output.contains("Prefer --json"));
+    assert!(output.contains("checkpoint start-execution"));
+    assert!(output.contains("checkpoint start-task"));
+    assert!(output.contains("checkpoint finish-execution"));
+    assert!(output.contains("memory status --project memory"));
+    assert!(output.contains("memory wizard"));
+    assert!(output.contains("memory init"));
+    assert!(output.contains("ingest"));
+    assert!(output.contains("auth"));
+    assert!(!output.contains("memory setup"));
+    assert!(!output.contains("memory stats"));
+    assert!(!output.contains(", automation,"));
+    assert!(output.contains("Examples:"));
+    assert!(output.contains("docs/user/README.md"));
+    assert!(output.contains("Ask a project-specific question against curated memory"));
+}
+
+#[test]
+fn health_and_watcher_flush_help_name_current_commands() {
+    let health = rendered_help(&["memory", "health", "--help"]);
+    assert!(health.contains("memory doctor --project memory"));
+    assert!(!health.contains("memory stats"));
+
+    let flush = rendered_help(&["memory", "watcher", "flush", "--help"]);
+    assert!(flush.contains("memory watcher flush --project memory --dry-run"));
+    assert!(flush.contains("Older documentation called this `memory automation flush`"));
+    assert!(!flush.contains("docs/user/cli/automation.md"));
+}
+
+#[test]
+fn grouped_help_includes_subcommand_descriptions() {
+    let output = rendered_help(&["memory", "service", "--help"]);
+    assert!(output.contains("Manage the Memory Layer backend service"));
+    assert!(output.contains("Run the backend service in the foreground"));
+    assert!(output.contains("Restart active Memory Layer services after an install or upgrade"));
+    assert!(output.contains("Agent notes:"));
+    assert!(output.contains("browser web UI"));
+    assert!(output.contains("127.0.0.1:4250"));
+    assert!(output.contains("Examples:"));
+    assert!(output.contains("docs/user/cli/service.md"));
+}
+
+#[test]
+fn leaf_help_includes_flag_help_examples_and_docs_hint() {
+    let output = rendered_help(&["memory", "checkpoint", "start-execution", "--help"]);
+    assert!(output.contains("Save a checkpoint and record the approved execution plan"));
+    assert!(output.contains("Read the approved plan markdown from a file"));
+    assert!(output.contains("Agent notes:"));
+    assert!(output.contains("approved plan moves into implementation"));
+    assert!(output.contains("Examples:"));
+    assert!(output.contains("docs/user/cli/checkpoint.md"));
+}
+
+#[test]
+fn start_task_help_includes_agent_workflow_guidance() {
+    let output = rendered_help(&["memory", "checkpoint", "start-task", "--help"]);
+    assert!(output.contains("Record a direct no-plan task"));
+    assert!(output.contains("Original user instruction"));
+    assert!(output.contains("direct no-plan task"));
+    assert!(output.contains("--dry-run --json"));
+    assert!(output.contains("docs/user/cli/checkpoint.md"));
+}
+
+#[test]
+fn query_help_includes_argument_descriptions() {
+    let output = rendered_help(&["memory", "query", "--help"]);
+    assert!(output.contains("Natural-language question to answer from project memory"));
+    assert!(output.contains("Restrict results to one or more memory types"));
+    assert!(output.contains("Use before answering project-specific questions"));
+    assert!(output.contains("insufficient_evidence"));
+    assert!(output.contains("docs/user/cli/query.md"));
+}
+
+#[test]
+fn verify_provenance_help_includes_dry_run_guidance() {
+    let output = rendered_help(&["memory", "verify-provenance", "--help"]);
+    assert!(output.contains("Verify memory source provenance against the filesystem"));
+    assert!(output.contains("Repository root used to resolve relative source paths"));
+    assert!(output.contains("--dry-run --json"));
+    assert!(output.contains("docs/user/cli/verify-provenance.md"));
+}
+
+#[test]
+fn status_help_defines_agent_output_contract() {
+    let output = rendered_help(&["memory", "status", "--help"]);
+    assert!(output.contains("Show the aggregate Memory Layer diagnostic status"));
+    assert!(output.contains("Recommended first diagnostic command"));
+    assert!(output.contains("aggregate payload on stdout"));
+    assert!(output.contains("warnings must go to stderr"));
+    assert!(output.contains("docs/user/cli/status.md"));
+}
+
+#[test]
+fn eval_shell_suites_require_explicit_allow_shell() {
+    let suite = codifix_eval::EvalSuite {
+        manifest: codifix_eval::EvalSuiteManifest {
+            name: "shell suite".to_string(),
+            description: None,
+            suite_version: None,
+            label_status: None,
+            fixture: None,
+            default_profile: None,
+            min_items: None,
+            default_repeats: None,
+            project: Some("memory".to_string()),
+            items: "items.jsonl".to_string(),
+        },
+        root: PathBuf::from("."),
+        items: vec![codifix_eval::EvalItem::CommandTask(
+            codifix_eval::CommandTaskItem {
+                id: "cmd".to_string(),
+                metadata: codifix_eval::EvalItemMetadata::default(),
+                project: None,
+                prompt: "Run command".to_string(),
+                command: "echo ok".to_string(),
+                expected_exit_code: 0,
+            },
+        )],
+    };
+
+    let error = ensure_eval_shell_allowed(&suite, false, false).unwrap_err();
+    assert!(error.to_string().contains("--allow-shell"));
+    assert!(ensure_eval_shell_allowed(&suite, true, false).is_ok());
+    assert!(ensure_eval_shell_allowed(&suite, false, true).is_ok());
+}
+
+#[test]
+fn eval_retriever_cmd_requires_explicit_allow_shell() {
+    let error = ensure_eval_retriever_allowed(Some("./retriever"), false).unwrap_err();
+
+    assert!(error.to_string().contains("--allow-shell"));
+    assert!(ensure_eval_retriever_allowed(Some("./retriever"), true).is_ok());
+    assert!(ensure_eval_retriever_allowed(None, false).is_ok());
+}
+
+#[test]
+fn external_retriever_response_normalizes_to_query_response() {
+    let response: ExternalRetrieverResponse = serde_json::from_str(
+        r#"{
+            "schema_version": 1,
+            "results": [
+                {
+                    "id": "external-release-rule",
+                    "score": 0.82,
+                    "text": "The release gate requires a green gate and paired benchmark.",
+                    "tags": ["mi-release"],
+                    "citations": [{"file_path": "docs/release-gate.md", "excerpt": "green gate"}]
+                }
+            ],
+            "diagnostics": {"latency_ms": 123, "tokens_in": 50, "tokens_out": 20}
+        }"#,
+    )
+    .unwrap();
+
+    let normalized = external_retriever_response_to_query_response(response, 999).unwrap();
+
+    assert_eq!(normalized.results.len(), 1);
+    assert_eq!(normalized.results[0].score, 0.82);
+    assert_eq!(normalized.results[0].tags, vec!["mi-release"]);
+    assert_eq!(
+        normalized.results[0].sources[0].file_path.as_deref(),
+        Some("docs/release-gate.md")
+    );
+    assert!(normalized.answer.contains("green gate"));
+    assert_eq!(normalized.diagnostics.total_duration_ms, 123);
+    assert_eq!(
+        normalized
+            .answer_generation
+            .token_usage
+            .unwrap()
+            .total_tokens,
+        70
+    );
+}
+
+#[test]
+fn external_retriever_fake_script_scores_with_existing_retrieval_scorer() {
+    let dir = unique_temp_dir("mem-external-retriever");
+    fs::create_dir_all(&dir).unwrap();
+    #[cfg(not(target_os = "windows"))]
+    let script = dir.join("retriever.sh");
+    #[cfg(target_os = "windows")]
+    let script = dir.join("retriever.ps1");
+    #[cfg(not(target_os = "windows"))]
+    fs::write(
+        &script,
+        r#"#!/usr/bin/env sh
+cat > request.json
+printf '%s\n' '{"schema_version":1,"results":[{"id":"external-release-rule","score":0.92,"text":"The release rule requires a green gate and paired benchmark.","tags":["mi-release"],"citations":["docs/release-gate.md"]}],"diagnostics":{"latency_ms":12,"tokens_in":3,"tokens_out":4}}'
+"#,
+    )
+    .unwrap();
+    #[cfg(target_os = "windows")]
+    fs::write(
+        &script,
+        r#"$input | Set-Content -NoNewline request.json
+Write-Output '{"schema_version":1,"results":[{"id":"external-release-rule","score":0.92,"text":"The release rule requires a green gate and paired benchmark.","tags":["mi-release"],"citations":["docs/release-gate.md"]}],"diagnostics":{"latency_ms":12,"tokens_in":3,"tokens_out":4}}'
+"#,
+    )
+    .unwrap();
+    let suite = codifix_eval::EvalSuite {
+        manifest: codifix_eval::EvalSuiteManifest {
+            name: "external suite".to_string(),
+            description: None,
+            suite_version: None,
+            label_status: None,
+            fixture: Some("fixtures/research".to_string()),
+            default_profile: None,
+            min_items: None,
+            default_repeats: None,
+            project: Some("memory".to_string()),
+            items: "items.jsonl".to_string(),
+        },
+        root: dir.clone(),
+        items: Vec::new(),
+    };
+    let item = codifix_eval::RetrievalQaItem {
+        id: "rq-release-rule".to_string(),
+        metadata: codifix_eval::EvalItemMetadata::default(),
+        project: Some("memory".to_string()),
+        question: "What release rule applies?".to_string(),
+        top_k: 8,
+        hidden_facts: vec!["The hidden gate is green.".to_string()],
+        expected_memory_ids: Vec::new(),
+        expected_tags: vec!["mi-release".to_string()],
+        expected_files: vec!["docs/release-gate.md".to_string()],
+    };
+    let context = EvalRunContext {
+        profile: codifix_eval::EvalProfile::Offline,
+        repeat_index: 0,
+        run_group_id: Uuid::nil(),
+        suite_checksum: None,
+        dry_run: false,
+        artifacts_root: dir.join("artifacts"),
+        memory_command: "/tmp/memory".to_string(),
+        memory_base_url: "http://127.0.0.1:4250".to_string(),
+        memory_config_path: None,
+        llm_judge: false,
+        #[cfg(not(target_os = "windows"))]
+        retriever_cmd: Some(format!("sh {}", script.display())),
+        #[cfg(target_os = "windows")]
+        retriever_cmd: Some(format!(
+            "powershell.exe -NoProfile -NonInteractive -File {}",
+            script.display()
+        )),
+        command_cwd: dir.clone(),
+    };
+
+    let response = run_external_retriever_for_retrieval_item(
+        &suite,
+        &item,
+        "memory",
+        codifix_eval::EvalCondition::FullMemory,
+        &context,
+    )
+    .unwrap();
+    let result =
+        codifix_eval::score_retrieval_qa(&item, codifix_eval::EvalCondition::FullMemory, &response);
+    let request = fs::read_to_string(dir.join("request.json")).unwrap();
+
+    assert!(result.success, "{result:?}");
+    assert_eq!(result.scores["tag_recall_at_k"], 1.0);
+    assert_eq!(result.scores["file_recall_at_k"], 1.0);
+    assert!(request.contains("\"item_id\":\"rq-release-rule\""));
+    assert!(request.contains("\"hidden_facts\":[\"The hidden gate is green.\"]"));
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn external_retriever_failures_become_failed_eval_results() {
+    let dir = unique_temp_dir("mem-external-retriever-failure");
+    fs::create_dir_all(&dir).unwrap();
+    let context = EvalRunContext {
+        profile: codifix_eval::EvalProfile::Offline,
+        repeat_index: 0,
+        run_group_id: Uuid::nil(),
+        suite_checksum: None,
+        dry_run: false,
+        artifacts_root: dir.join("artifacts"),
+        memory_command: "/tmp/memory".to_string(),
+        memory_base_url: "http://127.0.0.1:4250".to_string(),
+        memory_config_path: None,
+        llm_judge: false,
+        retriever_cmd: Some("printf 'not-json'".to_string()),
+        command_cwd: dir.clone(),
+    };
+    let suite = codifix_eval::EvalSuite {
+        manifest: codifix_eval::EvalSuiteManifest {
+            name: "external suite".to_string(),
+            description: None,
+            suite_version: None,
+            label_status: None,
+            fixture: None,
+            default_profile: None,
+            min_items: None,
+            default_repeats: None,
+            project: Some("memory".to_string()),
+            items: "items.jsonl".to_string(),
+        },
+        root: dir.clone(),
+        items: Vec::new(),
+    };
+    let request = build_external_retriever_request(
+        &suite,
+        "rq",
+        "memory",
+        "question?",
+        8,
+        &[],
+        codifix_eval::EvalCondition::FullMemory,
+    );
+
+    let error = run_external_retriever(&context, request).unwrap_err();
+    let result = external_retriever_failure_result(
+        "rq".to_string(),
+        "retrieval_qa",
+        codifix_eval::EvalItemMetadata::default(),
+        codifix_eval::EvalCondition::FullMemory,
+        error,
+    );
+
+    assert!(!result.success);
+    assert!(result.notes[0].contains("external retriever failed"));
+    assert_eq!(result.scores["external_retriever_success"], 0.0);
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn proposals_help_includes_review_guidance() {
+    let output = rendered_help(&["memory", "proposals", "--help"]);
+    assert!(output.contains("Review pending memory replacement proposals"));
+    assert!(output.contains("Approve/reject mutate memory state"));
+    assert!(output.contains("docs/user/cli/proposals.md"));
+}
+
+#[test]
+fn proposals_show_parses_uuid_and_json_flag() {
+    let cli = Cli::parse_from([
+        "memory",
+        "proposals",
+        "show",
+        "--project",
+        "memory",
+        "--id",
+        "00000000-0000-0000-0000-000000000000",
+        "--json",
+    ]);
+    let super::Command::Proposals(args) = cli.command else {
+        panic!("expected proposals command");
+    };
+    let super::ProposalsCommand::Show(args) = args.command else {
+        panic!("expected proposals show command");
+    };
+    assert_eq!(args.project, "memory");
+    assert_eq!(args.id, Uuid::nil());
+    assert!(args.json);
+}
+
+#[test]
+fn loops_help_mentions_explicit_user_approval() {
+    let help = rendered_help(&["memory", "loops", "enable", "--help"]);
+    assert!(help.contains("--explicit-user-approval"));
+    assert!(help.contains("Confirm that a human explicitly approved"));
+}
+
+#[test]
+fn loops_run_parses_dry_run_and_trigger_payload() {
+    let cli = Cli::parse_from([
+        "memory",
+        "loops",
+        "run",
+        "context_pack_refresh",
+        "--project",
+        "memory",
+        "--scope-type",
+        "project",
+        "--scope-id",
+        "memory",
+        "--dry-run",
+        "--trigger-payload",
+        r#"{"source":"test"}"#,
+        "--json",
+    ]);
+    let super::Command::Loops(args) = cli.command else {
+        panic!("expected loops command");
+    };
+    let super::LoopsCommand::Run(args) = args.command else {
+        panic!("expected loops run command");
+    };
+    assert_eq!(args.loop_id, "context_pack_refresh");
+    assert_eq!(args.project.as_deref(), Some("memory"));
+    assert_eq!(args.scope_type.as_deref(), Some("project"));
+    assert_eq!(args.scope_id.as_deref(), Some("memory"));
+    assert!(args.dry_run);
+    assert!(args.json);
+    assert_eq!(
+        args.trigger_payload
+            .as_ref()
+            .and_then(|payload| payload.get("source"))
+            .and_then(serde_json::Value::as_str),
+        Some("test")
+    );
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn systemd_unit_parser_finds_memory_watch_services() {
+    let units = parse_systemd_unit_names(
+        "memory-watch-manager.service loaded active running Manager\n\
+             memory-watch-codex-abc.service loaded active running Watcher\n\
+             ssh.service loaded active running SSH\n",
+    );
+
+    assert_eq!(
+        units,
+        vec![
+            "memory-watch-manager.service".to_string(),
+            "memory-watch-codex-abc.service".to_string()
+        ]
+    );
+}
+
+#[test]
+fn restart_notice_detects_newer_or_different_marker() {
+    let dir = std::env::temp_dir().join(format!("memory-tui-restart-test-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let marker_path = dir.join("tui-restart-required.json");
+    let startup_at = chrono::Utc::now();
+    let marker = TuiRestartMarker {
+        version: "9.9.9".to_string(),
+        marked_at: startup_at - chrono::Duration::seconds(30),
+        reason: "install-or-upgrade".to_string(),
+        binary_path: "memory".to_string(),
+        restarted_services: vec!["memory-layer.service".to_string()],
+    };
+    fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
+
+    let notice = newest_tui_restart_notice(startup_at, "0.1.0", vec![marker_path.clone()]).unwrap();
+
+    assert_eq!(notice.marker_path, marker_path);
+    assert_eq!(notice.version, "9.9.9");
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn restart_notice_ignores_older_stale_marker() {
+    let dir = std::env::temp_dir().join(format!(
+        "memory-tui-restart-stale-test-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let marker_path = dir.join("tui-restart-required.json");
+    let startup_at = chrono::Utc::now();
+    let marker = TuiRestartMarker {
+        version: "0.8.6".to_string(),
+        marked_at: startup_at - chrono::Duration::days(1),
+        reason: "install-or-upgrade".to_string(),
+        binary_path: "memory".to_string(),
+        restarted_services: vec!["memory-layer.service".to_string()],
+    };
+    fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
+
+    let notice = newest_tui_restart_notice(startup_at, "0.9.1", vec![marker_path.clone()]);
+
+    assert!(notice.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn restart_marker_requires_restart_for_same_version_written_after_startup() {
+    let startup_at = chrono::Utc::now();
+
+    assert!(restart_marker_requires_restart(
+        "0.9.1",
+        "0.9.1",
+        startup_at + chrono::Duration::seconds(30),
+        startup_at,
+    ));
+    assert!(!restart_marker_requires_restart(
+        "0.9.1",
+        "0.9.1",
+        startup_at - chrono::Duration::seconds(30),
+        startup_at,
+    ));
+}
+
+#[test]
+fn restart_notice_ignores_prod_marker_for_dev_tui() {
+    let dir = std::env::temp_dir().join(format!(
+        "memory-tui-restart-dev-test-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let marker_path = dir.join("tui-restart-required.json");
+    let startup_at = chrono::Utc::now();
+    let marker = TuiRestartMarker {
+        version: "0.8.2".to_string(),
+        marked_at: startup_at + chrono::Duration::seconds(30),
+        reason: "install-or-upgrade".to_string(),
+        binary_path: "memory".to_string(),
+        restarted_services: vec!["memory-layer.service".to_string()],
+    };
+    fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
+
+    let notice = newest_tui_restart_notice(startup_at, "0.8.2-dev", vec![marker_path.clone()]);
+
+    assert!(notice.is_none());
+    fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn native_installers_do_not_restart_unrelated_services() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .unwrap();
+    let postinst = fs::read_to_string(workspace.join("packaging/debian/postinst")).unwrap();
+    let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
+    let mac_postinstall =
+        fs::read_to_string(workspace.join("packaging/macos/postinstall.sh")).unwrap();
+    let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
+
+    assert!(!postinst.contains("service restart-all"));
+    assert!(!postinst.contains("ensure-api-token"));
+    assert!(pkg.contains("packaging/macos/postinstall.sh"));
+    for contents in [pkg, mac_postinstall] {
+        assert!(!contents.contains("service restart-all"));
+        assert!(!contents.contains("--mark-tui-restart"));
+    }
+    // The separate legacy Homebrew hook still marks any restart it performs.
+    assert!(formula.contains("service restart-all"));
+    assert!(formula.contains("--mark-tui-restart"));
+}
+
+#[test]
+fn packaging_installs_shell_completions() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .unwrap();
+    let local = fs::read_to_string(workspace.join("scripts/install-local.sh")).unwrap();
+    let deb = fs::read_to_string(workspace.join("packaging/build-deb.sh")).unwrap();
+    let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
+    let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
+
+    for contents in [local, deb, pkg, formula] {
+        assert!(contents.contains("completion\", \"bash") || contents.contains("completion bash"));
+        assert!(contents.contains("completion\", \"zsh") || contents.contains("completion zsh"));
+        assert!(contents.contains("completion\", \"fish") || contents.contains("completion fish"));
+        assert!(contents.contains("bash-completion") || contents.contains("bash_completion"));
+        assert!(contents.contains("_codifix"));
+        assert!(contents.contains("memory.fish"));
+    }
+}
+
+#[test]
+fn agent_critical_help_mentions_current_surfaces() {
+    let resume = rendered_help(&["memory", "resume", "--help"]);
+    assert!(resume.contains("after interruptions"));
+    assert!(resume.contains("--json"));
+
+    let remember = rendered_help(&["memory", "remember", "--help"]);
+    assert!(remember.contains("after meaningful completed work"));
+    assert!(remember.contains("--file-changed"));
+
+    let dev = rendered_help(&["memory", "dev", "--help"]);
+    assert!(dev.contains("127.0.0.1:4250"));
+    assert!(dev.contains("--copy-from-global"));
+    assert!(dev.contains("docs/developer/dev-stack.md"));
+
+    let watcher_manager = rendered_help(&["memory", "watcher", "manager", "--help"]);
+    assert!(watcher_manager.contains("Preferred automation surface"));
+    assert!(watcher_manager.contains("one watcher per repo/session"));
+
+    let embeddings_list = rendered_help(&["memory", "embeddings", "list", "--help"]);
+    assert!(embeddings_list.contains("Active backends are marked with *"));
+    assert!(embeddings_list.contains("avoid guessing backend names"));
+
+    let embeddings_activate = rendered_help(&["memory", "embeddings", "activate", "--help"]);
+    assert!(embeddings_activate.contains("does not recompute embeddings"));
+    assert!(embeddings_activate.contains("memory embeddings list"));
+
+    let history = rendered_help(&["memory", "prune-history", "--help"]);
+    assert!(history.contains("Always use --dry-run and --json first"));
+}
+
+#[test]
+fn watcher_manager_run_requires_config_load() {
+    let command = WatcherCommand::Manager(WatcherManagerArgs {
+        command: WatcherManagerCommand::Run,
+    });
+    assert!(watcher_command_requires_config_load(&command));
+    let status = WatcherCommand::Manager(WatcherManagerArgs {
+        command: WatcherManagerCommand::Status,
+    });
+    assert!(!watcher_command_requires_config_load(&status));
+}
+
+#[test]
+fn remember_request_uses_defaults() {
+    let request = build_remember_request(
+        RememberArgs {
+            project: None,
+            title: None,
+            memory_type: None,
+            prompt: None,
+            summary: None,
+            notes: vec!["durable fact".to_string()],
+            files_changed: vec!["src/main.rs".to_string()],
+            tests_passed: vec![],
+            tests_failed: vec![],
+            command_output_file: None,
+            auto_files: false,
+            dry_run: false,
+        },
+        "memory",
+        "codex-writer",
+        Some("Codex"),
+    )
+    .unwrap();
+
+    assert_eq!(request.task_title, "Memory update for memory");
+    assert_eq!(request.writer_id, "codex-writer");
+    assert!(request.user_prompt.contains("Auto-captured"));
+    assert!(request.agent_summary.contains("src/main.rs"));
+    assert_eq!(request.structured_candidates.len(), 1);
+    assert_eq!(
+        request.structured_candidates[0].memory_type,
+        codifix_record::MemoryType::Implementation
+    );
+}
+
+#[test]
+fn remember_accepts_file_alias_for_provenance() {
+    let args = Cli::try_parse_from([
+        "memory",
+        "remember",
+        "--project",
+        "memory",
+        "--note",
+        "query match types",
+        "--file",
+        "crates/codifix-search/src/lib.rs",
+    ])
+    .unwrap();
+
+    let super::Command::Remember(args) = args.command else {
+        panic!("expected remember command");
+    };
+    assert_eq!(args.files_changed, vec!["crates/codifix-search/src/lib.rs"]);
+}
+
+#[test]
+fn derive_plan_title_prefers_markdown_heading() {
+    let title = derive_plan_title(None, "# Resume Redesign\n\n- step", "memory");
+    assert_eq!(title, "Resume Redesign");
+}
+
+#[test]
+fn derive_plan_thread_key_sanitizes_title() {
+    let thread_key = derive_plan_thread_key(None, "Resume Redesign!", "memory");
+    assert_eq!(thread_key, "resume-redesign");
+}
+
+#[test]
+fn plan_execution_request_uses_plan_type_and_thread_tag() {
+    let writer = WriterIdentity {
+        id: "writer".to_string(),
+        name: Some("Writer".to_string()),
+    };
+    let request = build_plan_execution_request(
+        "memory",
+        &writer,
+        "Resume Redesign",
+        "resume-redesign",
+        "# Resume Redesign\n\n- step",
+        None,
+        Path::new("/tmp/memory"),
+        Some("abc123"),
+    );
+
+    assert_eq!(request.task_title, "Approved plan: Resume Redesign");
+    assert_eq!(request.structured_candidates.len(), 1);
+    let candidate = &request.structured_candidates[0];
+    assert_eq!(candidate.memory_type, codifix_record::MemoryType::Plan);
+    assert!(candidate.tags.contains(&"plan".to_string()));
+    assert!(
+        candidate
+            .tags
+            .contains(&"plan-thread:resume-redesign".to_string())
+    );
+}
+
+#[test]
+fn newer_memory_types_parse_from_cli_args() {
+    assert_eq!(
+        parse_memory_type_arg("task").unwrap(),
+        codifix_record::MemoryType::Task
+    );
+    assert_eq!(
+        parse_memory_type_arg("documentation").unwrap(),
+        codifix_record::MemoryType::Documentation
+    );
+    assert_eq!(
+        parse_memory_type_arg("refactor").unwrap(),
+        codifix_record::MemoryType::Refactor
+    );
+}
+
+#[test]
+fn task_start_request_uses_task_type_and_prompt_source() {
+    let writer = WriterIdentity {
+        id: "writer".to_string(),
+        name: Some("Writer".to_string()),
+    };
+    let request = build_task_start_request(
+        "memory",
+        &writer,
+        "Fix query input",
+        "Make the query input easier to use.",
+        "fix-query-input",
+        Some("abc123"),
+    );
+
+    assert_eq!(request.task_title, "Task started: Fix query input");
+    assert_eq!(request.user_prompt, "Make the query input easier to use.");
+    assert_eq!(request.structured_candidates.len(), 1);
+    assert!(
+        request
+            .idempotency_key
+            .as_deref()
+            .is_some_and(|key| key.starts_with("task-start:"))
+    );
+    let candidate = &request.structured_candidates[0];
+    assert_eq!(candidate.memory_type, codifix_record::MemoryType::Task);
+    assert!(candidate.canonical_text.contains("# Task: Fix query input"));
+    assert!(candidate.canonical_text.contains("Status: started"));
+    assert!(candidate.canonical_text.contains("Git head: abc123"));
+    assert!(candidate.tags.contains(&"task".to_string()));
+    assert!(
+        candidate
+            .tags
+            .contains(&"task-thread:fix-query-input".to_string())
+    );
+    assert!(candidate.tags.contains(&"direct-execution".to_string()));
+    assert!(candidate.tags.contains(&"no-approved-plan".to_string()));
+    assert!(candidate.sources.iter().any(|source| {
+        source.source_kind == codifix_record::SourceKind::TaskPrompt
+            && source
+                .excerpt
+                .as_deref()
+                .is_some_and(|excerpt| excerpt.contains("query input"))
+    }));
+}
+
+#[test]
+fn graph_activity_request_copies_extraction_report_counts() {
+    let run_id = Uuid::new_v4();
+    let report = codifix_graph::GraphExtractionReport {
+        project: "memory".to_string(),
+        repo_root: "/repo".to_string(),
+        git_head: Some("abc123".to_string()),
+        since: Some("HEAD~1".to_string()),
+        analyzer_version: "mem-analyze-v2".to_string(),
+        strategy_version: "code-graph-resolution-v1".to_string(),
+        extraction_run_id: Some(run_id),
+        reused_existing_run: true,
+        dry_run: false,
+        index_reused: true,
+        symbol_count: 10,
+        reference_count: 20,
+        resolved_reference_count: 12,
+        unresolved_reference_count: 7,
+        ambiguous_reference_count: 1,
+        graph_node_count: 10,
+        graph_edge_count: 9,
+        evidence_count: 19,
+        sample_unresolved_references: Vec::new(),
+    };
+
+    let request = codifix_graph::activity_request(&report);
+
+    assert_eq!(request.project, "memory");
+    assert_eq!(request.extraction_run_id, Some(run_id));
+    assert!(request.reused_existing_run);
+    assert_eq!(request.reference_count, 20);
+    assert_eq!(request.graph_edge_count, 9);
+    assert!(request.validate().is_ok());
+}
+
+#[test]
+fn durable_plan_source_path_keeps_repo_files_and_drops_outside_paths() {
+    let repo_root = unique_temp_dir("mem-plan-source-repo");
+    let plans_dir = repo_root.join("plans");
+    fs::create_dir_all(&plans_dir).unwrap();
+    let repo_plan = plans_dir.join("approved-plan.md");
+    fs::write(&repo_plan, "# Plan\n\n- [ ] step").unwrap();
+
+    let outside_root = unique_temp_dir("mem-plan-source-outside");
+    fs::create_dir_all(&outside_root).unwrap();
+    let outside_plan = outside_root.join("approved-plan.md");
+    fs::write(&outside_plan, "# Plan\n\n- [ ] step").unwrap();
+
+    assert_eq!(
+        durable_plan_source_path(&repo_plan, &repo_root),
+        Some(fs::canonicalize(&repo_plan).unwrap())
+    );
+    assert_eq!(durable_plan_source_path(&outside_plan, &repo_root), None);
+
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(outside_root);
+}
+
+#[test]
+fn plan_execution_request_omits_outside_repo_plan_file_source() {
+    let repo_root = unique_temp_dir("mem-plan-request-repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let outside_root = unique_temp_dir("mem-plan-request-outside");
+    fs::create_dir_all(&outside_root).unwrap();
+    let outside_plan = outside_root.join("approved-plan.md");
+    fs::write(&outside_plan, "# Plan\n\n- [ ] step").unwrap();
+    let writer = WriterIdentity {
+        id: "writer".to_string(),
+        name: Some("Writer".to_string()),
+    };
+
+    let request = build_plan_execution_request(
+        "memory",
+        &writer,
+        "Resume Redesign",
+        "resume-redesign",
+        "# Resume Redesign\n\n- [ ] step",
+        Some(outside_plan.as_path()),
+        &repo_root,
+        Some("abc123"),
+    );
+
+    assert!(
+        !request.structured_candidates[0]
+            .sources
+            .iter()
+            .any(|source| source.source_kind == codifix_record::SourceKind::File)
+    );
+
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(outside_root);
+}
+
+#[test]
+fn parse_plan_checkboxes_extracts_checked_and_unchecked_items() {
+    let items = parse_plan_checkboxes(
+        "# Plan\n\n- [ ] first task\n* [x] second task\n+ [X] third task\nplain bullet",
+    );
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0].text, "first task");
+    assert!(!items[0].checked);
+    assert_eq!(items[1].text, "second task");
+    assert!(items[1].checked);
+    assert_eq!(items[2].text, "third task");
+    assert!(items[2].checked);
+}
+
+#[test]
+fn no_memory_grounded_answer_parser_accepts_strict_json() {
+    let (answer, confidence, notes) = parse_no_memory_grounded_answer(
+        "```json\n{\"answer\":\"Token usage is reported.\",\"confidence\":1.4}\n```",
+    );
+
+    assert_eq!(answer, "Token usage is reported.");
+    assert_eq!(confidence, Some(1.0));
+    assert!(notes.is_empty());
+}
+
+#[test]
+fn no_memory_grounded_answer_parser_falls_back_to_text() {
+    let (answer, confidence, notes) = parse_no_memory_grounded_answer("I do not know.");
+
+    assert_eq!(answer, "I do not know.");
+    assert_eq!(confidence, None);
+    assert_eq!(
+        notes,
+        vec!["plain_llm response was not strict answer/confidence JSON".to_string()]
+    );
+}
+
+#[test]
+fn token_usage_from_chat_body_supports_openai_and_cache_fields() {
+    let usage = token_usage_from_chat_body(
+        r#"{
+                "choices":[{"message":{"content":"ok"}}],
+                "usage":{
+                    "prompt_tokens":10,
+                    "completion_tokens":5,
+                    "cached_input_tokens":2,
+                    "cache_creation_input_tokens":3
+                }
+            }"#,
+    )
+    .unwrap();
+
+    assert_eq!(usage.input_tokens, 10);
+    assert_eq!(usage.output_tokens, 5);
+    assert_eq!(usage.cache_read_tokens, 2);
+    assert_eq!(usage.cache_write_tokens, 3);
+    assert_eq!(usage.total_tokens, 20);
+}
+
+#[test]
+fn token_usage_from_json_value_supports_codex_nested_events() {
+    let value: serde_json::Value = serde_json::from_str(
+        r#"{
+                "type":"token_count",
+                "msg":{
+                    "total_token_usage":{
+                        "input_tokens":100,
+                        "output_tokens":25,
+                        "cached_input_tokens":10,
+                        "total_tokens":135
+                    }
+                }
+            }"#,
+    )
+    .unwrap();
+
+    let usage = token_usage_from_json_value(&value).unwrap();
+
+    assert_eq!(usage.input_tokens, 100);
+    assert_eq!(usage.output_tokens, 25);
+    assert_eq!(usage.cache_read_tokens, 10);
+    assert_eq!(usage.total_tokens, 135);
+}
+
+#[test]
+fn chat_completion_content_rejects_missing_content() {
+    let error = chat_completion_content(r#"{"choices":[{"message":{}}]}"#)
+        .expect_err("missing content should fail");
+
+    assert!(error.to_string().contains("missing content"));
+}
+
+#[test]
+fn agent_build_prompt_adds_memory_questions_for_memory_conditions() {
+    let item = codifix_eval::AgentBuildTaskItem {
+        id: "build".to_string(),
+        metadata: codifix_eval::EvalItemMetadata::default(),
+        project: Some("memory".to_string()),
+        prompt: "Build the app.".to_string(),
+        fixture: "fixtures/app".to_string(),
+        agent_command: "codex exec - < {prompt_file}".to_string(),
+        memory_questions: vec!["What changed recently?".to_string()],
+        setup_commands: Vec::new(),
+        score_commands: Vec::new(),
+        timeout_seconds: 60,
+        required_files: Vec::new(),
+        forbidden_files: Vec::new(),
+        required_content: Vec::new(),
+    };
+    let context = EvalRunContext {
+        profile: codifix_eval::EvalProfile::Llm,
+        repeat_index: 0,
+        run_group_id: Uuid::nil(),
+        suite_checksum: None,
+        dry_run: false,
+        artifacts_root: PathBuf::from("target/memory-evals"),
+        memory_command: "/tmp/memory".to_string(),
+        memory_base_url: "http://127.0.0.1:4250".to_string(),
+        memory_config_path: Some(PathBuf::from(".mem/config.toml")),
+        llm_judge: false,
+        retriever_cmd: None,
+        command_cwd: PathBuf::from("."),
+    };
+
+    let prompt = agent_build_prompt(&item, codifix_eval::EvalCondition::FullMemory, &context);
+
+    assert!(prompt.contains("memory-enabled"));
+    assert!(prompt.contains("/tmp/memory"));
+    assert!(prompt.contains("What changed recently?"));
+    assert!(prompt.contains("memory-evidence.md"));
+}
+
+#[test]
+fn agent_build_prompt_forbids_memory_for_no_memory_condition() {
+    let item = codifix_eval::AgentBuildTaskItem {
+        id: "build".to_string(),
+        metadata: codifix_eval::EvalItemMetadata::default(),
+        project: Some("memory".to_string()),
+        prompt: "Build the app.".to_string(),
+        fixture: "fixtures/app".to_string(),
+        agent_command: "codex exec - < {prompt_file}".to_string(),
+        memory_questions: vec!["What changed recently?".to_string()],
+        setup_commands: Vec::new(),
+        score_commands: Vec::new(),
+        timeout_seconds: 60,
+        required_files: Vec::new(),
+        forbidden_files: Vec::new(),
+        required_content: Vec::new(),
+    };
+    let context = EvalRunContext {
+        profile: codifix_eval::EvalProfile::Llm,
+        repeat_index: 0,
+        run_group_id: Uuid::nil(),
+        suite_checksum: None,
+        dry_run: false,
+        artifacts_root: PathBuf::from("target/memory-evals"),
+        memory_command: "/tmp/memory".to_string(),
+        memory_base_url: "http://127.0.0.1:4250".to_string(),
+        memory_config_path: None,
+        llm_judge: false,
+        retriever_cmd: None,
+        command_cwd: PathBuf::from("."),
+    };
+
+    let prompt = agent_build_prompt(&item, codifix_eval::EvalCondition::NoMemory, &context);
+
+    assert!(prompt.contains("no-memory"));
+    assert!(prompt.contains("Do not query"));
+    assert!(prompt.contains("Do not create memory-evidence.md"));
+    assert!(prompt.contains(".memory-eval"));
+    assert!(!prompt.contains("What changed recently?"));
+}
+
+#[test]
+fn agent_build_memory_evidence_verifies_required_queries() {
+    let workspace = std::env::temp_dir().join(format!("memory-eval-test-{}", Uuid::new_v4()));
+    fs::create_dir_all(workspace.join(".memory-eval")).unwrap();
+    fs::write(
+        workspace.join(".memory-eval/q1.status.json"),
+        r#"{"question_id":"q1","exit_code":0,"output_file":".memory-eval/q1.json"}"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join(".memory-eval/q1.json"),
+        r#"{"results":[{"memory_id":"00000000-0000-0000-0000-000000000000"}]}"#,
+    )
+    .unwrap();
+    let item = codifix_eval::AgentBuildTaskItem {
+        id: "build".to_string(),
+        metadata: codifix_eval::EvalItemMetadata::default(),
+        project: Some("memory".to_string()),
+        prompt: "Build the app.".to_string(),
+        fixture: "fixtures/app".to_string(),
+        agent_command: "codex exec - < {prompt_file}".to_string(),
+        memory_questions: vec!["What changed recently?".to_string()],
+        setup_commands: Vec::new(),
+        score_commands: Vec::new(),
+        timeout_seconds: 60,
+        required_files: Vec::new(),
+        forbidden_files: Vec::new(),
+        required_content: Vec::new(),
+    };
+
+    let evidence = validate_agent_build_memory_evidence(
+        &workspace,
+        &item,
+        codifix_eval::EvalCondition::FullMemory,
+    )
+    .unwrap();
+
+    assert!(evidence.ok);
+    assert_eq!(evidence.required, 1);
+    assert_eq!(evidence.verified, 1);
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn agent_build_no_memory_fails_on_memory_evidence_artifacts() {
+    let workspace = std::env::temp_dir().join(format!("memory-eval-test-{}", Uuid::new_v4()));
+    fs::create_dir_all(&workspace).unwrap();
+    fs::write(workspace.join("memory-evidence.md"), "query").unwrap();
+    let item = codifix_eval::AgentBuildTaskItem {
+        id: "build".to_string(),
+        metadata: codifix_eval::EvalItemMetadata::default(),
+        project: Some("memory".to_string()),
+        prompt: "Build the app.".to_string(),
+        fixture: "fixtures/app".to_string(),
+        agent_command: "codex exec - < {prompt_file}".to_string(),
+        memory_questions: vec!["What changed recently?".to_string()],
+        setup_commands: Vec::new(),
+        score_commands: Vec::new(),
+        timeout_seconds: 60,
+        required_files: Vec::new(),
+        forbidden_files: Vec::new(),
+        required_content: Vec::new(),
+    };
+
+    let evidence = validate_agent_build_memory_evidence(
+        &workspace,
+        &item,
+        codifix_eval::EvalCondition::NoMemory,
+    )
+    .unwrap();
+
+    assert!(!evidence.ok);
+    assert!(evidence.notes[0].contains("forbidden Memory evidence"));
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn ensure_checkbox_plan_rejects_plans_without_checkboxes() {
+    let items = parse_plan_checkboxes("# Plan\n\n- regular bullet");
+    let error = ensure_checkbox_plan(&items).expect_err("should reject non-checkbox plan");
+    assert!(
+        error
+            .to_string()
+            .contains("approved plans must contain Markdown checkbox items")
+    );
+}
+
+#[test]
+fn finish_report_lists_remaining_items() {
+    let report = build_plan_execution_finish_report(
+        "memory",
+        &codifix_record::MemoryEntryResponse {
+            id: Uuid::new_v4(),
+            project: "memory".to_string(),
+            canonical_text: "# Plan\n\n- [x] done\n- [ ] remaining".to_string(),
+            summary: "Execution plan".to_string(),
+            memory_type: codifix_record::MemoryType::Plan,
+            importance: 4,
+            confidence: 0.95,
+            status: codifix_record::MemoryStatus::Active,
+            tags: vec![
+                "plan".to_string(),
+                "plan-thread:resume-redesign".to_string(),
+            ],
+            sources: Vec::new(),
+            related_memories: Vec::new(),
+            embedding_spaces: Vec::new(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            canonical_id: Uuid::nil(),
+            version_no: 1,
+            is_tombstone: false,
+        },
+    )
+    .expect("build finish report");
+
+    assert_eq!(report.total_items, 2);
+    assert_eq!(report.completed_items, 1);
+    assert_eq!(report.completed_item_texts, vec!["done".to_string()]);
+    assert!(!report.verified_complete);
+    assert_eq!(report.remaining_items, vec!["remaining".to_string()]);
+}
+
+#[test]
+fn finish_execution_implementation_request_uses_completed_items() {
+    let writer = WriterIdentity {
+        id: "writer".to_string(),
+        name: Some("Writer".to_string()),
+    };
+    let report = PlanExecutionFinishReport {
+        project: "memory".to_string(),
+        thread_key: "footer-fix".to_string(),
+        plan_title: "Footer Fix".to_string(),
+        total_items: 2,
+        completed_items: 2,
+        completed_item_texts: vec![
+            "Add implementation memory type".to_string(),
+            "Record finish-execution implementation outcomes".to_string(),
+        ],
+        remaining_items: Vec::new(),
+        verified_complete: true,
+    };
+
+    let request = build_finish_execution_implementation_request(
+        "memory",
+        &writer,
+        &report,
+        "Implemented 2 items for Footer Fix",
+        &["The memories view now shows implemented outcomes.".to_string()],
+        Some("abc123"),
+    );
+
+    assert_eq!(request.structured_candidates.len(), 1);
+    let candidate = &request.structured_candidates[0];
+    assert_eq!(
+        candidate.memory_type,
+        codifix_record::MemoryType::Implementation
+    );
+    assert!(candidate.tags.contains(&"implemented".to_string()));
+    assert!(candidate.canonical_text.contains("Implemented items:"));
+    assert!(
+        candidate
+            .canonical_text
+            .contains("Add implementation memory type")
+    );
+    assert!(request.idempotency_key.is_some());
+}
+
+#[test]
+fn remember_request_auto_detects_refactor_type() {
+    let writer_id = "writer";
+    let args = RememberArgs {
+        project: Some("memory".to_string()),
+        title: Some("Refactor query helpers".to_string()),
+        prompt: Some("Refactor query helpers with no functional change.".to_string()),
+        summary: Some("Moved query helper code without behavior change.".to_string()),
+        notes: vec!["Refactored crates/codifix-search/src/lib.rs.".to_string()],
+        files_changed: vec!["crates/codifix-search/src/lib.rs".to_string()],
+        auto_files: false,
+        tests_passed: Vec::new(),
+        tests_failed: Vec::new(),
+        command_output_file: None,
+        memory_type: None,
+        dry_run: false,
+    };
+
+    let request = build_remember_request(args, "memory", writer_id, None).unwrap();
+
+    assert_eq!(
+        request.structured_candidates[0].memory_type,
+        codifix_record::MemoryType::Refactor
+    );
+    assert!(
+        request.structured_candidates[0]
+            .tags
+            .contains(&"refactor".to_string())
+    );
+}
+
+#[test]
+fn mixed_fix_and_refactor_remember_request_stays_implementation() {
+    let args = RememberArgs {
+        project: Some("memory".to_string()),
+        title: Some("Fix and refactor query helpers".to_string()),
+        prompt: Some("Fix ranking and refactor helper layout.".to_string()),
+        summary: Some("Fixed ranking while extracting helpers.".to_string()),
+        notes: Vec::new(),
+        files_changed: vec!["crates/codifix-search/src/lib.rs".to_string()],
+        auto_files: false,
+        tests_passed: Vec::new(),
+        tests_failed: Vec::new(),
+        command_output_file: None,
+        memory_type: None,
+        dry_run: false,
+    };
+
+    let request = build_remember_request(args, "memory", "writer", None).unwrap();
+
+    assert_eq!(
+        request.structured_candidates[0].memory_type,
+        codifix_record::MemoryType::Implementation
+    );
+}
+
+#[test]
+fn finish_execution_request_auto_detects_refactor_type() {
+    let writer = WriterIdentity {
+        id: "writer".to_string(),
+        name: Some("Writer".to_string()),
+    };
+    let report = PlanExecutionFinishReport {
+        project: "memory".to_string(),
+        thread_key: "query-refactor".to_string(),
+        plan_title: "Refactor query helpers".to_string(),
+        total_items: 1,
+        completed_items: 1,
+        completed_item_texts: vec!["Extract query helpers with no functional change".to_string()],
+        remaining_items: Vec::new(),
+        verified_complete: true,
+    };
+
+    let request = build_finish_execution_implementation_request(
+        "memory",
+        &writer,
+        &report,
+        "Refactored query helpers without behavior change",
+        &[],
+        Some("abc123"),
+    );
+
+    assert_eq!(
+        request.structured_candidates[0].memory_type,
+        codifix_record::MemoryType::Refactor
+    );
+}
+
+#[test]
+fn writer_identity_falls_back_to_derived_value() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let old_user = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_USER").ok();
+    let old_host = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_HOST").ok();
+    let old_writer = std::env::var("MEMORY_LAYER_WRITER_ID").ok();
+    let old_agent = std::env::var("MEMORY_LAYER_AGENT_ID").ok();
+
+    unsafe {
+        std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_USER", "cli-user");
+        std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", "cli-host");
+        std::env::remove_var("MEMORY_LAYER_WRITER_ID");
+        std::env::remove_var("MEMORY_LAYER_AGENT_ID");
+    }
+
+    let config: AppConfig =
+        toml::from_str("[service]\n\n[database]\nurl = \"postgres://example\"\n")
+            .expect("parse minimal config");
+    let writer = resolve_writer_identity(&config, None).expect("resolve writer identity");
+
+    restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_USER", old_user);
+    restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", old_host);
+    restore_env_var("MEMORY_LAYER_WRITER_ID", old_writer);
+    restore_env_var("MEMORY_LAYER_AGENT_ID", old_agent);
+
+    assert_eq!(writer.id, "memory-cli-user-cli-host");
+    assert_eq!(writer.name, None);
+}
+
+#[test]
+fn init_print_describes_repo_layout() {
+    let repo_root = PathBuf::from("/tmp/memory");
+    let summary = initialize_repo(&repo_root, "memory", false, true).unwrap();
+    let normalized_summary = summary.replace('\\', "/");
+
+    assert!(normalized_summary.contains("user-local project config"));
+    assert!(normalized_summary.contains(".mem/project.toml"));
+    assert!(normalized_summary.contains(".agents/memory-layer.toml"));
+    assert!(normalized_summary.contains(".agents/skills"));
+    assert!(normalized_summary.contains("bundled memory skills"));
+    if cfg!(target_os = "macos") {
+        assert!(summary.contains("memory watcher enable --project memory"));
+    } else {
+        assert!(summary.contains("memory watcher manager enable"));
+    }
+    assert!(summary.contains("memory service run"));
+}
+
+#[test]
+fn init_creates_repo_files_and_gitignore_entry() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo_root = unique_temp_dir("mem-init");
+    let xdg_root = unique_temp_dir("mem-init-xdg");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+    }
+    fs::create_dir_all(&repo_root).unwrap();
+
+    initialize_repo(&repo_root, "memory", false, false).unwrap();
+    let paths = codifix_platform::project_paths(&repo_root, "memory").unwrap();
+
+    assert!(paths.config_path().is_file());
+    assert!(paths.project_path().is_file());
+    assert!(repo_root.join(".mem/project.toml").is_file());
+    assert!(repo_root.join(".agents/memory-layer.toml").is_file());
+    assert!(paths.runtime_dir().is_dir());
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-layer/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-project-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-github-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-review-proposals/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-remember/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-layer/scripts/go.mod")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-layer/scripts/main.go")
+            .is_file()
+    );
+    assert!(
+        fs::read_to_string(paths.config_path())
+            .unwrap()
+            .contains("[automation]")
+    );
+    assert_eq!(
+        fs::read_to_string(repo_root.join(".mem/.gitignore")).unwrap(),
+        "*\n!.gitignore\n!project.toml\n"
+    );
+    assert!(!root_gitignore_contains_mem(&repo_root).unwrap());
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn init_migrates_legacy_mem_gitignore() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo_root = unique_temp_dir("mem-init-gitignore");
+    let xdg_root = unique_temp_dir("mem-init-gitignore-xdg");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+    }
+    fs::create_dir_all(repo_root.join(".mem")).unwrap();
+    fs::write(repo_root.join(".mem/.gitignore"), "runtime/\n").unwrap();
+
+    initialize_repo(&repo_root, "memory", false, false).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(repo_root.join(".mem/.gitignore")).unwrap(),
+        "*\n!.gitignore\n!project.toml\n"
+    );
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn dev_init_writes_service_overlay() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo_root = unique_temp_dir("mem-dev-init");
+    let xdg_root = unique_temp_dir("mem-dev-init-xdg");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+    }
+    fs::create_dir_all(&repo_root).unwrap();
+    initialize_repo(&repo_root, "memory", false, false).unwrap();
+
+    initialize_dev_overlay(
+        &repo_root,
+        &super::DevInitArgs {
+            force: false,
+            dry_run: false,
+            bind_addr: "127.0.0.1:4250".to_string(),
+            copy_from_global: false,
+            no_copy_from_global: true,
+        },
+    )
+    .unwrap();
+
+    let paths = codifix_platform::project_paths(&repo_root, "memory").unwrap();
+    let dev_config = fs::read_to_string(paths.dev_config_path()).unwrap();
+    assert!(dev_config.contains("bind_addr = \"127.0.0.1:4250\""));
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn resolve_repo_root_falls_back_to_cwd() {
+    let cwd = PathBuf::from("/tmp/not-a-repo");
+    assert_eq!(resolve_repo_root(&cwd).unwrap(), cwd);
+}
+
+#[test]
+fn placeholder_database_url_is_detected() {
+    assert!(is_placeholder_database_url(
+        "postgresql://memory:<password>@localhost:5432/memory"
+    ));
+    assert!(!is_placeholder_database_url(
+        "postgresql://memory:secret@localhost:5432/memory"
+    ));
+}
+
+#[test]
+fn database_url_is_masked_for_output() {
+    assert_eq!(
+        mask_database_url("postgresql://memory:secret@localhost:5432/memory"),
+        "postgresql://<redacted>@localhost:5432/memory"
+    );
+}
+
+#[test]
+fn repair_repo_bootstrap_creates_missing_files() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo_root = unique_temp_dir("mem-doctor-fix");
+    let xdg_root = unique_temp_dir("mem-doctor-fix-xdg");
+    let archive_path = repo_root.join("memory-main.zip");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    let old_archive = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
+    write_test_skill_archive(&archive_path, "0.4.0");
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+        std::env::set_var(
+            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+            format!("file://{}", archive_path.display()),
+        );
+    }
+    fs::create_dir_all(&repo_root).unwrap();
+
+    repair_repo_bootstrap(&repo_root, "memory").unwrap();
+    let paths = codifix_platform::project_paths(&repo_root, "memory").unwrap();
+
+    assert!(paths.config_path().is_file());
+    assert!(paths.project_path().is_file());
+    assert!(repo_root.join(".mem/project.toml").is_file());
+    assert!(repo_root.join(".agents/memory-layer.toml").is_file());
+    assert!(paths.runtime_dir().is_dir());
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-layer/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-project-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-github-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-remember/SKILL.md")
+            .is_file()
+    );
+    assert!(!root_gitignore_contains_mem(&repo_root).unwrap());
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    restore_env_var(
+        "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+        old_archive,
+    );
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn init_preserves_existing_memory_skills_without_force() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo_root = unique_temp_dir("mem-init-skill-bundle");
+    let xdg_root = unique_temp_dir("mem-init-skill-bundle-xdg");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+    }
+    fs::create_dir_all(repo_root.join(".agents/skills/memory-layer")).unwrap();
+    fs::write(
+        repo_root.join(".agents/skills/memory-layer/SKILL.md"),
+        "custom umbrella skill\n",
+    )
+    .unwrap();
+
+    initialize_repo(&repo_root, "memory", false, false).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(repo_root.join(".agents/skills/memory-layer/SKILL.md")).unwrap(),
+        "custom umbrella skill\n"
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-query-resume/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-project-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-github-init/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-plan-execution/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-direct-task-start/SKILL.md")
+            .is_file()
+    );
+    assert!(
+        repo_root
+            .join(".agents/skills/memory-remember/SKILL.md")
+            .is_file()
+    );
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo_root);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn agent_project_config_mentions_project_customization() {
+    let repo_root = PathBuf::from("/tmp/memory");
+    let content = render_agent_project_config("memory", &repo_root);
+
+    assert!(content.contains("[capture]"));
+    assert!(content.contains("include_paths"));
+    assert!(content.contains("graph_enabled = false"));
+}
+
+#[test]
+fn generated_toml_escapes_windows_paths() {
+    let windows_path = r"C:\Users\Test User\AppData\Local\memory-layer";
+    let rendered = format!("path = {}", render_toml_string(windows_path));
+    let parsed: toml::Value = toml::from_str(&rendered).unwrap();
+    assert_eq!(parsed["path"].as_str(), Some(windows_path));
+
+    let agent_config =
+        render_agent_project_config("memory", &PathBuf::from(r"C:\Users\Test User\memory"));
+    toml::from_str::<toml::Value>(&agent_config).unwrap();
+}
+
+#[test]
+fn claude_memory_section_mentions_code_explanation_memory() {
+    let content = render_claude_md_memory_section("memory");
+
+    assert!(content.contains("Remember distilled code and codebase explanations"));
+    assert!(content.contains("### Store code explanations"));
+    assert!(content.contains("memory remember --project memory --type project"));
+    assert!(content.contains("Do not store the full chat answer"));
+    assert!(content.contains("Do not use `--file-changed` unless files actually changed"));
+}
+
+#[test]
+fn init_copies_code_explanation_memory_rule_to_skills() {
+    let repo_root = unique_temp_dir("mem-init-explanation-memory");
+    fs::create_dir_all(&repo_root).unwrap();
+
+    initialize_repo(&repo_root, "memory", false, false).unwrap();
+
+    let umbrella =
+        fs::read_to_string(repo_root.join(".agents/skills/memory-layer/SKILL.md")).unwrap();
+    let github_init =
+        fs::read_to_string(repo_root.join(".agents/skills/memory-github-init/SKILL.md")).unwrap();
+    let query_resume =
+        fs::read_to_string(repo_root.join(".agents/skills/memory-query-resume/SKILL.md")).unwrap();
+    let remember =
+        fs::read_to_string(repo_root.join(".agents/skills/memory-remember/SKILL.md")).unwrap();
+
+    assert!(umbrella.contains("Code explanation memory rule"));
+    assert!(umbrella.contains("memory-github-init"));
+    assert!(github_init.contains("Memory GitHub Init Skill"));
+    assert!(github_init.contains("dry-run"));
+    assert!(umbrella.contains("Store a distilled memory, not the whole chat answer"));
+    assert!(query_resume.contains("explain code, a file, a module"));
+    assert!(query_resume.contains("store the distilled reusable explanation"));
+    assert!(remember.contains("Remember a distilled code explanation"));
+    assert!(remember.contains("--type project"));
+    assert!(remember.contains("Do not use `--file-changed`"));
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn watch_unit_name_is_project_scoped() {
+    assert_eq!(watch_unit_name("homelab"), "memory-watch-homelab.service");
+    assert_eq!(
+        watch_unit_name("customer portal"),
+        "memory-watch-customer-portal.service"
+    );
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watch_unit_name_is_profile_scoped() {
+    assert_eq!(
+        managed_watch_service_name(Profile::Prod, "session 123"),
+        "memory-watch-codex-session-123.service"
+    );
+    assert_eq!(
+        managed_watch_service_name(Profile::Dev, "session 123"),
+        "memory-watch-codex-dev-session-123.service"
+    );
+}
+
+#[test]
+fn dev_watcher_manager_is_scoped_to_its_loaded_project_config() {
+    let memory = Path::new("/tmp/memory/config.toml");
+    let other = Path::new("/tmp/other/config.toml");
+
+    assert!(watcher_manager_config_matches_repo(
+        Profile::Prod,
+        None,
+        None
+    ));
+    assert!(watcher_manager_config_matches_repo(
+        Profile::Dev,
+        Some(memory),
+        Some(memory)
+    ));
+    assert!(!watcher_manager_config_matches_repo(
+        Profile::Dev,
+        Some(memory),
+        Some(other)
+    ));
+    assert!(!watcher_manager_config_matches_repo(
+        Profile::Dev,
+        None,
+        Some(memory)
+    ));
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_prefers_real_session_over_tracked_pending_process() {
+    let repo_root = Path::new("/tmp/memory");
+    let pending = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "pending-10-1".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 1_000,
+    };
+    let real = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 11,
+        session_id: "session-real".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 2_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        pending.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "pending.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: pending.session_id.clone(),
+            agent_pid: pending.pid,
+            agent_started_at: Utc.timestamp_millis_opt(pending.started_at as i64).unwrap(),
+        },
+    );
+
+    let selected = select_managed_agent_session(repo_root, vec![pending, real.clone()], &tracked)
+        .expect("select managed session");
+
+    assert_eq!(selected, real);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_keeps_stable_real_session_for_repo() {
+    let repo_root = Path::new("/tmp/memory");
+    let tracked_session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "session-tracked".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 2_000,
+    };
+    let older_session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 11,
+        session_id: "session-older".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: 1_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        tracked_session.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "tracked.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: tracked_session.session_id.clone(),
+            agent_pid: tracked_session.pid,
+            agent_started_at: Utc
+                .timestamp_millis_opt(tracked_session.started_at as i64)
+                .unwrap(),
+        },
+    );
+
+    let selected = select_managed_agent_session(
+        repo_root,
+        vec![older_session, tracked_session.clone()],
+        &tracked,
+    )
+    .expect("select managed session");
+
+    assert_eq!(selected, tracked_session);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_resolves_only_one_session_per_repository() {
+    let repo_root = unique_temp_dir("mem-watch-deduplicate-repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    assert!(
+        std::process::Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(&repo_root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let sessions = vec![
+        LightweightAgentSession {
+            agent_cli: "codex",
+            pid: 10,
+            session_id: "pending-10-1".to_string(),
+            cwd: repo_root.display().to_string(),
+            started_at: 1_000,
+        },
+        LightweightAgentSession {
+            agent_cli: "codex",
+            pid: 11,
+            session_id: "session-real".to_string(),
+            cwd: repo_root.display().to_string(),
+            started_at: 2_000,
+        },
+    ];
+
+    let resolved =
+        resolve_managed_agent_sessions_by_repo(sessions, &std::collections::BTreeMap::new())
+            .unwrap();
+
+    assert_eq!(resolved.len(), 1);
+    assert_eq!(resolved[0].0, repo_root);
+    assert_eq!(resolved[0].1.session_id, "session-real");
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn managed_watcher_reuses_tracked_repository_for_same_process() {
+    let repo_root = unique_temp_dir("mem-watch-tracked-repo");
+    fs::create_dir_all(&repo_root).unwrap();
+    let session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 10,
+        session_id: "session-tracked".to_string(),
+        cwd: "/path/that/does/not/exist".to_string(),
+        started_at: 2_000,
+    };
+    let mut tracked = std::collections::BTreeMap::new();
+    tracked.insert(
+        session.session_id.clone(),
+        ManagedWatcherSession {
+            unit_name: "tracked.service".to_string(),
+            watcher_id: None,
+            config_path: None,
+            config_fingerprint: None,
+            project: "memory".to_string(),
+            repo_root: repo_root.display().to_string(),
+            agent_cli: "codex".to_string(),
+            agent_session_id: session.session_id.clone(),
+            agent_pid: session.pid,
+            agent_started_at: Utc.timestamp_millis_opt(session.started_at as i64).unwrap(),
+        },
+    );
+
+    let resolved = resolve_managed_agent_sessions_by_repo(vec![session.clone()], &tracked).unwrap();
+
+    assert_eq!(resolved, vec![(repo_root.clone(), session)]);
+    fs::remove_dir_all(repo_root).unwrap();
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn watch_unit_uses_repo_root_and_project() {
+    let repo_root = unique_temp_dir("mem-watch-unit");
+    fs::create_dir_all(&repo_root).unwrap();
+    let unit = render_watch_unit(&repo_root, "homelab").unwrap();
+
+    assert!(unit.contains("Description=Memory Layer Watcher (homelab)"));
+    assert!(unit.contains(&format!("WorkingDirectory={}", repo_root.display())));
+    assert!(unit.contains("EnvironmentFile=-"));
+    assert!(unit.contains("run --project homelab"));
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn watch_manager_unit_uses_manager_subcommand() {
+    let unit = render_watch_manager_unit(Path::new("/tmp/memory-layer.toml")).unwrap();
+    assert!(unit.contains("watcher manager run"));
+    assert!(unit.contains("Restart=always"));
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn watch_manager_unit_retains_an_explicit_operator_routing_file() {
+    let unit = crate::commands::watch_support::render_watch_manager_unit_routed(
+        Path::new("/operator/general.toml"),
+        Some(Path::new("/operator/company routes.json")),
+    )
+    .unwrap();
+    assert!(unit.contains("--area-routing '/operator/company routes.json'"));
+    assert!(unit.contains("--config /operator/general.toml"));
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+#[test]
+fn agent_watcher_start_logic_reuses_loaded_active_units() {
+    assert!(!should_start_agent_watcher(true, true));
+    assert!(should_start_agent_watcher(true, false));
+    assert!(should_start_agent_watcher(false, false));
+}
+
+#[test]
+fn watcher_manager_resolves_one_initialized_repo_beneath_a_workspace() {
+    let workspace = unique_temp_dir("mem-watch-workspace");
+    let repo = workspace.join("memory");
+    fs::create_dir_all(repo.join(".mem")).unwrap();
+    fs::write(
+        repo.join(".mem").join("project.toml"),
+        "project = \"memory\"\n",
+    )
+    .unwrap();
+    let status = std::process::Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(&repo)
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let resolved = resolve_agent_repo_root(workspace.to_str().unwrap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        resolved.canonicalize().unwrap(),
+        repo.canonicalize().unwrap()
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn launch_agent_labels_are_project_scoped() {
+    assert_eq!(backend_launch_agent_label(), "com.memory-layer.mem-service");
+    assert_eq!(
+        watch_manager_launch_agent_label(),
+        "com.memory-layer.memory-watch-manager"
+    );
+    assert_eq!(
+        watch_launch_agent_label("customer portal"),
+        "com.memory-layer.memory-watch.customer-portal"
+    );
+    assert_eq!(
+        managed_watch_launch_agent_label(Profile::Prod, "session 123"),
+        "com.memory-layer.memory-watch.codex.session-123"
+    );
+    assert_eq!(
+        managed_watch_launch_agent_label(Profile::Dev, "session 123"),
+        "com.memory-layer.memory-watch.codex.dev.session-123"
+    );
+    assert_eq!(
+        sanitize_service_fragment("customer portal"),
+        "customer-portal"
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn backend_launch_agent_uses_global_config_path() {
+    let plist = render_backend_launch_agent(&default_global_config_path()).unwrap();
+
+    assert!(plist.contains("<string>com.memory-layer.mem-service</string>"));
+    assert!(plist.contains("<string>/bin/zsh</string>"));
+    assert!(plist.contains("--config"));
+    assert!(plist.contains("memory-layer.toml"));
+    assert!(plist.contains("mem-service.stdout.log"));
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn watch_launch_agent_uses_repo_root_and_project() {
+    let repo_root = unique_temp_dir("mem-watch-launch-agent");
+    fs::create_dir_all(&repo_root).unwrap();
+    let plist = render_watch_launch_agent(&repo_root, "homelab").unwrap();
+
+    assert!(plist.contains("<string>com.memory-layer.memory-watch.homelab</string>"));
+    assert!(plist.contains(&repo_root.display().to_string()));
+    assert!(plist.contains("<string>/bin/zsh</string>"));
+    assert!(plist.contains("memory-watch"));
+    assert!(plist.contains("--project"));
+    assert!(plist.contains("homelab"));
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn watch_manager_launch_agent_uses_manager_subcommand() {
+    let plist = render_watch_manager_launch_agent(&default_global_config_path()).unwrap();
+
+    assert!(plist.contains("<string>com.memory-layer.memory-watch-manager</string>"));
+    assert!(plist.contains("<string>/bin/zsh</string>"));
+    assert!(plist.contains("watcher"));
+    assert!(plist.contains("manager"));
+    assert!(plist.contains("run"));
+    assert!(plist.contains("memory-watch-manager.stdout.log"));
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn managed_watch_launch_agent_uses_agent_metadata() {
+    let repo_root = unique_temp_dir("mem-managed-watch-launch-agent");
+    fs::create_dir_all(&repo_root).unwrap();
+    let session = LightweightAgentSession {
+        agent_cli: "codex",
+        pid: 42,
+        session_id: "session-123".to_string(),
+        cwd: repo_root.display().to_string(),
+        started_at: Utc::now().timestamp_millis() as u64,
+    };
+    let plist = render_managed_watch_launch_agent(
+        &repo_root,
+        "homelab",
+        &session,
+        Profile::Prod,
+        "2026-04-10T00:00:00Z",
+        &super::super::watch_support::ManagedWatcherTarget {
+            id: "session-123",
+            config_path: None,
+            routing_path: None,
+            area: None,
+        },
+    )
+    .unwrap();
+
+    assert!(plist.contains("<string>com.memory-layer.memory-watch.codex.session-123</string>"));
+    assert!(plist.contains("--agent-session-id"));
+    assert!(plist.contains("session-123"));
+    assert!(plist.contains("--agent-pid"));
+    assert!(plist.contains("42"));
+    assert!(plist.contains("--repo-root"));
+    assert!(plist.contains(&repo_root.display().to_string()));
+
+    let _ = fs::remove_dir_all(repo_root);
+}
+
+#[test]
+fn shared_env_lookup_reads_key() {
+    let dir = unique_temp_dir("mem-shared-env");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.env");
+    fs::write(&path, "OPENAI_API_KEY=test-key\n").unwrap();
+
+    assert_eq!(
+        super::shared_env_lookup(&path, "OPENAI_API_KEY").as_deref(),
+        Some("test-key")
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn ensure_shared_service_api_token_creates_missing_token() {
+    let dir = unique_temp_dir("mem-token-create");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.env");
+
+    let result = ensure_shared_service_api_token(&path, None, true).unwrap();
+    let token = shared_env_lookup(&path, SERVICE_API_TOKEN_KEY).unwrap();
+
+    assert!(result.changed);
+    assert!(matches!(result.action, ServiceApiTokenAction::Created));
+    assert!(token.starts_with("ml_"));
+    assert_ne!(token, DEV_API_TOKEN);
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cluster_enabled_is_added_when_missing() {
+    let dir = unique_temp_dir("mem-cluster-config");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.toml");
+    fs::write(&path, "[service]\nbind_addr = \"127.0.0.1:4040\"\n").unwrap();
+
+    set_cluster_enabled_in_shared_config(&path, true).unwrap();
+
+    let content = fs::read_to_string(&path).unwrap();
+    assert!(content.contains("[cluster]"));
+    assert!(content.contains("enabled = true"));
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn ensure_shared_service_api_token_rotates_placeholder() {
+    let dir = unique_temp_dir("mem-token-rotate");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.env");
+    fs::write(
+        &path,
+        format!("{SERVICE_API_TOKEN_KEY}={DEV_API_TOKEN}\nOPENAI_API_KEY=test-key\n"),
+    )
+    .unwrap();
+
+    let result = ensure_shared_service_api_token(&path, None, true).unwrap();
+    let token = shared_env_lookup(&path, SERVICE_API_TOKEN_KEY).unwrap();
+    let content = fs::read_to_string(&path).unwrap();
+
+    assert!(result.changed);
+    assert!(matches!(result.action, ServiceApiTokenAction::Rotated));
+    assert!(token.starts_with("ml_"));
+    assert!(content.contains("OPENAI_API_KEY=test-key"));
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn cluster_enabled_is_updated_in_existing_section() {
+    let dir = unique_temp_dir("mem-cluster-existing");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.toml");
+    fs::write(
+        &path,
+        "[cluster]\nenabled = false\npriority = 50\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n",
+    )
+    .unwrap();
+
+    set_cluster_enabled_in_shared_config(&path, true).unwrap();
+
+    let content = fs::read_to_string(&path).unwrap();
+    assert!(content.contains("[cluster]\nenabled = true\npriority = 50"));
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn ensure_shared_service_api_token_preserves_existing_non_placeholder() {
+    let dir = unique_temp_dir("mem-token-preserve");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("memory-layer.env");
+    fs::write(&path, format!("{SERVICE_API_TOKEN_KEY}=ml_existingtoken\n")).unwrap();
+
+    let result = ensure_shared_service_api_token(&path, None, true).unwrap();
+    let token = shared_env_lookup(&path, SERVICE_API_TOKEN_KEY).unwrap();
+
+    assert!(!result.changed);
+    assert!(matches!(result.action, ServiceApiTokenAction::Preserved));
+    assert_eq!(token, "ml_existingtoken");
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn write_headers_sends_token_for_loopback_service() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    unsafe {
+        std::env::remove_var("MEMORY_LAYER_CLIENT_TOKEN");
+    }
+    let mut config = test_app_config();
+    config.service.bind_addr = "127.0.0.1:4040".to_string();
+    config.service.api_token = "ml_testtoken".to_string();
+
+    let headers = write_headers(&config).unwrap();
+    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+
+    assert_eq!(
+        headers
+            .get("x-api-token")
+            .and_then(|value| value.to_str().ok()),
+        Some("ml_testtoken")
+    );
+    assert!(headers.get("origin").is_none());
+}
+
+#[test]
+fn write_headers_sends_token_for_non_loopback_service() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    unsafe {
+        std::env::remove_var("MEMORY_LAYER_CLIENT_TOKEN");
+    }
+    let mut config = test_app_config();
+    config.service.bind_addr = "10.22.6.42:4140".to_string();
+    config.service.api_token = "ml_testtoken".to_string();
+
+    let headers = write_headers(&config).unwrap();
+    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+
+    assert_eq!(
+        headers
+            .get("x-api-token")
+            .and_then(|value| value.to_str().ok()),
+        Some("ml_testtoken")
+    );
+    assert!(headers.get("origin").is_none());
+}
+
+#[test]
+fn write_headers_prefers_scoped_client_token_environment_variable() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    unsafe {
+        std::env::set_var("MEMORY_LAYER_CLIENT_TOKEN", "mlt_scoped-client-token");
+    }
+    let config = test_app_config();
+    let headers = write_headers(&config).unwrap();
+    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+
+    assert_eq!(
+        headers
+            .get("x-api-token")
+            .and_then(|value| value.to_str().ok()),
+        Some("mlt_scoped-client-token")
+    );
+}
+
+#[test]
+fn direct_llm_eval_accepts_ollama_without_api_key() {
+    let mut config = test_app_config();
+    config.llm = codifix_config::LlmConfig {
+        provider: "ollama".to_string(),
+        base_url: String::new(),
+        api_key_env: "OPENAI_API_KEY".to_string(),
+        model: "llama3.2".to_string(),
+        ..codifix_config::LlmConfig::default()
+    };
+
+    assert!(ensure_direct_llm_eval_config(&config).is_ok());
+}
+
+#[test]
+fn watcher_manager_start_check_uses_live_unit_health() {
+    assert!(!should_start_agent_watcher(true, true));
+    assert!(should_start_agent_watcher(false, true));
+    assert!(should_start_agent_watcher(true, false));
+}
+
+#[test]
+fn watcher_manager_repairs_repositories_only_when_needed() {
+    assert!(watcher_repo_needs_bootstrap("startup", true));
+    assert!(watcher_repo_needs_bootstrap("process-scan", false));
+    assert!(!watcher_repo_needs_bootstrap("process-scan", true));
+}
+
+#[test]
+fn watcher_manager_uses_resolved_project_config_for_children() {
+    let mut config = test_app_config();
+    config.resolved_config_path = Some(PathBuf::from("/tmp/project/config.toml"));
+
+    let path =
+        effective_watcher_manager_config_path(&config, Some(PathBuf::from("/tmp/fallback.toml")));
+
+    assert_eq!(path, config.resolved_config_path);
+}
+
+#[test]
+fn watcher_manager_uses_cli_fallback_without_resolved_config() {
+    let config = test_app_config();
+    let fallback = PathBuf::from("/tmp/memory-layer.toml");
+
+    let path = effective_watcher_manager_config_path(&config, Some(fallback.clone()));
+
+    assert_eq!(path, Some(fallback));
+}
+
+#[test]
+fn write_file_if_changed_skips_identical_content() {
+    let dir = unique_temp_dir("mem-write-if-changed");
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("config.toml");
+    write_file_if_changed(&path, b"same").unwrap();
+    let first_modified = fs::metadata(&path).unwrap().modified().unwrap();
+    std::thread::sleep(Duration::from_millis(5));
+    write_file_if_changed(&path, b"same").unwrap();
+    let second_modified = fs::metadata(&path).unwrap().modified().unwrap();
+    assert_eq!(first_modified, second_modified);
+    write_file_if_changed(&path, b"different").unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "different");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn test_app_config() -> AppConfig {
+    AppConfig {
+        laptop_cache: None,
+        area: None,
+        resolved_area_routing_path: None,
+        supervisor: None,
+        evaluation: Default::default(),
+        background_work: Default::default(),
+        service: codifix_config::ServiceConfig {
+            bind_addr: "127.0.0.1:4040".to_string(),
+            web_root: None,
+            api_token: "ml_testtoken".to_string(),
+            request_timeout: Duration::from_secs(30),
+            read_only: false,
+        },
+        auth: codifix_config::AuthConfig::default(),
+        mcp: codifix_config::McpConfig::default(),
+        database: codifix_config::DatabaseConfig {
+            url: "postgresql://memory:test@localhost:5432/memory".to_string(),
+            migrations: Default::default(),
+        },
+        offline: codifix_config::OfflineConfig::default(),
+        features: codifix_config::FeatureFlags::default(),
+        llm: codifix_config::LlmConfig::default(),
+        llm_audit: codifix_config::LlmAuditConfig::default(),
+        embeddings: codifix_config::EmbeddingsConfig::default(),
+        cluster: codifix_config::ClusterConfig::default(),
+        writer: codifix_config::WriterConfig::default(),
+        automation: codifix_config::AutomationConfig::default(),
+        retention: codifix_config::RetentionConfig::default(),
+        provenance: codifix_config::ProvenanceConfig::default(),
+        reinforcement: codifix_config::ReinforcementConfig::default(),
+        curation: codifix_config::CurationConfig::default(),
+        consolidation: codifix_config::ConsolidationConfig::default(),
+        procedural: codifix_config::ProceduralConfig::default(),
+        telemetry: codifix_config::TelemetryConfig::default(),
+        profile: codifix_config::Profile::Prod,
+        resolved_config_path: None,
+        resolved_dev_overlay_path: None,
+    }
+}
+
+#[test]
+fn skill_version_prefers_skill_frontmatter_over_agent_hint() {
+    let repo = unique_temp_dir("mem-skill-version");
+    let skill = repo.join("skill");
+    fs::create_dir_all(skill.join("agents")).unwrap();
+    fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: example\nversion: 1.2.3\ndescription: test\n---\n",
+    )
+    .unwrap();
+    fs::write(
+        skill.join("agents/openai.yaml"),
+        "name: example\nversion: 0.1.0\nentrypoint: SKILL.md\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        read_skill_version(&skill).unwrap(),
+        Some("1.2.3".to_string())
+    );
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn skill_inventory_marks_outdated_and_missing_skills() {
+    let repo = unique_temp_dir("mem-skill-inventory");
+    let project_root = repo.join("project");
+    let template_root = repo.join("memory-layer/skill-template");
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&template_root.join(name), "0.2.0");
+    }
+    write_test_skill(
+        &project_root
+            .join(".agents/skills")
+            .join(MEMORY_SKILL_NAMES[0]),
+        "0.1.0",
+    );
+    write_test_skill(
+        &project_root
+            .join(".agents/skills")
+            .join(MEMORY_SKILL_NAMES[1]),
+        "0.2.0",
+    );
+
+    let inventory =
+        project_skill_inventory_with_template(&project_root, Some(template_root), false);
+
+    assert_eq!(inventory.skills[0].status, SkillVersionStatus::Outdated);
+    assert_eq!(inventory.skills[0].action, SkillUpgradeAction::Replace);
+    assert_eq!(inventory.skills[1].status, SkillVersionStatus::UpToDate);
+    assert_eq!(inventory.skills[1].action, SkillUpgradeAction::Skip);
+    assert_eq!(inventory.skills[2].status, SkillVersionStatus::Missing);
+    assert_eq!(inventory.skills[2].action, SkillUpgradeAction::Install);
+    assert_eq!(inventory.bundle_version, env!("CARGO_PKG_VERSION"));
+    assert_eq!(inventory.status, SkillBundleStatus::Warn);
+    assert!(inventory.summary.contains("project skill(s) need upgrade"));
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo = unique_temp_dir("mem-visible-skill-inventory");
+    let home = unique_temp_dir("mem-visible-skill-home");
+    let codex_home = unique_temp_dir("mem-visible-skill-codex");
+    let home_env = if cfg!(target_os = "windows") {
+        "USERPROFILE"
+    } else {
+        "HOME"
+    };
+    let old_home = std::env::var(home_env).ok();
+    let old_codex_home = std::env::var("CODEX_HOME").ok();
+    unsafe {
+        std::env::set_var(home_env, &home);
+        std::env::set_var("CODEX_HOME", &codex_home);
+    }
+
+    let project_root = repo.join("project");
+    let template_root = repo.join("memory-layer/skill-template");
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&template_root.join(name), "0.2.0");
+    }
+    write_test_skill(
+        &project_root
+            .join(".agents/skills")
+            .join(MEMORY_SKILL_NAMES[0]),
+        "0.2.0",
+    );
+    write_test_skill(&project_root.join(".agents/skills/repo-custom"), "1.0.0");
+    write_test_skill(
+        &home.join(".agents/skills").join(MEMORY_SKILL_NAMES[1]),
+        "0.2.0",
+    );
+    write_test_skill(&home.join(".agents/skills/home-custom"), "1.0.0");
+    write_test_skill(&codex_home.join("skills/codex-user"), "1.0.0");
+    write_test_skill(&codex_home.join("skills/.system/openai-docs"), "1.0.0");
+    write_test_skill(
+        &codex_home.join("plugins/cache/github/version/skills/gh-fix-ci"),
+        "1.0.0",
+    );
+
+    let inventory =
+        visible_shared_skill_inventory_with_template(&project_root, Some(template_root), false);
+
+    let repo_memory = inventory
+        .skills
+        .iter()
+        .find(|skill| {
+            skill.name == MEMORY_SKILL_NAMES[0]
+                && skill.source_kind == SharedSkillSourceKind::RepoMemory
+        })
+        .expect("repo memory skill");
+    assert!(repo_memory.repairable);
+    assert_eq!(repo_memory.status, SharedSkillVersionStatus::UpToDate);
+
+    let repo_custom = inventory
+        .skills
+        .iter()
+        .find(|skill| skill.name == "repo-custom")
+        .expect("repo custom skill");
+    assert_eq!(repo_custom.source_kind, SharedSkillSourceKind::RepoLocal);
+    assert_eq!(repo_custom.status, SharedSkillVersionStatus::Unmanaged);
+    assert_eq!(repo_custom.action, SharedSkillUpgradeAction::Skip);
+    assert!(!repo_custom.repairable);
+
+    assert!(inventory.skills.iter().any(|skill| {
+        skill.name == MEMORY_SKILL_NAMES[1]
+            && skill.source_kind == SharedSkillSourceKind::HomeMemory
+    }));
+    assert!(inventory.skills.iter().any(|skill| {
+        skill.name == "home-custom" && skill.source_kind == SharedSkillSourceKind::HomeLocal
+    }));
+    assert!(inventory.skills.iter().any(|skill| {
+        skill.name == "codex-user" && skill.source_kind == SharedSkillSourceKind::CodexUser
+    }));
+    assert!(inventory.skills.iter().any(|skill| {
+        skill.name == "openai-docs" && skill.source_kind == SharedSkillSourceKind::CodexSystem
+    }));
+    assert!(inventory.skills.iter().any(|skill| {
+        skill.name == "gh-fix-ci" && skill.source_kind == SharedSkillSourceKind::Plugin
+    }));
+
+    restore_env_var(home_env, old_home);
+    restore_env_var("CODEX_HOME", old_codex_home);
+    let _ = fs::remove_dir_all(repo);
+    let _ = fs::remove_dir_all(home);
+    let _ = fs::remove_dir_all(codex_home);
+}
+
+#[test]
+fn skill_upgrade_dry_run_does_not_replace_project_skill() {
+    let repo = unique_temp_dir("mem-skill-upgrade-dry-run");
+    let project_root = repo.join("project");
+    let template_root = repo.join("memory-layer/skill-template");
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&template_root.join(name), "0.2.0");
+        write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
+    }
+    let first_skill = project_root
+        .join(".agents/skills")
+        .join(MEMORY_SKILL_NAMES[0])
+        .join("SKILL.md");
+    let before = fs::read_to_string(&first_skill).unwrap();
+
+    let report =
+        upgrade_project_skills_with_template(&project_root, Some(template_root), false, true)
+            .unwrap();
+
+    assert!(report.dry_run);
+    assert_eq!(report.backup_root, None);
+    assert_eq!(report.inventory.bundle_version, env!("CARGO_PKG_VERSION"));
+    assert_eq!(report.inventory.status, SkillBundleStatus::Warn);
+    assert_eq!(fs::read_to_string(&first_skill).unwrap(), before);
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn skill_upgrade_replaces_outdated_skill_and_creates_backup() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo = unique_temp_dir("mem-skill-upgrade");
+    let xdg_root = unique_temp_dir("mem-skill-upgrade-xdg");
+    let old_config = std::env::var("XDG_CONFIG_HOME").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_cache = std::env::var("XDG_CACHE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+        std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
+    }
+    let project_root = repo.join("project");
+    let template_root = repo.join("memory-layer/skill-template");
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&template_root.join(name), "0.2.0");
+        write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
+    }
+
+    let report =
+        upgrade_project_skills_with_template(&project_root, Some(template_root), false, false)
+            .unwrap();
+    let backup_root = report.backup_root.clone().expect("backup root");
+
+    assert!(!report.dry_run);
+    assert_eq!(
+        read_skill_version(
+            &project_root
+                .join(".agents/skills")
+                .join(MEMORY_SKILL_NAMES[0])
+        )
+        .unwrap(),
+        Some("0.2.0".to_string())
+    );
+    assert!(
+        PathBuf::from(backup_root)
+            .join(MEMORY_SKILL_NAMES[0])
+            .join("SKILL.md")
+            .is_file()
+    );
+    assert_eq!(report.inventory.status, SkillBundleStatus::Warn);
+
+    restore_env_var("XDG_CONFIG_HOME", old_config);
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("XDG_CACHE_HOME", old_cache);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+#[test]
+fn skill_inventory_reports_ok_for_matching_bundle_version() {
+    let repo = unique_temp_dir("mem-skill-bundle-ok");
+    let project_root = repo.join("project");
+    let template_root = repo.join("memory-layer/skill-template");
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&template_root.join(name), env!("CARGO_PKG_VERSION"));
+        write_test_skill(
+            &project_root.join(".agents/skills").join(name),
+            env!("CARGO_PKG_VERSION"),
+        );
+    }
+
+    let inventory =
+        project_skill_inventory_with_template(&project_root, Some(template_root), false);
+
+    assert_eq!(inventory.bundle_version, env!("CARGO_PKG_VERSION"));
+    assert_eq!(inventory.status, SkillBundleStatus::Ok);
+    assert!(inventory.summary.contains("all project skills match"));
+
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn github_skill_version_report_detects_outdated_project_skills() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo = unique_temp_dir("mem-github-skill-versions");
+    let project_root = repo.join("project");
+    let github_root = repo.join("github-skills");
+    let old_raw = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE").ok();
+    for name in MEMORY_SKILL_NAMES {
+        write_test_skill(&github_root.join(name), "0.3.0");
+        write_test_skill(&project_root.join(".agents/skills").join(name), "0.2.0");
+    }
+    unsafe {
+        std::env::set_var(
+            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE",
+            format!("file://{}", github_root.display()),
+        );
+    }
+
+    let report = github_skill_version_report(&project_root).unwrap();
+
+    assert_eq!(report.status, SkillBundleStatus::Warn);
+    assert_eq!(report.skills[0].status, SkillVersionStatus::Outdated);
+    assert_eq!(report.skills[0].github_version.as_deref(), Some("0.3.0"));
+
+    restore_env_var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE", old_raw);
+    let _ = fs::remove_dir_all(repo);
+}
+
+#[test]
+fn download_github_skill_template_extracts_archive_to_state_cache() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let repo = unique_temp_dir("mem-github-skill-archive");
+    let xdg_root = unique_temp_dir("mem-github-skill-archive-xdg");
+    let archive_path = repo.join("memory-main.zip");
+    let old_archive = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
+    let old_state = std::env::var("XDG_STATE_HOME").ok();
+    let old_local_app_data = redirect_test_local_app_data(&xdg_root);
+    write_test_skill_archive(&archive_path, "0.4.0");
+    unsafe {
+        std::env::set_var(
+            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+            format!("file://{}", archive_path.display()),
+        );
+        std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
+    }
+
+    let template_root = download_github_skill_template().unwrap();
+
+    assert!(template_root.ends_with("skill-template-github/main"));
+    for name in MEMORY_SKILL_NAMES {
+        assert_eq!(
+            read_skill_version(&template_root.join(name)).unwrap(),
+            Some("0.4.0".to_string())
+        );
+    }
+
+    restore_env_var(
+        "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+        old_archive,
+    );
+    restore_env_var("XDG_STATE_HOME", old_state);
+    restore_env_var("LOCALAPPDATA", old_local_app_data);
+    let _ = fs::remove_dir_all(repo);
+    let _ = fs::remove_dir_all(xdg_root);
+}
+
+fn write_test_skill(path: &Path, version: &str) {
+    fs::create_dir_all(path.join("agents")).unwrap();
+    let name = path.file_name().and_then(|value| value.to_str()).unwrap();
+    fs::write(
+        path.join("SKILL.md"),
+        format!("---\nname: {name}\nversion: {version}\ndescription: test\n---\n"),
+    )
+    .unwrap();
+    fs::write(
+        path.join("agents/openai.yaml"),
+        format!("name: {name}\nversion: {version}\nentrypoint: SKILL.md\n"),
+    )
+    .unwrap();
+}
+
+fn write_test_skill_archive(path: &Path, version: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).unwrap();
+    }
+    let file = fs::File::create(path).unwrap();
+    let mut zip = ZipWriter::new(file);
+    let options = SimpleFileOptions::default();
+    for name in MEMORY_SKILL_NAMES {
+        zip.start_file(
+            format!("memory-main/.agents/skills/{name}/SKILL.md"),
+            options,
+        )
+        .unwrap();
+        use std::io::Write;
+        zip.write_all(
+            format!("---\nname: {name}\nversion: {version}\ndescription: test\n---\n").as_bytes(),
+        )
+        .unwrap();
+        zip.add_directory(
+            format!("memory-main/.agents/skills/{name}/ignored/"),
+            options,
+        )
+        .unwrap();
+    }
+    zip.start_file("memory-main/README.md", options).unwrap();
+    use std::io::Write;
+    zip.write_all(b"not part of the skill template").unwrap();
+    zip.finish().unwrap();
+}
+
+fn unique_temp_dir(name: &str) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "{name}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    if path.exists() {
+        let _ = fs::remove_dir_all(&path);
+    }
+    path
+}
+
+#[test]
+fn capture_quality_help_and_flag_contract() {
+    let output = rendered_help(&["memory", "eval", "capture-quality", "--help"]);
+    for expected in [
+        "--suite",
+        "--backend",
+        "--out",
+        "--dry-run",
+        "--replay",
+        "TYPESAFE_API_KEY",
+        "Agent notes:",
+        "Examples:",
+        "docs/user/cli/eval.md",
+    ] {
+        assert!(output.contains(expected), "missing {expected}");
+    }
+    let parse = |tail: &[&str]| {
+        let mut args = vec![
+            "memory",
+            "eval",
+            "capture-quality",
+            "--suite",
+            "suite.json",
+            "--out",
+            "run",
+        ];
+        args.extend_from_slice(tail);
+        Cli::try_parse_from(args)
+    };
+    assert!(parse(&[]).is_ok());
+    assert!(parse(&["--backend", "both", "--dry-run"]).is_ok());
+    assert!(parse(&["--backend", "unknown"]).is_err());
+    assert!(parse(&["--dry-run", "--replay", "previous.json"]).is_err());
+}

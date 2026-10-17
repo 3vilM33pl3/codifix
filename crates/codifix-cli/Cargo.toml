@@ -1,0 +1,65 @@
+[package]
+name = "codifix-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+autobins = false
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+crossterm = { workspace = true, optional = true }
+codifix-agenttop = { path = "../codifix-agenttop" }
+codifix-analyze = { path = "../codifix-analyze" }
+codifix-curate = { path = "../codifix-curate" }
+codifix-config = { path = "../codifix-config" }
+codifix-record = { path = "../codifix-record" }
+codifix-federation-runtime = { path = "../codifix-federation-runtime", optional = true }
+codifix-eval = { path = "../codifix-eval" }
+codifix-graph = { path = "../codifix-graph" }
+codifix-mcp = { path = "../codifix-mcp" }
+codifix-platform = { path = "../codifix-platform" }
+codifix-service = { path = "../codifix-service", optional = true, default-features = false }
+codifix-skills = { path = "../codifix-skills" }
+codifix-watch = { path = "../codifix-watch" }
+ratatui = { workspace = true, optional = true }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+semver.workspace = true
+similar.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+futures-util.workspace = true
+tokio-tungstenite.workspace = true
+uuid.workspace = true
+toml.workspace = true
+humantime = "2"
+zip.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "=3.7.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Credentials", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs", "process"], optional = true }
+
+[features]
+default = ["full"]
+tui = ["dep:ratatui", "dep:crossterm"]
+project-sync = ["dep:codifix-federation-runtime", "dep:rustix"]
+embedded-service-postgres = ["dep:codifix-service", "project-sync"]
+embedded-service = ["embedded-service-postgres", "codifix-service/offline"]
+full = ["tui", "embedded-service"]
+
+[[bin]]
+name = "codifix"
+path = "src/main.rs"
+
+[lints]
+workspace = true

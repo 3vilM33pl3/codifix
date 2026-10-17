@@ -1,0 +1,70 @@
+[package]
+name = "codifix-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+autobins = false
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+matchit.workspace = true
+chrono.workspace = true
+config.workspace = true
+codifix-agenttop = { path = "../codifix-agenttop" }
+codifix-config = { path = "../codifix-config" }
+codifix-record = { path = "../codifix-record" }
+codifix-store = { path = "../codifix-store" }
+codifix-supervisor-store = { path = "../codifix-supervisor-store" }
+codifix-supervisor-runtime = { path = "../codifix-supervisor-runtime" }
+codifix-federation = { path = "../codifix-federation" }
+codifix-federation-store = { path = "../codifix-federation-store" }
+codifix-federation-runtime = { path = "../codifix-federation-runtime" }
+async-trait = "0.1"
+codifix-consolidate = { path = "../codifix-consolidate" }
+codifix-curate = { path = "../codifix-curate" }
+codifix-reinforce = { path = "../codifix-reinforce" }
+codifix-graph = { path = "../codifix-graph" }
+codifix-loops = { path = "../codifix-loops" }
+codifix-mcp = { path = "../codifix-mcp" }
+codifix-platform = { path = "../codifix-platform" }
+codifix-search = { path = "../codifix-search" }
+codifix-skills = { path = "../codifix-skills" }
+codifix-watch = { path = "../codifix-watch" }
+futures-util.workspace = true
+duckdb = { workspace = true, optional = true }
+reqwest.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+semver.workspace = true
+socket2.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
+urlencoding.workspace = true
+base64.workspace = true
+openidconnect.workspace = true
+rand.workspace = true
+regex.workspace = true
+sha2.workspace = true
+zip.workspace = true
+toml_edit = "0.23"
+libc = "0.2"
+
+
+[features]
+default = ["offline"]
+offline = ["dep:duckdb"]
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+codifix-supervisor = { path = "../codifix-supervisor" }
+
+[lints]
+workspace = true

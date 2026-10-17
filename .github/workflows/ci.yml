@@ -43,24 +43,24 @@ jobs:
             db:
               - "Cargo.toml"
               - "Cargo.lock"
-              - "crates/mem-record/**"
-              - "crates/mem-config/**"
-              - "crates/mem-curate/**"
-              - "crates/mem-graph/**"
-              - "crates/mem-search/**"
-              - "crates/mem-service/**"
-              - "crates/mem-test-support/**"
-              - "crates/mem-store/**"
-              - "crates/mem-platform/**"
-              - "crates/mem-loops/**"
-              - "crates/mem-cli/**"
+              - "crates/codifix-record/**"
+              - "crates/codifix-config/**"
+              - "crates/codifix-curate/**"
+              - "crates/codifix-graph/**"
+              - "crates/codifix-search/**"
+              - "crates/codifix-service/**"
+              - "crates/codifix-test-support/**"
+              - "crates/codifix-store/**"
+              - "crates/codifix-platform/**"
+              - "crates/codifix-loops/**"
+              - "crates/codifix-cli/**"
               - "scripts/r1-process-smoke.mjs"
               - ".github/workflows/ci.yml"
-              - "crates/mem-federation/**"
-              - "crates/mem-federation-store/**"
-              - "crates/mem-federation-runtime/**"
-              - "crates/mem-atproto/**"
-              - "crates/mem-atproto-verify/**"
+              - "crates/codifix-federation/**"
+              - "crates/codifix-federation-store/**"
+              - "crates/codifix-federation-runtime/**"
+              - "crates/codifix-atproto/**"
+              - "crates/codifix-atproto-verify/**"
               - "migrations/**"
             web:
               - "web/**"
@@ -69,10 +69,10 @@ jobs:
             evals:
               - "Cargo.toml"
               - "Cargo.lock"
-              - "crates/mem-cli/**"
-              - "crates/mem-eval/**"
-              - "crates/mem-record/**"
-              - "crates/mem-config/**"
+              - "crates/codifix-cli/**"
+              - "crates/codifix-eval/**"
+              - "crates/codifix-record/**"
+              - "crates/codifix-config/**"
               - "evals/**"
             package:
               - "Cargo.toml"
@@ -96,23 +96,23 @@ jobs:
               - "formal/memory-federation/**"
               - "fixtures/federation/traces/**"
               - "fixtures/federation/publication-traces/**"
-              - "crates/mem-federation/**"
+              - "crates/codifix-federation/**"
             federation_pds:
               - "Cargo.toml"
               - "Cargo.lock"
-              - "crates/mem-federation/**"
-              - "crates/mem-federation-store/**"
-              - "crates/mem-federation-runtime/**"
-              - "crates/mem-service/**"
-              - "crates/mem-cli/**"
+              - "crates/codifix-federation/**"
+              - "crates/codifix-federation-store/**"
+              - "crates/codifix-federation-runtime/**"
+              - "crates/codifix-service/**"
+              - "crates/codifix-cli/**"
               - "web/**"
               - "migrations/**"
               - "tests/federation-pds/**"
               - "tests/federation-isolation/**"
               - "deploy/federation/**"
               - "fixtures/federation/upstream-lock.json"
-              - "crates/mem-atproto/**"
-              - "crates/mem-atproto-verify/**"
+              - "crates/codifix-atproto/**"
+              - "crates/codifix-atproto-verify/**"
               - "fixtures/federation/atproto/**"
               - ".github/workflows/ci.yml"
 
@@ -148,15 +148,15 @@ jobs:
       - run: docker pull ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
       - run: node tests/federation-pds/backup.test.cjs
       - run: node tests/federation-pds/run.mjs
-      - run: cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
-      - run: cargo build -p mem-cli --locked
+      - run: cargo test -p codifix-federation-runtime --test c_workflow --locked --no-run
+      - run: cargo build -p codifix-cli --locked
       - run: npm --prefix web ci
       - run: npm --prefix web run test
       - run: npm --prefix web run build
       - run: npx playwright install chromium
         working-directory: web
       - name: F1 browser collection and queued-question rehearsal
-        run: cargo test -p mem-service f1_browser_collection --lib --locked -- --nocapture
+        run: cargo test -p codifix-service f1_browser_collection --lib --locked -- --nocapture
         env:
           MEMORY_FEDERATION_F1_BROWSER: "1"
       - run: node tests/federation-pds/run.mjs --runtime
@@ -214,7 +214,7 @@ jobs:
       - run: cargo test --workspace --all-targets --locked
       - name: Test project onboarding CLI and independent cache agents
         run: |
-          cargo test -p mem-cli --no-default-features --features project-sync,tui --locked commands::auth_enrollment:: -- --test-threads=2
+          cargo test -p codifix-cli --no-default-features --features project-sync,tui --locked commands::auth_enrollment:: -- --test-threads=2
 
   rust-clippy:
     name: Rust Clippy
@@ -236,7 +236,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check --locked --features full --package mem-cli --bin memory
+      - run: cargo check --locked --features full --package codifix-cli --bin codifix
 
   db-integration:
     name: DB Integration
@@ -271,41 +271,41 @@ jobs:
       - run: cargo test --workspace --all-targets --locked
         env:
           RUST_TEST_THREADS: 8
-      - run: cargo build -p mem-cli --bin memory --locked
+      - run: cargo build -p codifix-cli --bin codifix --locked
       - run: node scripts/r1-process-smoke.mjs
       - name: Verify R3 snapshot owner and foreground service
         run: |
-          cargo build -p mem-test-support --example r3_snapshot --locked
-          cargo build -p mem-eval --example r3_score --locked
-          cargo build -p mem-eval --example r3_budget --locked
+          cargo build -p codifix-test-support --example r3_snapshot --locked
+          cargo build -p codifix-eval --example r3_score --locked
+          cargo build -p codifix-eval --example r3_budget --locked
           r3_fixture_image=ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
           docker pull "$r3_fixture_image"
           r3_container_image=$(docker image inspect --format '{{.Id}}' "$r3_fixture_image")
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_SNAPSHOT=1 \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" MEMORY_R3_REQUIRE_SNAPSHOT=1 \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SERVICE_ANSWER=1 \
             node --test evals/r3/snapshot.test.mjs
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" \
             MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_REQUIRE_BUDGETED_SERVICE=1 MEMORY_R3_REQUIRE_MEDIATOR=1 MEMORY_R3_REQUIRE_EMBEDDINGS=1 MEMORY_R3_REQUIRE_MODEL_AGENT=1 MEMORY_R3_REQUIRE_MODEL_ANSWER=1 \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SERVICE_SESSION=1 \
             node --test evals/r3/isolation/service-session.test.mjs evals/r3/isolation/embedding-proxy.test.mjs evals/r3/request-mediator.test.mjs evals/r3/responses-call.test.mjs evals/r3/embeddings-call.test.mjs evals/r3/provider-profile.test.mjs evals/r3/context-reservation.test.mjs evals/r3/synthetic-wire-provider.test.mjs evals/r3/isolation/model-agent.test.mjs evals/r3/isolation/model-answer.test.mjs
-          cargo build -p mem-eval --example r3_retriever --locked
+          cargo build -p codifix-eval --example r3_retriever --locked
           docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
           r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_REHEARSAL_TASK=1 \
             MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_REQUIRE_PROVIDER_SESSION=1 MEMORY_R3_REQUIRE_PROVIDER_OWNER=1 MEMORY_R3_REQUIRE_APPROVED_SESSION=1 \
             node --test evals/r3/isolation/rehearsal-task.test.mjs evals/r3/provider-campaign-session.test.mjs evals/r3/approved-provider.test.mjs
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" \
             MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_REQUIRE_PAID_LAUNCHER=1 \
             node --test evals/r3/paid-launcher.test.mjs
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_REHEARSAL=1 \
             node --test evals/r3/rehearse.test.mjs
-          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" \
+          MEMORY_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" \
             MEMORY_R3_TEST_IMAGE="$r3_container_image" MEMORY_R3_RUST_IMAGE="$r3_rust_image" \
             MEMORY_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" MEMORY_R3_WIRE=1 \
             MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_REHEARSAL=1 \
@@ -322,12 +322,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo check -p mem-cli --no-default-features --locked
-      - run: cargo check -p mem-cli --no-default-features --features tui --locked
-      - run: cargo check -p mem-cli --locked
-      - run: cargo check -p mem-cli --features full --locked
-      - run: cargo check -p mem-service --no-default-features --locked
-      - run: cargo clippy -p mem-cli --features full --all-targets --locked -- -D warnings
+      - run: cargo check -p codifix-cli --no-default-features --locked
+      - run: cargo check -p codifix-cli --no-default-features --features tui --locked
+      - run: cargo check -p codifix-cli --locked
+      - run: cargo check -p codifix-cli --features full --locked
+      - run: cargo check -p codifix-service --no-default-features --locked
+      - run: cargo clippy -p codifix-cli --features full --all-targets --locked -- -D warnings
       - run: ./scripts/check-boundaries.sh
 
   offline-eval:
@@ -346,7 +346,7 @@ jobs:
           r3_review_root=$(mktemp -d)
           node evals/r3/build-review-pack.mjs "$r3_review_root/pack"
           node evals/r3/verify-review-pack.mjs "$r3_review_root/pack"
-          cargo run --locked --bin memory -- eval campaign plan \
+          cargo run --locked --bin codifix -- eval campaign plan \
             --manifest "$r3_review_root/pack/campaign.json" --split held-out
         env:
           MEMORY_LAYER_PROFILE: prod
@@ -365,15 +365,15 @@ jobs:
             node --test evals/r3/isolation/rust.test.mjs evals/r3/representative.test.mjs evals/r3/held-out.test.mjs
       - name: Verify R3 external baseline adapter
         run: |
-          cargo build -p mem-eval --example r3_retriever --locked
+          cargo build -p codifix-eval --example r3_retriever --locked
           MEMORY_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" MEMORY_R3_REQUIRE_RETRIEVER=1 \
             node --test evals/r3/retriever.test.mjs
       - name: Verify R3 blinded adjudication utility
         run: |
-          cargo build -p mem-eval --example r3_score --locked
+          cargo build -p codifix-eval --example r3_score --locked
           MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_SCORE=1 \
             node --test evals/r3/scoring.test.mjs
-          MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_REVIEW=1 \
+          MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" MEMORY_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" MEMORY_R3_REQUIRE_REVIEW=1 \
             node --test evals/r3/review.test.mjs evals/r3/label-review.test.mjs evals/r3/responses-receipt.test.mjs evals/r3/responses-request.test.mjs evals/r3/provider-transport.test.mjs evals/r3/synthetic-embedding.test.mjs evals/r3/approved-credential.test.mjs evals/r3/campaign-dispatch.test.mjs
       - name: Verify R3 retrieved context and isolated knowledge answering
         run: |
@@ -383,13 +383,13 @@ jobs:
             node --test evals/r3/isolation/knowledge.test.mjs
       - name: Verify R3 campaign dispatch and explicit recovery
         run: |
-          MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_REPRESENTATIVE_PACK=1 \
+          MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" MEMORY_R3_REQUIRE_REPRESENTATIVE_PACK=1 \
             node --test evals/r3/representative-pack.test.mjs
-          MEMORY_R3_CLI_BIN="$PWD/target/debug/memory" MEMORY_R3_REQUIRE_RUNNER=1 \
+          MEMORY_R3_CLI_BIN="$PWD/target/debug/codifix" MEMORY_R3_REQUIRE_RUNNER=1 \
             node --test evals/r3/runner.test.mjs
       - run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
-          cargo run --locked --bin memory -- \
+          cargo run --locked --bin codifix -- \
             --config "$RUNNER_TEMP/memory-layer.toml" \
             eval run \
             --suite evals/examples/memory-smoke \

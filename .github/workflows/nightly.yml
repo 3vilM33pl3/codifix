@@ -39,7 +39,7 @@ jobs:
       - name: Offline evaluation smoke
         run: |
           cp memory-layer.toml.example "$RUNNER_TEMP/memory-layer.toml"
-          cargo run --locked --bin memory -- \
+          cargo run --locked --bin codifix -- \
             --config "$RUNNER_TEMP/memory-layer.toml" \
             eval run \
             --suite evals/examples/memory-smoke \

@@ -1,0 +1,24 @@
+[package]
+name = "codifix-supervisor-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+codifix-record = { path = "../codifix-record" }
+codifix-supervisor = { path = "../codifix-supervisor" }
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+tokio.workspace = true
+
+[lints]
+workspace = true

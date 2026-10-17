@@ -1,0 +1,711 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+#![allow(clippy::unwrap_used)]
+//! Real loopback HTTP/signatures and disposable DB; not origin/service/PDS E2E.
+use codifix_federation::{expertise::*, publication::*, *};
+use codifix_federation_runtime::*;
+use codifix_federation_store::*;
+use uuid::Uuid;
+#[path = "support/f1_collections.rs"]
+mod f1_collections;
+
+fn instance() -> InstanceId {
+    InstanceId::new(Uuid::new_v4()).unwrap()
+}
+fn token() -> String {
+    format!("disposable-f1-{}", Uuid::new_v4())
+}
+fn intent(space: SpaceId, publisher: InstanceId, record: PublicationRecord) -> PublicationIntent {
+    let id = Uuid::new_v4();
+    PublicationIntent {
+        locator: RecordLocator::new(format!("fixture:{id}")).unwrap(),
+        envelope: PublicationEnvelope {
+            schema_version: 3,
+            space,
+            publisher,
+            record_id: RecordId::new(id).unwrap(),
+            author: AuthorIdentity::new("fixture-author").unwrap(),
+            authored_at: chrono::Utc::now(),
+            causation: None,
+            record,
+        },
+    }
+}
+async fn publish(
+    store: &GatewayStore,
+    fence: WriterFence,
+    security: &GatewaySecurity,
+    intent: &PublicationIntent,
+) {
+    assert_eq!(
+        store
+            .accept(fence, intent.envelope.publisher, intent)
+            .await
+            .unwrap()
+            .outcome,
+        PublicationOutcome::Applied
+    );
+    let Claim::Ready(lease) = store
+        .claim_publication(fence, RetryPolicy::default())
+        .await
+        .unwrap()
+    else {
+        panic!("claim");
+    };
+    // Simulate completed publication only. No claim of PDS verification here.
+    store
+        .acknowledge_with_receipt(&lease, serde_json::json!({"fixture_only":true}), security)
+        .await
+        .unwrap();
+}
+async fn listen(server: &GatewayServer) -> (Endpoint, tokio::task::JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint =
+        Endpoint::new(&format!("http://{}", listener.local_addr().unwrap()), true).unwrap();
+    let router = server.router();
+    (
+        endpoint,
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        }),
+    )
+}
+
+async fn delivery_claim(client: &GatewayClient, responder: InstanceId) -> AnswerDeliveryLease {
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if let ExpertiseReply::DeliveryLease(Some(lease)) = client
+                .expertise(responder, ExpertiseOperation::ClaimDelivery)
+                .await
+                .unwrap()
+            {
+                return *lease;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn private_http_exchange_is_explicit_addressed_signed_and_recoverable() {
+    let Some(db) = codifix_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let store = GatewayStore::new(db.pool.clone());
+    let space = SpaceId::new(Uuid::new_v4()).unwrap();
+    let authority = instance();
+    let memory = instance();
+    let homelab = instance();
+    let game = instance();
+    let root_token = token();
+    let memory_token = token();
+    let homelab_token = token();
+    let game_token = token();
+    let credentials = vec![
+        (root_token.clone(), authority),
+        (memory_token.clone(), memory),
+        (homelab_token.clone(), homelab),
+        (game_token.clone(), game),
+    ];
+    let security = GatewaySecurity::initial(&[41; 32], SpacePolicy::default()).unwrap();
+    let server = GatewayServer::new(
+        store.clone(),
+        space,
+        authority,
+        credentials.clone(),
+        security.clone(),
+    )
+    .await
+    .unwrap();
+    let fence = store.initialize(space, authority).await.unwrap();
+    let (disabled_endpoint, disabled_task) = listen(&server).await;
+    let response = reqwest::Client::new()
+        .post(format!("{}/v1/expertise", disabled_endpoint.origin()))
+        .bearer_auth(&root_token)
+        .json(&ExpertiseRpc {
+            nonce: Uuid::new_v4(),
+            operation: ExpertiseOperation::Claim,
+        })
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+    disabled_task.abort();
+    let fleet = [(authority, 3), (memory, 3), (homelab, 3), (game, 3)];
+    let mut old_fleet = fleet;
+    old_fleet[1].1 = 2;
+    assert!(
+        server
+            .clone()
+            .enable_expertise_rehearsal(&old_fleet)
+            .await
+            .is_err()
+    );
+    assert!(
+        server
+            .clone()
+            .enable_expertise_rehearsal(&fleet[..3])
+            .await
+            .is_err()
+    );
+    let server = server.enable_expertise_rehearsal(&fleet).await.unwrap();
+    for member in [memory, homelab] {
+        for capability in [
+            SpaceCapability::Pull,
+            SpaceCapability::Publish,
+            SpaceCapability::AskExpertise,
+            SpaceCapability::AnswerExpertise,
+        ] {
+            publish(
+                &store,
+                fence,
+                &security,
+                &intent(
+                    space,
+                    authority,
+                    PublicationRecord::Membership { member, capability },
+                ),
+            )
+            .await;
+        }
+    }
+    let mut ad = CapabilityAdvertisement {
+        owner: memory,
+        collection: RecordId::new(Uuid::new_v4()).unwrap(),
+        revision: StateRevision::new(1).unwrap(),
+        collection_digest: CanonicalJsonCodec::digest(&"reviewed private memory snapshot").unwrap(),
+        name: "Memory expertise".into(),
+        description: "Reviewed metadata only".into(),
+        topics: vec!["memory".into()],
+        modes: vec![AnswerMode::Deterministic],
+        requesters: vec![homelab],
+        model_destinations: vec![],
+        output_destinations: vec!["local_human".into()],
+        active: true,
+        limits: Default::default(),
+    };
+    publish(
+        &store,
+        fence,
+        &security,
+        &intent(space, memory, PublicationRecord::Expertise(ad.clone())),
+    )
+    .await;
+    let (endpoint, task) = listen(&server).await;
+    let client = |token: String| {
+        GatewayClient::new(endpoint.clone(), token, space, authority, security.trust()).unwrap()
+    };
+    let requester = client(homelab_token.clone());
+    let responder = client(memory_token);
+    let game_client = client(game_token);
+    let discover = || ExpertiseOperation::Discover {
+        after: None,
+        limit: 32,
+    };
+    let ExpertiseReply::Capabilities(ads) = requester.expertise(homelab, discover()).await.unwrap()
+    else {
+        panic!("discovery");
+    };
+    assert_eq!(ads, vec![ad.clone()]);
+    assert!(game_client.expertise(game, discover()).await.is_err());
+    assert!(requester.expertise(memory, discover()).await.is_err()); // wrong audience fails verification
+    let created_at = chrono::Utc::now();
+    let q = ExpertiseQuestion {
+        request_id: Uuid::new_v4(),
+        space,
+        requester: homelab,
+        principal: Uuid::new_v4(),
+        capability: ad.key(),
+        revision: ad.revision,
+        collection_digest: ad.collection_digest.clone(),
+        question: "Private Q&A, never a public timeline item".into(),
+        mode: AnswerMode::Deterministic,
+        model_destination: None,
+        output_destination: "local_human".into(),
+        created_at,
+        expires_at: created_at + chrono::Duration::seconds(120),
+    };
+    let submit = || ExpertiseOperation::Submit {
+        question: q.clone(),
+    };
+    for _ in 0..2 {
+        requester.expertise(homelab, submit()).await.unwrap();
+    }
+    let mut changed = q.clone();
+    changed.question.push('?');
+    assert!(
+        requester
+            .expertise(homelab, ExpertiseOperation::Submit { question: changed })
+            .await
+            .is_err()
+    );
+    let result = || ExpertiseOperation::Result {
+        request_id: q.request_id,
+    };
+    assert!(game_client.expertise(game, result()).await.is_err());
+    assert!(responder.expertise(memory, result()).await.is_err());
+    let (a, b) = tokio::join!(
+        responder.expertise(memory, ExpertiseOperation::Claim),
+        responder.expertise(memory, ExpertiseOperation::Claim)
+    );
+    let mut leases = [a.unwrap(), b.unwrap()]
+        .into_iter()
+        .filter_map(|r| match r {
+            ExpertiseReply::Lease(l) => l,
+            _ => panic!("lease"),
+        });
+    let lease = leases.next().unwrap();
+    assert!(leases.next().is_none());
+    assert_eq!(lease.question, q);
+    responder
+        .expertise(
+            memory,
+            ExpertiseOperation::Renew {
+                lease: (*lease).clone(),
+            },
+        )
+        .await
+        .unwrap();
+    // A refused result tests transport completion without pretending that a
+    // gateway can validate the responder's undisclosed source database.
+    let answer = ExpertiseAnswer {
+        request_digest: q.digest().unwrap(),
+        status: ExpertiseStatus::Refused,
+        text: "Insufficient reviewed evidence".into(),
+        citations: vec![],
+        insufficient_evidence: true,
+        reason: None,
+        untrusted: true,
+    };
+    for _ in 0..2 {
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::Complete {
+                    lease: (*lease).clone(),
+                    answer: answer.clone(),
+                },
+            )
+            .await
+            .unwrap();
+    }
+    // A release after its live challenge expires cannot deliver retained bytes.
+    // A subsequent read needs a new nonce and a new origin authorization.
+    let (expired, denied) = tokio::join!(requester.expertise(homelab, result()), async {
+        let lease = delivery_claim(&responder, memory).await;
+        sqlx::query("UPDATE federation_expertise_deliveries SET expires_at=clock_timestamp()-interval '1 second' WHERE nonce=$1")
+            .bind(lease.nonce).execute(&db.pool).await.unwrap();
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery {
+                    authorization: lease.authorization(true).unwrap(),
+                },
+            )
+            .await
+    });
+    assert!(expired.is_err());
+    assert!(denied.is_err());
+    let (received, authorization) = tokio::join!(requester.expertise(homelab, result()), async {
+        let lease = delivery_claim(&responder, memory).await;
+        let authorization = lease.authorization(true).unwrap();
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery {
+                    authorization: authorization.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        authorization
+    });
+    let ExpertiseReply::Question(result) = received.unwrap() else {
+        panic!("result");
+    };
+    assert_eq!(result.answer.unwrap(), answer);
+    assert!(
+        responder
+            .expertise(
+                memory,
+                ExpertiseOperation::AuthorizeDelivery { authorization }
+            )
+            .await
+            .is_err()
+    );
+    let leaked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM federation_accepted WHERE delivery::text LIKE '%Private Q&A%')")
+        .fetch_one(&db.pool).await.unwrap();
+    assert!(!leaked);
+    // Enrollment alone does not grant discovery or asking this collection.
+    for capability in [SpaceCapability::Pull, SpaceCapability::AskExpertise] {
+        publish(
+            &store,
+            fence,
+            &security,
+            &intent(
+                space,
+                authority,
+                PublicationRecord::Membership {
+                    member: game,
+                    capability,
+                },
+            ),
+        )
+        .await;
+    }
+    let ExpertiseReply::Capabilities(empty) =
+        game_client.expertise(game, discover()).await.unwrap()
+    else {
+        panic!("discovery");
+    };
+    assert!(empty.is_empty());
+    ad.revision = StateRevision::new(2).unwrap();
+    ad.requesters.push(game);
+    publish(
+        &store,
+        fence,
+        &security,
+        &intent(space, memory, PublicationRecord::Expertise(ad.clone())),
+    )
+    .await;
+    let ExpertiseReply::Capabilities(ads) = game_client.expertise(game, discover()).await.unwrap()
+    else {
+        panic!("discovery");
+    };
+    assert_eq!(ads, vec![ad]);
+    assert!(
+        requester
+            .expertise(
+                homelab,
+                ExpertiseOperation::Submit {
+                    question: q.clone()
+                }
+            )
+            .await
+            .is_err()
+    ); // stale revision even on retry
+    // Network restart preserves completed metadata; old revision remains denied.
+    task.abort();
+    let restarted = GatewayServer::new(
+        store.clone(),
+        space,
+        authority,
+        credentials,
+        security.clone(),
+    )
+    .await
+    .unwrap()
+    .enable_expertise_rehearsal(&fleet)
+    .await
+    .unwrap();
+    let (endpoint, task) = listen(&restarted).await;
+    let requester =
+        GatewayClient::new(endpoint, homelab_token, space, authority, security.trust()).unwrap();
+    assert!(
+        requester
+            .expertise(
+                homelab,
+                ExpertiseOperation::Result {
+                    request_id: q.request_id
+                }
+            )
+            .await
+            .is_err()
+    );
+    task.abort();
+    db.cleanup().await.unwrap();
+}
+
+/// Four independently enrolled area identities exercise signed gateway RPC,
+/// recipient isolation and both fixed agent destinations. PDS signature and
+/// CAR inclusion are exercised separately in http_contract, not faked here.
+#[tokio::test]
+async fn four_area_addressed_gateway_transport_is_private_and_replay_safe() {
+    let Some(db) = codifix_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let store = GatewayStore::new(db.pool.clone());
+    let space = SpaceId::new(Uuid::new_v4()).unwrap();
+    let workshop = instance();
+    let homelab = instance();
+    let trust = instance();
+    let general = instance();
+    let ids = [workshop, homelab, trust, general];
+    let tokens = [token(), token(), token(), token()];
+    let security = GatewaySecurity::initial(
+        &[87; 32],
+        SpacePolicy {
+            external_models: ["codex_openai".into(), "claude_anthropic".into()]
+                .into_iter()
+                .collect(),
+        },
+    )
+    .unwrap();
+    let server = GatewayServer::new(
+        store.clone(),
+        space,
+        workshop,
+        ids.into_iter()
+            .zip(tokens.iter().cloned())
+            .map(|(id, token)| (token, id))
+            .collect(),
+        security.clone(),
+    )
+    .await
+    .unwrap();
+    let fleet = ids.map(|id| (id, 3));
+    let addressed_fleet = ids.map(|id| (id, ADDRESSED_EXPERTISE_SCHEMA_VERSION));
+    assert!(
+        server
+            .clone()
+            .enable_addressed_expertise(&addressed_fleet)
+            .await
+            .is_err()
+    );
+    let server = server
+        .enable_expertise_rehearsal(&fleet)
+        .await
+        .unwrap()
+        .enable_addressed_expertise(&addressed_fleet)
+        .await
+        .unwrap();
+    let fence = store.initialize(space, workshop).await.unwrap();
+    for member in ids {
+        for capability in [
+            SpaceCapability::Pull,
+            SpaceCapability::Publish,
+            SpaceCapability::AskExpertise,
+            SpaceCapability::AnswerExpertise,
+        ] {
+            publish(
+                &store,
+                fence,
+                &security,
+                &intent(
+                    space,
+                    workshop,
+                    PublicationRecord::Membership { member, capability },
+                ),
+            )
+            .await;
+        }
+    }
+    let ad = CapabilityAdvertisement {
+        owner: trust,
+        collection: RecordId::new(Uuid::new_v4()).unwrap(),
+        revision: StateRevision::new(1).unwrap(),
+        collection_digest: CanonicalJsonCodec::digest(&"synthetic-reviewed-trust").unwrap(),
+        name: "Trust".into(),
+        description: "Reviewed synthetic CA notes".into(),
+        topics: vec!["ca".into()],
+        modes: vec![AnswerMode::Deterministic],
+        requesters: vec![workshop, general],
+        model_destinations: vec![],
+        output_destinations: vec!["codex_openai".into(), "claude_anthropic".into()],
+        active: true,
+        limits: Default::default(),
+    };
+    publish(
+        &store,
+        fence,
+        &security,
+        &intent(space, trust, PublicationRecord::Expertise(ad.clone())),
+    )
+    .await;
+    let (endpoint, task) = listen(&server).await;
+    let client = |index: usize| {
+        GatewayClient::new(
+            endpoint.clone(),
+            tokens[index].clone(),
+            space,
+            workshop,
+            security.trust(),
+        )
+        .unwrap()
+    };
+    let trust_client = client(2);
+    // Homelab is a member, but this collection did not review it as requester.
+    let ExpertiseReply::Capabilities(empty) = client(1)
+        .expertise(
+            homelab,
+            ExpertiseOperation::Discover {
+                after: None,
+                limit: 32,
+            },
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("discovery")
+    };
+    assert!(empty.is_empty());
+    for (index, requester, destination) in [
+        (0, workshop, "codex_openai"),
+        (3, general, "claude_anthropic"),
+    ] {
+        let requester_client = client(index);
+        let ExpertiseReply::Capabilities(ads) = requester_client
+            .expertise(
+                requester,
+                ExpertiseOperation::Discover {
+                    after: None,
+                    limit: 32,
+                },
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("discovery")
+        };
+        assert_eq!(ads, vec![ad.clone()]);
+        let now = chrono::Utc::now();
+        let question = ExpertiseQuestion {
+            request_id: Uuid::new_v4(),
+            space,
+            requester,
+            principal: Uuid::new_v4(),
+            capability: ad.key(),
+            revision: ad.revision,
+            collection_digest: ad.collection_digest.clone(),
+            question: "What is the reviewed CA recovery fact?".into(),
+            mode: AnswerMode::Deterministic,
+            model_destination: None,
+            output_destination: destination.into(),
+            created_at: now,
+            expires_at: now + chrono::Duration::seconds(120),
+        };
+        let record = AddressedExpertiseRecord::question(
+            question.clone(),
+            1,
+            CanonicalJsonCodec::digest(&"synthetic-standing-policy").unwrap(),
+        )
+        .unwrap();
+        let submit = || ExpertiseOperation::AddressedSubmit {
+            record: record.clone(),
+            answer_claim: None,
+        };
+        requester_client
+            .expertise(requester, submit())
+            .await
+            .unwrap();
+        requester_client
+            .expertise(requester, submit())
+            .await
+            .unwrap();
+        let mut changed = record.clone();
+        if let AddressedExpertisePayload::Question(ref mut q) = changed.payload {
+            q.question.push('!');
+        }
+        changed.payload_digest = CanonicalJsonCodec::digest(&changed.payload).unwrap();
+        assert!(
+            requester_client
+                .expertise(
+                    requester,
+                    ExpertiseOperation::AddressedSubmit {
+                        record: changed,
+                        answer_claim: None
+                    }
+                )
+                .await
+                .is_err()
+        );
+        let lease = store.claim_addressed(fence).await.unwrap().unwrap();
+        store
+            .acknowledge_addressed(
+                fence,
+                &lease,
+                "fixture-cid",
+                serde_json::json!({"record_cid":"fixture-cid"}),
+            )
+            .await
+            .unwrap();
+        assert!(
+            client(1)
+                .expertise(
+                    homelab,
+                    ExpertiseOperation::AddressedRead {
+                        request_id: question.request_id,
+                        kind: "question".into()
+                    }
+                )
+                .await
+                .is_err()
+        );
+        let ExpertiseReply::AddressedDelivery(Some(delivery)) = requester_client
+            .expertise(
+                requester,
+                ExpertiseOperation::AddressedRead {
+                    request_id: question.request_id,
+                    kind: "question".into(),
+                },
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("question read")
+        };
+        assert_eq!(delivery.record, Some(record.clone()));
+        let ExpertiseReply::AddressedLease(Some(answer_lease)) = trust_client
+            .expertise(trust, ExpertiseOperation::AddressedClaim)
+            .await
+            .unwrap()
+        else {
+            panic!("answer claim")
+        };
+        assert_eq!(answer_lease.record, record);
+        let answer = ExpertiseAnswer {
+            request_digest: question.digest().unwrap(),
+            status: ExpertiseStatus::Refused,
+            text: "Insufficient reviewed evidence".into(),
+            citations: vec![],
+            insufficient_evidence: true,
+            reason: None,
+            untrusted: true,
+        };
+        let answer_record = AddressedExpertiseRecord::answer(
+            &question,
+            answer,
+            1,
+            record.policy_digest.clone(),
+            chrono::Utc::now(),
+        )
+        .unwrap();
+        trust_client
+            .expertise(
+                trust,
+                ExpertiseOperation::AddressedSubmit {
+                    record: answer_record.clone(),
+                    answer_claim: Some(answer_lease.lease_token),
+                },
+            )
+            .await
+            .unwrap();
+        let lease = store.claim_addressed(fence).await.unwrap().unwrap();
+        store
+            .acknowledge_addressed(
+                fence,
+                &lease,
+                "fixture-cid",
+                serde_json::json!({"record_cid":"fixture-cid"}),
+            )
+            .await
+            .unwrap();
+        let ExpertiseReply::AddressedDelivery(Some(delivery)) = requester_client
+            .expertise(
+                requester,
+                ExpertiseOperation::AddressedRead {
+                    request_id: question.request_id,
+                    kind: "answer".into(),
+                },
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("answer read")
+        };
+        assert_eq!(delivery.record, Some(answer_record));
+    }
+    task.abort();
+    db.cleanup().await.unwrap();
+}

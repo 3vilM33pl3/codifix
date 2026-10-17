@@ -1,0 +1,23 @@
+[package]
+name = "codifix-curate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+chrono.workspace = true
+codifix-record = { path = "../codifix-record" }
+codifix-store = { path = "../codifix-store" }
+serde.workspace = true
+sha2.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+tokio.workspace = true
+
+[lints]
+workspace = true

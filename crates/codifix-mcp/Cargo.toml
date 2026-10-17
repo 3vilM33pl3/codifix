@@ -1,0 +1,27 @@
+[package]
+name = "codifix-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+http.workspace = true
+codifix-config = { path = "../codifix-config" }
+codifix-record = { path = "../codifix-record" }
+codifix-platform = { path = "../codifix-platform" }
+reqwest.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+urlencoding.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+
+[lints]
+workspace = true

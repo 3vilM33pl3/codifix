@@ -35,7 +35,7 @@ class InstalledCoreCheckTests(unittest.TestCase):
                          "$journal.input_sha256 -cne $old.preview_input_sha256",
                          "$journal.operation_id -cne $InstallOperationId.ToString()",
                          "(Get-CoreInstallHash $config) -cne $old.config_sha256",
-                         '(Get-CoreInstallHash "$release\\bin\\memory.exe") -cne $core.binary_sha256',
+                         '(Get-CoreInstallHash "$release\\bin\\codifix.exe") -cne $core.binary_sha256',
                          "Get-CoreInstallBinding ([IO.File]::ReadAllText($config))",
                          "original_receipt_sha256=(Get-CoreInstallHash $oldPath)"]:
             self.assertIn(required, source)

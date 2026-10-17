@@ -49,7 +49,7 @@ class CoreInstallTests(unittest.TestCase):
                          "$InstallOperationId -eq $OperationId", r"runs\$InstallOperationId\core-install",
                          r"runs\$OperationId\core-workflow", "core_operation_id=$OperationId.ToString()",
                          "operation_id=$InstallOperationId.ToString()", "'-OperationId',$InstallOperationId.ToString()",
-                         "return Join-Path $CoreRoot 'code\\memory.exe'", "return Join-Path $DebugRoot $File",
+                         "return Join-Path $CoreRoot 'code\\codifix.exe'", "return Join-Path $DebugRoot $File",
                          "Copy-CoreInstallFile $from (Join-Path $payload ('bin\\'+$file)) $pin[0].sha256 $file",
                          "Pinned core installation input unavailable or changed: '+$Component"]:
             self.assertIn(required, source)
@@ -131,7 +131,7 @@ class CoreInstallTests(unittest.TestCase):
         source = SCRIPT.read_text()
         for required in ["Get-CimInstance Win32_Service", "$scm.StartName -ine $account", "GetOwnerSid",
                          "$owner.Sid -cne $serviceSid", "$childOwner.Sid -cne $serviceSid",
-                         "'bin\\memory.exe'", "UseProxy=$false", "AllowAutoRedirect=$false",
+                         "'bin\\codifix.exe'", "UseProxy=$false", "AllowAutoRedirect=$false",
                          "Test-NativeReadinessHealth $health $instance", "$htmlHash -cne $receipt.web_index_sha256",
                          "'/v1/query'", "retrieval_mode='lexical';answer_mode='deterministic'",
                          "'/v1/projects/native-smoke/memories'", "$_.id -ceq $core.curated_memory_id"]:

@@ -1,0 +1,99 @@
+{
+  "baseline": "6af8cc36",
+  "packages": {
+    "mem-agenttop": "codifix-agenttop",
+    "mem-analyze": "codifix-analyze",
+    "mem-area": "codifix-area",
+    "mem-area-ops": "codifix-area-ops",
+    "mem-area-store": "codifix-area-store",
+    "mem-atproto": "codifix-atproto",
+    "mem-atproto-verify": "codifix-atproto-verify",
+    "mem-cli": "codifix-cli",
+    "mem-config": "codifix-config",
+    "mem-consolidate": "codifix-consolidate",
+    "mem-curate": "codifix-curate",
+    "mem-eval": "codifix-eval",
+    "mem-federation": "codifix-federation",
+    "mem-federation-runtime": "codifix-federation-runtime",
+    "mem-federation-store": "codifix-federation-store",
+    "mem-graph": "codifix-graph",
+    "mem-loops": "codifix-loops",
+    "mem-mcp": "codifix-mcp",
+    "mem-platform": "codifix-platform",
+    "mem-platform-files": "codifix-platform-files",
+    "mem-record": "codifix-record",
+    "mem-reinforce": "codifix-reinforce",
+    "mem-search": "codifix-search",
+    "mem-service": "codifix-service",
+    "mem-skills": "codifix-skills",
+    "mem-store": "codifix-store",
+    "mem-supervisor": "codifix-supervisor",
+    "mem-supervisor-pi": "codifix-supervisor-pi",
+    "mem-supervisor-runtime": "codifix-supervisor-runtime",
+    "mem-supervisor-store": "codifix-supervisor-store",
+    "mem-test-support": "codifix-test-support",
+    "mem-watch": "codifix-watch"
+  },
+  "binaries": {
+    "memory-area": {
+      "name": "codifix-area",
+      "source": "crates/mem-area/src/main.rs",
+      "declared": true
+    },
+    "memory-area-import": {
+      "name": "codifix-area-import",
+      "source": "crates/mem-area-ops/src/main.rs",
+      "declared": true
+    },
+    "memory-gateway-schema": {
+      "name": "codifix-gateway-schema",
+      "source": "crates/mem-area-ops/src/bin/memory-gateway-schema.rs",
+      "declared": true
+    },
+    "memory": {
+      "name": "codifix",
+      "source": "crates/mem-cli/src/main.rs",
+      "declared": true
+    },
+    "memory-federation-enroll": {
+      "name": "codifix-federation-enroll",
+      "source": "crates/mem-federation-runtime/src/bin/memory-federation-enroll.rs",
+      "declared": false
+    },
+    "memory-federation-gateway": {
+      "name": "codifix-federation-gateway",
+      "source": "crates/mem-federation-runtime/src/bin/memory-federation-gateway.rs",
+      "declared": false
+    },
+    "memory-pds-pipe": {
+      "name": "codifix-pds-pipe",
+      "source": "crates/mem-federation-runtime/src/bin/memory-pds-pipe.rs",
+      "declared": false
+    },
+    "memory-windows-evaluation-helper": {
+      "name": "codifix-windows-evaluation-helper",
+      "source": "crates/mem-platform/src/bin/memory-windows-evaluation-helper.rs",
+      "declared": true
+    },
+    "memory-windows-isolation-probe": {
+      "name": "codifix-windows-isolation-probe",
+      "source": "crates/mem-platform/src/bin/memory-windows-isolation-probe.rs",
+      "declared": true
+    },
+    "memory-windows-service": {
+      "name": "codifix-windows-service",
+      "source": "crates/mem-platform/src/bin/memory-windows-service.rs",
+      "declared": false
+    },
+    "memory-pi-sandbox": {
+      "name": "codifix-pi-sandbox",
+      "source": "crates/mem-supervisor-pi/src/bin/memory-pi-sandbox.rs",
+      "declared": false
+    },
+    "memory-workshop-worker": {
+      "name": "codifix-workshop-worker",
+      "source": "crates/mem-supervisor-runtime/src/bin/memory-workshop-worker.rs",
+      "declared": false
+    }
+  }
+}

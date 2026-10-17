@@ -1,0 +1,39 @@
+[package]
+name = "codifix-supervisor-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+codifix-supervisor = { path = "../codifix-supervisor" }
+codifix-supervisor-store = { path = "../codifix-supervisor-store" }
+codifix-supervisor-pi = { path = "../codifix-supervisor-pi" }
+chrono.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+axum.workspace = true
+tokio.workspace = true
+subtle = "2.6.1"
+sqlx.workspace = true
+tempfile = "3.27.0"
+toml.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+codifix-platform = { path = "../codifix-platform" }
+codifix-platform-files = { path = "../codifix-platform-files" }
+tower = { version = "0.5.3", features = ["util"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_System_Pipes", "Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+
+[lints]
+workspace = true

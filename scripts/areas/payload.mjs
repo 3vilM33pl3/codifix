@@ -16,8 +16,8 @@ Uses one read-only repeatable-read transaction, complete row JSON, C-locale key
 ordering and exact SHA-256 bytes. Output is exclusive mode 0600 beneath an
 existing owner-only 0700 parent. No row or database error is printed.
 
---inventory-sha256 is the normalized digest from memory-area inventory, not the
-inventory file digest. This argument is a claimed binding: memory-area-import
+--inventory-sha256 is the normalized digest from codifix-area inventory, not the
+inventory file digest. This argument is a claimed binding: codifix-area-import
 must independently check every exported row against the reviewed inventory.
 This command does not approve ownership, import records or activate workers.
 `;

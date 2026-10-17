@@ -18,7 +18,7 @@ $owner=[guid]::NewGuid(); $project=[guid]::NewGuid()
 $scope=[ordered]@{company_origin='https://synthetic.example.invalid';company=[guid]::NewGuid().ToString();device=[guid]::NewGuid().ToString()
     subscription=$OperationId.ToString();space=[guid]::NewGuid().ToString();area='homelab';owner=$owner.ToString();project=$project.ToString()
     local_database=[ordered]@{host='127.0.0.1';port=55471;database='synthetic_not_connected'}}
-$plan=Get-OnboardingPlan -Stage EnableSync -Memory "$root\memory.exe" -MemorySha256 ('a'*64) -ReleaseRoot $root `
+$plan=Get-OnboardingPlan -Stage EnableSync -Memory "$root\codifix.exe" -MemorySha256 ('a'*64) -ReleaseRoot $root `
     -Config "$root\config.toml" -ConfigSha256 ('b'*64) -Company $scope.company_origin -Area homelab -Owner $owner -Project $project `
     -Profile "$root\profile.json" -ProfileSha256 ('c'*64) -ProfileScope $scope -CallerSid $sid
 $digest=Get-NativeInputDigest $plan

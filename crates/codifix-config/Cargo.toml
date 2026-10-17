@@ -1,0 +1,24 @@
+[package]
+name = "codifix-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+chrono.workspace = true
+config.workspace = true
+humantime-serde.workspace = true
+codifix-platform = { path = "../codifix-platform" }
+codifix-record = { path = "../codifix-record" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+url = "=2.5.8"
+
+[dev-dependencies]
+toml.workspace = true
+
+[lints]
+workspace = true

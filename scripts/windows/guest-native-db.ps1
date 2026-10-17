@@ -35,10 +35,10 @@ $lock=Join-Path $SourceRoot 'Cargo.lock'; $lockHash=(Get-FileHash -LiteralPath $
 $receipt=[ordered]@{format='memory-native-database-tests-v1';source_commit=$head;lock_sha256=$lockHash;compiler=($compiler -join "`n")
     state='running';required_database=$true;native_database='PostgreSQL17/127.0.0.1:55471';scope=$Scope;workflow_verified=$false}
 if($Scope -eq 'Repository'){
-    $receipt.packages=@('mem-service');$receipt.test_target='db_repository';$receipt.whole_workspace_verified=$false
+    $receipt.packages=@('codifix-service');$receipt.test_target='db_repository';$receipt.whole_workspace_verified=$false
 }
 if($Scope -eq 'Portability'){
-    $receipt.packages=@('mem-cli','mem-config','mem-eval','mem-federation-runtime')
+    $receipt.packages=@('codifix-cli','codifix-config','codifix-eval','codifix-federation-runtime')
     $receipt.whole_workspace_verified=$false
 }
 $result=Join-Path $root 'result.json'; $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8
@@ -67,7 +67,7 @@ try {
         # This is an explicitly diagnostic, synthetic rehearsal, never the
         # production artifact/package. Default driver builds remain silent.
         $receipt.diagnostic_driver=$true
-        $build=Start-Process -FilePath $cargo -ArgumentList @('build','--locked','-p','mem-supervisor-pi','--bin','memory-pi-sandbox','--features','windows-native-diagnostics') -NoNewWindow -PassThru `
+        $build=Start-Process -FilePath $cargo -ArgumentList @('build','--locked','-p','codifix-supervisor-pi','--bin','codifix-pi-sandbox','--features','windows-native-diagnostics') -NoNewWindow -PassThru `
             -RedirectStandardOutput (Join-Path $root 'build.stdout.log') -RedirectStandardError (Join-Path $root 'build.stderr.log')
         $null=$build.Handle
         if (-not $build.WaitForExit(1800000)) { & "$env:SystemRoot\System32\taskkill.exe" /PID $build.Id /T /F | Out-Null; throw 'Owned supervisor build deadline' }
@@ -81,8 +81,8 @@ try {
         $code=Join-Path $root 'code'; $private=Join-Path $root 'private'
         New-Item -ItemType Directory -Path $code,$private | Out-Null
         Copy-Item -LiteralPath $pi -Destination (Join-Path $code 'pi.exe')
-        Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'x86_64-pc-windows-msvc\debug\memory-pi-sandbox.exe') -Destination $code
-        $driver=Join-Path $code 'memory-pi-sandbox.exe'
+        Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'x86_64-pc-windows-msvc\debug\codifix-pi-sandbox.exe') -Destination $code
+        $driver=Join-Path $code 'codifix-pi-sandbox.exe'
         $config=[ordered]@{pi=(Join-Path $code 'pi.exe');driver=$driver;driver_sha256=(Get-FileHash $driver).Hash.ToLowerInvariant()
             private_runtime=$private;windows_artifacts=$evidence.artifact}
         $configPath=Join-Path $root 'config.json'
@@ -91,19 +91,19 @@ try {
         $env:MEMORY_PI_WINDOWS_SANDBOX_CONFIG_SHA256=(Get-FileHash $configPath).Hash.ToLowerInvariant()
     }
     $program=$cargo
-    $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','mem-service','--lib','--','--test-threads=1') }
-        elseif ($Scope -eq 'Repository') { @('test','--locked','-p','mem-service','--test','db_repository','--','--test-threads=1') }
+    $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','codifix-service','--lib','--','--test-threads=1') }
+        elseif ($Scope -eq 'Repository') { @('test','--locked','-p','codifix-service','--test','db_repository','--','--test-threads=1') }
         # Gather every failing test binary in one consolidated pass instead of
         # repeatedly stopping at the first crate and rebuilding to find the next.
         elseif ($Scope -eq 'Workspace') { @('test','--workspace','--all-targets','--locked','--no-fail-fast','--','--test-threads=1') }
-        elseif ($Scope -eq 'Portability') { @('test','-p','mem-cli','-p','mem-config','-p','mem-eval','-p','mem-federation-runtime','--all-targets','--locked','--no-fail-fast','--','--test-threads=1') }
-        elseif ($Scope -eq 'Supervisor') { @('test','--locked','-p','mem-supervisor-runtime','--lib',
+        elseif ($Scope -eq 'Portability') { @('test','-p','codifix-cli','-p','codifix-config','-p','codifix-eval','-p','codifix-federation-runtime','--all-targets','--locked','--no-fail-fast','--','--test-threads=1') }
+        elseif ($Scope -eq 'Supervisor') { @('test','--locked','-p','codifix-supervisor-runtime','--lib',
             'transport::tests::broker::launcher_windows::native_production_launcher_delivers_revokes_accounts_and_recovers','--','--ignored','--exact','--test-threads=1','--nocapture') }
         elseif ($Scope -eq 'Fleet') {
             $program='C:\MemoryLab\Tools\node-v24.18.1-win-x64\node.exe'
             @('C:\MemoryLab\inputs\guest-pds-fleet.mjs',$SourceRoot,$root,$sid,'--fleet','C:\MemoryLab\inputs\native-pds-profile.json')
         }
-        else { @('test','--locked','-p','mem-area-ops','-p','mem-area-store','--all-targets','--','--test-threads=1') }
+        else { @('test','--locked','-p','codifix-area-ops','-p','codifix-area-store','--all-targets','--','--test-threads=1') }
     $process=Start-Process -FilePath $program -ArgumentList $arguments -NoNewWindow -PassThru `
         -RedirectStandardOutput (Join-Path $root 'cargo.stdout.log') -RedirectStandardError (Join-Path $root 'cargo.stderr.log')
     $null=$process.Handle

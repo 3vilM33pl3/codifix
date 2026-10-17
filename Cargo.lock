@@ -787,6 +787,607 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
+name = "codifix-agenttop"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-platform",
+ "dirs",
+ "libc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "codifix-analyze"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "sha2",
+ "tree-sitter",
+ "tree-sitter-javascript",
+ "tree-sitter-python",
+ "tree-sitter-rust",
+ "tree-sitter-typescript",
+]
+
+[[package]]
+name = "codifix-area"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-area-ops"
+version = "2.1.0"
+dependencies = [
+ "clap",
+ "codifix-area",
+ "codifix-area-store",
+ "codifix-platform-files",
+ "codifix-test-support",
+ "percent-encoding",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-area-store"
+version = "2.1.0"
+dependencies = [
+ "codifix-area",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-atproto"
+version = "2.1.0"
+dependencies = [
+ "atrium-api",
+ "atrium-repo",
+ "atrium-xrpc",
+ "chrono",
+ "codifix-federation",
+ "futures",
+ "http",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-atproto-verify"
+version = "2.1.0"
+dependencies = [
+ "atrium-api",
+ "atrium-crypto",
+ "atrium-repo",
+ "chrono",
+ "codifix-atproto",
+ "codifix-federation",
+ "futures",
+ "multibase",
+ "proptest",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-cli"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "codifix-agenttop",
+ "codifix-analyze",
+ "codifix-config",
+ "codifix-curate",
+ "codifix-eval",
+ "codifix-federation-runtime",
+ "codifix-graph",
+ "codifix-mcp",
+ "codifix-platform",
+ "codifix-record",
+ "codifix-service",
+ "codifix-skills",
+ "codifix-watch",
+ "crossterm 0.28.1",
+ "futures-util",
+ "humantime",
+ "ratatui",
+ "reqwest",
+ "rustix 1.1.4",
+ "security-framework",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "similar",
+ "tokio",
+ "tokio-tungstenite 0.24.0",
+ "toml 0.8.23",
+ "uuid",
+ "windows-sys 0.61.2",
+ "zip",
+]
+
+[[package]]
+name = "codifix-config"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-platform",
+ "codifix-record",
+ "config",
+ "humantime-serde",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml 0.8.23",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-consolidate"
+version = "2.1.0"
+dependencies = [
+ "serde",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-curate"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-eval"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-record",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml 0.8.23",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-federation"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-record",
+ "proptest",
+ "serde",
+ "serde_json",
+ "serde_json_canonicalizer",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-federation-runtime"
+version = "2.1.0"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "codifix-atproto",
+ "codifix-atproto-verify",
+ "codifix-curate",
+ "codifix-federation",
+ "codifix-federation-store",
+ "codifix-platform-files",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "reqwest",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "codifix-federation-store"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-federation",
+ "codifix-record",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-graph"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-analyze",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-loops"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-platform",
+ "codifix-record",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-mcp"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "codifix-config",
+ "codifix-platform",
+ "codifix-record",
+ "http",
+ "reqwest",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "tokio",
+ "urlencoding",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-platform"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "codifix-platform-files",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sysinfo",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "codifix-platform-files"
+version = "2.1.0"
+dependencies = [
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "codifix-record"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-supervisor",
+ "humantime-serde",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-reinforce"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "codifix-config",
+ "codifix-curate",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-search"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "codifix-config",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "pgvector",
+ "proptest",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "codifix-service"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "codifix-agenttop",
+ "codifix-config",
+ "codifix-consolidate",
+ "codifix-curate",
+ "codifix-federation",
+ "codifix-federation-runtime",
+ "codifix-federation-store",
+ "codifix-graph",
+ "codifix-loops",
+ "codifix-mcp",
+ "codifix-platform",
+ "codifix-record",
+ "codifix-reinforce",
+ "codifix-search",
+ "codifix-skills",
+ "codifix-store",
+ "codifix-supervisor",
+ "codifix-supervisor-runtime",
+ "codifix-supervisor-store",
+ "codifix-test-support",
+ "codifix-watch",
+ "config",
+ "duckdb",
+ "futures-util",
+ "libc",
+ "matchit",
+ "openidconnect",
+ "rand 0.9.5",
+ "regex",
+ "reqwest",
+ "rmcp",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "socket2 0.5.10",
+ "sqlx",
+ "tokio",
+ "tokio-tungstenite 0.24.0",
+ "toml_edit 0.23.10+spec-1.0.0",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "urlencoding",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "codifix-skills"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-config",
+ "codifix-platform",
+ "reqwest",
+ "semver",
+ "serde",
+ "zip",
+]
+
+[[package]]
+name = "codifix-store"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-record",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "serde_json_canonicalizer",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-supervisor"
+version = "2.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "codifix-supervisor-pi"
+version = "2.1.0"
+dependencies = [
+ "codifix-platform",
+ "codifix-supervisor",
+ "codifix-supervisor-runtime",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "codifix-supervisor-runtime"
+version = "2.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "codifix-platform",
+ "codifix-platform-files",
+ "codifix-supervisor",
+ "codifix-supervisor-pi",
+ "codifix-supervisor-store",
+ "codifix-test-support",
+ "reqwest",
+ "rustix 1.1.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 0.8.23",
+ "tower",
+ "uuid",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "codifix-supervisor-store"
+version = "2.1.0"
+dependencies = [
+ "chrono",
+ "codifix-record",
+ "codifix-supervisor",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-test-support"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-search",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-watch"
+version = "2.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "codifix-config",
+ "codifix-platform",
+ "codifix-record",
+ "notify",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2640,607 +3241,6 @@ checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
 dependencies = [
  "cfg-if",
  "digest",
-]
-
-[[package]]
-name = "mem-agenttop"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "dirs",
- "libc",
- "mem-platform",
- "serde",
- "serde_json",
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mem-analyze"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "sha2",
- "tree-sitter",
- "tree-sitter-javascript",
- "tree-sitter-python",
- "tree-sitter-rust",
- "tree-sitter-typescript",
-]
-
-[[package]]
-name = "mem-area"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "serde",
- "serde_json",
- "sha2",
- "uuid",
-]
-
-[[package]]
-name = "mem-area-ops"
-version = "2.1.0"
-dependencies = [
- "clap",
- "mem-area",
- "mem-area-store",
- "mem-platform-files",
- "mem-test-support",
- "percent-encoding",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-area-store"
-version = "2.1.0"
-dependencies = [
- "mem-area",
- "mem-test-support",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-atproto"
-version = "2.1.0"
-dependencies = [
- "atrium-api",
- "atrium-repo",
- "atrium-xrpc",
- "chrono",
- "futures",
- "http",
- "mem-federation",
- "serde",
- "serde_ipld_dagcbor",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "mem-atproto-verify"
-version = "2.1.0"
-dependencies = [
- "atrium-api",
- "atrium-crypto",
- "atrium-repo",
- "chrono",
- "futures",
- "mem-atproto",
- "mem-federation",
- "multibase",
- "proptest",
- "serde",
- "serde_bytes",
- "serde_ipld_dagcbor",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "mem-cli"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "clap_complete",
- "crossterm 0.28.1",
- "futures-util",
- "humantime",
- "mem-agenttop",
- "mem-analyze",
- "mem-config",
- "mem-curate",
- "mem-eval",
- "mem-federation-runtime",
- "mem-graph",
- "mem-mcp",
- "mem-platform",
- "mem-record",
- "mem-service",
- "mem-skills",
- "mem-watch",
- "ratatui",
- "reqwest",
- "rustix 1.1.4",
- "security-framework",
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "similar",
- "tokio",
- "tokio-tungstenite 0.24.0",
- "toml 0.8.23",
- "uuid",
- "windows-sys 0.61.2",
- "zip",
-]
-
-[[package]]
-name = "mem-config"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "config",
- "humantime-serde",
- "mem-platform",
- "mem-record",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "toml 0.8.23",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "mem-consolidate"
-version = "2.1.0"
-dependencies = [
- "serde",
- "uuid",
-]
-
-[[package]]
-name = "mem-curate"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-record",
- "mem-store",
- "mem-test-support",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-eval"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "mem-record",
- "serde",
- "serde_json",
- "sha2",
- "toml 0.8.23",
- "uuid",
-]
-
-[[package]]
-name = "mem-federation"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-record",
- "proptest",
- "serde",
- "serde_json",
- "serde_json_canonicalizer",
- "sha2",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "mem-federation-runtime"
-version = "2.1.0"
-dependencies = [
- "axum",
- "base64 0.22.1",
- "chrono",
- "http-body-util",
- "hyper",
- "hyper-util",
- "mem-atproto",
- "mem-atproto-verify",
- "mem-curate",
- "mem-federation",
- "mem-federation-store",
- "mem-platform-files",
- "mem-record",
- "mem-store",
- "mem-test-support",
- "reqwest",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mem-federation-store"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-federation",
- "mem-record",
- "mem-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-graph"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "mem-analyze",
- "mem-record",
- "mem-store",
- "mem-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-loops"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-platform",
- "mem-record",
- "serde",
- "serde_json",
- "uuid",
-]
-
-[[package]]
-name = "mem-mcp"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "http",
- "mem-config",
- "mem-platform",
- "mem-record",
- "reqwest",
- "rmcp",
- "serde",
- "serde_json",
- "tokio",
- "urlencoding",
- "uuid",
-]
-
-[[package]]
-name = "mem-platform"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "mem-platform-files",
- "serde",
- "serde_json",
- "sha2",
- "sysinfo",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mem-platform-files"
-version = "2.1.0"
-dependencies = [
- "tempfile",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mem-record"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "humantime-serde",
- "mem-supervisor",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "mem-reinforce"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "mem-config",
- "mem-curate",
- "mem-record",
- "mem-store",
- "mem-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "mem-search"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "mem-config",
- "mem-record",
- "mem-store",
- "mem-test-support",
- "pgvector",
- "proptest",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
- "wiremock",
-]
-
-[[package]]
-name = "mem-service"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "base64 0.22.1",
- "chrono",
- "config",
- "duckdb",
- "futures-util",
- "libc",
- "matchit",
- "mem-agenttop",
- "mem-config",
- "mem-consolidate",
- "mem-curate",
- "mem-federation",
- "mem-federation-runtime",
- "mem-federation-store",
- "mem-graph",
- "mem-loops",
- "mem-mcp",
- "mem-platform",
- "mem-record",
- "mem-reinforce",
- "mem-search",
- "mem-skills",
- "mem-store",
- "mem-supervisor",
- "mem-supervisor-runtime",
- "mem-supervisor-store",
- "mem-test-support",
- "mem-watch",
- "openidconnect",
- "rand 0.9.5",
- "regex",
- "reqwest",
- "rmcp",
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "socket2 0.5.10",
- "sqlx",
- "tokio",
- "tokio-tungstenite 0.24.0",
- "toml_edit 0.23.10+spec-1.0.0",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "urlencoding",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "mem-skills"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "mem-config",
- "mem-platform",
- "reqwest",
- "semver",
- "serde",
- "zip",
-]
-
-[[package]]
-name = "mem-store"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-record",
- "mem-test-support",
- "serde",
- "serde_json",
- "serde_json_canonicalizer",
- "sha2",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-supervisor"
-version = "2.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "mem-supervisor-pi"
-version = "2.1.0"
-dependencies = [
- "mem-platform",
- "mem-supervisor",
- "mem-supervisor-runtime",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
-]
-
-[[package]]
-name = "mem-supervisor-runtime"
-version = "2.1.0"
-dependencies = [
- "axum",
- "chrono",
- "mem-platform",
- "mem-platform-files",
- "mem-supervisor",
- "mem-supervisor-pi",
- "mem-supervisor-store",
- "mem-test-support",
- "reqwest",
- "rustix 1.1.4",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "subtle",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "toml 0.8.23",
- "tower",
- "uuid",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "mem-supervisor-store"
-version = "2.1.0"
-dependencies = [
- "chrono",
- "mem-record",
- "mem-supervisor",
- "mem-test-support",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-test-support"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "mem-search",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "mem-watch"
-version = "2.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "mem-config",
- "mem-platform",
- "mem-record",
- "notify",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "toml 0.8.23",
- "tracing",
- "uuid",
 ]
 
 [[package]]

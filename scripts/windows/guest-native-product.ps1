@@ -71,7 +71,7 @@ try {
     # Separate bounded evidence files avoid PowerShell 5.1 turning ordinary
     # compiler stderr into a terminating error or dropping it from transcripts.
     $arguments=if ($Action -eq 'Build') {
-        @('build','--workspace','--bins','--locked','--features','mem-platform/windows-evaluation-helper,mem-platform/windows-native-tests')
+        @('build','--workspace','--bins','--locked','--features','codifix-platform/windows-evaluation-helper,codifix-platform/windows-native-tests')
     } else { @('check','--workspace','--all-targets','--locked') }
     $process=Start-Process -FilePath $cargo -ArgumentList $arguments -NoNewWindow -PassThru `
         -RedirectStandardOutput (Join-Path $root 'cargo.stdout.log') -RedirectStandardError (Join-Path $root 'cargo.stderr.log')

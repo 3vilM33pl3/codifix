@@ -1,0 +1,46 @@
+[package]
+name = "codifix-federation-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+chrono.workspace = true
+base64.workspace = true
+codifix-federation = { path = "../codifix-federation" }
+codifix-federation-store = { path = "../codifix-federation-store" }
+codifix-atproto = { path = "../codifix-atproto" }
+codifix-atproto-verify = { path = "../codifix-atproto-verify" }
+codifix-record = { path = "../codifix-record" }
+codifix-store = { path = "../codifix-store" }
+axum.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+codifix-platform-files = { path = "../codifix-platform-files" }
+hyper = { version = "1.8.1", features = ["client", "http1"] }
+hyper-util = { version = "0.1.20", features = ["tokio"] }
+http-body-util = "0.1.3"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_System_Pipes"] }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1.4", features = ["fs", "process"] }
+
+[dev-dependencies]
+codifix-atproto-verify = { path = "../codifix-atproto-verify", features = ["test-fixtures"] }
+codifix-test-support = { path = "../codifix-test-support" }
+codifix-curate = { path = "../codifix-curate" }
+tracing-subscriber.workspace = true
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

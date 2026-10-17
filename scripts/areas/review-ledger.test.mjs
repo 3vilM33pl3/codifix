@@ -220,7 +220,7 @@ test('generated v2 projections and cross-project relations pass the independent 
 }, async t => {
   const root = await mkdtemp(join(tmpdir(), 'memory-ledger-rust-test-')); t.after(() => rm(root, { recursive: true, force: true }));
   const repo = fileURLToPath(new URL('../../', import.meta.url));
-  const policy = await readFile(join(repo, 'crates/mem-area/src/policy.rs'), 'utf8');
+  const policy = await readFile(join(repo, 'crates/codifix-area/src/policy.rs'), 'utf8');
   const names = [...new Set([...policy.split('pub const SUPERVISOR_TABLES_0053')[0].matchAll(/"(public\.[a-z_0-9]+)"/g)].map(m => m[1]))];
   const tables = names.map(table => ({ table, columns: [{ name: 'id', data_type: 'uuid', nullable: false }], foreign_keys: [], row_count: 0, rows: [] }));
   const table = name => tables.find(t => t.table === name);
@@ -253,16 +253,16 @@ test('generated v2 projections and cross-project relations pass the independent 
     captured_at: '2026-09-19T12:00:00Z', migration_version: 52, projects: index.projects, tables };
   const inventoryFile = join(root, 'inventory.json'), manifestFile = join(root, 'manifest.json');
   await writeFile(inventoryFile, JSON.stringify(inventory), { mode: 0o600 });
-  const plan = spawnSync(join(repo, 'target/debug/memory-area'), ['plan', '--inventory', inventoryFile], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  const plan = spawnSync(join(repo, 'target/debug/codifix-area'), ['plan', '--inventory', inventoryFile], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   assert.equal(plan.status, 0, 'Synthetic inventory must pass the compiled Rust schema allowlist');
   const draft = JSON.parse(plan.stdout); index.source.inventory_semantic_sha256 = draft.inventory_sha256;
   const ledger = ledgerOf(index), manifest = createManifest(index, ledger, draft);
   await writeFile(manifestFile, JSON.stringify(manifest), { mode: 0o600 });
-  const inspect = spawnSync(join(repo, 'target/debug/memory-area-import'), ['inspect', '--inventory', inventoryFile, '--manifest', manifestFile], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  const inspect = spawnSync(join(repo, 'target/debug/codifix-area-import'), ['inspect', '--inventory', inventoryFile, '--manifest', manifestFile], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
   assert.equal(inspect.status, 0);
   assert.equal(JSON.parse(inspect.stdout).plan_valid, true, 'Independent Rust must accept projection field order, digests and relation/project ownership');
   manifest.provenance_projections[0].binding.version.version_no++;
   await writeFile(manifestFile, JSON.stringify(manifest));
-  const rejected = spawnSync(join(repo, 'target/debug/memory-area-import'), ['inspect', '--inventory', inventoryFile, '--manifest', manifestFile], { encoding: 'utf8' });
+  const rejected = spawnSync(join(repo, 'target/debug/codifix-area-import'), ['inspect', '--inventory', inventoryFile, '--manifest', manifestFile], { encoding: 'utf8' });
   assert.equal(JSON.parse(rejected.stdout).plan_valid, false);
 });

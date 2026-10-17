@@ -17,8 +17,8 @@ $git='C:\MemoryLab\Tools\git\cmd\git.exe'
 $head=& $git -C $SourceRoot rev-parse HEAD
 if($LASTEXITCODE -or $build.state -cne 'succeeded' -or $build.action -cne 'Build' -or $build.source_commit -cne $head){throw 'Matching successful native build required'}
 if((& $git -C $SourceRoot status --porcelain --untracked-files=no)){throw 'Clean source required'}
-$binary='C:\MemoryLab\build\product-msvc\x86_64-pc-windows-msvc\debug\memory.exe'
-$pin=@($build.artifacts | Where-Object file -ceq 'memory.exe')
+$binary='C:\MemoryLab\build\product-msvc\x86_64-pc-windows-msvc\debug\codifix.exe'
+$pin=@($build.artifacts | Where-Object file -ceq 'codifix.exe')
 if($pin.Count -ne 1 -or (Get-FileHash $binary).Hash.ToLowerInvariant() -cne $pin[0].sha256){throw 'Native binary changed'}
 $root="C:\MemoryLab\runs\$OperationId\core-workflow"
 if(Test-Path $root){throw 'Preserve previous evidence; use fresh operation'}
@@ -27,7 +27,7 @@ $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 & "$env:SystemRoot\System32\icacls.exe" $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
 if($LASTEXITCODE){throw 'Private lab evidence required'}
 $code=Join-Path $root 'code';$null=New-Item -ItemType Directory $code
-Copy-Item $binary (Join-Path $code 'memory.exe');$binary=Join-Path $code 'memory.exe'
+Copy-Item $binary (Join-Path $code 'codifix.exe');$binary=Join-Path $code 'codifix.exe'
 $pg='C:\MemoryLab\NativePostgres';$psql=Join-Path $pg 'runtime\pgsql\bin\psql.exe'
 $pgProof=Get-Content (Join-Path $pg 'verified.json') -Raw | ConvertFrom-Json
 if($pgProof.host -cne '127.0.0.1' -or $pgProof.port -ne 55471 -or $pgProof.production -ne $false){throw 'Verified disposable PG required'}

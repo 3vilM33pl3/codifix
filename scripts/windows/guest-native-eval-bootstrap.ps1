@@ -141,10 +141,10 @@ try{
     $cargo=Join-Path $userProfile '.cargo\bin\cargo.exe'
     $receipt.cargo_sha256=Get-EvalHash $cargo;$receipt.rust_toolchain=$buildEnv.RUSTUP_TOOLCHAIN
     $specs=@(
-        @{label='helper-build';args=@('-p','mem-platform','--bin','memory-windows-evaluation-helper','--features','windows-evaluation-helper')},
-        @{label='memory-build';args=@('-p','mem-cli','--bin','memory')},
-        @{label='snapshot-build';args=@('-p','mem-test-support','--example','r3_snapshot')},
-        @{label='score-retriever-build';args=@('-p','mem-eval','--example','r3_score','--example','r3_retriever')})
+        @{label='helper-build';args=@('-p','codifix-platform','--bin','codifix-windows-evaluation-helper','--features','windows-evaluation-helper')},
+        @{label='memory-build';args=@('-p','codifix-cli','--bin','codifix')},
+        @{label='snapshot-build';args=@('-p','codifix-test-support','--example','r3_snapshot')},
+        @{label='score-retriever-build';args=@('-p','codifix-eval','--example','r3_score','--example','r3_retriever')})
     $buildClock=[Diagnostics.Stopwatch]::StartNew()
     foreach($spec in $specs){
         $remaining=7200-[int]$buildClock.Elapsed.TotalSeconds
@@ -155,7 +155,7 @@ try{
     $code=Join-Path $root 'code';$io=Join-Path $root 'io';$source=Join-Path $root 'source\r3'
     $null=New-Item -ItemType Directory -Path $code,$io,$source
     $debug=Join-Path $buildEnv.CARGO_TARGET_DIR 'x86_64-pc-windows-msvc\debug'
-    $selected=@{helper=(Join-Path $debug 'memory-windows-evaluation-helper.exe');memory=(Join-Path $debug 'memory.exe')
+    $selected=@{helper=(Join-Path $debug 'codifix-windows-evaluation-helper.exe');memory=(Join-Path $debug 'codifix.exe')
         snapshot=(Join-Path $debug 'examples\r3_snapshot.exe');score=(Join-Path $debug 'examples\r3_score.exe');retriever=(Join-Path $debug 'examples\r3_retriever.exe')}
     foreach($name in @($selected.Keys)){$target=if($name -eq 'helper'){Join-Path $root 'evaluation-helper.exe'}else{Join-Path $code ([IO.Path]::GetFileName($selected[$name]))}
         Copy-EvalFile $selected[$name] $target (Get-EvalHash $selected[$name]);$selected[$name]=$target}

@@ -19,7 +19,7 @@ if (process.platform !== 'win32' || process.env.COMPUTERNAME !== 'MEMORY-WINLAB'
     || (mode !== undefined && mode !== '--fleet' && !accountOnly)
     || (!accountOnly && process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1')) throw Error('Explicit disposable native fleet required');
 const node = 'C:\\MemoryLab\\Tools\\node-v24.18.1-win-x64\\node.exe';
-const binary = 'C:\\MemoryLab\\build\\product-msvc\\x86_64-pc-windows-msvc\\debug\\memory-pds-pipe.exe';
+const binary = 'C:\\MemoryLab\\build\\product-msvc\\x86_64-pc-windows-msvc\\debug\\codifix-pds-pipe.exe';
 const digest = async file => createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const json = async file => JSON.parse((await fs.readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
 const baselinePath = 'C:\\MemoryLab\\NativePds\\prepared.json';
@@ -91,7 +91,7 @@ for (let offset = 0; offset < prepared.files.length; offset += 16) {
 assert.equal(actualFiles.size, 0);
 const build = JSON.parse((await fs.readFile('C:\\MemoryLab\\runs\\79a6444a-a60b-4494-a8e3-de90d1b4c807\\product-build\\result.json', 'utf8')).replace(/^\uFEFF/, ''));
 assert.equal(build.state, 'succeeded');
-assert.equal(await digest(binary), build.artifacts.find(a => a.file === 'memory-pds-pipe.exe').sha256);
+assert.equal(await digest(binary), build.artifacts.find(a => a.file === 'codifix-pds-pipe.exe').sha256);
 const require = createRequire(path.join(runtime, 'pds-server.mjs'));
 const pdsRequire = createRequire(require.resolve('@atproto/pds'));
 const { Secp256k1Keypair } = pdsRequire('@atproto/crypto');
@@ -222,7 +222,7 @@ try {
   for (const filter of ['e_two_instance_http_workflow','f1_independent_instances','watched_agents_four_area_signed_pds_rehearsal']) {
     const log = await fs.open(path.join(root, `${filter}.log`), 'wx');
     try {
-      const cargo = tracked('C:\\Users\\memorylab\\.cargo\\bin\\cargo.exe', ['test','--locked','-p','mem-service','--lib',filter,'--','--test-threads=1','--nocapture'], {
+      const cargo = tracked('C:\\Users\\memorylab\\.cargo\\bin\\cargo.exe', ['test','--locked','-p','codifix-service','--lib',filter,'--','--test-threads=1','--nocapture'], {
         cwd: source, env: { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: path.join(root, 'fixture.json'),
           MEMORY_FEDERATION_F1_INSTANCES: '1', MEMORY_FEDERATION_AGENT_INSTANCES: '1',
           CARGO_TARGET_DIR: 'C:\\MemoryLab\\build\\product-msvc', CARGO_BUILD_TARGET: 'x86_64-pc-windows-msvc', CARGO_BUILD_JOBS: '2' }, stdio: ['ignore',log.fd,log.fd] });

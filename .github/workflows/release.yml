@@ -101,7 +101,7 @@ jobs:
           cargo test --workspace --all-targets --locked --no-fail-fast
           cargo clippy --workspace --all-targets --locked -- -D warnings
           bash scripts/check-boundaries.sh
-          cargo build --locked -p mem-cli --no-default-features --features tui,project-sync --bin memory
+          cargo build --locked -p codifix-cli --no-default-features --features tui,project-sync --bin codifix
       - name: Packaging and stable/RC operator contracts
         run: |
           for suite in test_release.py test_instance.py test_console.py test_upgrade.py; do

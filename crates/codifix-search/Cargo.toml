@@ -1,0 +1,32 @@
+[package]
+name = "codifix-search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+codifix-config = { path = "../codifix-config" }
+codifix-record = { path = "../codifix-record" }
+codifix-store = { path = "../codifix-store" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+pgvector.workspace = true
+uuid.workspace = true
+async-trait = "0.1"
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+proptest = "1"
+wiremock = "0.6"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

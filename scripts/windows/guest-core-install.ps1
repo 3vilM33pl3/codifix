@@ -24,14 +24,14 @@ function Write-CoreInstallNew([string]$Path,[byte[]]$Bytes){
     Assert-CoreInstallPath $Path;$file=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$file.Write($Bytes,0,$Bytes.Length);$file.Flush($true)}finally{$file.Dispose()}
 }
-function Get-CoreInstallExecutableSource([ValidateSet('memory.exe','memory-windows-service.exe')][string]$File,[string]$CoreRoot,[string]$DebugRoot){
+function Get-CoreInstallExecutableSource([ValidateSet('codifix.exe','codifix-windows-service.exe')][string]$File,[string]$CoreRoot,[string]$DebugRoot){
     # Cargo may rewrite normal debug binaries during unrelated native tests.
     # The completed core proof already retained its exact private Memory bytes.
-    if($File -ceq 'memory.exe'){return Join-Path $CoreRoot 'code\memory.exe'}
+    if($File -ceq 'codifix.exe'){return Join-Path $CoreRoot 'code\codifix.exe'}
     return Join-Path $DebugRoot $File
 }
 function Copy-CoreInstallFile([string]$From,[string]$To,[string]$Expected,
-    [ValidateSet('asset','memory.exe','memory-windows-service.exe')][string]$Component='asset'){
+    [ValidateSet('asset','codifix.exe','codifix-windows-service.exe')][string]$Component='asset'){
     try{
         if($Expected -cnotmatch '^[0-9a-f]{64}$' -or (Get-CoreInstallHash $From) -cne $Expected){throw 'Input pin differs'}
         Assert-CoreInstallPath $To;$null=New-Item -ItemType Directory -Path (Split-Path -Parent $To) -Force
@@ -200,10 +200,10 @@ $client=$null;$handler=$null;$token=$null;$binding=$null
 try{
     $payload=Join-Path $root 'LAB-ONLY-payload';$null=New-Item -ItemType Directory -Path $payload
     $debug='C:\MemoryLab\build\product-msvc\x86_64-pc-windows-msvc\debug'
-    foreach($file in @('memory.exe','memory-windows-service.exe')){
+    foreach($file in @('codifix.exe','codifix-windows-service.exe')){
         $pin=@($build.artifacts | Where-Object file -ceq $file)
         if($pin.Count -ne 1){throw ('Required native executable absent from ProductBuild receipt: '+$file)}
-        if($file -eq 'memory.exe' -and $pin[0].sha256 -cne $core.binary_sha256){throw 'Completed core workflow used different native bytes'}
+        if($file -eq 'codifix.exe' -and $pin[0].sha256 -cne $core.binary_sha256){throw 'Completed core workflow used different native bytes'}
         $from=Get-CoreInstallExecutableSource $file $coreRoot $debug
         Copy-CoreInstallFile $from (Join-Path $payload ('bin\'+$file)) $pin[0].sha256 $file
     }
@@ -260,7 +260,7 @@ try{
     $process=Get-CimInstance Win32_Process -Filter "ProcessId=$($scm.ProcessId)"
     $owner=Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid
     if($owner.ReturnValue -ne 0 -or $owner.Sid -cne $serviceSid){throw 'SCM wrapper process did not use its exact virtual account'}
-    $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($scm.ProcessId)" | Where-Object ExecutablePath -ieq (Join-Path $release 'bin\memory.exe'))
+    $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($scm.ProcessId)" | Where-Object ExecutablePath -ieq (Join-Path $release 'bin\codifix.exe'))
     if($children.Count -ne 1){throw 'Exact installed Memory child process required'}
     $childOwner=Invoke-CimMethod -InputObject $children[0] -MethodName GetOwnerSid
     if($childOwner.ReturnValue -ne 0 -or $childOwner.Sid -cne $serviceSid){throw 'Installed Memory child did not use its exact virtual account'}

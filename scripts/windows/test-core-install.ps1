@@ -76,21 +76,21 @@ try{
     Reject-CoreInstall {Write-CoreInstallNew $source ([byte[]]@(0))}
     $core=Join-Path $root 'completed-core';$debug=Join-Path $root 'mutable-cache';$payload=Join-Path $root 'payload'
     $null=New-Item -ItemType Directory -Path (Join-Path $core 'code'),$debug,$payload
-    $privateMemory=Join-Path $core 'code/memory.exe';$cachedMemory=Join-Path $debug 'memory.exe'
-    $cachedWrapper=Join-Path $debug 'memory-windows-service.exe'
+    $privateMemory=Join-Path $core 'code/codifix.exe';$cachedMemory=Join-Path $debug 'codifix.exe'
+    $cachedWrapper=Join-Path $debug 'codifix-windows-service.exe'
     Write-CoreInstallNew $privateMemory ([Text.Encoding]::UTF8.GetBytes('original pinned Memory'))
     Write-CoreInstallNew $cachedMemory ([Text.Encoding]::UTF8.GetBytes('cargo test changed Memory'))
     Write-CoreInstallNew $cachedWrapper ([Text.Encoding]::UTF8.GetBytes('original pinned wrapper'))
     $memoryPin=Get-CoreInstallHash $privateMemory;$wrapperPin=Get-CoreInstallHash $cachedWrapper
-    $selected=Get-CoreInstallExecutableSource 'memory.exe' $core $debug
-    Copy-CoreInstallFile $selected (Join-Path $payload 'memory.exe') $memoryPin 'memory.exe'
-    if((Get-CoreInstallHash (Join-Path $payload 'memory.exe')) -cne $memoryPin){throw 'Mutable cargo binary replaced completed core proof'}
-    $selected=Get-CoreInstallExecutableSource 'memory-windows-service.exe' $core $debug
-    Copy-CoreInstallFile $selected (Join-Path $payload 'memory-windows-service.exe') $wrapperPin 'memory-windows-service.exe'
+    $selected=Get-CoreInstallExecutableSource 'codifix.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'codifix.exe') $memoryPin 'codifix.exe'
+    if((Get-CoreInstallHash (Join-Path $payload 'codifix.exe')) -cne $memoryPin){throw 'Mutable cargo binary replaced completed core proof'}
+    $selected=Get-CoreInstallExecutableSource 'codifix-windows-service.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'codifix-windows-service.exe') $wrapperPin 'codifix-windows-service.exe'
     [IO.File]::AppendAllText($cachedWrapper,'changed')
     $failure=$null
-    try{Copy-CoreInstallFile $selected (Join-Path $payload 'changed-wrapper.exe') $wrapperPin 'memory-windows-service.exe'}catch{$failure=$_.Exception.Message}
-    if($failure -cne 'Pinned core installation input unavailable or changed: memory-windows-service.exe'){throw 'Component mismatch was not opaque and exact'}
+    try{Copy-CoreInstallFile $selected (Join-Path $payload 'changed-wrapper.exe') $wrapperPin 'codifix-windows-service.exe'}catch{$failure=$_.Exception.Message}
+    if($failure -cne 'Pinned core installation input unavailable or changed: codifix-windows-service.exe'){throw 'Component mismatch was not opaque and exact'}
     if(Test-Path (Join-Path $payload 'changed-wrapper.exe')){throw 'Changed wrapper was copied'}
     $webAssets=Join-Path $payload 'web/assets';$null=New-Item -ItemType Directory -Path $webAssets
     Write-CoreInstallNew (Join-Path $webAssets 'app.js') ([Text.Encoding]::UTF8.GetBytes('synthetic nested asset'))
@@ -111,7 +111,7 @@ try{
             if($hash -cne $pin[0].sha256){throw 'ZIP bytes changed'}
         }
     }finally{$archive.Dispose();$readStream.Dispose()}
-    Reject-CoreInstall {Assert-NativeArchiveName 'bin\memory.exe'}
+    Reject-CoreInstall {Assert-NativeArchiveName 'bin\codifix.exe'}
     Reject-CoreInstall {New-CoreInstallArchive $payload $zip $inventory}
     if((Get-CoreInstallHash $zip) -cne $zipHash){throw 'Existing ZIP evidence was changed'}
     Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'unsafe.zip') @(@{name='../outside';sha256=$memoryPin})}

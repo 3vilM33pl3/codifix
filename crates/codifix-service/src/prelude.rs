@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+pub(crate) use std::{
+    collections::{BTreeMap, HashMap, VecDeque},
+    fs,
+    io::ErrorKind,
+    io::Read,
+    net::SocketAddr,
+    path::{Path as FsPath, PathBuf},
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration as StdDuration, SystemTime},
+};
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) use std::process::Command as ProcessCommand;
+
+#[cfg(target_vendor = "apple")]
+pub(crate) use std::os::fd::AsRawFd;
+
+pub(crate) use crate::repository::{
+    fetch_project_commit, fetch_project_commits, fetch_project_memories,
+    fetch_project_memory_graph, fetch_project_overview, parse_status_filter,
+    preview_project_commit_sync,
+};
+pub(crate) use anyhow::{Context, Result};
+pub(crate) use axum::{
+    Json,
+    body::Bytes,
+    extract::{
+        Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
+    http::{HeaderMap, StatusCode, header},
+    response::{Html, IntoResponse, Response},
+};
+pub(crate) use codifix_config::{
+    AppConfig, LlmAuditConfig, effective_llm_base_url, is_supported_llm_provider,
+    llm_max_output_tokens_field, llm_requires_api_key, load_repo_replacement_policy,
+    repo_agent_settings_path, resolve_llm_api_key,
+};
+#[cfg(feature = "offline")]
+pub(crate) use codifix_curate::store_capture;
+pub(crate) use codifix_curate::{list_replacement_proposals, preview_capture, preview_curate};
+pub(crate) use codifix_platform::{
+    managed_watch_service_name, preferred_user_state_dir, restart_local_watcher_service_name,
+    watch_service_unit_name,
+};
+pub(crate) use codifix_record::{
+    ActivateEmbeddingBackendRequest, ActivityDetails, ActivityEvent, ActivityKind,
+    ActivityListResponse, AgentWorkspaceFinishRequest, AgentWorkspaceHeartbeatRequest,
+    AgentWorkspaceListResponse, AgentWorkspaceRecord, AgentWorkspaceStartRequest,
+    AgentWorkspaceStatus, AgentWorkspaceWarning, ArchiveMemoryResponse, ArchiveRequest,
+    ArchiveResponse, CaptureTaskRequest, CheckpointActivityRequest, CodeGraphResponse,
+    CodeGraphStatusResponse, CodeGraphViewRequest, CommitDetailResponse, CommitSyncRequest,
+    CommitSyncResponse, CurateRequest, DeleteMemoryRequest, DeleteMemoryResponse, DiagnosticInfo,
+    DiagnosticSeverity, EmbeddingBackendInfo, EmbeddingBackendsResponse, GraphActivityRequest,
+    LlmAuditMessage, LlmAuditStatusResponse, LoopApprovalDecisionRequest,
+    LoopApprovalDecisionResponse, LoopApprovalRequestRecord, LoopApprovalStatus,
+    LoopApprovalsResponse, LoopCancelRequest, LoopContextInstructionRef, LoopContextPack,
+    LoopContextPackRequest, LoopContextPackResponse, LoopDefinitionRecord, LoopDefinitionResponse,
+    LoopDefinitionsResponse, LoopFeedbackRequest, LoopGlobalStateResponse,
+    LoopGlobalStateUpdateRequest, LoopMemoryProposalCreateRequest,
+    LoopMemoryProposalDecisionRequest, LoopMemoryProposalDecisionResponse,
+    LoopMemoryProposalRecord, LoopMemoryProposalsResponse, LoopMode, LoopRiskLevel, LoopRunDetail,
+    LoopRunRequest, LoopRunResponse, LoopRunStatus, LoopRunSummary, LoopRunsResponse,
+    LoopScopeType, LoopSettingRecord, LoopSettingResponse, LoopSettingsUpdateRequest,
+    LoopTraceRecord, LoopTriggerEventRecord, LoopTriggerRouteRequest, LoopTriggerRouteResponse,
+    LoopTrustLevel, MemoryEntryResponse, MemoryHistoryResponse, MemorySourceRecord,
+    PlanActivityAction, PlanActivityRequest, ProjectCommitsResponse, ProjectMemoryBundleEntry,
+    ProjectMemoryBundleEntryRelation, ProjectMemoryBundleManifest, ProjectMemoryBundlePreview,
+    ProjectMemoryBundleSource, ProjectMemoryExportOptions, ProjectMemoryGraphResponse,
+    ProjectMemoryImportPreview, ProjectMemoryImportResponse, ProjectMemoryListItem,
+    ProjectOverviewResponse, ProvenanceVerificationRequest, ProvenanceVerificationResponse,
+    PruneEmbeddingsRequest, PruneEmbeddingsResponse, PruneHistoryRequest, PruneHistoryResponse,
+    QueryAnswerCitation, QueryAnswerGeneration, QueryAnswerMethod, QueryAnswerMode,
+    QueryGraphConnection, QueryRequest, QueryResponse, ReembedRequest, ReembedResponse,
+    ReindexRequest, ReindexResponse, RelatedMemorySummary, ReplacementPolicy,
+    ReplacementPolicyRequest, ReplacementPolicyResponse, ReplacementProposalListResponse,
+    ReplacementProposalResolutionResponse, ResumeAction, ResumeCheckpoint, ResumeRequest,
+    ResumeResponse, ScanActivityRequest, SetEmbeddingCreationRequest, SetLlmAuditRequest,
+    SourceKind, SourceProvenanceRecord, SourceProvenanceStatus, SourceProvenanceVerification,
+    StreamRequest, StreamResponse, TokenUsage, TokenUsageSummary, UpToSpeedRequest,
+    UpToSpeedResponse, ValidationError, WatcherHealth, WatcherHeartbeatRequest, WatcherPresence,
+    WatcherPresenceSummary, WatcherRestartRequest, WatcherRestartResponse,
+    WatcherUnregisterRequest,
+};
+pub(crate) use codifix_search::{
+    EmbeddingRegistry, effective_embedding_base_url, parse_memory_type, parse_relation_type,
+    parse_source_kind,
+};
+pub(crate) use futures_util::{SinkExt, StreamExt};
+pub(crate) use regex::Regex;
+pub(crate) use serde::Deserialize;
+pub(crate) use serde::{Deserialize as SerdeDeserialize, Serialize};
+pub(crate) use sha2::{Digest, Sha256};
+pub(crate) use socket2::{Domain, Protocol, Socket, Type};
+pub(crate) use sqlx::{PgPool, Row, postgres::PgPoolOptions};
+pub(crate) use tokio::{
+    net::{TcpListener, UdpSocket},
+    sync::{broadcast, oneshot},
+    task::JoinHandle,
+    time::Duration,
+};
+pub(crate) use tokio_tungstenite::{connect_async, tungstenite::client::IntoClientRequest};
+pub(crate) use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+pub(crate) use uuid::Uuid;
+pub(crate) use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};

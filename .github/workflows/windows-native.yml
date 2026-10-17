@@ -6,10 +6,10 @@ on:
     paths:
       - 'Cargo.toml'
       - 'Cargo.lock'
-      - 'crates/mem-platform/**'
-      - 'crates/mem-platform-files/**'
-      - 'crates/mem-cli/src/commands/auth_enrollment/**'
-      - 'crates/mem-cli/Cargo.toml'
+      - 'crates/codifix-platform/**'
+      - 'crates/codifix-platform-files/**'
+      - 'crates/codifix-cli/src/commands/auth_enrollment/**'
+      - 'crates/codifix-cli/Cargo.toml'
       - 'packaging/windows/**'
       - '.github/workflows/windows-native.yml'
 

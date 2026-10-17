@@ -1,0 +1,562 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+use crate::prelude::*;
+use crate::*;
+use axum::Extension;
+use codifix_record::Permission;
+
+#[derive(Default)]
+pub(crate) struct ConnectionSubscriptions {
+    project: Option<String>,
+    memory_id: Option<Uuid>,
+}
+
+pub(crate) async fn websocket(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    principal: Option<Extension<crate::auth::AuthenticatedPrincipal>>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| async move {
+        if state.is_primary() {
+            let principal = principal.map(|Extension(principal)| principal);
+            handle_websocket_connection(socket, state, principal).await;
+        } else if let Err(error) = bridge_relay_websocket(socket, state, headers).await {
+            tracing::warn!(error = %error, "relay websocket bridge failed");
+        }
+    })
+}
+
+pub(crate) async fn handle_websocket_connection(
+    mut socket: WebSocket,
+    state: AppState,
+    mut principal: Option<crate::auth::AuthenticatedPrincipal>,
+) {
+    let mut subscriptions = ConnectionSubscriptions::default();
+    let mut events = state.events.subscribe();
+
+    loop {
+        tokio::select! {
+            incoming = socket.recv() => {
+                let Some(result) = incoming else {
+                    break;
+                };
+                match result {
+                    Ok(Message::Text(text)) => {
+                        let request = match serde_json::from_str::<StreamRequest>(&text) {
+                            Ok(request) => request,
+                            Err(error) => {
+                                if send_ws_response(
+                                    &mut socket,
+                                    StreamResponse::Error {
+                                        message: format!("parse stream request: {error}"),
+                                    },
+                                )
+                                .await
+                                .is_err()
+                                {
+                                    break;
+                                }
+                                continue;
+                            }
+                        };
+                        match process_stream_request(
+                            &state,
+                            &mut subscriptions,
+                            &mut principal,
+                            request,
+                        )
+                        .await
+                        {
+                            Ok(responses) => {
+                                for response in responses {
+                                    if send_ws_response(&mut socket, response).await.is_err() {
+                                        return;
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                if send_ws_response(
+                                    &mut socket,
+                                    StreamResponse::Error {
+                                        message: error.to_string(),
+                                    },
+                                )
+                                .await
+                                .is_err()
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Ok(Message::Ping(payload)) => {
+                        if socket.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Ok(Message::Close(_)) => break,
+                    Ok(_) => {}
+                    Err(_) => break,
+                }
+            }
+            event = events.recv() => {
+                let Ok(event) = event else {
+                    continue;
+                };
+                let Some(principal) = principal.as_ref() else {
+                    continue;
+                };
+                match render_subscription_updates(&state, &subscriptions, principal, &event).await {
+                    Ok(responses) => {
+                        for response in responses {
+                            if send_ws_response(&mut socket, response).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        if send_ws_response(
+                            &mut socket,
+                            StreamResponse::Error {
+                                message: error.to_string(),
+                            },
+                        )
+                        .await
+                        .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub(crate) async fn bridge_relay_websocket(
+    socket: WebSocket,
+    state: AppState,
+    headers: HeaderMap,
+) -> Result<()> {
+    let upstream = selected_primary_peer(&state)
+        .ok_or_else(|| anyhow::anyhow!("no primary available for relay websocket"))?;
+    let mut request = format!("ws://{}/ws", upstream.advertise_addr).into_client_request()?;
+    for name in [header::AUTHORIZATION, header::COOKIE] {
+        if let Some(value) = headers.get(&name) {
+            request.headers_mut().insert(name, value.clone());
+        }
+    }
+    if let Some(value) = headers.get("x-api-token") {
+        request.headers_mut().insert("x-api-token", value.clone());
+    }
+    let (upstream_stream, _) = connect_async(request)
+        .await
+        .context("connect upstream websocket")?;
+
+    let (mut client_sender, mut client_receiver) = socket.split();
+    let (mut upstream_sender, mut upstream_receiver) = upstream_stream.split();
+
+    let client_to_upstream = async {
+        while let Some(message) = client_receiver.next().await {
+            let message = message?;
+            let mapped = match message {
+                Message::Text(text) => {
+                    tokio_tungstenite::tungstenite::Message::Text(text.to_string())
+                }
+                Message::Binary(binary) => {
+                    tokio_tungstenite::tungstenite::Message::Binary(binary.to_vec())
+                }
+                Message::Ping(payload) => {
+                    tokio_tungstenite::tungstenite::Message::Ping(payload.to_vec())
+                }
+                Message::Pong(payload) => {
+                    tokio_tungstenite::tungstenite::Message::Pong(payload.to_vec())
+                }
+                Message::Close(frame) => {
+                    let close =
+                        frame.map(
+                            |frame| tokio_tungstenite::tungstenite::protocol::CloseFrame {
+                                code: frame.code.into(),
+                                reason: frame.reason.to_string().into(),
+                            },
+                        );
+                    tokio_tungstenite::tungstenite::Message::Close(close)
+                }
+            };
+            upstream_sender.send(mapped).await?;
+        }
+        Result::<(), anyhow::Error>::Ok(())
+    };
+
+    let upstream_to_client = async {
+        while let Some(message) = upstream_receiver.next().await {
+            let message = message?;
+            let mapped = match message {
+                tokio_tungstenite::tungstenite::Message::Text(text) => Message::Text(text.into()),
+                tokio_tungstenite::tungstenite::Message::Binary(binary) => {
+                    Message::Binary(binary.into())
+                }
+                tokio_tungstenite::tungstenite::Message::Ping(payload) => {
+                    Message::Ping(payload.into())
+                }
+                tokio_tungstenite::tungstenite::Message::Pong(payload) => {
+                    Message::Pong(payload.into())
+                }
+                tokio_tungstenite::tungstenite::Message::Close(frame) => {
+                    let close = frame.map(|frame| axum::extract::ws::CloseFrame {
+                        code: frame.code.into(),
+                        reason: frame.reason.to_string().into(),
+                    });
+                    Message::Close(close)
+                }
+                tokio_tungstenite::tungstenite::Message::Frame(_) => continue,
+            };
+            client_sender.send(mapped).await?;
+        }
+        Result::<(), anyhow::Error>::Ok(())
+    };
+
+    tokio::select! {
+        result = client_to_upstream => result?,
+        result = upstream_to_client => result?,
+    }
+
+    Ok(())
+}
+
+pub(crate) async fn send_ws_response(
+    socket: &mut WebSocket,
+    response: StreamResponse,
+) -> Result<()> {
+    socket
+        .send(Message::Text(serde_json::to_string(&response)?.into()))
+        .await
+        .context("send websocket response")?;
+    Ok(())
+}
+
+pub(crate) async fn process_stream_request(
+    state: &AppState,
+    subscriptions: &mut ConnectionSubscriptions,
+    principal: &mut Option<crate::auth::AuthenticatedPrincipal>,
+    request: StreamRequest,
+) -> Result<Vec<StreamResponse>> {
+    let mut responses = Vec::new();
+    match request {
+        StreamRequest::Authenticate { token } => {
+            let authenticated =
+                crate::auth::resolve_principal(state, crate::auth::Credential::ApiToken(token))
+                    .await
+                    .map_err(|error| anyhow::anyhow!(error.message))?
+                    .ok_or_else(|| anyhow::anyhow!("stream authentication required"))?;
+            if !authenticated.has_anywhere(Permission::MemoryRead) {
+                anyhow::bail!("stream principal does not have reader access");
+            }
+            *principal = Some(authenticated);
+            responses.push(StreamResponse::Ack {
+                message: "stream authenticated".to_string(),
+            });
+        }
+        StreamRequest::Health => responses.push(StreamResponse::Health {
+            value: health_payload(state).await?,
+        }),
+        StreamRequest::ProjectOverview { project } => {
+            require_stream_project_role(principal.as_ref(), &project, Permission::MemoryRead)?;
+            responses.push(StreamResponse::ProjectOverview {
+                value: fetch_project_overview_with_watchers(state, &project).await?,
+            });
+        }
+        StreamRequest::ProjectMemories { project } => {
+            require_stream_project_role(principal.as_ref(), &project, Permission::MemoryRead)?;
+            let pool = state
+                .pool()
+                .map_err(|error| anyhow::anyhow!(error.message))?;
+            responses.push(StreamResponse::ProjectMemories {
+                value: fetch_project_memories(&pool, &project, None, 500, 0).await?,
+            });
+        }
+        StreamRequest::MemoryDetail { memory_id } => {
+            let pool = state
+                .pool()
+                .map_err(|error| anyhow::anyhow!(error.message))?;
+            let value = fetch_memory_entry(&pool, memory_id).await?;
+            if let Some(memory) = value.as_ref() {
+                require_stream_project_role(
+                    principal.as_ref(),
+                    &memory.project,
+                    Permission::MemoryRead,
+                )?;
+            }
+            responses.push(StreamResponse::MemoryDetail { value });
+        }
+        StreamRequest::SubscribeProject { project } => {
+            require_stream_project_role(principal.as_ref(), &project, Permission::MemoryRead)?;
+            let pool = state
+                .pool()
+                .map_err(|error| anyhow::anyhow!(error.message))?;
+            subscriptions.project = Some(project.clone());
+            let overview = fetch_project_overview_with_watchers(state, &project).await?;
+            let memories = fetch_project_memories(&pool, &project, None, 500, 0).await?;
+            responses.push(StreamResponse::ProjectSnapshot { overview, memories });
+            responses.extend(recent_activity_responses(&state.recent_activity, &project).await);
+        }
+        StreamRequest::Resync { project } => {
+            require_stream_project_role(principal.as_ref(), &project, Permission::MemoryRead)?;
+            let pool = state
+                .pool()
+                .map_err(|error| anyhow::anyhow!(error.message))?;
+            let overview = fetch_project_overview_with_watchers(state, &project).await?;
+            let memories = fetch_project_memories(&pool, &project, None, 500, 0).await?;
+            responses.push(StreamResponse::ProjectSnapshot { overview, memories });
+        }
+        StreamRequest::SubscribeMemory { memory_id } => {
+            let pool = state
+                .pool()
+                .map_err(|error| anyhow::anyhow!(error.message))?;
+            let detail = fetch_memory_entry(&pool, memory_id).await?;
+            if let Some(memory) = detail.as_ref() {
+                require_stream_project_role(
+                    principal.as_ref(),
+                    &memory.project,
+                    Permission::MemoryRead,
+                )?;
+            }
+            subscriptions.memory_id = Some(memory_id);
+            responses.push(StreamResponse::MemorySnapshot { detail });
+        }
+        StreamRequest::UnsubscribeMemory => {
+            subscriptions.memory_id = None;
+            responses.push(StreamResponse::Ack {
+                message: "memory subscription cleared".to_string(),
+            });
+        }
+        StreamRequest::Ping => responses.push(StreamResponse::Pong),
+    }
+    Ok(responses)
+}
+
+pub(crate) async fn render_subscription_updates(
+    state: &AppState,
+    subscriptions: &ConnectionSubscriptions,
+    principal: &crate::auth::AuthenticatedPrincipal,
+    event: &ServiceEvent,
+) -> Result<Vec<StreamResponse>> {
+    let pool = state
+        .pool()
+        .map_err(|error| anyhow::anyhow!(error.message))?;
+    let mut responses = Vec::new();
+    if let Some(project) = &subscriptions.project
+        && project == &event.project
+        && principal.has_for_project(project, Permission::MemoryRead)
+    {
+        if event.include_activity {
+            responses.push(stream_activity_response(event.clone()));
+        }
+        // Deltas, not snapshots: the event names its subject; consumers that
+        // detect a seq gap issue StreamRequest::Resync for a full snapshot.
+        if let Some(memory_id) = event.memory_id {
+            match fetch_memory_entry(&pool, memory_id).await? {
+                Some(detail) if detail.status == codifix_record::MemoryStatus::Active => {
+                    responses.push(StreamResponse::MemoryUpserted { detail });
+                }
+                Some(detail) => {
+                    responses.push(StreamResponse::MemoryRemoved {
+                        memory_id,
+                        canonical_id: Some(detail.canonical_id),
+                    });
+                }
+                None => {
+                    responses.push(StreamResponse::MemoryRemoved {
+                        memory_id,
+                        canonical_id: None,
+                    });
+                }
+            }
+        }
+        let overview = fetch_project_overview_with_watchers(state, project).await?;
+        responses.push(StreamResponse::OverviewChanged { overview });
+    }
+
+    if let Some(memory_id) = subscriptions.memory_id
+        && event.memory_id == Some(memory_id)
+    {
+        let detail = fetch_memory_entry(&pool, memory_id).await?;
+        if detail.as_ref().is_some_and(|memory| {
+            principal.has_for_project(&memory.project, Permission::MemoryRead)
+        }) {
+            responses.push(StreamResponse::MemoryChanged { detail });
+        }
+    }
+
+    Ok(responses)
+}
+
+fn require_stream_project_role(
+    principal: Option<&crate::auth::AuthenticatedPrincipal>,
+    project: &str,
+    required: Permission,
+) -> Result<()> {
+    let principal = principal.ok_or_else(|| anyhow::anyhow!("stream authentication required"))?;
+    if principal.has_for_project(project, required) {
+        Ok(())
+    } else {
+        anyhow::bail!("stream principal does not have {required:?} access to project {project}")
+    }
+}
+
+pub(crate) async fn recent_activity_responses(
+    recent_activity: &Mutex<VecDeque<ServiceEvent>>,
+    project: &str,
+) -> Vec<StreamResponse> {
+    let history = recent_activity
+        .lock()
+        .expect("activity history mutex poisoned");
+    history
+        .iter()
+        .filter(|event| event.project == project)
+        .cloned()
+        .map(stream_activity_response)
+        .collect()
+}
+
+pub(crate) async fn health_payload(state: &AppState) -> Result<serde_json::Value> {
+    Ok(with_area_identity(
+        health_payload_core(state).await?,
+        state.config.area.as_ref().map(|area| area.instance_id),
+    ))
+}
+
+fn with_area_identity(
+    mut payload: serde_json::Value,
+    configured_area: Option<Uuid>,
+) -> serde_json::Value {
+    // instance_id remains the runtime/session identity used by watchers. Never
+    // reinterpret it as durable area ownership during installation readiness.
+    payload["area_instance_id"] = serde_json::json!(configured_area);
+    payload
+}
+
+async fn health_payload_core(state: &AppState) -> Result<serde_json::Value> {
+    if state.is_primary() {
+        let pending = offline_pending_count(state).await?;
+        let Some(pool) = state
+            .pool
+            .read()
+            .expect("database pool lock poisoned")
+            .clone()
+        else {
+            return Ok(serde_json::json!({
+                "status": "degraded",
+                "role": "primary",
+                "database": "offline",
+                "offline_pending": pending,
+                "offline_database": state.offline.as_ref().map(|offline| offline.store.path().display().to_string()),
+                "instance_id": state.instance_id,
+                "service_id": state.config.cluster.service_id,
+                "version": state.config.profile.display_version(env!("CARGO_PKG_VERSION"))
+            }));
+        };
+        if let Err(error) = sqlx::query("SELECT 1").execute(&pool).await {
+            return Ok(serde_json::json!({
+                "status": if state.offline.is_some() { "degraded" } else { "error" },
+                "role": "primary",
+                "database": "offline",
+                "database_error": error.to_string(),
+                "offline_pending": pending,
+                "offline_database": state.offline.as_ref().map(|offline| offline.store.path().display().to_string()),
+                "instance_id": state.instance_id,
+                "service_id": state.config.cluster.service_id,
+                "version": state.config.profile.display_version(env!("CARGO_PKG_VERSION"))
+            }));
+        }
+        Ok(serde_json::json!({
+            "status": "ok",
+            "role": "primary",
+            "database": "up",
+            "offline_pending": pending,
+            "offline_database": state.offline.as_ref().map(|offline| offline.store.path().display().to_string()),
+            "instance_id": state.instance_id,
+            "service_id": state.config.cluster.service_id,
+            "version": state.config.profile.display_version(env!("CARGO_PKG_VERSION"))
+        }))
+    } else {
+        let upstream = relay_upstream_health(state).await?;
+        Ok(serde_json::json!({
+            "status": if upstream.is_some() { "ok" } else { "degraded" },
+            "role": "relay",
+            "database": "down",
+            "offline_pending": offline_pending_count(state).await?,
+            "instance_id": state.instance_id,
+            "service_id": state.config.cluster.service_id,
+            "version": state.config.profile.display_version(env!("CARGO_PKG_VERSION")),
+            "upstream": upstream
+        }))
+    }
+}
+
+async fn offline_pending_count(state: &AppState) -> Result<u64> {
+    let Some(store) = state.offline_store() else {
+        return Ok(0);
+    };
+    store.pending_count().await
+}
+
+pub(crate) async fn relay_upstream_health(state: &AppState) -> Result<Option<serde_json::Value>> {
+    let Some(peer) = selected_primary_peer(state) else {
+        return Ok(None);
+    };
+    let health = state
+        .http_client
+        .get(format!("http://{}/healthz", peer.advertise_addr))
+        .send()
+        .await;
+    let status = match health {
+        Ok(response) => {
+            let code = response.status();
+            let body = response
+                .json::<serde_json::Value>()
+                .await
+                .unwrap_or_else(|_| serde_json::json!({}));
+            serde_json::json!({
+                "service_id": peer.service_id,
+                "address": peer.advertise_addr,
+                "version": peer.version,
+                "status": code.as_u16(),
+                "health": body
+            })
+        }
+        Err(error) => serde_json::json!({
+            "service_id": peer.service_id,
+            "address": peer.advertise_addr,
+            "version": peer.version,
+            "status": "unreachable",
+            "error": error.to_string()
+        }),
+    };
+    Ok(Some(status))
+}
+
+#[cfg(test)]
+mod health_identity_tests {
+    use super::*;
+
+    #[test]
+    fn configured_area_survives_runtime_restarts_without_redefining_instance_id() {
+        let area = Uuid::new_v4();
+        let runtime_one = Uuid::new_v4();
+        let runtime_two = Uuid::new_v4();
+        for runtime in [runtime_one, runtime_two] {
+            let health = with_area_identity(
+                serde_json::json!({"instance_id": runtime, "status": "ok"}),
+                Some(area),
+            );
+            assert_eq!(health["instance_id"], serde_json::json!(runtime));
+            assert_eq!(health["area_instance_id"], serde_json::json!(area));
+        }
+        let unconfigured =
+            with_area_identity(serde_json::json!({"instance_id": runtime_one}), None);
+        assert!(unconfigured["area_instance_id"].is_null());
+        assert_eq!(unconfigured["instance_id"], serde_json::json!(runtime_one));
+    }
+}

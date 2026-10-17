@@ -47,7 +47,7 @@ class NativeEvalBootstrapTests(unittest.TestCase):
 
     def test_only_current_first_party_targets_are_built_without_installing_tools(self):
         script = SCRIPT.read_text()
-        for target in ["'memory-windows-evaluation-helper'", "'memory'", "'r3_snapshot'", "'r3_score'", "'r3_retriever'"]:
+        for target in ["'codifix-windows-evaluation-helper'", "'codifix'", "'r3_snapshot'", "'r3_score'", "'r3_retriever'"]:
             self.assertIn(target, script)
         for forbidden in ["rustup install", "cargo install", "npm install", "--workspace", "--all-targets"]:
             self.assertNotIn(forbidden, script)

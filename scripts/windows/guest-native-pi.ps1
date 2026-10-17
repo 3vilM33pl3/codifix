@@ -38,11 +38,11 @@ function Run([string]$Program,[string[]]$Arguments) {
     & $Program @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Native Pi command failed: $([IO.Path]::GetFileName($Program)) ($LASTEXITCODE); preserve this attempt" }
 }
-$expected=@('crates/mem-supervisor-pi/scripts/build-windows.ps1','crates/mem-supervisor-pi/patches/no-tools-1.patch',
-    'crates/mem-supervisor-pi/patches/windows-broker-1.patch','crates/mem-supervisor-pi/patches/LICENSE.pi',
+$expected=@('crates/codifix-supervisor-pi/scripts/build-windows.ps1','crates/codifix-supervisor-pi/patches/no-tools-1.patch',
+    'crates/codifix-supervisor-pi/patches/windows-broker-1.patch','crates/codifix-supervisor-pi/patches/LICENSE.pi',
     'packaging/ca-bookworm/pi_smoke.py','packaging/windows-pi/smoke.py',
-    'crates/mem-supervisor-pi/patches/windows-broker-safe-handle-1.patch',
-    'crates/mem-supervisor-pi/windows-pipe-helper/Cargo.toml','crates/mem-supervisor-pi/windows-pipe-helper/src/lib.rs')
+    'crates/codifix-supervisor-pi/patches/windows-broker-safe-handle-1.patch',
+    'crates/codifix-supervisor-pi/windows-pipe-helper/Cargo.toml','crates/codifix-supervisor-pi/windows-pipe-helper/src/lib.rs')
 if (@($manifest.inputs).Count -ne $expected.Count -or @(Compare-Object $expected @($manifest.inputs | ForEach-Object path) -CaseSensitive).Count) { throw 'Pi proof requires the exact existing builder, notices, patches and protocol adapters' }
 for ($index=0; $index -lt $expected.Count; $index++) {
     if ($manifest.inputs[$index].path -cne $expected[$index]) { throw 'Pi proof input order differs from reviewed manifest' }
@@ -101,7 +101,7 @@ try {
         $lines=@(& (Join-Path $system 'System32\cmd.exe') /d /s /c ('""'+$vcvars+'" >nul && set"'))
         if ($LASTEXITCODE -ne 0) { throw 'Cannot initialize native MSVC environment' }
         foreach ($line in $lines) { $pair=$line.Split('=',2); if ($pair.Length -eq 2 -and $pair[0]) { [Environment]::SetEnvironmentVariable($pair[0],$pair[1],'Process') } }
-        & (Join-Path $SourceRoot 'crates\mem-supervisor-pi\scripts\build-windows.ps1') -SourceRepository $repository -BuildRoot $build -InstallToolchain
+        & (Join-Path $SourceRoot 'crates\codifix-supervisor-pi\scripts\build-windows.ps1') -SourceRepository $repository -BuildRoot $build -InstallToolchain
     }
     if (-not (Test-Path -LiteralPath $receipt)) { throw 'A successfully recorded native Pi build is required before verification' }
     $evidence=Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json

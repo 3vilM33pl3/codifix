@@ -42,15 +42,15 @@ function inspect(service) {
 function ip(service) {return Object.values(inspect(service).NetworkSettings.Networks)[0].IPAddress;}
 let started=false,built=false,proxyBuilt=false;
 try {
-  await long('cargo',['build','-p','mem-federation-runtime','--bin','memory-federation-gateway','--example','isolation-admin','--locked']);
+  await long('cargo',['build','-p','codifix-federation-runtime','--bin','codifix-federation-gateway','--example','isolation-admin','--locked']);
   // A fixture image from our built binary and its exact dynamic libraries avoids
   // host mounts and dependence on a base image's glibc version. Not a release image.
   const staging=join(root,'image/rootfs');await mkdir(join(staging,'usr/local/bin'),{recursive:true});
-  const binary=join(repo,'target/debug/memory-federation-gateway');
-  await copyFile(binary,join(staging,'usr/local/bin/memory-federation-gateway'));
+  const binary=join(repo,'target/debug/codifix-federation-gateway');
+  await copyFile(binary,join(staging,'usr/local/bin/codifix-federation-gateway'));
   const libs=[...run('ldd',[binary]).matchAll(/\/[\w/+.,:@-]+/g)].map(m=>m[0]);
   for(const lib of new Set(libs)) {await mkdir(dirname(join(staging,lib)),{recursive:true});await copyFile(lib,join(staging,lib));}
-  await save(join(root,'image/Dockerfile'),'FROM scratch\nCOPY rootfs /\nENTRYPOINT ["/usr/local/bin/memory-federation-gateway"]\n');
+  await save(join(root,'image/Dockerfile'),'FROM scratch\nCOPY rootfs /\nENTRYPOINT ["/usr/local/bin/codifix-federation-gateway"]\n');
   await long('docker',['build','-q','-t',image,join(root,'image')]);built=true;
   await copyFile(join(repo,'deploy/federation/Proxy.Dockerfile'),join(root,'image/Proxy.Dockerfile'));
   await long('docker',['build','-q','-t',proxy,'--build-arg',`PROXY_IMAGE=${proxyImage}`,'-f',join(root,'image/Proxy.Dockerfile'),join(root,'image')]);proxyBuilt=true;

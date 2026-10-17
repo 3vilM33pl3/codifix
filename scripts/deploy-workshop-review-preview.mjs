@@ -49,7 +49,7 @@ if(phase==='upgrade'){
   fs.writeFileSync(`${backup}/upgrade.json`,output,{mode:0o600,flag:'wx'});
   const staging=`${root}/interaction-59`;fs.mkdirSync(staging,{mode:0o700});
   fs.copyFileSync(`${root}/work.json`,`${staging}/work.json`,fs.constants.COPYFILE_EXCL);
-  fs.copyFileSync(`${built}/memory`,`${staging}/memory`,fs.constants.COPYFILE_EXCL);
+  fs.copyFileSync(`${built}/codifix`,`${staging}/memory`,fs.constants.COPYFILE_EXCL);
   fs.chmodSync(`${staging}/memory`,0o500);
   fs.cpSync(`${repository}/web/dist`,`${staging}/web`,{recursive:true,errorOnExist:true,force:false});
   fs.writeFileSync(`${staging}/artifact.json`,JSON.stringify({memory_sha256:digest(fs.readFileSync(`${staging}/memory`)),manifest_sha256:digest(fs.readFileSync(`${staging}/work.json`))}),{mode:0o600,flag:'wx'});

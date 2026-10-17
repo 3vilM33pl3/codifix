@@ -262,13 +262,13 @@ switch($Kind){
         foreach($name in @('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll')){Copy-PackFile (Join-Path $pgBin $name) ('pi/'+$name) (Get-PackHash (Join-Path $pgBin $name))}
         Copy-PackFile (Join-Path $build 'source.tar') 'source/pi-source.tar' $baseline.source_archive_sha256
         foreach($name in @('no-tools-1.patch','windows-broker-1.patch','windows-broker-safe-handle-1.patch')){
-            $source=Join-Path $SourceRoot ('crates/mem-supervisor-pi/patches/'+$name);Copy-PackFile $source ('source/'+$name) (Get-PackHash $source)
+            $source=Join-Path $SourceRoot ('crates/codifix-supervisor-pi/patches/'+$name);Copy-PackFile $source ('source/'+$name) (Get-PackHash $source)
         }
         foreach($name in @('Cargo.toml','src/lib.rs')){
-            $source=Join-Path $SourceRoot ('crates/mem-supervisor-pi/windows-pipe-helper/'+$name);Copy-PackFile $source ('source/windows-pipe-helper/'+$name) (Get-PackHash $source)
+            $source=Join-Path $SourceRoot ('crates/codifix-supervisor-pi/windows-pipe-helper/'+$name);Copy-PackFile $source ('source/windows-pipe-helper/'+$name) (Get-PackHash $source)
         }
         Copy-PackFile (Join-Path $build 'source/Cargo.lock') 'source/Cargo.lock' $baseline.patched_lock_sha256
-        $piLicense=Join-Path $SourceRoot 'crates/mem-supervisor-pi/patches/LICENSE.pi'
+        $piLicense=Join-Path $SourceRoot 'crates/codifix-supervisor-pi/patches/LICENSE.pi'
         Copy-PackFile $piLicense 'notices/pi.txt' (Get-PackHash $piLicense)
         Copy-PackFile (Join-Path $SourceRoot 'LICENSE') 'notices/memory-windows-pipe.txt' (Get-PackHash (Join-Path $SourceRoot 'LICENSE'))
         $manifest.pi_version='0.5.1';$manifest.artifact=$evidence.artifact;$manifest.source_archive_sha256=$baseline.source_archive_sha256

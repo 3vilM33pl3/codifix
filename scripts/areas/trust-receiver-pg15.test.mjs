@@ -80,7 +80,7 @@ test('PostgreSQL 17 Trust data restores atomically into the exact CA PostgreSQL 
     for (const database of databases) docker(container, ['createdb', '-U', 'postgres', database]);
   }
   const binary = process.env.MEMORY_AREA_IMPORT_BINARY
-    ?? new URL('../../target/debug/memory-area-import', import.meta.url).pathname;
+    ?? new URL('../../target/debug/codifix-area-import', import.meta.url).pathname;
   const initialize = async (database, socket) => {
     const descriptor = join(root, `${database}.json`);
     const bytes = JSON.stringify({ format_version: 1, instance_id: id(database === 'memory_staging_trust' ? 90 : 91),

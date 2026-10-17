@@ -21,7 +21,7 @@ It verifies private snapshot/archive/proof bindings and a Docker network-none sa
 Optional --source-instance UUID and --snapshot-id UUID must match the descriptor.
 Uses one REPEATABLE READ READ ONLY transaction and UTC complete-row JSON hashing.
 Streams all ordinary/partitioned tables in every non-system schema, including empty
-tables. Foreign tables fail closed. FK targets and the mem-area logical-reference
+tables. Foreign tables fail closed. FK targets and the codifix-area logical-reference
 contract are included. Only public lineage/project metadata is interpreted;
 per-schema project catalogs are retained in the private evidence sidecar.
 
@@ -34,7 +34,7 @@ Envelopes exceeding 64 MiB fail collection; rows are never silently truncated.
 
 This does not import, verify restore correctness, classify historical schemas,
 discover references embedded in opaque text/JSON, or certify a partition ready.
-Unknown schemas remain mem-area planning blockers.
+Unknown schemas remain codifix-area planning blockers.
 `;
 
 export function parseArgs(args) {
@@ -253,7 +253,7 @@ export async function streamInventory(session, options, write) {
       'Public project/canonical metadata and explicit nonpublic project_id fields are recorded; source classification is separate.',
       'All physical heap tables are read with ONLY to avoid inheritance duplication; partitioned FK routing requires planner review.',
       'Tables without primary keys fail closed pending a reviewed lossless identity format.',
-      'Catalog foreign keys plus explicit mem-area logical references are inventoried; links embedded in text/JSON are not inferred.',
+      'Catalog foreign keys plus explicit codifix-area logical references are inventoried; links embedded in text/JSON are not inferred.',
       'Views, sequences, functions, role/privilege state and physical byte identity remain in the protected backup, not this row inventory.',
       'No classification, import, credential transfer, worker activation or cutover is performed.'],
   };

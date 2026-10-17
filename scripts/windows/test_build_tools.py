@@ -12,17 +12,17 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn("'Repository' {'native-repository-db'}",script)
         self.assertIn("$receipt.test_target='db_repository'",script)
         branch=script.split("elseif ($Scope -eq 'Repository')",1)[1].split("elseif",1)[0]
-        self.assertIn("'-p','mem-service','--test','db_repository'",branch)
+        self.assertIn("'-p','codifix-service','--test','db_repository'",branch)
         self.assertNotIn("'--workspace'",branch)
 
     def test_portability_rerun_is_exactly_four_packages_not_workspace(self):
         script=(Path(__file__).parent/'guest-native-db.ps1').read_text()
         self.assertIn("'Portability' {'native-portability-db'}",script)
-        self.assertIn("$receipt.packages=@('mem-cli','mem-config','mem-eval','mem-federation-runtime')",script)
+        self.assertIn("$receipt.packages=@('codifix-cli','codifix-config','codifix-eval','codifix-federation-runtime')",script)
         self.assertIn("$receipt.whole_workspace_verified=$false",script)
         branch=script.split("elseif ($Scope -eq 'Portability')",1)[1].split("elseif",1)[0]
-        for required in ["'test'", "'-p','mem-cli'", "'-p','mem-config'", "'-p','mem-eval'",
-                         "'-p','mem-federation-runtime'", "'--all-targets'", "'--locked'",
+        for required in ["'test'", "'-p','codifix-cli'", "'-p','codifix-config'", "'-p','codifix-eval'",
+                         "'-p','codifix-federation-runtime'", "'--all-targets'", "'--locked'",
                          "'--no-fail-fast'", "'--test-threads=1'"]:
             self.assertIn(required,branch)
         self.assertNotIn("'--workspace'",branch)
@@ -103,7 +103,7 @@ class BuildToolsManifestTests(unittest.TestCase):
 
     def test_pi_source_alias_is_materialized_without_link_privilege_or_source_repin(self):
         root=Path(__file__).resolve().parents[2]
-        script=(root/'crates/mem-supervisor-pi/scripts/build-windows.ps1').read_text()
+        script=(root/'crates/codifix-supervisor-pi/scripts/build-windows.ps1').read_text()
         for required in ["--exclude=.beads/beads.jsonl",'120000 blob',"${Revision}:.beads/beads.jsonl",
                          "'issues.jsonl'",'source_link_materialization=',"policy='git-core-symlinks-false'"]:
             self.assertIn(required,script)

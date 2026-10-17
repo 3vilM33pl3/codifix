@@ -97,7 +97,7 @@ async function runtimeTest() {
   delete testEnv.MEMORY_LAYER_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;
   delete testEnv.MEMORY_LAYER_FEDERATION_CONFIG;
-  const child = spawn('cargo', ['test', '-p', 'mem-federation-runtime', '--test', 'c_workflow', '--locked', '--', '--nocapture'],
+  const child = spawn('cargo', ['test', '-p', 'codifix-federation-runtime', '--test', 'c_workflow', '--locked', '--', '--nocapture'],
     { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
   const timer = setTimeout(() => child.kill('SIGTERM'), 540_000);
   try {
@@ -108,7 +108,7 @@ async function runtimeTest() {
   } finally { clearTimeout(timer); }
   // Stage E exercises the local application contract over this SAME pinned PDS.
   // Optional client coverage requires a locally built CLI/web and Chromium.
-  const app = spawn('cargo', ['test', '-p', 'mem-service', 'e_two_instance_http_workflow', '--locked', '--', '--test-threads=1', '--nocapture'],
+  const app = spawn('cargo', ['test', '-p', 'codifix-service', 'e_two_instance_http_workflow', '--locked', '--', '--test-threads=1', '--nocapture'],
     { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
   const appTimer = setTimeout(() => app.kill('SIGTERM'), 540_000);
   try {
@@ -118,14 +118,14 @@ async function runtimeTest() {
   const expertiseEnv = { ...testEnv, MEMORY_FEDERATION_F1_INSTANCES: '1' };
   if (testEnv.MEMORY_FEDERATION_E_CLIENTS === '1') expertiseEnv.MEMORY_FEDERATION_F1_CLIENTS = '1';
   delete expertiseEnv.MEMORY_FEDERATION_E_CLIENTS;
-  const expertise = spawn('cargo', ['test', '-p', 'mem-service', 'f1_independent_instances', '--locked', '--', '--test-threads=1', '--nocapture'],
+  const expertise = spawn('cargo', ['test', '-p', 'codifix-service', 'f1_independent_instances', '--locked', '--', '--test-threads=1', '--nocapture'],
     { cwd: join(directory, '../..'), env: expertiseEnv, stdio: 'inherit' });
   const expertiseTimer = setTimeout(() => expertise.kill('SIGTERM'), 540_000);
   try {
     const code = await new Promise((resolve, reject) => { expertise.once('error', reject); expertise.once('exit', resolve); });
     if (code !== 0) throw new Error('F1 expertise separate-database workflow failed');
   } finally { clearTimeout(expertiseTimer); }
-  const agents = spawn('cargo', ['test', '-p', 'mem-service', 'watched_agents_four_area_signed_pds_rehearsal', '--locked', '--', '--test-threads=1', '--nocapture'],
+  const agents = spawn('cargo', ['test', '-p', 'codifix-service', 'watched_agents_four_area_signed_pds_rehearsal', '--locked', '--', '--test-threads=1', '--nocapture'],
     { cwd: join(directory, '../..'), env: { ...testEnv, MEMORY_FEDERATION_AGENT_INSTANCES: '1' }, stdio: 'inherit' });
   const agentsTimer = setTimeout(() => agents.kill('SIGTERM'), 540_000);
   try {

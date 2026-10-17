@@ -1,0 +1,23 @@
+[package]
+name = "codifix-area-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+codifix-area = { path = "../codifix-area" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

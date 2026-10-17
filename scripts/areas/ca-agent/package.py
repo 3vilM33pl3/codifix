@@ -20,7 +20,7 @@ GUIDES = (
     "scripts/areas/releases/upgrade-README.md",
     "scripts/areas/releases/instance-README.md",
     "scripts/areas/releases/README.md",
-    "crates/mem-area-ops/README.md",
+    "crates/codifix-area-ops/README.md",
     "deploy/areas/instance.toml.example",
     "deploy/areas/ca-preflight.sh",
     "deploy/areas/CA-CONSOLE-HANDOFF.md",

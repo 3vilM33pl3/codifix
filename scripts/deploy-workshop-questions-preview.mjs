@@ -112,7 +112,7 @@ if (phase === 'upgrade') {
   backupVerified();
   if (inspectApp().State.Running) throw Error('Stop the exact preview before migrating');
   if (fs.existsSync(staging)) throw Error('Staging already exists; inspect, do not overwrite');
-  for (const file of [`${built}/memory`, `${built}/memory-workshop-worker`, `${built}/examples/upgrade_workshop_questions`, `${repository}/web/dist/index.html`]) {
+  for (const file of [`${built}/codifix`, `${built}/codifix-workshop-worker`, `${built}/examples/upgrade_workshop_questions`, `${repository}/web/dist/index.html`]) {
     if (!fs.statSync(file).isFile()) throw Error('Required build artifact unavailable');
   }
   const output = run(`${built}/examples/upgrade_workshop_questions`, ['--writers-stopped-backup-verified'], {
@@ -123,7 +123,7 @@ if (phase === 'upgrade') {
   fs.writeFileSync(`${backup}/upgrade.json`, output, { mode: 0o600, flag: 'wx' });
   fs.mkdirSync(staging, { mode: 0o700 });
   fs.copyFileSync(`${root}/work.json`, `${staging}/work.json`, fs.constants.COPYFILE_EXCL);
-  for (const [source, target] of [[`${built}/memory`, 'memory'], [`${built}/memory-workshop-worker`, 'worker']]) {
+  for (const [source, target] of [[`${built}/codifix`, 'memory'], [`${built}/codifix-workshop-worker`, 'worker']]) {
     fs.copyFileSync(source, `${staging}/${target}`, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(`${staging}/${target}`, 0o500);
   }

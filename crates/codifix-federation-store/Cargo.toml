@@ -1,0 +1,23 @@
+[package]
+name = "codifix-federation-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+codifix-federation = { path = "../codifix-federation" }
+codifix-record = { path = "../codifix-record" }
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+tokio.workspace = true
+
+[lints]
+workspace = true

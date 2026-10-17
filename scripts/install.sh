@@ -91,7 +91,7 @@ Linux)
         say "  Build from source (needs Rust + Node):"
         say "    git clone https://github.com/$REPO && cd memory"
         say "    npm --prefix web ci && npm --prefix web run build"
-        say "    cargo install --path crates/mem-cli --bin memory"
+        say "    cargo install --path crates/codifix-cli --bin codifix"
         exit 0
     fi
     ;;
