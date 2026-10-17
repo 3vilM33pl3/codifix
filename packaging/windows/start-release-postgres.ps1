@@ -57,8 +57,31 @@ if (-not (Test-Path -LiteralPath $vswhere)) { throw 'Native MSVC toolchain unava
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if ($LASTEXITCODE -ne 0 -or -not $vs) { throw 'Native MSVC installation unavailable' }
 $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
-$environment = & "$env:SystemRoot\System32\cmd.exe" /d /s /c "`"`"$vcvars`" >nul && set`""
-if ($LASTEXITCODE -ne 0) { throw 'Could not initialize native MSVC environment' }
+if (-not (Test-Path -LiteralPath $vcvars)) { throw 'Native MSVC environment script unavailable' }
+# PowerShell 7 rewrites embedded quotes passed through native argument binding;
+# the historical Windows PowerShell invocation becomes literal \"\"C:\Program
+# on hosted runners. Supply cmd.exe's raw command line through .NET instead.
+$start = [Diagnostics.ProcessStartInfo]::new()
+$start.FileName = "$env:SystemRoot\System32\cmd.exe"
+$start.Arguments = '/d /s /c ""' + $vcvars + '" >nul && set"'
+$start.UseShellExecute = $false
+$start.CreateNoWindow = $true
+$start.RedirectStandardOutput = $true
+$start.RedirectStandardError = $true
+$process = [Diagnostics.Process]::new()
+$process.StartInfo = $start
+try {
+    $null = $process.Start()
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit(120000)) {
+        $process.Kill($true); $process.WaitForExit()
+        throw 'Native MSVC environment initialization exceeded two minutes'
+    }
+    if ($process.ExitCode -ne 0) { throw "Could not initialize native MSVC environment (exit $($process.ExitCode))" }
+    $environment = $stdout.GetAwaiter().GetResult() -split '\r?\n'
+    $null = $stderr.GetAwaiter().GetResult()
+} finally { $process.Dispose() }
 foreach ($line in $environment) {
     if ($line -match '^(PATH|INCLUDE|LIB|LIBPATH|VCINSTALLDIR|VCToolsInstallDir|VCToolsRedistDir|WindowsSdkDir|WindowsSDKVersion)=(.*)$') {
         [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
