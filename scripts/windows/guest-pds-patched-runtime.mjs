@@ -36,10 +36,10 @@ export function checkedInventory(files) {
   if (bytes > 2 * 1024 * 1024 * 1024) throw Error('Prepared runtime exceeds bounded payload size');
   return files;
 }
-export async function fileDigest(file) {
+export async function fileDigest(file, { baselinePackage = false } = {}) {
   await assertPlainPath(file);
   const info = await fs.lstat(file);
-  if (!info.isFile() || info.nlink !== 1) throw Error('Regular unaliased preparation file required');
+  if (!info.isFile() || (!baselinePackage && info.nlink !== 1)) throw Error('Regular unaliased preparation file required');
   const hash = createHash('sha256');
   for await (const bytes of createReadStream(file)) hash.update(bytes);
   return { sha256: hash.digest('hex'), bytes: info.size };
@@ -79,7 +79,10 @@ export async function copyVerifiedRuntime(source, destination, files) {
       if (index >= files.length) return;
       const item = files[index], input = path.join(source, item.path), output = path.join(destination, item.path);
       try {
-        const digest = await fileDigest(input);
+        // pnpm's pinned baseline legitimately shares immutable package files.
+        // Verify bytes before copying, flatten aliases, and keep every output,
+        // receipt, executable and patch script subject to single-link checks.
+        const digest = await fileDigest(input, { baselinePackage: true });
         if (digest.sha256 !== item.sha256 || digest.bytes !== item.bytes) throw Error('Original runtime no longer matches preparation receipt');
         await fs.mkdir(path.dirname(output), { recursive: true });
         await fs.copyFile(input, output, constants.COPYFILE_EXCL);

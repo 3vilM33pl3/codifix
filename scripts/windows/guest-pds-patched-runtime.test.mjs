@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { checkedInventory, copyVerifiedRuntime, preparePatchedRuntime, patchSha256 } from './guest-pds-patched-runtime.mjs';
+import { checkedInventory, copyVerifiedRuntime, preparePatchedRuntime, patchSha256, fileDigest } from './guest-pds-patched-runtime.mjs';
 import { patchPdsFile, originalFiles } from '../../packaging/windows-pds/windows-paths.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 async function fixture(fn) {
@@ -44,6 +44,26 @@ test('baseline links are rejected without copying their target', async () => fix
   const item = await put(source, 'package.json', 'original');
   await fs.symlink(source, path.join(source, 'alias'), process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(copyVerifiedRuntime(source, path.join(root, 'copy'), [item]), /link/);
+}));
+test('pinned package hardlinks are flattened without relaxing output or receipt checks', async () => fixture(async root => {
+  const source = path.join(root, 'baseline');
+  const first = await put(source, 'node_modules/a/LICENSE', 'pinned package notice');
+  const alias = 'node_modules/b/LICENSE';
+  await fs.mkdir(path.dirname(path.join(source, alias)), { recursive: true });
+  await fs.link(path.join(source, first.path), path.join(source, alias));
+  const files = [first, { ...first, path: alias }];
+  await assert.rejects(fileDigest(path.join(source, first.path)), /unaliased/);
+  const destination = path.join(root, 'flattened');
+  assert.deepEqual(await copyVerifiedRuntime(source, destination, files), files);
+  for (const file of files) {
+    assert.equal((await fs.stat(path.join(source, file.path))).nlink, 2);
+    assert.equal((await fs.stat(path.join(destination, file.path))).nlink, 1);
+    assert.equal((await fileDigest(path.join(destination, file.path))).sha256, file.sha256);
+    assert.equal(sha(await fs.readFile(path.join(source, file.path))), file.sha256);
+  }
+  await fs.writeFile(path.join(source, alias), 'changed through alias');
+  await assert.rejects(copyVerifiedRuntime(source, path.join(root, 'changed'), files), /preparation receipt/);
+  assert.equal((await fileDigest(path.join(destination, first.path))).sha256, first.sha256);
 }));
 test('reviewed patch script pin matches the source actually imported', async () => {
   assert.equal(sha(await fs.readFile(new URL('../../packaging/windows-pds/windows-paths.mjs', import.meta.url))), patchSha256);
