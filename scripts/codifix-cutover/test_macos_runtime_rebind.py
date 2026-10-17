@@ -52,7 +52,7 @@ class FakeBoundary(rebind.Boundary):
         if "pg_control_system" in query:
             return {"system_identifier": self.system_identifier, "data_directory": str(self.fixture.new / "cluster"),
                     "port": 55432, "admin_oid": 10, "admin_scram": True}
-        if "legacy" in query or "SELECT EXISTS" in query:
+        if "legacy" in query or "SELECT to_json(EXISTS" in query:
             return False
         name = database.removeprefix("codifix_laptop_")
         item = next(a for a in self.fixture.recon["areas"] if a["name"] == name)

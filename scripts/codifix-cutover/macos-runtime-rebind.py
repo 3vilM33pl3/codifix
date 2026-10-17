@@ -313,7 +313,7 @@ class Boundary(onboarding.Native):
                 projection = self.query(payload, role, "SELECT COALESCE((SELECT json_build_object('subscription',subscription,'device',device,'scope',scope) FROM public." + table + " WHERE subscription='" + metadata["subscription"] + "'::uuid),'null'::json)", role=role)
                 require(projection == expected, "historical cache identity not present; no new subscription is created")
         legacy_roles = ["memory_onboarding_admin"] + ["memory_laptop_" + a["name"] for a in reconciled["areas"]]
-        legacy = self.query(payload, "postgres", "SELECT EXISTS(SELECT FROM pg_roles WHERE rolname IN (" + ",".join("'" + r + "'" for r in legacy_roles) + "))")
+        legacy = self.query(payload, "postgres", "SELECT to_json(EXISTS(SELECT FROM pg_roles WHERE rolname IN (" + ",".join("'" + r + "'" for r in legacy_roles) + ")))")
         require(legacy is False, "old database role namespace remains")
 
 
