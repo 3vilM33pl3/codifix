@@ -26,7 +26,26 @@ snapshot evidence and [CA console checks](../ca-console-checks.md).
   selects the smallest valid frame to isolate the block-count bound; all 11
   verifier tests passed. No security limit was relaxed.
 
-Consolidated all-target Rust testing is still in progress. Native Windows and
+Consolidated all-target Rust testing used the release workflow's four-thread
+limit and an explicitly required disposable database. It completed 102 targets:
+1,516 tests passed, 14 were explicitly ignored, and one MCP authorization fixture
+still used the old tool name. That fixture was corrected. The final affected
+CLI/service/MCP/platform all-target rerun passed 665 tests across 9 targets,
+with 3 explicit ignores and no failures. The earlier unconstrained run
+exhausted the disposable PostgreSQL connection limit; no production database was
+involved. No remaining observed test failure is open.
+
+Docs content (99 source files), local links, 16 image references, production docs
+build, architecture boundaries and five release asset-contract tests passed.
+The complete area-script suite passed 116 tests with six optional skips.
+All 84 previously applied migration files match the original baseline bytes.
+The candidate contract confirms all 32 workspace packages and root versions.
+
+The Mac administrator transition has additional isolated evidence: 22 baseline
+and 11 guarded-transaction checks passed. A temporary NOLOGIN role exists only
+inside the transaction and is dropped before commit; no permanent login is added.
+Astra reviewed the supported session-authorization design. Actual cold cutover
+and new runtime bindings remain pending. Native Windows and
 Mac Intel/ARM installer/signing acceptance, real-client credentials, fresh
 federation enrollment, final coordinated backup/restore and live cutover remain
 open. Previously recorded Mac app unit coverage is 55 tests with four explicit

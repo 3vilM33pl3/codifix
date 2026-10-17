@@ -42,9 +42,9 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 ## B. Core workspace
 
 - [x] Rename crates, imports, dependency declarations, six declared binaries and inventoried launchers; update build scripts and boundary/feature checks.
-- [ ] Update help, completions, subprocess calls, executable discovery, environment/config/marker/state defaults.
+- [x] Update help, completions, subprocess calls, executable discovery, environment/config/marker/state defaults.
 - [x] Preserve durable UUIDs and update lockfiles without unrelated upgrades.
-- [ ] Compile and run focused checks; commit coherent milestones and obtain Astra review.
+- [x] Compile and run focused checks; commit coherent milestones and obtain Astra review.
 
 ## C. Applications, services and installation
 
