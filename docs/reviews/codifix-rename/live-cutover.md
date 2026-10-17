@@ -99,8 +99,10 @@ Corrected unpublished candidate run `39073102523` is running at source
 recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
 no failures reported. The later 22:56 UTC snapshot confirms release contract,
 source archive and full source/security validation succeeded, including the Rust
-audit with its documented RSA exception. Five platform builds remain running.
-No public release or tag has been published.
+audit with its documented RSA exception. The final Mac-restoration snapshot has
+eight successful jobs, also including both Linux builds/installation checks and
+Apple Silicon build/native acceptance. Intel Mac and Windows x64 remain running;
+none has failed. No public release or tag has been published.
 
 Crash recovery reconfirmed all three Monolith area health checks. The initial
 Mac installer authentication blocker is resolved.
