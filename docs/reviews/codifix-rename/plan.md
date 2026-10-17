@@ -33,7 +33,7 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## A. Baseline and recovery
 
-- [ ] Record clean source/release baseline and Workshop approved-plan checkpoint before implementation.
+- [x] Record clean source/release baseline and Workshop approved-plan checkpoint before implementation.
 - [ ] Inventory actual live installations, services, watchers, databases, offline stores, credentials, agent configs, consuming project markers and participating peers. Treat Monolith/Mac/CA docs only as leads.
 - [ ] Record exact old/new state paths and storage keys; verify domain and GitHub target availability.
 - [ ] Freeze naming map and explicit exceptions.
@@ -41,15 +41,15 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## B. Core workspace
 
-- [ ] Rename crates, imports, dependency declarations, six declared binaries and inventoried launchers; update build scripts and boundary/feature checks.
+- [x] Rename crates, imports, dependency declarations, six declared binaries and inventoried launchers; update build scripts and boundary/feature checks.
 - [ ] Update help, completions, subprocess calls, executable discovery, environment/config/marker/state defaults.
-- [ ] Preserve durable UUIDs and update lockfiles without unrelated upgrades.
+- [x] Preserve durable UUIDs and update lockfiles without unrelated upgrades.
 - [ ] Compile and run focused checks; commit coherent milestones and obtain Astra review.
 
 ## C. Applications, services and installation
 
 - [ ] Update Linux services/accounts/paths and Web/TUI branding, browser storage, session and CSRF cookies.
-- [ ] Rename Swift project, targets, modules, app and Network Access helper; update signing, entitlements and privacy metadata.
+- [x] Rename Swift project, targets, modules, app and Network Access helper; update signing, entitlements and privacy metadata.
 - [ ] Preserve connection metadata and rehearse Keychain transfer/access BEFORE uninstalling the old Mac app.
 - [ ] Update Windows MSI identities, registry/install paths, user/server tools; update Homebrew, DEB and all PKG variants.
 - [ ] Provide a release-specific reinstall procedure; validate fresh installation and transition from populated state.
@@ -64,9 +64,9 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## E. Federation reset and preservation
 
-- [ ] Change namespaces, signed-purpose strings and record-key derivation together; regenerate synthetic fixtures from test keys and hashes.
+- [x] Change namespaces, signed-purpose strings and record-key derivation together; regenerate synthetic fixtures from test keys and hashes.
 - [ ] Archive original signed records, receipts, keys and configuration unchanged.
-- [ ] Implement one release-specific reset against exact reviewed schema/rows/tables; reject schema drift and unknown dependencies. No wildcard deletion or TRUNCATE CASCADE.
+- [x] Implement one release-specific reset against exact reviewed schema/rows/tables; reject schema drift and unknown dependencies. No wildcard deletion or TRUNCATE CASCADE.
 - [ ] Preserve canonical/received knowledge, identifiers, provenance, attachments, embeddings and area identities; retire old queues/enrolments/subscriptions so they cannot restart.
 - [ ] Re-enrol only previously participating peers; retain inactive status and explicitly restore approved subscriptions/permissions.
 - [ ] Validate original-origin citations, attachments, deduplication and fresh publication; do not automatically republish imported knowledge.
@@ -74,7 +74,7 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 ## F. Documentation and release
 
 - [ ] Update current docs, examples, diagrams and assets; preserve historical evidence with explicit exceptions.
-- [ ] Update release version validators, manifests, signing and artifact inventory for 3.0.0-rc.1 and 3.0.0.
+- [x] Update release version validators, manifests, signing and artifact inventory for 3.0.0-rc.1 and 3.0.0.
 - [ ] Cover Linux amd64/arm64, Mac Intel/Apple silicon standard and update packages, Windows ZIP/user MSI/server tools. Windows remains preview.
 - [ ] Prepare website, redirects and installation URLs; freeze a single candidate source SHA.
 
@@ -107,3 +107,12 @@ Before new remote federation effects, a matched backup restore is available. Aft
 - [ ] Versions, source/artifact hashes, commits and validation evidence are recorded; inactive services were not activated.
 - [ ] Update Notion status, finish the Workshop plan workflow and remember the implementation. Keep backups until explicit deletion approval.
 
+
+## Current operational boundary
+
+CA is console-administered only; SSH remains disabled and no certificate renewal
+is required. Follow [the exact read-only console handoff](ca-console-checks.md);
+host-local checks remain pending returned results. Current source checks and
+private rehearsal evidence are in [integration status](evidence/integration-status.md)
+and [federation preservation](evidence/federation-slice.md). Source-level checked
+items do not establish native installation, final recovery or live cutover.
