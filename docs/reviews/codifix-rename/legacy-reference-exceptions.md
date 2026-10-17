@@ -21,6 +21,7 @@ use Codifix. Do not run a blanket string replacement over the repository.
 | Old names in cutover instructions and CA preflight | Identify exact existing objects for inventory/retirement. They do not create runtime aliases or change the CA access boundary. |
 | `scripts/deploy-workshop-review-preview.mjs`, `scripts/deploy-workshop-questions-preview.mjs` | Historical one-shot preview operators pinned to old deployments/schema; retain as evidence and do not run them with the candidate. |
 | Existing live database names outside the explicitly rehearsed Mac mapping | Remain operational until an exact old/new role/database/config mapping is reviewed and applied during cutover. They are pending work, not completion exceptions. |
+| `evidence/historical-assets/memory-layer-infograph.png` | Preserved original diagram; active docs use `codifix-flow.svg`. The old image is outside the public site tree. |
 | Existing screenshots and old build-cache ignore rules | Screenshots may document historical UI; old cache/state exclusions preserve recoverable files during transition. Refresh current screenshots before declaring visual acceptance. |
 
 Semantic memory vocabulary remains unchanged: `memory_id`, `memory_entries`,
