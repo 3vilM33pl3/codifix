@@ -1,33 +1,41 @@
 ---
 title: "Windows"
-description: "Install Codifix on Windows with the native x86_64 MSI/ZIP, Docker Desktop, or WSL2."
+description: "Review the Codifix Windows x86_64 preview packages and their limits."
 ---
 
 # Windows
 
-Codifix 2.1.0 publishes native Windows x86_64 **preview** artifacts:
+Codifix 3.0.0-rc.1 Windows packages are planned as an x86_64 preview and are
+not published yet. The published v2.1.0 assets install the previous Memory
+Layer product, not Codifix. Windows ARM64 is not a release target.
 
-- `codifix-2.1.0-windows-x86_64-build.1.msi`
-- `codifix-2.1.0-windows-x86_64-build.1.zip`
-- `codifix-2.1.0-windows-x86_64-build.1-server-tools.msi`
+## Candidate packages
 
-The packages include client/operator executables, Web assets and skills, not a
-complete native PostgreSQL/PDS/Pi stack. The machine-level server-tools MSI does
-not provision dependencies or start services. Full Windows parity and supervisor
-acceptance remain unfinished; consult the release's exact verified capability list.
+The expected candidate names are:
 
-Windows ARM64 is not a release target yet.
+- `codifix-3.0.0-rc.1-windows-x86_64-build.1.msi`
+- `codifix-3.0.0-rc.1-windows-x86_64-build.1.zip`
+- `codifix-3.0.0-rc.1-windows-x86_64-build.1-server-tools.msi`
 
-## Native MSI
+These filenames are not currently published artifacts. Once the release page
+is available, download from there and verify the matching checksum. The MSI
+and ZIP provide client/operator tools; the separate machine-level server-tools
+MSI is a scaffold and does not provision dependencies or start services. This
+preview does not provide the complete native PostgreSQL/PDS/Pi stack or full
+Windows parity.
 
-Download the MSI and matching checksum from the
-[v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0),
-verify it, and run the installer. The per-user installer places
-`codifix.exe`, the bundled web UI, skill templates, README, example config, and
-PowerShell completion under `%LOCALAPPDATA%\Programs\Codifix`, then adds
-its `bin` directory to the user `PATH`.
+The candidate is a breaking product rename. For an existing Memory Layer
+installation, follow the [Update guide](/docs/install/update) and the
+[release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md)
+before replacing it.
 
-After installing:
+## MSI
+
+After publication, download and verify the per-user MSI, then run it. The
+installer places `codifix.exe`, the bundled web UI, skill templates, README,
+example config, and PowerShell completion under
+`%LOCALAPPDATA%\Programs\Codifix`, then adds its `bin` directory to the user
+`PATH`.
 
 ```powershell
 codifix --version
@@ -37,14 +45,13 @@ codifix health
 codifix tui
 ```
 
-The native package does not include PostgreSQL. Use an existing PostgreSQL
-server with pgvector, a local database you manage yourself, or the bundled
-Docker Compose stack.
+The native package does not include PostgreSQL. Use a PostgreSQL server with
+pgvector, a local database you manage yourself, or the bundled Docker Compose
+stack where supported.
 
 ## Portable ZIP
 
-Use the ZIP when you want to inspect or run the binary without installing the
-MSI. Extract the archive, add its directory to `PATH`, then run:
+After publication, extract the ZIP, add its directory to `PATH`, then run:
 
 ```powershell
 codifix --version
@@ -61,8 +68,8 @@ cd codifix
 docker compose up
 ```
 
-That brings up PostgreSQL with pgvector, the Codifix service, and the web
-UI at [http://localhost:4040](http://localhost:4040). Load the showcase project
+That brings up PostgreSQL with pgvector, the Codifix service, and the web UI
+at [http://localhost:4040](http://localhost:4040). Load the showcase project
 from inside the container:
 
 ```powershell
@@ -71,9 +78,9 @@ docker compose exec codifix codifix demo
 
 ## WSL2
 
-For Linux-native shell behavior, TUI workflows, and file watchers, use an Ubuntu
-[WSL2](https://learn.microsoft.com/windows/wsl/install) distribution and follow
-the [Linux / Debian install](/docs/install/linux-debian) inside it.
+For Linux-native shell behavior, TUI workflows, and file watchers, use an
+Ubuntu [WSL2](https://learn.microsoft.com/windows/wsl/install) distribution
+and follow the [Linux / Debian install](/docs/install/linux-debian) inside it.
 
 Repositories are reachable from WSL2 under `/mnt/c/...`, though keeping active
 repositories inside the WSL2 filesystem is faster and works better with file

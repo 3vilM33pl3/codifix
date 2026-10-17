@@ -1,138 +1,79 @@
 ---
 title: "Update"
-description: "Upgrade to Codifix v2.1.0 safely, including backups, breaking changes, migrations, and verification."
+description: "Understand the breaking Memory Layer v2 to Codifix v3 reinstall and state-preservation boundary."
 ---
 
 # Update
 
-Codifix v2.1.0 is the current stable release. It is a breaking major
-upgrade from v1: PostgreSQL data migrates in place and old bundles still import,
-but direct API clients, configuration, and renamed CLI commands need review.
+The published v2.1.0 release is the previous Memory Layer product. It does not
+install Codifix, and there was no published Codifix v2.0 or v2.1 release. The
+Codifix 3.0.0-rc.1 candidate is not published yet. Its technical rename changes
+package, executable, service, and configuration identities, so installing a
+Codifix package over Memory Layer is not an in-place upgrade.
 
-Read the [v2.1.0 release notes](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
-before upgrading a production installation.
+Before changing an existing installation, read the
+[Codifix 3.0 release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
+It describes the preservation and explicit cutover boundaries. Do not begin a
+live cutover from the candidate filenames below: wait until the release,
+checksums, and required release gates are published and reviewed.
 
-## 1. Back up and inspect
+## Before a future v2-to-v3 cutover
 
-Stop if either diagnostic already reports a database or authentication problem:
+First record the exact installed Memory Layer package, version, configuration,
+service state, database target, and active watchers. Preserve a matched,
+recoverable backup of the database, attachments, configuration, credentials,
+state directories, and old executables. Keep this recovery material private.
+Do not purge the old package or remove its data during preparation.
+
+Codifix is a separate product identity. The installers do not transfer
+Memory Layer configuration or state, start old services, or run an automatic
+database migration. Semantic memory records, canonical IDs, and area topology
+are intended to be preserved by the reviewed release-specific cutover. Follow
+that procedure for exact state reconciliation, service shutdown, package
+retirement, and new installation; do not infer a general database rename from
+matching names.
+
+## Candidate package names
+
+These names identify the expected 3.0.0-rc.1 assets. The candidate is not
+published, so downloads and checksums are not yet available.
+
+| Platform | Candidate assets |
+|---|---|
+| Debian/Ubuntu | `codifix_3.0.0~rc.1_amd64.deb` or `codifix_3.0.0~rc.1_arm64.deb` |
+| macOS | `codifix-3.0.0-rc.1-macos-{x86_64,aarch64}.pkg` and corresponding `-application-update.pkg` files |
+| Windows x86_64 | `codifix-3.0.0-rc.1-windows-x86_64-build.1.{zip,msi}` and `-server-tools.msi` |
+
+Use a standard macOS package for a fresh Codifix installation. The
+application-update package is only for an existing Codifix installation; it
+does not migrate Memory Layer. The Windows packages are a preview. Homebrew is
+HEAD-only until a pinned Codifix formula is published with the release source
+archive and checksum.
+
+## After an approved installation
+
+Configure and verify the new Codifix installation using its own documented
+configuration and service commands:
 
 ```bash
 codifix --version
-codifix status --project <project-slug>
-codifix doctor
-codifix health
-```
-
-Back up PostgreSQL before starting the v2 binary:
-
-```bash
-pg_dump "$DATABASE_URL" > codifix-before-v2.sql
-```
-
-If `DATABASE_URL` is stored only in `codifix.env`, load it through your
-normal secret-management workflow rather than copying it into shell history.
-For a portable memory-level backup, also export important projects:
-
-```bash
-codifix bundle export --project <project-slug> --out <project-slug>-before-v2.mlbundle.zip
-```
-
-## 2. Review the v2 breaks
-
-- Delete `capnp_unix_socket` and `capnp_tcp_addr`; the TUI and clients now use
-  the `/ws` WebSocket stream.
-- Replace `memory automation flush` with `codifix watcher flush`,
-  `codifix capture task` with `codifix capture`, and `codifix dev init` with
-  `codifix dev`. Use `codifix wizard` instead of the removed `memory setup`.
-- Update direct HTTP integrations from the running service's
-  `GET /v1/openapi.yaml`. v2 removed `/v1/stats`, `/v1/offline/pending`, and the
-  browser auth-token handoff, and consolidated loop/activity routes.
-- Treat `[writer]`, `--writer-id`, and `CODIFIX_WRITER_ID` as advisory
-  labels. The authenticated principal supplies durable authorship.
-- Expect new bundle exports to use deterministic schema v2. Existing schema v1
-  bundles remain importable.
-
-## 3. Install v2.1.0
-
-Choose the command for the way you installed Codifix.
-
-### Debian or Ubuntu
-
-Download the matching v2.1.0 `.deb` and checksum from
-[GitHub Releases](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0),
-verify the checksum, then install it:
-
-```bash
-sha256sum -c codifix_2.1.0_amd64.deb.sha256
-sudo dpkg -i codifix_2.1.0_amd64.deb
-```
-
-Use the `arm64` filenames on 64-bit ARM Linux.
-
-### Homebrew
-
-```bash
-brew update
-brew upgrade 3vilM33pl3/codifix/codifix
-```
-
-### macOS package or Windows MSI
-
-Download the architecture-matched v2.1.0 installer and checksum. For a bundled
-Mac installation, choose the **application-update** package: it preserves the
-existing PostgreSQL/runtime tree. The standard package requires separately
-provisioned dependencies and refuses to overwrite a bundled runtime.
-
-Windows is a **preview**. Use the exact `-build.1` filenames in the release;
-the per-user installer uses `%LOCALAPPDATA%\Programs\Codifix`. Its separate
-server-tools MSI does not install the complete PostgreSQL/PDS/Pi stack.
-Signing and notarization status are stated in the release notes.
-
-### Source checkout
-
-Check out the `v2.1.0` tag, build with `--locked`, and follow the same
-service restart and verification steps as your original source installation.
-
-## 4. Restart and migrate
-
-```bash
-codifix service restart
 codifix doctor
 codifix health
 codifix status --project <project-slug>
 ```
 
-The service embeds append-only migrations through 0084 and applies pending
-migrations at startup. Restart only the selected installation after reviewing
-its configuration and database. Named instances need their explicit upgrade
-procedure; package installation does not switch independently pinned releases.
-Do not run an older binary against the migrated database. Once new writes have
-been accepted, preserve them and recover forward rather than restoring stale
-state as authority.
+The service includes append-only database migrations through 0085 and applies
+pending migrations at startup. Those application migrations do not perform
+the product-identity cutover described above. Keep the old installation
+available for recovery until the reviewed reconciliation and post-install
+checks are complete. Never run the old Memory Layer binary against a database
+after Codifix has accepted writes.
 
-Refresh repo-local Codifix skills only after reviewing the preview:
+## Previous release history
 
-```bash
-cd /path/to/project
-codifix upgrade --dry-run
-codifix upgrade
-```
-
-## 5. Verify integrations
-
-```bash
-codifix --version
-codifix query --project <project-slug> --question "What changed recently?"
-codifix resume --project <project-slug>
-codifix watcher status --project <project-slug>
-codifix mcp status
-```
-
-Direct API clients should fetch `GET /v1/openapi.yaml` from the upgraded
-service. MCP and agent clients should reconnect after the service restart so
-they negotiate the current tool surface.
-
-## Next
+The v2.1.0 release remains available as a Memory Layer release. Its packages
+and history retain their original identity. Do not use an old release asset as
+a Codifix installer or interpret it as a Codifix v2 release.
 
 Read [Release compatibility and known limitations](/docs/help/known-limitations),
-[Operations](/docs/operations), or [Doctor and health](/docs/help/doctor-and-health).
+[Operations](/docs/operations), or the platform-specific [install guide](/docs/install).

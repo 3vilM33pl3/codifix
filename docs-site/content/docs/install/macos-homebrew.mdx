@@ -1,52 +1,50 @@
 ---
 title: "macOS"
-description: "Install Codifix with Homebrew or a native .pkg and run the first health checks."
+description: "Review Codifix macOS package names and Homebrew availability."
 ---
 
 # macOS
 
-## What you will do
-
-Install Codifix through Homebrew or the native `.pkg`, configure global and
-project settings, and verify the service.
+The Codifix 3.0.0-rc.1 macOS packages are not published yet. The existing
+v2.1.0 release is the previous Memory Layer product; its assets are not
+Codifix installers. Homebrew currently provides a HEAD formula only. There is
+no stable Codifix formula or published candidate archive and checksum yet.
 
 ## Homebrew
 
+The formula can be used for development from the current source checkout:
+
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
-brew install 3vilM33pl3/codifix/codifix
-codifix wizard --global
-cd /path/to/project
-codifix wizard --dry-run
-codifix wizard
-codifix service enable
-codifix doctor
-codifix health
-codifix tui
-```
-
-For unreleased changes, use:
-
-```bash
 brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
 
-## Native .pkg
+This builds the current source; it is not a packaged 3.0.0-rc.1 release
+install. Do not use `brew upgrade` as a v2-to-v3 migration path.
 
-The [v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
-publishes separate native installers and matching checksums:
+## Native packages
 
-- Intel Mac: `codifix-2.1.0-macos-x86_64.pkg`
-- Apple Silicon Mac: `codifix-2.1.0-macos-aarch64.pkg`
+After publication, the expected standard package names are:
 
-These standard packages require separately configured PostgreSQL/pgvector. If
-Memory already has a bundled runtime, choose the architecture-matched
-`-application-update.pkg` instead: it preserves that runtime, its data and helper
-launcher. The standard package refuses to overwrite a bundled runtime. Do not
-switch an existing bundled installation to Homebrew as an implicit migration.
+- Intel Mac: `codifix-3.0.0-rc.1-macos-x86_64.pkg`
+- Apple Silicon: `codifix-3.0.0-rc.1-macos-aarch64.pkg`
 
-Download the package for your Mac, run it, then continue with the same setup
-commands:
+The matching packages ending in
+`-macos-x86_64-application-update.pkg` or
+`-macos-aarch64-application-update.pkg` are for updating an existing Codifix
+installation. They do not migrate Memory Layer. Standard packages require
+separately configured PostgreSQL/pgvector; application-update packages preserve
+the Codifix runtime they update. The candidate packages are not yet published,
+so these filenames have no available checksums to verify.
+
+Download only from the published Codifix 3.0.0-rc.1 release and verify its
+matching checksum. For an existing Memory Layer installation, first follow the
+[Update guide](/docs/install/update) and the
+[release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
+Do not replace an existing bundled runtime with Homebrew as an implicit
+migration.
+
+After installing a published candidate, configure and verify it:
 
 ```bash
 codifix wizard --global
@@ -58,10 +56,6 @@ codifix doctor
 codifix health
 codifix tui
 ```
-
-If a release notes that the `.pkg` is unsigned, macOS may require an explicit
-Open action from Finder or System Settings. Homebrew remains the preferred path
-when you want the fewest Gatekeeper prompts.
 
 ## Verify
 

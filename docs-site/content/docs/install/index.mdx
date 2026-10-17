@@ -1,74 +1,73 @@
 ---
 title: "Install"
-description: "Install Codifix, configure PostgreSQL with pgvector, and initialise your first project."
+description: "Install Codifix when release packages are available, configure PostgreSQL with pgvector, and initialise your first project."
 ---
 
 # Install
 
-The fastest paths are the [five-minute quickstart](/docs/quickstart) or the one-line installer:
+The 3.0.0-rc.1 packages are being prepared and are not published yet. Do not
+use the one-line installer for this candidate: until a Codifix stable release
+is available, it deliberately refuses to select the older Memory Layer
+release. The existing v2.1.0 release is still published under the Memory Layer
+product and package identity; it is not a Codifix installer or an upgrade path.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/3vilM33pl3/codifix/main/scripts/install.sh | sh
-```
+The Codifix candidate introduces a breaking product rename. Installing it over
+an existing Memory Layer setup does not transfer its state. If you are moving
+an existing installation, read the [Update guide](/docs/install/update) and
+the [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
 
-The installer detects your platform, checks whether PostgreSQL is reachable, and points you at the bundled Docker stack when none is found.
+## Candidate package names
 
-The current stable release is
-[v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0). If you are
-upgrading from v1, stop here and use the [Update guide](/docs/install/update)
-before restarting the service. The published v2.1.0 distribution remains the
-stable release. This source tree is preparing the breaking v3.0.0-rc.1 rename:
-its executable is `codifix`, while v2.1.0 installs `memory`. The candidate is not
-published and must not be treated as a stable package or upgrade. See the
-[RC.1 preparation note](https://github.com/3vilM33pl3/codifix/blob/main/docs/releases/3.0.0-rc.1.md).
+After the 3.0.0-rc.1 release is published, its assets are expected to use these
+names. Until then, these are names for identification only; there are no
+published candidate downloads or checksums to verify.
 
-## Choose a platform
+| Platform | Candidate asset names |
+|---|---|
+| Debian/Ubuntu | `codifix_3.0.0~rc.1_amd64.deb`, `codifix_3.0.0~rc.1_arm64.deb` |
+| macOS | `codifix-3.0.0-rc.1-macos-x86_64.pkg`, `codifix-3.0.0-rc.1-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
+| Windows x86_64 | `codifix-3.0.0-rc.1-windows-x86_64-build.1.zip`, `.msi`, and `-server-tools.msi` |
+
+Use platform instructions only after the candidate's release page and checksums
+are available:
 
 <CardGroup cols={3}>
   <Card title="Linux / Debian" href="/docs/install/linux-debian">
-    Install the .deb package and enable the systemd service.
+    Install the architecture-matched Debian package.
   </Card>
-  <Card title="macOS / Homebrew" href="/docs/install/macos-homebrew">
-    Install via Homebrew or the native Intel/Apple Silicon .pkg.
+  <Card title="macOS" href="/docs/install/macos-homebrew">
+    Review the native package options and Homebrew status.
   </Card>
   <Card title="Windows" href="/docs/install/windows">
-    Install the native x86_64 MSI/ZIP or use Docker Desktop/WSL2.
+    Review the native x86_64 preview packages.
   </Card>
 </CardGroup>
 
-Codifix runs as a native background service (`codifix.service` on Linux, a launchd agent on macOS) that manages the database connection, curation pipeline, and embedding backends. The `codifix` CLI and TUI communicate with this service over a local socket, so nothing leaves your machine unless you configure an external embedding or LLM provider.
-
 ## Prerequisites
 
-You need a PostgreSQL database with the pgvector extension enabled. See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup instructions. Optional LLM and embedding providers improve curation and semantic retrieval, but the core service works without them.
+Codifix requires a PostgreSQL database with the pgvector extension enabled.
+See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup
+instructions. Optional LLM and embedding providers improve curation and
+semantic retrieval, but the core service works without them.
 
 | Requirement | Why it matters | Verify |
 |---|---|---|
 | PostgreSQL | Durable storage for projects, captures, memories, activity, and history. | `psql "$DATABASE_URL" -c "SELECT 1;"` |
 | pgvector | Vector storage for semantic retrieval. | `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` |
-| Stable v2.1.0 binary | CLI, TUI launcher, service management, MCP, evals. | `memory --version` (current release: `2.1.0`) |
-| v3.0.0-rc.1 source candidate | Renamed CLI and service tooling. | `codifix --version` (unpublished candidate) |
-| Optional LLM provider | Better curation, summaries, and answer synthesis. | `codifix doctor` |
-| Optional embedding provider | Semantic search and graph-enhanced retrieval quality. | `codifix embeddings list` |
+| Codifix 3.0.0-rc.1 candidate | Renamed CLI and service tooling; packages are not published yet. | After installing a published candidate: `codifix --version` |
 
-## Configure
+## Configure after installation
 
 ```bash
 cd /path/to/project
+codifix wizard --dry-run
 codifix wizard
-```
-
-`codifix wizard` runs the setup flow once, covering the machine configuration and, when run inside a repository, the repo-local project setup. Secrets are written outside your repository so they are never committed. Use `codifix wizard --dry-run` to preview every file and service action first.
-
-## Verify
-
-```bash
 codifix doctor
 codifix health
-codifix status --project <project-slug>
 ```
 
-`doctor` checks configuration and dependencies. `health` checks the backend service. `status` combines service, project, watcher, and MCP diagnostics.
+The dry run previews setup actions before files or services are changed. See
+[Service setup](/docs/install/service-setup) and [Doctor and health](/docs/help/doctor-and-health).
 
 ## More install topics
 
