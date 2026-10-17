@@ -106,6 +106,11 @@ function Get-OnboardingSyncCommand($Plan) {
 function ConvertTo-OnboardingPolicyValue($Value) {
     if ($null -eq $Value) { return $null }
     if ($Value -is [string] -or $Value -is [ValueType]) { return [string]$Value }
+    if ($Value -is [Collections.IDictionary]) {
+        $result=[ordered]@{}
+        foreach ($key in ($Value.Keys | Sort-Object)) { $result[$key]=ConvertTo-OnboardingPolicyValue $Value[$key] }
+        return $result
+    }
     if ($Value -is [Collections.IEnumerable] -and $Value -isnot [Collections.IDictionary]) {
         return ,@($Value | ForEach-Object { ConvertTo-OnboardingPolicyValue $_ })
     }
@@ -114,19 +119,42 @@ function ConvertTo-OnboardingPolicyValue($Value) {
     foreach ($property in ($properties | Sort-Object Name)) { $fields[$property.Name]=ConvertTo-OnboardingPolicyValue $property.Value }
     return $fields
 }
-function Get-OnboardingTaskPolicy($Task) {
-    return [ordered]@{actions=(ConvertTo-OnboardingPolicyValue @($Task.Actions));principal=(ConvertTo-OnboardingPolicyValue $Task.Principal)
-        triggers=(ConvertTo-OnboardingPolicyValue @($Task.Triggers));settings=(ConvertTo-OnboardingPolicyValue $Task.Settings)}
+function Resolve-OnboardingTriggerSid([string]$User, [string]$ExpectedSid, [scriptblock]$Resolver) {
+    if ($User -ceq $ExpectedSid) { return $ExpectedSid }
+    # Scheduler may serialize an exact SID as its registered domain\user name.
+    # Resolve only that bounded account spelling, never reinterpret a foreign SID.
+    if ($User.Length -gt 256 -or $User -notmatch '^[^\\/\x00-\x1f]{1,128}\\[^\\/\x00-\x1f]{1,128}$') { throw 'Foreign sync trigger identity' }
+    $resolved=& $Resolver $User
+    if ($resolved -isnot [string] -or $resolved -cne $ExpectedSid) { throw 'Foreign sync trigger identity' }
+    return $ExpectedSid
 }
-function Assert-OnboardingTask($Task, $Plan, [string]$PowerShell, [string]$Arguments, [string]$Digest, $ExpectedTask) {
+function Get-OnboardingTaskPolicy($Task, [string]$ExpectedSid, [scriptblock]$Resolver) {
+    $policy=[ordered]@{actions=(ConvertTo-OnboardingPolicyValue @($Task.Actions));principal=(ConvertTo-OnboardingPolicyValue $Task.Principal)
+        triggers=(ConvertTo-OnboardingPolicyValue @($Task.Triggers));settings=(ConvertTo-OnboardingPolicyValue $Task.Settings)}
+    # Only registration defaults observed on Windows are normalized. All other
+    # principal, action, trigger and settings fields remain in the exact digest.
+    if ($null -eq $policy.principal['Id'] -or $policy.principal['Id'] -ceq 'Author') { $policy.principal['Id']='Author' }
+    foreach ($trigger in $policy.triggers) {
+        $trigger['UserId']=Resolve-OnboardingTriggerSid $trigger['UserId'] $ExpectedSid $Resolver
+        $repetition=$trigger['Repetition']
+        if ($null -ne $repetition -and (($repetition.Keys | Sort-Object) -join ',') -ceq 'Duration,Interval,StopAtDurationEnd' -and
+            $null -eq $repetition['Duration'] -and $null -eq $repetition['Interval'] -and $repetition['StopAtDurationEnd'] -ceq 'False') {
+            $trigger['Repetition']=$null
+        } elseif ($null -eq $repetition) { $trigger['Repetition']=$null }
+    }
+    return ConvertTo-OnboardingPolicyValue $policy
+}
+function Assert-OnboardingTask($Task, $Plan, [string]$PowerShell, [string]$Arguments, [string]$Digest, $ExpectedTask,
+    [scriptblock]$ResolveUser = { param($User) ([Security.Principal.NTAccount]::new($User)).Translate([Security.Principal.SecurityIdentifier]).Value }) {
     if ($Task.Description -cne ('Memory Layer reviewed device sync ' + $Digest) -or $Task.TaskName -cne $Plan.task.name -or
         $Task.Principal.UserId -cne $Plan.task.user_sid -or [string]$Task.Principal.LogonType -cne 'Interactive' -or
         [string]$Task.Principal.RunLevel -cne 'Limited' -or @($Task.Actions).Count -ne 1 -or
         $Task.Actions[0].Execute -ine $PowerShell -or $Task.Actions[0].Arguments -cne $Arguments -or
         $Task.Actions[0].WorkingDirectory -ine $Plan.release_root -or @($Task.Triggers).Count -ne 1 -or
         $Task.Triggers[0].CimClass.CimClassName -cne 'MSFT_TaskLogonTrigger' -or
-        $Task.Triggers[0].UserId -cne $Plan.task.user_sid -or -not $Task.Triggers[0].Enabled -or
+        (Resolve-OnboardingTriggerSid $Task.Triggers[0].UserId $Plan.task.user_sid $ResolveUser) -cne $Plan.task.user_sid -or -not $Task.Triggers[0].Enabled -or
         [string]$Task.Settings.MultipleInstances -cne 'IgnoreNew' -or -not $Task.Settings.Enabled -or
         [string]$Task.Settings.ExecutionTimeLimit -cne 'PT0S' -or $null -eq $ExpectedTask -or
-        (Get-NativeInputDigest (Get-OnboardingTaskPolicy $Task)) -cne (Get-NativeInputDigest (Get-OnboardingTaskPolicy $ExpectedTask))) { throw 'Existing sync task differs; do not adopt or replace it' }
+        (Get-NativeInputDigest (Get-OnboardingTaskPolicy $Task $Plan.task.user_sid $ResolveUser)) -cne
+        (Get-NativeInputDigest (Get-OnboardingTaskPolicy $ExpectedTask $Plan.task.user_sid $ResolveUser))) { throw 'Existing sync task differs; do not adopt or replace it' }
 }

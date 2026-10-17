@@ -62,4 +62,32 @@ Assert-OnboardingTask $task $syncPlan $powerShell $encoded $digest $expected
 $task.Settings.AllowDemandStart=$false;Reject { Assert-OnboardingTask $task $syncPlan $powerShell $encoded $digest $expected }
 $task.Settings.AllowDemandStart=$true;$task.Principal.RunLevel='Highest';Reject { Assert-OnboardingTask $task $syncPlan $powerShell $encoded $digest $expected }
 $task.Principal.RunLevel='Limited';$task.Actions[0].Arguments+=' changed';Reject { Assert-OnboardingTask $task $syncPlan $powerShell $encoded $digest $expected }
+# Exact registration normalization observed on the native VM, not a general
+# omission of principal IDs, trigger identity, repetition or future properties.
+$expected.Principal | Add-Member -NotePropertyName Id -NotePropertyValue $null
+$expected.Triggers[0] | Add-Member -NotePropertyName Repetition -NotePropertyValue $null
+$registered=$expected | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+$registered.Principal.Id='Author'
+$registered.Triggers[0].UserId='MEMORY-WINLAB\memorylab'
+$registered.Triggers[0].Repetition=[pscustomobject]@{Duration=$null;Interval=$null;StopAtDurationEnd=$false}
+$resolve={param($User) if($User -cne 'MEMORY-WINLAB\memorylab'){throw 'unknown synthetic account'};return 'S-1-5-21-1-2-3-1001'}
+Assert-OnboardingTask $registered $syncPlan $powerShell $encoded $digest $expected $resolve
+$wrong={param($User) 'S-1-5-21-1-2-3-9999'}
+Reject { Assert-OnboardingTask $registered $syncPlan $powerShell $encoded $digest $expected $wrong }
+foreach($change in @('foreign-id','interval','duration','stop','extra-repetition','foreign-sid','unknown-user','highest','settings','action')) {
+    $copy=$registered | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    switch($change){
+        'foreign-id' {$copy.Principal.Id='OtherPrincipal'}
+        'interval' {$copy.Triggers[0].Repetition.Interval='PT5M'}
+        'duration' {$copy.Triggers[0].Repetition.Duration='PT1H'}
+        'stop' {$copy.Triggers[0].Repetition.StopAtDurationEnd=$true}
+        'extra-repetition' {$copy.Triggers[0].Repetition | Add-Member -NotePropertyName Extra -NotePropertyValue 'foreign'}
+        'foreign-sid' {$copy.Triggers[0].UserId='S-1-5-21-1-2-3-9999'}
+        'unknown-user' {$copy.Triggers[0].UserId='OTHER\someone'}
+        'highest' {$copy.Principal.RunLevel='Highest'}
+        'settings' {$copy.Settings.AllowDemandStart=$false}
+        'action' {$copy.Actions[0].Arguments+=' changed'}
+    }
+    Reject { Assert-OnboardingTask $copy $syncPlan $powerShell $encoded $digest $expected $resolve }
+}
 Write-Output 'Portable Windows onboarding policy checks passed; native execution remains unverified.'
