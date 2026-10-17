@@ -5,15 +5,22 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { checkedVector, openEmbeddingProxy } from './embedding-proxy.mjs';
+import { validateExecutionInput } from './execution.mjs';
 
-function childProcess(binary, args, options) {
-  const child = spawn(binary, args, options);
+const exec = promisify(execFile);
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const invokeNativeHelper = (binary, args, env) => exec(binary, args,
+  { env, timeout: 10000, maxBuffer: 1048576, windowsHide: true, shell: false });
+
+function childProcess(spawnProcess, binary, args, options) {
+  const child = spawnProcess(binary, args, { ...options, shell: false, windowsHide: true });
   const closed = new Promise(resolve => {
     child.once('error', () => resolve({ code: null, signal: 'spawn-error' }));
     child.once('close', (code, signal) => resolve({ code, signal }));
@@ -22,10 +29,13 @@ function childProcess(binary, args, options) {
   return { child, closed };
 }
 
-async function stopService(process) {
+async function stopService(process, native) {
   if (!process) return;
   const { child, closed } = process;
-  if (child.exitCode === null && child.signalCode === null) child.kill('SIGINT');
+  // Native roots inherit the independently verified outer kill-on-close Job.
+  // Node's Windows SIGINT has no graceful console meaning; terminate only the
+  // exact owned root. Outer native cancellation also reaps its descendants.
+  if (child.exitCode === null && child.signalCode === null) child.kill(native ? 'SIGKILL' : 'SIGINT');
   const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
   try { await closed; } finally { clearTimeout(timer); }
 }
@@ -39,15 +49,74 @@ async function port() {
   return value;
 }
 
-export async function openPreparedSession(options) {
+export function createPreparedSessionOpener({ fileSystem = fs, spawnProcess = spawn, invokeHelper = invokeNativeHelper,
+  platform = process.platform, requestId = randomUUID, reservePort = port, fetchResponse = fetch, wait = delay,
+  systemRoot = process.env.SystemRoot ?? 'C:\\Windows', callerPid = process.pid } = {}) {
+  if ([spawnProcess, invokeHelper, requestId, reservePort, fetchResponse, wait].some(value => typeof value !== 'function')) throw Error('invalid trusted service-session adapter');
+  return options => openSession(options, { fileSystem, spawnProcess, invokeHelper, platform, requestId,
+    reservePort, fetchResponse, wait, systemRoot, callerPid });
+}
+export const openPreparedSession = createPreparedSessionOpener();
+
+async function nativeDirectory(execution, binaries, deps) {
+  const { fileSystem, invokeHelper, platform, requestId, systemRoot, callerPid } = deps;
+  validateExecutionInput({ execution, argv: [execution.profile?.node?.path], files: {}, exportPaths: [] });
+  if (platform !== 'win32') throw Error('native prepared service requires Windows; no Linux fallback');
+  if (typeof systemRoot !== 'string' || !/^[A-Za-z]:\\Windows$/i.test(systemRoot)
+      || !Number.isSafeInteger(callerPid) || callerPid < 1) throw Error('invalid native service host contract');
+  const profile = execution.profile;
+  const inventory = profile.toolchains.flatMap(tree => tree.files);
+  const pins = [profile.helper];
+  for (const binary of binaries) {
+    validateExecutionInput({ execution, argv: [binary], files: {}, exportPaths: [] });
+    const pin = inventory.find(file => file.path.toLowerCase() === binary.toLowerCase());
+    if (!pin) throw Error('native service executable absent from reviewed profile');
+    pins.push(pin);
+  }
+  for (const pin of pins) {
+    const stat = await fileSystem.stat(pin.path);
+    if (!stat.isFile() || stat.size < 1 || stat.size > 512 * 1024 * 1024
+        || hash(await fileSystem.readFile(pin.path)) !== pin.sha256) throw Error('native service helper/executable bytes changed');
+  }
+  const helperEnv = { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '' };
+  let job;
+  try { job = JSON.parse((await invokeHelper(profile.helper.path, ['--verify-outer-job', String(callerPid)], helperEnv)).stdout); }
+  catch { throw Error('native prepared service requires a verified outer Job; no payload written'); }
+  if (!job || Object.keys(job).sort().join(',') !== 'breakaway_allowed,caller_pid,format,helper_pid,kill_on_close'
+      || job.format !== 'memory-windows-trusted-outer-job-v1' || job.caller_pid !== callerPid
+      || !Number.isSafeInteger(job.helper_pid) || job.helper_pid < 1 || job.helper_pid === callerPid
+      || job.kill_on_close !== true || job.breakaway_allowed !== false) throw Error('invalid native outer Job receipt; no payload written');
+  const id = requestId();
+  if (typeof id !== 'string' || id === '00000000-0000-0000-0000-000000000000'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw Error('invalid native service directory identity');
+  const directory = path.win32.join(profile.io_root, id);
+  let prepared;
+  try { prepared = JSON.parse((await invokeHelper(profile.helper.path, ['--prepare-io', profile.io_root, '--request-id', id], helperEnv)).stdout); }
+  catch { throw Error('native service private I/O preparation failed; no payload written'); }
+  if (!prepared || prepared.format !== 'memory-windows-evaluation-io-v1' || prepared.request_id !== id
+      || typeof prepared.directory !== 'string' || path.win32.normalize(prepared.directory).toLowerCase() !== directory.toLowerCase()
+      || ![prepared.root_identity, prepared.directory_identity].every(value => Array.isArray(value) && value.length === 2
+        && value.every(part => typeof part === 'string' && /^[0-9a-f]+$/.test(part)))) throw Error('native service private I/O receipt mismatch; no payload written');
+  return directory;
+}
+
+async function openSession(options, deps) {
+  const { fileSystem, spawnProcess, platform, reservePort, fetchResponse, wait, systemRoot } = deps;
   const { embedding, ...plainOptions } = options;
-  const { snapshotBinary, memoryBinary, databaseUrl, semanticTime, documents } = structuredClone(plainOptions);
-  if (!path.isAbsolute(snapshotBinary) || !path.isAbsolute(memoryBinary)
+  const { snapshotBinary, memoryBinary, databaseUrl, semanticTime, documents, execution } = structuredClone(plainOptions);
+  const native = execution?.kind === 'windows-native-v1';
+  if (execution !== undefined && !native) throw Error('unknown prepared service backend; no Linux fallback');
+  if (platform === 'win32' && !native) throw Error('explicit native prepared service profile required');
+  const paths = native ? path.win32 : path;
+  if (!paths.isAbsolute(snapshotBinary) || !paths.isAbsolute(memoryBinary)
       || typeof databaseUrl !== 'string' || !databaseUrl.startsWith('postgres')
       || !Array.isArray(documents) || documents.length < 1) throw Error('invalid disposable service contract');
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-service-session-'));
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
-  const owner = childProcess(snapshotBinary, [], { cwd: directory,
+  const directory = native ? await nativeDirectory(execution, [snapshotBinary, memoryBinary], deps)
+    : await fileSystem.mkdtemp(path.join(os.tmpdir(), 'memory-r3-service-session-'));
+  const env = native ? { SystemRoot: systemRoot, WINDIR: systemRoot, PATH: '', HOME: directory,
+    USERPROFILE: directory, TEMP: directory, TMP: directory, MEMORY_LAYER_PROFILE: 'prod' }
+    : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: directory, MEMORY_LAYER_PROFILE: 'prod' };
+  const owner = childProcess(spawnProcess, snapshotBinary, [], { cwd: directory,
     env: { ...env, MEMORY_LAYER_TEST_DATABASE_URL: databaseUrl, MEMORY_LAYER_TEST_REQUIRE_DB: '1' },
     stdio: ['pipe', 'pipe', 'pipe'] });
   let pending, unavailable = false, closing = false, active = false, proxy;
@@ -90,7 +159,7 @@ export async function openPreparedSession(options) {
     let outcome;
     try { outcome = await owner.closed; } finally { clearTimeout(timer); lines.close(); await proxy?.close(); }
     if (outcome.code !== 0) throw Error(`reconcile disposable snapshot session; private staging retained at ${directory}`);
-    await fs.rm(directory, { recursive: true });
+    await fileSystem.rm(directory, { recursive: true });
   };
   let prepared;
   try {
@@ -129,25 +198,25 @@ export async function openPreparedSession(options) {
         reader = await request({ operation: 'fork' });
         if (reader.snapshot_sha256 !== prepared.snapshot_sha256 || !reader.project_tokens?.[project]
             || !/^[a-f0-9-]{36}$/.test(reader.id)) throw Error('invalid disposable clone');
-        const bindPort = await port();
-        config = path.join(directory, `${reader.id}.toml`);
-        await fs.writeFile(config, `[service]\nbind_addr = "127.0.0.1:${bindPort}"\napi_token = "unused-synthetic"\nread_only = true\n` +
+        const bindPort = await reservePort();
+        config = paths.join(directory, `${reader.id}.toml`);
+        await fileSystem.writeFile(config, `[service]\nbind_addr = "127.0.0.1:${bindPort}"\napi_token = "unused-synthetic"\nread_only = true\n` +
           `[database]\nurl = ${JSON.stringify(reader.database_url)}\n[evaluation]\nsemantic_time = ${JSON.stringify(semanticTime)}\n` +
           `[auth]\nmode = "multi_user"\npublic_base_url = "http://127.0.0.1:${bindPort}"\n` +
           `[auth.oidc]\nissuer_url = "https://unused.example.test"\nclient_id = "synthetic-unused"\n` +
           `[offline]\nenabled = false\n[cluster]\nenabled = false\n[mcp]\nenabled = false\n` +
           (proxy ? `[embeddings]\nenabled = true\ncreate_enabled = false\nactive = "r3-supplied"\n` +
             `[[embeddings.backends]]\nname = "r3-supplied"\nprovider = "openai_compatible"\ncreate_enabled = false\n` +
-            `model = ${JSON.stringify(proxy.model)}\ndimensions = ${proxy.dimensions}\nbase_url = ${JSON.stringify(proxy.baseUrl)}\napi_key_env = "R3_SUPPLIED_VECTOR_TOKEN"\n` : ''), { flag: 'wx', mode: 0o600 });
-        service = childProcess(memoryBinary, ['--config', config, 'service', 'run'], {
+            `model = ${JSON.stringify(proxy.model)}\ndimensions = ${proxy.dimensions}\nbase_url = ${JSON.stringify(proxy.baseUrl)}\napi_key_env = "R3_SUPPLIED_VECTOR_TOKEN"\n` : ''), { flag: 'wx', ...(native ? {} : { mode: 0o600 }) });
+        service = childProcess(spawnProcess, memoryBinary, ['--config', config, 'service', 'run'], {
           cwd: directory, env: proxy ? { ...env, R3_SUPPLIED_VECTOR_TOKEN: proxy.token } : env, stdio: ['ignore', 'pipe', 'pipe'] });
         service.child.stdout.resume();
         const url = `http://127.0.0.1:${bindPort}`;
         let ready = false;
         for (let attempt = 0; attempt < 100 && service.child.exitCode === null && service.child.signalCode === null; attempt++) {
-          try { ready = (await fetch(url + '/healthz', { redirect: 'error', signal: AbortSignal.timeout(500) })).ok; } catch { /* startup */ }
+          try { ready = (await fetchResponse(url + '/healthz', { redirect: 'error', signal: AbortSignal.timeout(500) })).ok; } catch { /* startup */ }
           if (ready) break;
-          await delay(100);
+          await wait(100);
         }
         if (!ready) throw Error('disposable service did not start');
         const fingerprint = async () => {
@@ -168,7 +237,7 @@ export async function openPreparedSession(options) {
                   || !Number.isInteger(topK) || topK < 1 || topK > 8) throw Error('invalid scoped evaluation query');
               try {
                 const execute = async () => {
-                const response = await fetch(url + '/v1/query', { method: 'POST', redirect: 'error',
+                const response = await fetchResponse(url + '/v1/query', { method: 'POST', redirect: 'error',
                   headers: { Authorization: `Bearer ${reader.project_tokens[project]}`, 'Content-Type': 'application/json' },
                   body: JSON.stringify({ project, query: question, top_k: topK, answer_mode: 'deterministic' }),
                   signal: AbortSignal.timeout(10000) });
@@ -192,9 +261,9 @@ export async function openPreparedSession(options) {
         return { value, beforeSha256: before, afterSha256: after, instanceId: reader.id };
       } finally {
         try {
-          await stopService(service);
+          await stopService(service, native);
           if (reader) await request({ operation: 'release', id: reader.id });
-          if (config) await fs.rm(config);
+          if (config) await fileSystem.rm(config);
         } finally { active = false; }
       }
     },

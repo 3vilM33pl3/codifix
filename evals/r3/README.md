@@ -303,12 +303,28 @@ Validated answer, agent, compiler-readiness and probe receipt identities are
 retained in result metadata as `native_execution` JSON strings. These receipts
 remain smoke evidence with `disk_hard_limit_enforced: false`.
 
-This bounded executor seam does not make the full campaign controller native:
-the bootstrap, IPC and prepared-service lifecycle still require a separate
-Windows integration pass. Native `createProviderExecutor` calls remain rejected,
+The prepared-service seam also accepts this explicit profile when both native
+snapshot and Memory executables are pinned in its reviewed inventory. It checks
+those bytes and the helper before the helper verifies the caller's membership
+in an outer kill-on-close Job with breakaway disabled. The helper then creates
+an ACL-validated private directory before any database credentials are written.
+Child environments contain only explicit Windows/system and disposable-session
+settings. Uncontained direct Node launches fail before payload writes.
+
+This bounded executor/service seam does not make the full campaign controller
+native: bootstrap and IPC still require a separate Windows integration pass.
+Native `createProviderExecutor` calls remain rejected,
 including offline mediated provider campaigns. Fake-adapter tests exercise the
 five retrieval conditions and three-stage dispatch without proving native OS
 isolation or enabling paid R3 execution.
+
+The opt-in native prepared-service test requires a Windows Node process launched
+inside that trusted outer Job, `MEMORY_R3_NATIVE_EXECUTION` pointing to the exact
+execution-profile JSON, native `MEMORY_R3_SNAPSHOT_BIN`/`MEMORY_R3_CLI_BIN` paths,
+and the explicit disposable `MEMORY_LAYER_TEST_DATABASE_URL`. Set
+`MEMORY_R3_REQUIRE_NATIVE_SERVICE=1` to fail when this fixture is unavailable, then
+run `node --test evals/r3/isolation/service-session-native.test.mjs`. It exercises
+two scoped reads with unchanged snapshot fingerprints, without provider calls.
 
 The complete development allocation has now executed all660 dispatches through
 this controller with valid execution evidence, unchanged snapshots and zero
