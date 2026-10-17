@@ -44,6 +44,15 @@ function Copy-PackFile([string]$Source,[string]$Relative,[string]$Expected) {
 function New-PackComponent([string]$Name,[string]$Version,[string]$SourceHash,[string]$License,[string]$Notice) {
     return [ordered]@{name=$Name;version=$Version;source_sha256=$SourceHash;license=$License;notice_path=$Notice}
 }
+function Get-PackPdsNotice($Prepared){
+    $relative='node_modules/@atproto/pds/LICENSE.txt'
+    $entries=@($Prepared.files | Where-Object {$_.path -ieq $relative})
+    if($entries.Count -ne 1 -or $entries[0].path -isnot [string] -or $entries[0].path -cne $relative -or
+        $entries[0].sha256 -isnot [string] -or $entries[0].sha256 -cnotmatch '^[0-9a-f]{64}$'){
+        throw 'Exactly one proof-bound PDS LICENSE.txt notice with a valid SHA256 is required'
+    }
+    return $entries[0]
+}
 function Assert-PackPostgresRuntime([string]$Bin,[string]$Lib,$Prepared){
     $records=@($Prepared.runtime_support)
     $names=@($records | ForEach-Object name | Sort-Object)
@@ -199,6 +208,7 @@ switch($Kind){
             Copy-PackFile $patchFile 'pds/windows-paths.mjs' $proof.path_patch.patch_sha256
             Copy-PackFile (Join-Path $SourceRoot 'LICENSE') 'notices/memory-pds-path-patch.txt' (Get-PackHash (Join-Path $SourceRoot 'LICENSE'))
         }
+        $pdsNotice=Get-PackPdsNotice $proof
         $proofInputs.pds_prepared_sha256=Get-PackHash $proofPath
         $proofInputs.pds_manifest_sha256=Get-PackHash $baselinePath
         $nodeRoot='C:\MemoryLab\Tools\node-v24.18.1-win-x64'
@@ -214,8 +224,7 @@ switch($Kind){
         }
         foreach($name in @('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll')){Copy-PackFile (Join-Path $pgBin $name) ('node/'+$name) (Get-PackHash (Join-Path $pgBin $name))}
         Copy-PackFile (Join-Path $nodeRoot 'LICENSE') 'notices/node.txt' (Get-PackHash (Join-Path $nodeRoot 'LICENSE'))
-        $pdsNotice=Join-Path $runtime 'node_modules/@atproto/pds/LICENSE'
-        Copy-PackFile $pdsNotice 'notices/pds.txt' (Get-PackHash $pdsNotice)
+        Copy-PackFile (Join-Path $runtime $pdsNotice.path) 'notices/pds.txt' $pdsNotice.sha256
         Copy-PackFile (Join-Path $SourceRoot 'LICENSE') 'notices/memory-pds-adapter.txt' (Get-PackHash (Join-Path $SourceRoot 'LICENSE'))
         # All full dependency notices remain at their original node_modules paths.
         # This index binds their exact bytes instead of substituting licence names.

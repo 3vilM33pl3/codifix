@@ -39,6 +39,29 @@ try{
     Reject-Pack {Read-PackJson (Join-Path $root 'receipt.json') 1}
     $component=New-PackComponent 'example' '1.0' $hash 'Actual terms in notice' 'notices/component.txt'
     if($component.source_sha256 -cne $hash -or $component.notice_path -cne 'notices/component.txt'){throw 'Component lost provenance'}
+    $pdsRuntime=Join-Path $root 'pds-runtime';$noticePath=Join-Path $pdsRuntime 'node_modules/@atproto/pds/LICENSE.txt'
+    $null=New-Item -ItemType Directory -Path (Split-Path -Parent $noticePath) -Force
+    [IO.File]::WriteAllText($noticePath,"Actual synthetic test bytes`n",[Text.UTF8Encoding]::new($false))
+    $noticeProof=[pscustomobject]@{files=@([pscustomobject]@{path='node_modules/@atproto/pds/LICENSE.txt';sha256=$hash})}
+    $notice=Get-PackPdsNotice $noticeProof
+    if($notice.path -cne 'node_modules/@atproto/pds/LICENSE.txt' -or $notice.sha256 -cne $hash){throw 'PDS notice lost its exact prepared proof binding'}
+    Copy-PackFile (Join-Path $pdsRuntime $notice.path) 'notices/pds.txt' $notice.sha256
+    if((Get-PackHash (Join-Path $script:payload 'notices/pds.txt')) -cne $hash){throw 'PDS notice bytes changed'}
+    foreach($change in @({param($p)$p.files=@()},
+        {param($p)$p.files[0].path='node_modules/@atproto/pds/LICENSE'},
+        {param($p)$p.files[0].path='node_modules/@atproto/pds/license.txt'},
+        {param($p)$p.files+=$p.files[0]},
+        {param($p)$p.files+=([pscustomobject]@{path='node_modules/@atproto/pds/license.txt';sha256=$hash})},
+        {param($p)$p.files[0].sha256='not-a-sha256'},
+        {param($p)$p.files[0].sha256=('A'*64)},
+        {param($p)$p.files[0].sha256=$null},
+        {param($p)$p.files[0].sha256=@($hash,$hash)})){
+        $changed=$noticeProof | ConvertTo-Json -Depth 5 | ConvertFrom-Json;&$change $changed
+        Reject-Pack {Get-PackPdsNotice $changed}
+    }
+    [IO.File]::AppendAllText($noticePath,'changed after proof')
+    Reject-Pack {Copy-PackFile (Join-Path $pdsRuntime $notice.path) 'notices/changed-pds.txt' $notice.sha256}
+    if(Test-Path (Join-Path $script:payload 'notices/changed-pds.txt')){throw 'Changed PDS notice was selected by a fresh untrusted hash'}
     $bin=Join-Path $root 'bin';$lib=Join-Path $root 'lib';$null=New-Item -ItemType Directory -Path $bin,$lib
     $dlls=@('vcruntime140.dll','vcruntime140_1.dll','msvcp140.dll','libssl-3-x64.dll')
     $extensions=@('pg_trgm.dll','pgcrypto.dll','vector.dll')
@@ -87,6 +110,8 @@ try{
     }
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
 $text=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'guest-runtime-pack.ps1') -Raw
+if(-not $text.Contains("Copy-PackFile (Join-Path `$runtime `$pdsNotice.path) 'notices/pds.txt' `$pdsNotice.sha256") -or
+    $text.Contains("'node_modules/@atproto/pds/LICENSE'")){throw 'PDS notice selection lost the pinned LICENSE.txt proof digest'}
 foreach($forbidden in @('Invoke-WebRequest','Start-Service','New-Service','initdb.exe','npm install','pnpm install')){
     if($text.Contains($forbidden)){throw 'Runtime packer acquired activation/download behavior'}
 }
