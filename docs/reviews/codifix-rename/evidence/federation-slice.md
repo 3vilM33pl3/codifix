@@ -52,9 +52,8 @@ Metadata manifests stay mode0600 under
 `federation-workshop-retire-rehearsal.json`. The explicit disposable test settings
 are in `federation-test.env`; no credentials or payloads are committed here.
 
-No live service, database, CA, peer or provider was mutated or contacted by this
-slice. Populated Mac device-cache rehearsal, consolidated workspace checks and
-the operational stop/drain/restart
+No live service, database, CA, peer or provider was mutated by this slice.
+Consolidated workspace checks and the operational stop/drain/restart
 cutover remain parent release gates. Original seed restores remain untouched.
 The release operators document that old processes must be drained before applying
 markers and only candidate binaries may restart afterwards.
@@ -90,3 +89,51 @@ Mode0600 local metadata is retained under the same state directory in
 `federation-{general,homelab,gateway}-retire-rehearsal.json` manifests. Original
 seed restores and dumps remain untouched; all upgraded/retired databases are
 disposable clones in the existing loopback-only PostgreSQL test container.
+
+## Populated Mac device-cache rehearsal
+
+The two existing custom dumps and their manifest were copied read-only over the
+authorized SSH connection from the completed Mac seed
+`mac-rehearsal-seed-194738Z`. No new live dump, service/configuration/credential
+change, archive extraction, provider/federation request or Cargo build occurred.
+Only those three files were transferred, into a mode0700 local seed directory
+with mode0600 files. Their SHA256 values match the prior inventory and the
+unchanged remote files. The seed is a transactionally consistent dump per DB,
+not a coordinated quiesced cross-database/offline/configuration recovery bundle.
+
+Fresh clones were restored into the existing isolated PostgreSQL17.11 container
+with vector available. Every applied migration1–84 checksum matched source.
+After upgrade to85, both normalized semantic schemas and all migration checksums
+matched the independent pristine candidate. Operators, migration source and the
+reused read-only verifier source were unchanged through candidate `a147024b`.
+
+| Cache | Original device records | Local canonicals / versions | Curated origins / outbox | Current browse SQL joins |
+| --- | --- | --- | --- | --- |
+| Workshop | 1707 `canonical_state` + 1850 `memory_version` = 3557 | 4 / 4 | 4 / 4 | 1707 |
+| Homelab | 459 `canonical_state` + 519 `memory_version` = 978 | 2 / 2 | 2 / 2 | 459 |
+
+Both clones passed exact schema inspection, retirement of their single space,
+immediate exact retry and all 159 reviewed preserved table fingerprints. Separate
+untouched84 baseline restores then confirmed all 158 original non-migration-table
+fingerprints through upgrade and retirement, plus all 84 original migration rows.
+That preserves the original record payloads/digests, canonical/version/project/
+principal/device/area/origin identifiers, projection cursors and old outbox
+bindings. Semantic payload kinds stay `canonical_state` and `memory_version`.
+Only the reviewed operational fields differ, including disabled contribution
+bindings. Both local seed dump hashes remain unchanged after rehearsal.
+
+The unchanged store browse SQL still joins the current rows shown above after
+retirement. This is a populated database preservation/join check; it does not
+claim application HTTP authorization, citations, Rust decoding/search, fresh
+enrollment or device signature verification on this seed. These private caches
+have no legacy federation replica receipt history, so the reused historical
+verifier reports zero such spaces/records/receipts. The earlier synthetic tests
+exercise decoding, retained reads, egress fencing and rebind behavior separately.
+Role/database renaming was deliberately outside this slice.
+
+Restricted local artifacts remain under the same state directory:
+`mac-rehearsal-seed/`, `federation-mac-schema-reference.json`,
+`federation-mac-rehearsal-results.json` and
+`federation-mac-{workshop,homelab}-retire-rehearsal.json`. Disposable upgraded and
+untouched84 baseline clone databases are retained. Original local and remote
+seeds are unchanged; a final quiesced matched bundle and live cutover remain open.
