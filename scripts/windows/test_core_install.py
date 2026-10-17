@@ -33,7 +33,7 @@ class CoreInstallTests(unittest.TestCase):
                          "'native-instance.ps1'", "'-Action','Preview','-PreviewAction','Install'",
                          "'-Action','Install','-ExpectedInputSha256',$preview.input_sha256",
                          "'-DatabaseCompatibilityConfirmed'", "schema.Trim() -cne '84:0'",
-                         "Copy-CoreInstallFile (Join-Path $debug $file)", "$pin[0].sha256 -cne $core.binary_sha256",
+                         "Get-CoreInstallExecutableSource $file $coreRoot $debug", "$pin[0].sha256 -cne $core.binary_sha256",
                          "payload_files=$payloadFiles", "package_sha256=Get-CoreInstallHash $package",
                          "'LAB-ONLY-manifest.json'", "'unsigned-lab-debug'", "database_reused=$true"]:
             self.assertIn(required, source)
@@ -41,6 +41,18 @@ class CoreInstallTests(unittest.TestCase):
         self.assertNotIn("New-Service", source, "Installation must remain delegated to the authority script")
         self.assertLess(source.index("'schema-read'"), source.index("'-Action','Preview'"))
         self.assertLess(source.index("'-Action','Preview'"), source.index("'-Action','Install'"))
+
+    def test_fresh_install_attempt_retains_core_and_uses_immutable_memory(self):
+        source = SCRIPT.read_text()
+        for required in ["[guid]$InstallOperationId", "$InstallOperationId -eq [guid]::Empty",
+                         "$InstallOperationId -eq $OperationId", r"runs\$InstallOperationId\core-install",
+                         r"runs\$OperationId\core-workflow", "core_operation_id=$OperationId.ToString()",
+                         "operation_id=$InstallOperationId.ToString()", "'-OperationId',$InstallOperationId.ToString()",
+                         "return Join-Path $CoreRoot 'code\\memory.exe'", "return Join-Path $DebugRoot $File",
+                         "Copy-CoreInstallFile $from (Join-Path $payload ('bin\\'+$file)) $pin[0].sha256 $file",
+                         "Pinned core installation input unavailable or changed: '+$Component"]:
+            self.assertIn(required, source)
+        self.assertNotIn("Copy-CoreInstallFile (Join-Path $debug $file)", source)
 
     def test_running_exact_virtual_identity_and_actual_http_proofs(self):
         source = SCRIPT.read_text()

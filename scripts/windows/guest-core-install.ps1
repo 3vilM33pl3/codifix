@@ -5,11 +5,12 @@
 # MEMORY-WINLAB\memorylab task; do not check out or rebuild an active build tree.
 # Example inputs (the same completed core operation is deliberately reused):
 # -OperationId 399bb47c-2931-46e5-967f-e5c88625eb26
+# -InstallOperationId <fresh-UUID-for-this-install-attempt>
 # -BuildOperationId 19627f7d-bc81-4a6a-ab2d-7db3312447fe
 # -SourceRoot C:\MemoryLab\source\<committed-operator-copy>
 # -WebRoot C:\MemoryLab\source\native-stack-v6\web\dist
 [CmdletBinding()]
-param([guid]$OperationId,[guid]$BuildOperationId,[string]$SourceRoot,[string]$WebRoot,[switch]$FunctionsOnly)
+param([guid]$OperationId,[guid]$InstallOperationId,[guid]$BuildOperationId,[string]$SourceRoot,[string]$WebRoot,[switch]$FunctionsOnly)
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 function Assert-CoreInstallPath([string]$Path){
     $current=[IO.Path]::GetFullPath($Path)
@@ -21,13 +22,22 @@ function Write-CoreInstallNew([string]$Path,[byte[]]$Bytes){
     Assert-CoreInstallPath $Path;$file=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try{$file.Write($Bytes,0,$Bytes.Length);$file.Flush($true)}finally{$file.Dispose()}
 }
-function Copy-CoreInstallFile([string]$From,[string]$To,[string]$Expected){
-    if($Expected -cnotmatch '^[0-9a-f]{64}$' -or (Get-CoreInstallHash $From) -cne $Expected){throw 'Pinned core installation input changed'}
-    Assert-CoreInstallPath $To;$null=New-Item -ItemType Directory -Path (Split-Path -Parent $To) -Force
-    $inputFile=[IO.File]::Open($From,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
-    try{$outputFile=[IO.File]::Open($To,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
-        try{$inputFile.CopyTo($outputFile);$outputFile.Flush($true)}finally{$outputFile.Dispose()}}finally{$inputFile.Dispose()}
-    if((Get-CoreInstallHash $To) -cne $Expected){throw 'Private core payload copy changed'}
+function Get-CoreInstallExecutableSource([ValidateSet('memory.exe','memory-windows-service.exe')][string]$File,[string]$CoreRoot,[string]$DebugRoot){
+    # Cargo may rewrite normal debug binaries during unrelated native tests.
+    # The completed core proof already retained its exact private Memory bytes.
+    if($File -ceq 'memory.exe'){return Join-Path $CoreRoot 'code\memory.exe'}
+    return Join-Path $DebugRoot $File
+}
+function Copy-CoreInstallFile([string]$From,[string]$To,[string]$Expected,
+    [ValidateSet('asset','memory.exe','memory-windows-service.exe')][string]$Component='asset'){
+    try{
+        if($Expected -cnotmatch '^[0-9a-f]{64}$' -or (Get-CoreInstallHash $From) -cne $Expected){throw 'Input pin differs'}
+        Assert-CoreInstallPath $To;$null=New-Item -ItemType Directory -Path (Split-Path -Parent $To) -Force
+        $inputFile=[IO.File]::Open($From,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+        try{$outputFile=[IO.File]::Open($To,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+            try{$inputFile.CopyTo($outputFile);$outputFile.Flush($true)}finally{$outputFile.Dispose()}}finally{$inputFile.Dispose()}
+        if((Get-CoreInstallHash $To) -cne $Expected){throw 'Private payload pin differs'}
+    }catch{throw ('Pinned core installation input unavailable or changed: '+$Component)}
 }
 function Get-CoreInstallBinding([string]$Text,[guid]$Operation,[guid]$Instance){
     $patterns=@{instance="(?m)^instance_id = '([0-9a-f-]{36})'\r?$";port="(?m)^bind_addr = '127\.0\.0\.1:([0-9]{1,5})'\r?$"
@@ -58,7 +68,7 @@ function Set-CoreInstalledWeb([string]$Text,[string]$InstalledWeb){
 }
 if($FunctionsOnly){return}
 if($env:OS -cne 'Windows_NT' -or $env:COMPUTERNAME -cne 'MEMORY-WINLAB' -or
-    $OperationId -eq [guid]::Empty -or $BuildOperationId -eq [guid]::Empty -or
+    $OperationId -eq [guid]::Empty -or $InstallOperationId -eq [guid]::Empty -or $InstallOperationId -eq $OperationId -or $BuildOperationId -eq [guid]::Empty -or
     $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$' -or
     $WebRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+\\web\\dist$' -or
     $env:PROCESSOR_ARCHITECTURE -cne 'AMD64' -or
@@ -89,9 +99,9 @@ if($core.format -cne 'memory-native-core-workflow-v1' -or $core.state -cne 'succ
     $build.compilation_verified -ne $true -or $build.release_candidate -ne $false -or
     $build.source_commit -cnotmatch '^[0-9a-f]{40}$'){throw 'Completed matching core workflow and native ProductBuild required'}
 $instance=[guid]$core.instance;if($instance -eq [guid]::Empty){throw 'Exact core instance identity required'}
-$name='lab-core-'+$OperationId.ToString('N').Substring(0,16);$serviceName='MemoryLayer-'+$name
+$name='lab-core-'+$InstallOperationId.ToString('N').Substring(0,16);$serviceName='MemoryLayer-'+$name
 if(Get-Service -Name $serviceName -ErrorAction SilentlyContinue){throw 'Existing lab service retained; no automatic adoption or reinstall'}
-$root="C:\MemoryLab\runs\$OperationId\core-install"
+$root="C:\MemoryLab\runs\$InstallOperationId\core-install"
 Assert-CoreInstallPath $root
 if(Test-Path -LiteralPath $root){throw 'Retain installation evidence; no automatic repeat'}
 $null=New-Item -ItemType Directory -Path $root
@@ -101,7 +111,7 @@ if($LASTEXITCODE){throw 'Private installation rehearsal directory required'}
 $releaseIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' 60000
 $release=Join-Path ([Environment]::GetFolderPath('ProgramFiles')) ('Memory Layer\releases\'+$releaseIdentity.release_identity)
 if(Test-Path -LiteralPath $release){throw 'LAB-ONLY build60000 already exists; preserve it for reconciliation'}
-$receipt=[ordered]@{format='memory-native-core-install-v1';state='running';operation_id=$OperationId.ToString();lab_only=$true;release_candidate=$false
+$receipt=[ordered]@{format='memory-native-core-install-v1';state='running';operation_id=$InstallOperationId.ToString();core_operation_id=$OperationId.ToString();lab_only=$true;release_candidate=$false
     installer_build=60000;installer_source_commit=$head;binary_source_commit=$build.source_commit;core_source_commit=$core.source_commit
     build_operation_id=$BuildOperationId.ToString();build_receipt_sha256=(Get-CoreInstallHash $buildPath);core_receipt_sha256=(Get-CoreInstallHash $corePath)
     script_sha256=(Get-CoreInstallHash $PSCommandPath);service_name=$serviceName;instance=$instance.ToString();database_reused=$true
@@ -135,10 +145,12 @@ try{
     $debug='C:\MemoryLab\build\product-msvc\x86_64-pc-windows-msvc\debug'
     foreach($file in @('memory.exe','memory-windows-service.exe')){
         $pin=@($build.artifacts | Where-Object file -ceq $file)
-        if($pin.Count -ne 1){throw 'Required cached native executable absent from ProductBuild receipt'}
-        Copy-CoreInstallFile (Join-Path $debug $file) (Join-Path $payload ('bin\'+$file)) $pin[0].sha256
+        if($pin.Count -ne 1){throw ('Required native executable absent from ProductBuild receipt: '+$file)}
         if($file -eq 'memory.exe' -and $pin[0].sha256 -cne $core.binary_sha256){throw 'Completed core workflow used different native bytes'}
+        $from=Get-CoreInstallExecutableSource $file $coreRoot $debug
+        Copy-CoreInstallFile $from (Join-Path $payload ('bin\'+$file)) $pin[0].sha256 $file
     }
+    $receipt.memory_input='completed-core-private-copy';$receipt.service_wrapper_input='original-build-pinned-cache'
     $webItems=@(Get-ChildItem -LiteralPath $WebRoot -Recurse -Force)
     if($webItems | Where-Object {$_.Attributes -band [IO.FileAttributes]::ReparsePoint}){throw 'Explicit Web tree contains reparse points'}
     foreach($file in @($webItems | Where-Object {-not $_.PSIsContainer})){
@@ -176,8 +188,8 @@ try{
     $operator=Join-Path $operators 'native-instance.ps1';$receipt.operator_sha256=Get-CoreInstallHash $operator
     $receipt.operator_helpers=@(@('native-instance-functions.ps1','native-prerequisites-functions.ps1','release-identity.ps1') | ForEach-Object {
         @{name=$_;sha256=(Get-CoreInstallHash (Join-Path $operators $_))}})
-    $recovery='LAB-ONLY: retain core workflow database/config and core-install artifacts for operation '+$OperationId.ToString()
-    $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$operator,'-Name',$name,'-OperationId',$OperationId.ToString()
+    $recovery='LAB-ONLY: retain core '+$OperationId.ToString()+' database/config and install '+$InstallOperationId.ToString()+' artifacts'
+    $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$operator,'-Name',$name,'-OperationId',$InstallOperationId.ToString()
         '-PackagePath',$package,'-ManifestPath',$manifestPath,'-ManifestSha256',$receipt.manifest_sha256,'-ConfigPath',$config
         '-HealthUri',($origin+'/healthz'),'-ExpectedInstanceId',$instance.ToString(),'-RecoveryReference',$recovery)
     $powershell=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

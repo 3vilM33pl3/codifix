@@ -72,5 +72,23 @@ try{
     Reject-CoreInstall {Copy-CoreInstallFile $source (Join-Path $root 'wrong.bin') ('0'*64)}
     if(Test-Path (Join-Path $root 'wrong.bin')){throw 'Changed source was copied'}
     Reject-CoreInstall {Write-CoreInstallNew $source ([byte[]]@(0))}
+    $core=Join-Path $root 'completed-core';$debug=Join-Path $root 'mutable-cache';$payload=Join-Path $root 'payload'
+    $null=New-Item -ItemType Directory -Path (Join-Path $core 'code'),$debug,$payload
+    $privateMemory=Join-Path $core 'code/memory.exe';$cachedMemory=Join-Path $debug 'memory.exe'
+    $cachedWrapper=Join-Path $debug 'memory-windows-service.exe'
+    Write-CoreInstallNew $privateMemory ([Text.Encoding]::UTF8.GetBytes('original pinned Memory'))
+    Write-CoreInstallNew $cachedMemory ([Text.Encoding]::UTF8.GetBytes('cargo test changed Memory'))
+    Write-CoreInstallNew $cachedWrapper ([Text.Encoding]::UTF8.GetBytes('original pinned wrapper'))
+    $memoryPin=Get-CoreInstallHash $privateMemory;$wrapperPin=Get-CoreInstallHash $cachedWrapper
+    $selected=Get-CoreInstallExecutableSource 'memory.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'memory.exe') $memoryPin 'memory.exe'
+    if((Get-CoreInstallHash (Join-Path $payload 'memory.exe')) -cne $memoryPin){throw 'Mutable cargo binary replaced completed core proof'}
+    $selected=Get-CoreInstallExecutableSource 'memory-windows-service.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'memory-windows-service.exe') $wrapperPin 'memory-windows-service.exe'
+    [IO.File]::AppendAllText($cachedWrapper,'changed')
+    $failure=$null
+    try{Copy-CoreInstallFile $selected (Join-Path $payload 'changed-wrapper.exe') $wrapperPin 'memory-windows-service.exe'}catch{$failure=$_.Exception.Message}
+    if($failure -cne 'Pinned core installation input unavailable or changed: memory-windows-service.exe'){throw 'Component mismatch was not opaque and exact'}
+    if(Test-Path (Join-Path $payload 'changed-wrapper.exe')){throw 'Changed wrapper was copied'}
 }finally{Remove-Item -LiteralPath $root -Recurse -Force}
 Write-Output 'Core installation parser and pure helpers passed; SCM/native execution was not attempted.'
