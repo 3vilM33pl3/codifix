@@ -69,7 +69,7 @@ class BuildToolsManifestTests(unittest.TestCase):
     def test_native_build_families_are_separate_but_each_is_serialized(self):
         script = (Path(__file__).parent / 'guest-stage.ps1').read_text()
         for required in ["'PiBuild' { 'Local\\MemoryLab-NativePiBuild' }",
-                         "'ProductCheck' { 'Local\\MemoryLab-NativeProductBuild' }",
+                         "{ $_ -in @('ProductCheck','ProductBuild') } { 'Local\\MemoryLab-NativeProductBuild' }",
                          "default { 'Local\\MemoryLab-NativeBuildStage' }",'$mutex.WaitOne(0)']:
             self.assertIn(required,script)
 
@@ -82,6 +82,8 @@ class BuildToolsManifestTests(unittest.TestCase):
             self.assertIn(required,script)
         self.assertNotIn('publish',script)
         self.assertNotIn('Invoke-Expression',script)
+        self.assertIn("@('build','--workspace','--bins','--locked','--features'",script)
+        self.assertIn('$receipt.release_candidate=$false',script)
 
     def test_optional_lab_ssh_is_pinned_key_only_and_never_replaces_service(self):
         script = (Path(__file__).parent / 'guest-ssh.ps1').read_text()
@@ -120,7 +122,7 @@ class BuildToolsManifestTests(unittest.TestCase):
         self.assertIn('Queued native proof file inventory changed', stage)
         self.assertIn('New-TimeSpan -Minutes 20', stage)
         self.assertIn('-LogonType Interactive', stage)
-        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
+        self.assertIn("$runLevel = if ($Stage -in @('NativeApi','PiBuild','ProductCheck','ProductBuild','PdsVerify','NativeEval')) { 'Limited' } else { 'Highest' }",stage)
         self.assertIn('-LogonType Interactive -RunLevel $runLevel',stage)
         script = (root / 'guest-native-api.ps1').read_text()
         for required in ['memory-windows-native-api-v1', 'Get-FileHash',

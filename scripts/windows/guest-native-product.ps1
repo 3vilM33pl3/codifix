@@ -3,7 +3,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$SourceRoot,
-    [Parameter(Mandatory=$true)][guid]$OperationId
+    [Parameter(Mandatory=$true)][guid]$OperationId,
+    [ValidateSet('Check','Build')][string]$Action='Check'
 )
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
@@ -23,7 +24,8 @@ $changes=(& $git -C $SourceRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -or $changes) { throw 'Committed clean product source required' }
 $compiler=(& $rustc -vV)
 if ($LASTEXITCODE -or ($compiler -join "`n") -notmatch '(?m)^host: x86_64-pc-windows-msvc\r?$') { throw 'Native MSVC Rust compiler required' }
-$root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\product-check')
+$label=if ($Action -eq 'Build') { 'product-build' } else { 'product-check' }
+$root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\'+$label)
 if (Test-Path -LiteralPath $root) { throw 'Product attempt exists; retain its evidence and use an explicit new operation' }
 New-Item -ItemType Directory -Path $root | Out-Null
 $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
@@ -35,7 +37,7 @@ $env:CARGO_TARGET_DIR='C:\MemoryLab\build\product-msvc'
 $env:CARGO_BUILD_JOBS='2'
 $env:CARGO_BUILD_TARGET='x86_64-pc-windows-msvc'
 $env:PATH=(Join-Path $env:USERPROFILE '.cargo\bin')+';'+(Join-Path $tools 'node-v24.18.1-win-x64')+';'+(Split-Path -Parent $git)+';'+$env:PATH
-$receipt=[ordered]@{format='memory-native-product-check-v1';source_commit=$head;lock_sha256=$lockHash
+$receipt=[ordered]@{format='memory-native-product-check-v1';action=$Action;source_commit=$head;lock_sha256=$lockHash
     compiler=($compiler -join "`n");state='running';compilation_verified=$false;workflow_verified=$false}
 $result=Join-Path $root 'result.json'
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8
@@ -43,7 +45,10 @@ Push-Location $SourceRoot
 try {
     # Separate bounded evidence files avoid PowerShell 5.1 turning ordinary
     # compiler stderr into a terminating error or dropping it from transcripts.
-    $process=Start-Process -FilePath $cargo -ArgumentList @('check','--workspace','--all-targets','--locked') -NoNewWindow -PassThru `
+    $arguments=if ($Action -eq 'Build') {
+        @('build','--workspace','--bins','--locked','--features','mem-platform/windows-evaluation-helper,mem-platform/windows-native-tests')
+    } else { @('check','--workspace','--all-targets','--locked') }
+    $process=Start-Process -FilePath $cargo -ArgumentList $arguments -NoNewWindow -PassThru `
         -RedirectStandardOutput (Join-Path $root 'cargo.stdout.log') -RedirectStandardError (Join-Path $root 'cargo.stderr.log')
     $null=$process.Handle
     if (-not $process.WaitForExit(7200000)) {
@@ -53,6 +58,13 @@ try {
     $process.WaitForExit()
     if ($process.ExitCode -ne 0) { throw 'Native workspace compilation failed; inspect retained compiler logs' }
     if ((Get-FileHash -LiteralPath $lock).Hash.ToLowerInvariant() -cne $lockHash) { throw 'Build changed the frozen Cargo.lock' }
+    if ($Action -eq 'Build') {
+        # Debug executables for disposable workflow acceptance, not candidate
+        # release artifacts. Final packaging must bind its own frozen build.
+        $receipt.artifacts=@(Get-ChildItem -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'x86_64-pc-windows-msvc\debug') -Filter '*.exe' -File |
+            Sort-Object Name | ForEach-Object { @{file=$_.Name;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()} })
+        $receipt.release_candidate=$false
+    }
     $receipt.state='succeeded'; $receipt.compilation_verified=$true
 } catch { $receipt.state='failed'; throw }
 finally {
