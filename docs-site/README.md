@@ -6,7 +6,7 @@ The site is intended for Vercel deployment with `docs-site` as the project root.
 
 ## Local preview
 
-For editing prose in VSCode, open [`Memory Docs.code-workspace`](Memory%20Docs.code-workspace). It focuses the explorer on `content/docs`, images, app routes, components, and config while hiding generated folders. See [`EDITING.md`](EDITING.md) for the page map and sidebar rules.
+For editing prose in VSCode, open [`Codifix Docs.code-workspace`](Codifix%20Docs.code-workspace). It focuses the explorer on `content/docs`, images, app routes, components, and config while hiding generated folders. See [`EDITING.md`](EDITING.md) for the page map and sidebar rules.
 
 ```bash
 npm install
