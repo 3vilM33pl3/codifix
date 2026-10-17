@@ -1164,15 +1164,26 @@ fn legacy_and_new_capture_threshold_keys_can_be_merged() {
     .unwrap();
 
     let original_dir = env::current_dir().unwrap();
+    let config_home_key = if cfg!(windows) {
+        "LOCALAPPDATA"
+    } else {
+        "XDG_CONFIG_HOME"
+    };
+    let previous_config_home = env::var_os(config_home_key);
     unsafe {
-        env::set_var("XDG_CONFIG_HOME", &config_home);
+        env::set_var(config_home_key, &config_home);
     }
     env::set_current_dir(&repo_dir).unwrap();
-    let config = AppConfig::load_with_profile(None, Profile::Prod).unwrap();
+    let config = AppConfig::load_with_profile(None, Profile::Prod);
     env::set_current_dir(original_dir).unwrap();
     unsafe {
-        env::remove_var("XDG_CONFIG_HOME");
+        if let Some(previous) = previous_config_home {
+            env::set_var(config_home_key, previous);
+        } else {
+            env::remove_var(config_home_key);
+        }
     }
+    let config = config.unwrap();
 
     assert_eq!(
         config.automation.capture_idle_threshold,

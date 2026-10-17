@@ -623,7 +623,15 @@ mod tests {
         writeln!(
             config,
             "[filter \"trap\"]\n process = touch {}\n required = true",
-            fixture.0.join("filter-ran").display()
+            // Git config treats raw Windows backslashes as escape sequences.
+            // Keep this a valid custom filter on every platform so the test
+            // reaches the materialization policy, not a config parse failure.
+            fixture
+                .0
+                .join("filter-ran")
+                .display()
+                .to_string()
+                .replace('\\', "/")
         )
         .unwrap();
         assert!(

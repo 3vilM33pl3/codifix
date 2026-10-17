@@ -19,7 +19,9 @@ fn config() -> EnrollmentConfig {
         gateway: "https://gateway.example.test".into(),
         gateway_ca_file: None,
         gateway_ca_sha256: None,
-        token_file: "/nonexistent/private/token".into(),
+        token_file: std::env::temp_dir()
+            .join(format!("absent-enrollment-{}", Uuid::new_v4()))
+            .join("private-token"),
         receipt_keys: security.trust().keys().to_vec(),
         plan: EnrollmentPlan {
             operation_id: Uuid::new_v4(),
@@ -76,7 +78,7 @@ fn default_preview_is_offline_bounded_and_canonical_without_secret_access() {
         config.preview().unwrap().review_sha256
     );
     let json = serde_json::to_string(&preview).unwrap();
-    assert!(!json.contains("/nonexistent/private/token"));
+    assert!(!json.contains("private-token"));
     assert!(!json.contains("manage_membership"));
     let restored: EnrollmentConfig =
         serde_json::from_str(&serde_json::to_string_pretty(&config).unwrap()).unwrap();
