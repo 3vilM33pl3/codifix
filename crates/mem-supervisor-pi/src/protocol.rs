@@ -82,6 +82,46 @@ pub enum StartupFailure {
     Other,
 }
 
+/// Finite diagnostic vocabulary only; never retain a child error message.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StartupDiagnostic {
+    pub internal: bool,
+    pub access_denied: bool,
+    pub runtime: bool,
+    pub thread: bool,
+    pub socket: bool,
+    pub directory: bool,
+    pub session: bool,
+    pub model: bool,
+    pub config: bool,
+}
+impl StartupDiagnostic {
+    #[cfg(any(test, feature = "windows-native-diagnostics"))]
+    fn from_frame(frame: &WireFrame) -> Self {
+        let message = frame
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        Self {
+            internal: frame.code.as_deref() == Some("internal"),
+            access_denied: message.contains("access is denied")
+                || message.contains("permission denied")
+                || message.contains("os error 5"),
+            runtime: message.contains("runtime"),
+            thread: message.contains("thread"),
+            socket: message.contains("socket")
+                || message.contains("tcp")
+                || message.contains("io driver"),
+            directory: message.contains("directory") || message.contains("folder"),
+            session: message.contains("session"),
+            model: message.contains("model"),
+            config: message.contains("config"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[serde(rename_all = "snake_case", tag = "failure", content = "class")]
 pub enum Failure {
@@ -142,6 +182,8 @@ struct WireFrame {
     data: Option<WireState>,
     phase: Option<String>,
     code: Option<String>,
+    #[cfg_attr(not(feature = "windows-native-diagnostics"), allow(dead_code))]
+    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -278,6 +320,10 @@ pub(crate) async fn read_frame_bounded<R: tokio::io::AsyncRead + Unpin>(
 fn accept_response(command: ControlCommand, frame: WireFrame) -> Result<(), Failure> {
     if frame.kind == "error" {
         if frame.phase.as_deref() == Some("startup") {
+            #[cfg(feature = "windows-native-diagnostics")]
+            if let Ok(metadata) = serde_json::to_string(&StartupDiagnostic::from_frame(&frame)) {
+                eprintln!("{metadata}");
+            }
             let class = match frame.code.as_deref() {
                 Some("auth.missing_api_key") => StartupFailure::MissingCredential,
                 Some("auth.invalid_api_key") => StartupFailure::InvalidCredential,
@@ -344,6 +390,8 @@ mod startup_tests {
                 "message":"DO_NOT_LEAK_PRIVATE_PATH_OR_CONTENT"
             }))
             .unwrap();
+            let metadata = serde_json::to_string(&StartupDiagnostic::from_frame(&frame)).unwrap();
+            assert!(!metadata.contains("DO_NOT_LEAK"));
             let failure = accept_response(ControlCommand::DisableRetry, frame).unwrap_err();
             assert_eq!(failure, Failure::Startup(expected));
             assert!(

@@ -23,6 +23,7 @@ use std::{path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
+pub use protocol::StartupDiagnostic;
 pub use protocol::{ControlCommand, EventKind, Failure, StartupFailure, TranscriptEvent};
 
 pub const PI_VERSION: &str = "0.5.1";

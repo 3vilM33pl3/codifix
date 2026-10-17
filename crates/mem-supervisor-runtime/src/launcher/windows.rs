@@ -252,6 +252,7 @@ fn record_failed_child_report(
     run_dir: &std::path::Path,
     report: &ChildReport,
     spawn_diagnostic: Option<mem_platform::windows_process::InheritedSpawnDiagnostic>,
+    startup_diagnostic: Option<mem_supervisor_pi::StartupDiagnostic>,
 ) -> Result<(), LaunchError> {
     use std::io::Write;
     let bytes = serde_json::to_vec(&serde_json::json!({
@@ -260,6 +261,7 @@ fn record_failed_child_report(
         "process": report.process,
         "failure": report.failure,
         "spawn_diagnostic": spawn_diagnostic,
+        "startup_diagnostic": startup_diagnostic,
     }))
     .map_err(|_| LaunchError::Files)?;
     let mut file = mem_platform_files::windows::create_private_file(
@@ -380,6 +382,7 @@ pub(super) async fn run(
                     &err,
                 )
                 .ok(),
+                serde_json::from_slice::<mem_supervisor_pi::StartupDiagnostic>(&err).ok(),
             )
             .is_err()
             {
