@@ -48,7 +48,7 @@ The bundle as a whole tells the agent when to:
 - remember distilled code and codebase explanations after answering explanation requests
 - review pending replacement proposals with evidence gathering before approve/reject
 
-The umbrella skill handles broad or mixed memory turns. The focused skills handle the narrow workflow phases. The shared Go helper under `.agents/skills/codifix/scripts/` is the shared execution path. Its installed Workshop route still uses the legacy `memory` executable until that route is explicitly cut over.
+The umbrella skill handles broad or mixed memory turns. The focused skills handle the narrow workflow phases. The shared Go helper under `.agents/skills/codifix/scripts/` calls the installed `codifix` executable with explicit Workshop routing.
 
 ## Current Workflow
 
@@ -93,7 +93,7 @@ The supported helper commands are:
 - `capture-task`
 - `curate-memory`
 
-`go` must be available on `PATH` anywhere the repo-local skill bundle is expected to run. That requirement is specific to the skill helper runtime. The Codifix product CLI is `codifix`. The selected Workshop route below deliberately retains the installed legacy `memory` executable until cutover.
+`go` must be available on `PATH` anywhere the repo-local skill bundle is expected to run. That requirement is specific to the skill helper runtime. The installed product CLI is `codifix`.
 
 Command resolution is explicit and stops after one selected destination:
 
@@ -103,11 +103,9 @@ Command resolution is explicit and stops after one selected destination:
 3. Without either selection, a Codifix source checkout uses `cargo run --bin codifix`; other
    repositories use the installed `codifix` command.
 
-This repository deliberately selects `["memory", "--area", "workshop"]` for durable notes,
-including queries, task starts, plans and completed work. This remains the installed
-legacy Workshop helper route until an explicit cutover; it uses the existing Workshop
-API and operator-owned credentials/routing. The source CLI is renamed; the installed
-Workshop service has not yet been cut over. The helper
+This repository selects `["codifix", "--area", "workshop"]` for durable notes,
+including queries, task starts, plans and completed work. It uses the Workshop
+API and operator-owned credentials/routing. The helper
 does not read database credentials or automatically switch services on failure.
 Other repositories do not inherit this project's command file when installing
 the skill bundle.
