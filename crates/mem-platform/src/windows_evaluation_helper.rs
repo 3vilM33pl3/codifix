@@ -3,6 +3,7 @@
 //! The descriptor and stdin file are operator-approved private inputs. Never put
 //! hidden grader expectations in them or in the reviewed toolchain inventory.
 mod export;
+pub mod host_journal;
 
 use crate::{
     private_windows::{Directory, Input, create_private_directory},

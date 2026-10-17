@@ -10,6 +10,39 @@ fn main() {
 fn main() {
     use std::path::Path;
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 6 && args[0] == "--host-journal" && args[4] == "--caller-pid" {
+        use mem_platform::windows_evaluation_helper::{host_journal, verify_outer_job};
+        use std::io::Read;
+        let outcome = (|| -> anyhow::Result<String> {
+            let pid = args[5]
+                .to_str()
+                .and_then(|value| value.parse::<u32>().ok())
+                .ok_or_else(|| anyhow::anyhow!("explicit caller required"))?;
+            verify_outer_job(pid)?;
+            let operation = args[1]
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("invalid operation"))?;
+            let name = args[3]
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("invalid name"))?;
+            let mut bytes = Vec::new();
+            if operation == "write" {
+                std::io::stdin()
+                    .take(host_journal::LIMIT + 1)
+                    .read_to_end(&mut bytes)?;
+            }
+            let receipt = host_journal::run(operation, Path::new(&args[2]), name, &bytes)?;
+            Ok(serde_json::to_string(&receipt)?)
+        })();
+        match outcome {
+            Ok(json) => println!("{json}"),
+            Err(_) => {
+                eprintln!("protected host journal operation failed; retain private evidence");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if args.len() == 2 && args[0] == "--verify-outer-job" {
         if let Some(pid) = args[1].to_str().and_then(|value| value.parse::<u32>().ok())
             && let Ok(receipt) = mem_platform::windows_evaluation_helper::verify_outer_job(pid)
