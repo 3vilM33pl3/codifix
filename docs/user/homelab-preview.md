@@ -116,7 +116,7 @@ If the app process alone needs restarting:
 docker restart memory-homelab-preview-app-20260919
 ```
 
-Do not use `memory service restart-all`. Do not run the original saved binary
+Do not use `codifix service restart-all`. Do not run the original saved binary
 against this prepared runtime role: it assumes migration-owner privileges. The
 current app uses [prepared-database verification](prepared-database.md) at schema
 `0060`, with a non-owner database role. If the database container is recreated,

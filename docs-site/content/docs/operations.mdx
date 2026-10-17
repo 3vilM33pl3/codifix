@@ -1,18 +1,18 @@
 ---
 title: "Operations"
-description: "Run Memory Layer safely: service, database, logs, backups, privacy, and upgrades."
+description: "Run Codifix safely: service, database, logs, backups, privacy, and upgrades."
 ---
 
 # Operations
 
-Memory Layer is local-first, but it still has operational concerns: service health, database availability, backups, logs, privacy, and upgrade safety. Use this page as a runbook, not a second copy of the troubleshooting guide.
+Codifix is local-first, but it still has operational concerns: service health, database availability, backups, logs, privacy, and upgrade safety. Use this page as a runbook, not a second copy of the troubleshooting guide.
 
 ## Baseline
 
 ```bash
-memory health                          # backend service
-memory doctor                          # config and dependencies
-memory status --project <project-slug> # combined service, watcher, MCP, doctor
+codifix health                          # backend service
+codifix doctor                          # config and dependencies
+codifix status --project <project-slug> # combined service, watcher, MCP, doctor
 ```
 
 Run these once at the start of an incident or change. After that, move to the relevant section below instead of repeating them.
@@ -23,17 +23,17 @@ The service runs as a systemd unit on Linux or a launchd agent on macOS. Use sta
 
 | Task | Command |
 |---|---|
-| Run in foreground for debugging | `memory service run` |
-| Enable packaged background service | `memory service enable` |
-| Inspect configured service | `memory service status` |
-| Restart known service components | `memory service restart-all` |
-| Regenerate or confirm API token | `memory service ensure-api-token` |
+| Run in foreground for debugging | `codifix service run` |
+| Enable packaged background service | `codifix service enable` |
+| Inspect configured service | `codifix service status` |
+| Restart known service components | `codifix service restart-all` |
+| Regenerate or confirm API token | `codifix service ensure-api-token` |
 
 The foreground run command is intentionally blocking. If it exits, the service is not running from that terminal.
 
 ## Database
 
-Memory Layer stores everything in PostgreSQL with pgvector. See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup.
+Codifix stores everything in PostgreSQL with pgvector. See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup.
 
 <Mermaid chart="flowchart TB\n    P[Projects] --> M[Canonical memories]\n    M --> E[Evidence and sources]\n    M --> V[Embeddings]\n    M --> A[Activity events]\n    M --> G[Code graph references]" />
 
@@ -43,23 +43,23 @@ Memory Layer stores everything in PostgreSQL with pgvector. See [PostgreSQL and 
 
 - PostgreSQL database.
 - Global configuration.
-- Repo-local `.mem/` project config.
+- Repo-local `.codifix/` project config.
 - `.agents/` integration files if they are part of the project workflow.
 
 ### Basic database backup
 
 ```bash
-pg_dump "$DATABASE_URL" > memory-layer-backup.sql
-psql "$DATABASE_URL" < memory-layer-backup.sql
+pg_dump "$DATABASE_URL" > codifix-backup.sql
+psql "$DATABASE_URL" < codifix-backup.sql
 ```
 
-For production-grade backups, prefer custom-format dumps, checksums, restore tests, and a retention policy. Verify a restore by running `memory doctor` against a disposable database.
+For production-grade backups, prefer custom-format dumps, checksums, restore tests, and a retention policy. Verify a restore by running `codifix doctor` against a disposable database.
 
 Do not commit secrets, API keys, local database URLs, or runtime state.
 
 ## Upgrades
 
-Memory Layer v2.0.0 is a breaking upgrade from v1. Follow the
+Codifix v2.0.0 is a breaking upgrade from v1. Follow the
 [v2 Update guide](/docs/install/update) for removed config keys, renamed
 commands, API changes, package-specific install steps, migrations, and rollback.
 The sequence below is the shorter runbook for routine updates within a
@@ -68,28 +68,28 @@ compatible release line.
 Before upgrading, take a baseline and back up the database:
 
 ```bash
-pg_dump "$DATABASE_URL" > memory-layer-before-upgrade.sql
+pg_dump "$DATABASE_URL" > codifix-before-upgrade.sql
 ```
 
 After upgrading:
 
 ```bash
-memory service restart-all
-memory doctor
-memory health
-memory status --project <project-slug>
-memory upgrade --dry-run
+codifix service restart-all
+codifix doctor
+codifix health
+codifix status --project <project-slug>
+codifix upgrade --dry-run
 ```
 
-Run `memory upgrade` inside repositories only after reviewing the dry run, because it can refresh `.agents/` and other repo-local integration files.
+Run `codifix upgrade` inside repositories only after reviewing the dry run, because it can refresh `.agents/` and other repo-local integration files.
 
 ## Logs and diagnostics
 
 | Surface | Use it for |
 |---|---|
-| `memory doctor` | Configuration, database, provider, and environment checks. |
-| `memory status --project <slug>` | Combined project, service, watcher, MCP, and health view. |
-| `memory loops runs --project <slug>` | Automation run ledger and recent loop outcomes. |
+| `codifix doctor` | Configuration, database, provider, and environment checks. |
+| `codifix status --project <slug>` | Combined project, service, watcher, MCP, and health view. |
+| `codifix loops runs --project <slug>` | Automation run ledger and recent loop outcomes. |
 | TUI Errors tab | Persisted diagnostics with fix hints and raw errors. |
 | Web UI Errors tab | Same diagnostic model in a browser surface. |
 | OS service logs | Startup failures, migrations, port conflicts, crashes. |
@@ -98,7 +98,7 @@ Redact provider tokens, database URLs, prompts, and local file paths before shar
 
 ## Security and privacy
 
-Memory Layer can be local-first, but external embedding or LLM providers may receive text depending on your configuration.
+Codifix can be local-first, but external embedding or LLM providers may receive text depending on your configuration.
 
 ### Check before enabling integrations
 
@@ -118,7 +118,7 @@ controls. HTTP MCP remains cookie-blind and needs its own service token.
 
 ## Multi-project use
 
-One backend serves multiple projects. Each project has its own slug, config, watchers, and scoped queries. Use `memory status --project <slug>` to inspect each one independently.
+One backend serves multiple projects. Each project has its own slug, config, watchers, and scoped queries. Use `codifix status --project <slug>` to inspect each one independently.
 
 ## Web UI
 

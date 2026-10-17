@@ -28,8 +28,8 @@ for (const file of contentFiles) {
   const text = readFileSync(file, 'utf8');
   const rel = path.relative(root, file);
   const regexes = [
-    /!\[[^\]]*]\(((?:https:\/\/www\.memory-layer\.dev)?\/images\/[^)\s]+)\)/g,
-    /src=["']((?:https:\/\/www\.memory-layer\.dev)?\/images\/[^"']+)["']/g,
+    /!\[[^\]]*]\(((?:https:\/\/www\.codifix\.dev)?\/images\/[^)\s]+)\)/g,
+    /src=["']((?:https:\/\/www\.codifix\.dev)?\/images\/[^"']+)["']/g,
   ];
 
   for (const regex of regexes) {

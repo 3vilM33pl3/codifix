@@ -1,6 +1,6 @@
 # Beginner Guide To Evaluations
 
-This guide walks through your first Memory Layer evaluation. It is written for
+This guide walks through your first Codifix evaluation. It is written for
 someone who wants practical proof that memory is helping an agent, without
 starting from the full command reference.
 
@@ -9,13 +9,13 @@ Memory enabled than without it? The useful evidence comes from paired runs. Run
 the same suite under two conditions, compare item by item, then inspect the
 quality, cost, and latency differences.
 
-For the full command reference, see [`memory eval`](cli/eval.md).
+For the full command reference, see [`codifix eval`](cli/eval.md).
 
 ## Before You Start
 
 You need:
 
-- a running Memory Layer service for non-dry-run evaluations
+- a running Codifix service for non-dry-run evaluations
 - project memory to search against
 - an LLM provider configured when using `--profile llm`
 - PostgreSQL with `pgvector` when testing semantic retrieval
@@ -23,13 +23,13 @@ You need:
 If you are running from an installed package, use commands like this:
 
 ```bash
-memory eval doctor --suite evals/examples/memory-smoke --text
+codifix eval doctor --suite evals/examples/memory-smoke --text
 ```
 
 If you are developing inside this repository, use the dev binary instead:
 
 ```bash
-cargo run --bin memory -- eval doctor --suite evals/examples/memory-smoke --text
+cargo run --bin codifix -- eval doctor --suite evals/examples/memory-smoke --text
 ```
 
 ## Step 1: Understand The Pieces
@@ -67,7 +67,7 @@ claims.
 Run `doctor` before expensive runs:
 
 ```bash
-memory eval doctor --suite evals/examples/memory-smoke --text
+codifix eval doctor --suite evals/examples/memory-smoke --text
 ```
 
 `doctor` checks that the suite can be parsed and that the environment is ready
@@ -84,7 +84,7 @@ evaluation:
 Use an offline dry run first:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/examples/memory-smoke \
   --condition full-memory \
   --profile offline \
@@ -101,7 +101,7 @@ agent, so it proves the fixture-copying, agent-command, and scoring path without
 model cost:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/examples/app-build-smoke \
   --condition no-memory \
   --condition full-memory \
@@ -114,7 +114,7 @@ When you want the full token-spending version, run the Codex-backed suite:
 
 ```bash
 MEMORY_EVAL_CODEX_MODEL=gpt-5.4-mini \
-memory eval run \
+codifix eval run \
   --suite evals/suites/app-build-codex-v1 \
   --condition no-memory \
   --condition full-memory \
@@ -137,7 +137,7 @@ For a longer software-building test, use the Dockerized sequence suite:
 docker compose -f evals/docker/app-build-sequence/compose.yml run --rm eval
 ```
 
-This starts PostgreSQL with pgvector, starts the Memory service, seeds
+This starts PostgreSQL with pgvector, starts the Codifix service, seeds
 deterministic project memories, and runs the 20-step Codex app-build sequence
 under `no-memory` and `full-memory`. Each step keeps the previous workspace
 state, so the run tests continuity across a realistic product build rather than
@@ -163,7 +163,7 @@ reading the fixture files.
 For useful evidence, compare a baseline against a Memory-backed condition:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/suites/research-v1 \
   --condition no-memory \
   --condition full-memory \
@@ -207,7 +207,7 @@ files for release notes, research notes, or regression tracking.
 After the paired run, compare the baseline artifact with the candidate artifact:
 
 ```bash
-memory eval compare \
+codifix eval compare \
   --baseline target/memory-evals/no-memory.json \
   --candidate target/memory-evals/full-memory.json \
   --out target/memory-evals/comparison.json \
@@ -224,7 +224,7 @@ aggregate scores.
 For repeated runs, compare globs instead of one file at a time:
 
 ```bash
-memory eval compare \
+codifix eval compare \
   --baseline 'target/memory-evals/*no-memory*.json' \
   --candidate 'target/memory-evals/*full-memory*.json' \
   --out target/memory-evals/comparison.json \
@@ -234,7 +234,7 @@ memory eval compare \
 Create a readable report:
 
 ```bash
-memory eval report \
+codifix eval report \
   --comparison target/memory-evals/comparison.json \
   --markdown \
   --out target/memory-evals/report.md
@@ -264,7 +264,7 @@ the token/latency cost is acceptable for the use case.
 Use a gate policy when an evaluation becomes part of release discipline:
 
 ```bash
-memory eval gate \
+codifix eval gate \
   --comparison target/memory-evals/comparison.json \
   --policy evals/gates/research-v1.toml \
   --text
@@ -278,7 +278,7 @@ If it fails, inspect the comparison instead of weakening the gate immediately.
 Scaffold a starter suite from recent project memories:
 
 ```bash
-memory eval scaffold --project memory --out evals/suites/my-first-suite --text
+codifix eval scaffold --project memory --out evals/suites/my-first-suite --text
 ```
 
 Review every generated item before trusting it:

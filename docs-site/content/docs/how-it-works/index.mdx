@@ -1,13 +1,13 @@
 ---
 title: "How it works"
-description: "Understand how Memory Layer captures, curates, stores, and retrieves project memory."
+description: "Understand how Codifix captures, curates, stores, and retrieves project memory."
 ---
 
 # How it works
 
-Memory Layer turns project activity into durable, evidence-backed memory that agents and humans can retrieve in future sessions. The core loop is: **capture -> curate -> store -> retrieve**.
+Codifix turns project activity into durable, evidence-backed memory that agents and humans can retrieve in future sessions. The core loop is: **capture -> curate -> store -> retrieve**.
 
-![How Memory Layer turns project work into cited context](/images/memory-layer-flow.svg)
+![How Codifix turns project work into cited context](/images/codifix-flow.svg)
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ flowchart LR
 
 ## Mental model
 
-Memory Layer is not a chat transcript store. It separates short-lived activity from durable knowledge:
+Codifix is not a chat transcript store. It separates short-lived activity from durable knowledge:
 
 | Layer | What it contains | Why it matters |
 |---|---|---|
@@ -34,14 +34,14 @@ Memory Layer is not a chat transcript store. It separates short-lived activity f
 
 A **project** is the unit of scoping. Each project gets its own memory namespace tied to a repository or working directory. Memories, activity, and configuration are isolated per project, so context from one codebase does not leak into another.
 
-Projects are identified by a slug, for example `memory` or `docs-site`, and configured through `memory wizard`, `memory init`, and `.mem/project.toml`.
+Projects are identified by a slug, for example `memory` or `docs-site`, and configured through `codifix wizard`, `codifix init`, and `.codifix/project.toml`.
 
 ## Capture
 
 Capture records what happened without deciding yet whether it is durable. Sources include:
 
-- explicit `memory remember` calls after completed work
-- structured `memory capture` payloads from tools
+- explicit `codifix remember` calls after completed work
+- structured `codifix capture` payloads from tools
 - repository scans
 - watcher activity
 - checkpoint and plan-execution events
@@ -68,9 +68,9 @@ Replacement proposals require review before older knowledge is superseded. This 
 
 ## Store
 
-Memory Layer stores canonical memories, raw captures, history, proposals, activity, embeddings, commit evidence, and graph references in PostgreSQL with pgvector. The database is the shared backend for the CLI, TUI, web UI, watchers, and MCP server.
+Codifix stores canonical memories, raw captures, history, proposals, activity, embeddings, commit evidence, and graph references in PostgreSQL with pgvector. The database is the shared backend for the CLI, TUI, web UI, watchers, and MCP server.
 
-The repo-local `.mem/` directory scopes a checkout to a project; it is not the database. Global config stores service, database, and provider settings outside the repository.
+The repo-local `.codifix/` directory scopes a checkout to a project; it is not the database. Global config stores service, database, and provider settings outside the repository.
 
 ## Retrieve
 
@@ -94,7 +94,7 @@ flowchart LR
 
 ## Trust and staleness
 
-Memories are durable claims, not permanent truths. Code changes, dependencies move, and decisions are revisited. Memory Layer manages this with confidence scores, source evidence, memory history, provenance verification, replacement proposals, and explicit refactor memories that can invalidate or update affected knowledge. On top of that, [reinforcement](/docs/how-it-works/reinforcement) tracks which memories are actually used and re-validates the hot ones against your repository.
+Memories are durable claims, not permanent truths. Code changes, dependencies move, and decisions are revisited. Codifix manages this with confidence scores, source evidence, codifix history, provenance verification, replacement proposals, and explicit refactor memories that can invalidate or update affected knowledge. On top of that, [reinforcement](/docs/how-it-works/reinforcement) tracks which memories are actually used and re-validates the hot ones against your repository.
 
 ## Deep dives
 

@@ -5,15 +5,15 @@ description: "Automatic context capture from agent sessions and project activity
 
 # Watchers
 
-Watchers observe agent sessions and project activity so Memory Layer can capture useful context without requiring every fact to be manually entered.
+Watchers observe agent sessions and project activity so Codifix can capture useful context without requiring every fact to be manually entered.
 
 ## Watcher manager
 
 The recommended path for Codex-linked sessions. The manager detects live sessions, maps them to projects, and starts a watcher automatically.
 
 ```bash
-memory watcher manager enable
-memory watcher manager status
+codifix watcher manager enable
+codifix watcher manager status
 ```
 
 ## Manual / generic watcher
@@ -21,8 +21,8 @@ memory watcher manager status
 For agents or environments where the manager doesn't apply, run a watcher directly:
 
 ```bash
-memory watcher run    --project <slug>
-memory watcher status --project <slug>
+codifix watcher run    --project <slug>
+codifix watcher status --project <slug>
 ```
 
 Foreground watchers observe repository changes, debounce bursts, and send activity to the service. Use this path for Claude Code, custom agents, or any setup where the watcher manager doesn't match.
@@ -38,8 +38,8 @@ A healthy watcher sends periodic heartbeats. If heartbeats stop, the watcher bec
 ## Verify
 
 ```bash
-memory status     --project <slug>     # combined service, watcher, MCP, and doctor status
-memory activities --project <slug> --kind watcher --limit 10
+codifix status     --project <slug>     # combined service, watcher, MCP, and doctor status
+codifix activities --project <slug> --kind watcher --limit 10
 ```
 
 Open the TUI [Watchers tab](/docs/tui/watchers) to see live watcher state, or the [Activity tab](/docs/tui/activity) to inspect captured events.

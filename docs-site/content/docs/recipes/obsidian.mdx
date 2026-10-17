@@ -5,7 +5,7 @@ description: "Make a Markdown vault queryable with cited answers."
 
 # Obsidian / note vault
 
-An Obsidian vault is already what Memory Layer wants: a folder of Markdown files, each holding durable knowledge. One command makes it queryable.
+An Obsidian vault is already what Codifix wants: a folder of Markdown files, each holding durable knowledge. One command makes it queryable.
 
 ## Ingest the vault
 
@@ -19,10 +19,10 @@ Each note becomes a memory: its first heading as the summary, an excerpt as the 
 ## Ask your notes questions
 
 ```bash
-memory query --project vault --question "What did I decide about the greenhouse irrigation?"
+codifix query --project vault --question "What did I decide about the greenhouse irrigation?"
 ```
 
-Answers cite the exact notes they draw from — and when your vault doesn't contain an answer, you get an honest `insufficient_evidence` refusal instead of a guess. `memory tui` gives you browsing, search, and the memory graph over the whole vault.
+Answers cite the exact notes they draw from — and when your vault doesn't contain an answer, you get an honest `insufficient_evidence` refusal instead of a guess. `codifix tui` gives you browsing, search, and the codifix graph over the whole vault.
 
 ## Keep it synced
 
@@ -37,4 +37,4 @@ Edited notes arrive as new candidates; curation's replacement engine supersedes 
 
 ## See the structure
 
-Open the **Graph** tab (`memory tui` or the web UI at `http://localhost:4040`) on the `vault` project: notes appear as memory nodes with provenance edges to their files, sized by how often you actually retrieve them — your vault's real usage topology, not just its link structure.
+Open the **Graph** tab (`codifix tui` or the web UI at `http://localhost:4040`) on the `vault` project: notes appear as memory nodes with provenance edges to their files, sized by how often you actually retrieve them — your vault's real usage topology, not just its link structure.

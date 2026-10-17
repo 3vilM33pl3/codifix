@@ -1,8 +1,8 @@
 # Authentication And Access
 
-`memory auth` inspects the current principal and administers service tokens and
+`codifix auth` inspects the current principal and administers service tokens and
 explicit project memberships. Browser users sign in through Authentik; CLI,
-TUI, watcher, relay, and MCP clients use a Memory Layer service token.
+TUI, watcher, relay, and MCP clients use a Codifix service token.
 
 ## Modes
 
@@ -29,19 +29,19 @@ and permissions from applicable grants are combined.
 Set the issued token in the client process:
 
 ```bash
-export MEMORY_LAYER_CLIENT_TOKEN='mlt_...'
-memory auth whoami
-memory query --project memory --question 'What changed?'
+export CODIFIX_CLIENT_TOKEN='mlt_...'
+codifix auth whoami
+codifix query --project memory --question 'What changed?'
 ```
 
-`MEMORY_LAYER_CLIENT_TOKEN` takes precedence over `service.api_token`. Do not
+`CODIFIX_CLIENT_TOKEN` takes precedence over `service.api_token`. Do not
 write a multi-user service token into a repository or command history.
 
 ## Inspect Identity
 
 ```bash
-memory auth whoami
-memory auth whoami --json
+codifix auth whoami
+codifix auth whoami --json
 ```
 
 The output includes principal ID, kind, role presets, expanded permissions,
@@ -54,18 +54,18 @@ the required permission or project membership.
 Only a global admin can create, list, or revoke tokens:
 
 ```bash
-memory auth token create \
+codifix auth token create \
   --name hermes \
   --project memory \
   --role writer \
   --ttl 30d
 
-memory auth token list
-memory auth token revoke <token-uuid-or-unique-prefix>
+codifix auth token list
+codifix auth token revoke <token-uuid-or-unique-prefix>
 ```
 
 Creation makes a service principal and an initial project membership. The raw
-`mlt_...` secret is displayed once; Memory Layer stores only its SHA-256 hash.
+`mlt_...` secret is displayed once; Codifix stores only its SHA-256 hash.
 Store the secret in OpenBao or another secret manager before closing the output.
 Use memberships to grant the same service principal access to more projects.
 
@@ -111,13 +111,13 @@ model destinations for the initial internal installation.
 ## Project Memberships
 
 ```bash
-memory auth membership grant \
+codifix auth membership grant \
   --principal <principal-uuid> \
   --project another-project \
   --role reader
 
-memory auth membership list
-memory auth membership revoke <membership-uuid>
+codifix auth membership list
+codifix auth membership revoke <membership-uuid>
 ```
 
 Explicit memberships coexist with Authentik group mappings. Revoking an
@@ -136,9 +136,9 @@ The unreleased Mac onboarding candidate adds a separate browser-approved device
 flow:
 
 ```bash
-memory auth login --company https://YOUR-COMPANY-MEMORY-ORIGIN --name "My Mac"
+codifix auth login --company https://YOUR-COMPANY-MEMORY-ORIGIN --name "My Mac"
 memory projects available --company https://YOUR-COMPANY-MEMORY-ORIGIN
-memory auth logout --company https://YOUR-COMPANY-MEMORY-ORIGIN
+codifix auth logout --company https://YOUR-COMPANY-MEMORY-ORIGIN
 ```
 
 The device secret remains in macOS Keychain or the current Windows user's
@@ -157,16 +157,16 @@ synchronization runs in that user's context, not the machine service account.
 
 ## OpenBao Pattern
 
-OpenBao distributes the secret but is not a runtime dependency of Memory Layer:
+OpenBao distributes the secret but is not a runtime dependency of Codifix:
 
 ```bash
-bao kv put secret/memory-layer/hermes token='mlt_...'
-export MEMORY_LAYER_CLIENT_TOKEN="$(bao kv get -field=token secret/memory-layer/hermes)"
-memory auth whoami
+bao kv put secret/codifix/hermes token='mlt_...'
+export CODIFIX_CLIENT_TOKEN="$(bao kv get -field=token secret/codifix/hermes)"
+codifix auth whoami
 ```
 
 Keep human login in Authentik and machine-secret delivery in OpenBao. Do not
-store Authentik client secrets or Memory Layer service tokens in source control.
+store Authentik client secrets or Codifix service tokens in source control.
 
 ## See Also
 

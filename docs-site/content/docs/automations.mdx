@@ -1,22 +1,22 @@
 ---
 title: "Automations"
-description: "Understand the built-in Memory Layer loop automations, what they can do, and how to run or approve them safely."
+description: "Understand the built-in Codifix loop automations, what they can do, and how to run or approve them safely."
 ---
 
 # Automations
 
-Automations are Memory Layer's built-in loop workflows. They are registered by the local service, scoped by project or repository, and recorded as auditable runs with traces, approvals, and proposed outputs.
+Automations are Codifix's built-in loop workflows. They are registered by the local service, scoped by project or repository, and recorded as auditable runs with traces, approvals, and proposed outputs.
 
-They are not external bots and they are not repo-local agent skills. Skills tell a coding agent how to use Memory Layer; automations are service-owned workflows that can be run manually or routed from trusted events.
+They are not external bots and they are not repo-local agent skills. Skills tell a coding agent how to use Codifix; automations are service-owned workflows that can be run manually or routed from trusted events.
 
 ## How they work
 
 ```bash
-memory loops list
-memory loops show memory_hygiene --project memory
-memory loops run memory_hygiene --project memory --dry-run --reason "inspect cleanup candidates"
-memory loops runs --project memory
-memory loops inspect <run-id>
+codifix loops list
+codifix loops show memory_hygiene --project memory
+codifix loops run memory_hygiene --project memory --dry-run --reason "inspect cleanup candidates"
+codifix loops runs --project memory
+codifix loops inspect <run-id>
 ```
 
 Each automation has:
@@ -30,7 +30,7 @@ Each automation has:
 | Capabilities | What evidence the loop is allowed to read or request. |
 | Outputs | Reports, proposals, task packs, draft metadata, or metrics produced by the run. |
 
-Loop outputs still use Memory Layer APIs and approval flows. A loop does not get a private write path to memories or code.
+Loop outputs still use Codifix APIs and approval flows. A loop does not get a private write path to memories or code.
 
 ## Built-in loops
 
@@ -84,12 +84,12 @@ Produces an internal run report for retrieval and context quality. It tracks pre
 Use project-scoped settings unless you intentionally want broader behavior:
 
 ```bash
-memory loops enable memory_hygiene --project memory --mode suggest_only --explicit-user-approval
-memory loops pause memory_hygiene --project memory --until 2026-06-16T09:00:00Z
-memory loops disable memory_hygiene --project memory --reason "pause while reviewing output quality"
+codifix loops enable memory_hygiene --project memory --mode suggest_only --explicit-user-approval
+codifix loops pause memory_hygiene --project memory --until 2026-06-16T09:00:00Z
+codifix loops disable memory_hygiene --project memory --reason "pause while reviewing output quality"
 ```
 
-The global kill switch blocks routed non-manual runs. Manual `memory loops run ...` calls still record a trigger event, but they are deliberate operator actions and are not blocked by the kill switch.
+The global kill switch blocks routed non-manual runs. Manual `codifix loops run ...` calls still record a trigger event, but they are deliberate operator actions and are not blocked by the kill switch.
 
 Approval-gated actions include memory mutation, repository writes, and runner invocation. Forbidden actions include direct pushes to `main`, deploys, secret access, destructive migrations, and enabling loops from inside a loop.
 
@@ -98,11 +98,11 @@ Approval-gated actions include memory mutation, repository writes, and runner in
 | Surface | Use it for |
 |---|---|
 | Web UI Automations tab | Inspect definitions, settings, recent runs, approvals, context packs, and memory proposals. |
-| `memory loops list` | Show registered loop definitions. |
-| `memory loops run` | Start a manual dry-run or run. |
-| `memory loops approvals` | Review pending approval requests. |
-| `memory loops memory-proposals` | Review proposals emitted by loop runs. |
-| `memory loops inspect <run-id>` | Inspect a specific run, traces, and outputs. |
+| `codifix loops list` | Show registered loop definitions. |
+| `codifix loops run` | Start a manual dry-run or run. |
+| `codifix loops approvals` | Review pending approval requests. |
+| `codifix loops memory-proposals` | Review proposals emitted by loop runs. |
+| `codifix loops inspect <run-id>` | Inspect a specific run, traces, and outputs. |
 
 ## Next
 

@@ -1,14 +1,14 @@
 # TUI Guide
 
-The terminal UI is the fastest way to inspect what Memory Layer knows before you act on it. It combines cited query results, stored memory, project health, agent activity, watcher state, proposals, and diagnostics in one local surface.
+The terminal UI is the fastest way to inspect what Codifix knows before you act on it. It combines cited query results, stored memory, project health, agent activity, watcher state, proposals, and diagnostics in one local surface.
 
-![Memory Layer terminal UI overview](https://www.memory-layer.dev/images/tui-frontpage.png)
+![Codifix terminal UI overview](https://codifix.dev/images/tui-frontpage.png)
 
 ## Start the TUI
 
 ```bash
-memory tui
-memory tui --project <project-slug>
+codifix tui
+codifix tui --project <project-slug>
 ```
 
 The header identifies the active project and the footer reports TUI, service, watcher, and skill health. A source checkout uses an isolated dev profile; its header is marked `[dev]` so it is not confused with a packaged installation.
@@ -29,21 +29,21 @@ The header identifies the active project and the footer reports TUI, service, wa
 
 | Need | Tab |
 | --- | --- |
-| Read or filter known memory | [Memories](https://www.memory-layer.dev/docs/tui/memories) |
-| Ask a cited project question | [Query](https://www.memory-layer.dev/docs/tui/query) |
-| Review replacement proposals | [Review](https://www.memory-layer.dev/docs/tui/review) |
-| See active coding sessions | [Agents](https://www.memory-layer.dev/docs/tui/agents) |
-| Check watcher liveness | [Watchers](https://www.memory-layer.dev/docs/tui/watchers) |
-| Inspect the managed skill bundle | [Skills](https://www.memory-layer.dev/docs/tui/skills) |
-| See loop state | [Automations](https://www.memory-layer.dev/docs/tui/automations) |
-| Generate a handoff briefing | [Activity](https://www.memory-layer.dev/docs/tui/activity) or [Resume](https://www.memory-layer.dev/docs/tui/resume) |
-| Maintain semantic retrieval | [Embeddings](https://www.memory-layer.dev/docs/tui/embeddings) |
-| Diagnose a failure | [Errors](https://www.memory-layer.dev/docs/tui/errors) |
-| See the whole project at a glance | [Project](https://www.memory-layer.dev/docs/tui/project) |
+| Read or filter known memory | [Memories](https://codifix.dev/docs/tui/memories) |
+| Ask a cited project question | [Query](https://codifix.dev/docs/tui/query) |
+| Review replacement proposals | [Review](https://codifix.dev/docs/tui/review) |
+| See active coding sessions | [Agents](https://codifix.dev/docs/tui/agents) |
+| Check watcher liveness | [Watchers](https://codifix.dev/docs/tui/watchers) |
+| Inspect the managed skill bundle | [Skills](https://codifix.dev/docs/tui/skills) |
+| See loop state | [Automations](https://codifix.dev/docs/tui/automations) |
+| Generate a handoff briefing | [Activity](https://codifix.dev/docs/tui/activity) or [Resume](https://codifix.dev/docs/tui/resume) |
+| Maintain semantic retrieval | [Embeddings](https://codifix.dev/docs/tui/embeddings) |
+| Diagnose a failure | [Errors](https://codifix.dev/docs/tui/errors) |
+| See the whole project at a glance | [Project](https://codifix.dev/docs/tui/project) |
 
-The TUI is for human inspection. Agents should prefer structured CLI output such as `memory query --json` when another tool will parse the result.
+The TUI is for human inspection. Agents should prefer structured CLI output such as `codifix query --json` when another tool will parse the result.
 
-See also: [Daily workflow](https://www.memory-layer.dev/docs/daily-workflow) and the [Web UI](https://www.memory-layer.dev/docs/web-ui).
+See also: [Daily workflow](https://codifix.dev/docs/daily-workflow) and the [Web UI](https://codifix.dev/docs/web-ui).
 
 ## Additional workspaces
 
@@ -64,13 +64,13 @@ The configured local loopback owner must authenticate. A disabled/unsupported
 server or failed read is reported as unavailable, not an empty healthy cache.
 
 The **Jobs** tab inspects durable background stages and provides confirmed retry
-with stable request IDs. See [Background jobs](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/jobs.md) for keys and policy.
+with stable request IDs. See [Background jobs](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/jobs.md) for keys and policy.
 
 The **Supervisor** tab provides instance-wide metadata-only inspection, separate
-from local coding sessions in Agents. See [Supervisor inspection](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/supervisor.md)
+from local coding sessions in Agents. See [Supervisor inspection](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md)
 for permissions, cursor controls and explicit inactive-worker limitations.
 
-For private federation, launch `memory federation --project <slug> tui`. This
+For private federation, launch `codifix federation --project <slug> tui`. This
 focused workspace supports membership, exact publication review, shared citations,
 proposals, approval/rejection and synchronization through the same authenticated
-local API as Web and CLI. See [Federation commands and keys](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/federation.md).
+local API as Web and CLI. See [Federation commands and keys](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/federation.md).

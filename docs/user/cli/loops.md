@@ -1,6 +1,6 @@
-# `memory loops`
+# `codifix loops`
 
-`memory loops` operates the loop engineering control plane. It is for inspecting registered loop definitions, changing loop settings, creating manual policy-checked runs, reviewing approval requests, and using the global kill switch.
+`codifix loops` operates the loop engineering control plane. It is for inspecting registered loop definitions, changing loop settings, creating manual policy-checked runs, reviewing approval requests, and using the global kill switch.
 
 This command is an operator surface over the service API. It does not bypass
 policy checks. Loop runs are recorded in the service ledger, and runner
@@ -10,12 +10,12 @@ adapters are allowed to write repo changes.
 ## Common Workflow
 
 ```bash
-memory loops list
-memory loops show context_pack_refresh --project memory
-memory loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
-memory loops run context_pack_refresh --project memory --dry-run --reason "manual smoke test"
-memory loops runs --project memory
-memory loops inspect <run-id>
+codifix loops list
+codifix loops show context_pack_refresh --project memory
+codifix loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
+codifix loops run context_pack_refresh --project memory --dry-run --reason "manual smoke test"
+codifix loops runs --project memory
+codifix loops inspect <run-id>
 ```
 
 Use `--json` on any subcommand when another tool will parse the result.
@@ -23,10 +23,10 @@ Use `--json` on any subcommand when another tool will parse the result.
 ## Loop Definitions
 
 ```bash
-memory loops list
-memory loops list --json
-memory loops show context_pack_refresh --project memory
-memory loops show context_pack_refresh --project memory --repo-root "$PWD"
+codifix loops list
+codifix loops list --json
+codifix loops show context_pack_refresh --project memory
+codifix loops show context_pack_refresh --project memory --repo-root "$PWD"
 ```
 
 `list` prints the registered loop id, version, risk level, default mode, name, and description. `show` adds the effective settings for the selected project or repo scope when those arguments are provided.
@@ -34,10 +34,10 @@ memory loops show context_pack_refresh --project memory --repo-root "$PWD"
 ## Settings
 
 ```bash
-memory loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
-memory loops disable context_pack_refresh --project memory --reason "not ready for this repo"
-memory loops pause context_pack_refresh --project memory --until 2026-06-16T09:00:00Z
-memory loops snooze context_pack_refresh --project memory --until 2026-06-16T09:00:00Z
+codifix loops enable context_pack_refresh --project memory --mode suggest_only --explicit-user-approval
+codifix loops disable context_pack_refresh --project memory --reason "not ready for this repo"
+codifix loops pause context_pack_refresh --project memory --until 2026-06-16T09:00:00Z
+codifix loops snooze context_pack_refresh --project memory --until 2026-06-16T09:00:00Z
 ```
 
 Scope resolution accepts:
@@ -53,15 +53,15 @@ The text output prints the effective scope, mode, blocked reasons, and budget JS
 ## Runs
 
 ```bash
-memory loops run context_pack_refresh --project memory --dry-run --reason "manual validation"
-memory loops runs --project memory
-memory loops runs --project memory --loop-id context_pack_refresh --status blocked
-memory loops inspect <run-id>
-memory loops context-pack context_pack_refresh --project memory --repo-root "$PWD"
-memory loops context-pack context_pack_refresh --run-id <run-id> --from-run
-memory loops cancel <run-id> --reason "superseded"
-memory loops feedback <run-id> --rating useful --note "Good context pack"
-memory loops replay <run-id> --dry-run
+codifix loops run context_pack_refresh --project memory --dry-run --reason "manual validation"
+codifix loops runs --project memory
+codifix loops runs --project memory --loop-id context_pack_refresh --status blocked
+codifix loops inspect <run-id>
+codifix loops context-pack context_pack_refresh --project memory --repo-root "$PWD"
+codifix loops context-pack context_pack_refresh --run-id <run-id> --from-run
+codifix loops cancel <run-id> --reason "superseded"
+codifix loops feedback <run-id> --rating useful --note "Good context pack"
+codifix loops replay <run-id> --dry-run
 ```
 
 `run` creates a manual control-plane run and records policy decisions, effective settings, blocked reasons, output summary, and traces. `--dry-run` is intended for local validation and CI logs. `replay` reads a previous run and creates a new policy-checked run with the same loop id and scope plus a `replay_of` trigger payload.
@@ -101,7 +101,7 @@ outputs, and proposed memory updates. The built-in mock runner is deterministic
 and exists for tests, replay, and later Draft PR adapter integration.
 
 Coding-oriented loops use isolated git worktrees under
-`.mem/runtime/loop-worktrees/` on generated `memory/loops/...` branches. The
+`.codifix/runtime/loop-worktrees/` on generated `memory/loops/...` branches. The
 sandbox manager allowlists commands, enforces runtime and output limits, captures
 diffs, changed files, artifacts, and command logs, and refuses to clean paths
 outside the generated sandbox root. It never pushes directly to `main`.
@@ -142,13 +142,13 @@ context-pack comparison data across retriever or model changes.
 ## Approvals
 
 ```bash
-memory loops approvals --project memory
-memory loops approvals --project memory --status pending
-memory loops approvals --project memory --run-id <run-id>
-memory loops approvals --project memory --loop-id context_pack_refresh
-memory loops approve <approval-id> --reviewer olivier --reason "Approved for this repo"
-memory loops edit-approval <approval-id> --proposed-action '{"proposal_id":"...","scope":"project"}' --reviewer olivier --reason "Narrowed scope"
-memory loops reject <approval-id> --reviewer olivier --reason "Too broad"
+codifix loops approvals --project memory
+codifix loops approvals --project memory --status pending
+codifix loops approvals --project memory --run-id <run-id>
+codifix loops approvals --project memory --loop-id context_pack_refresh
+codifix loops approve <approval-id> --reviewer olivier --reason "Approved for this repo"
+codifix loops edit-approval <approval-id> --proposed-action '{"proposal_id":"...","scope":"project"}' --reviewer olivier --reason "Narrowed scope"
+codifix loops reject <approval-id> --reviewer olivier --reason "Too broad"
 ```
 
 Approval requests are created by policy gates for risky settings or actions. Each
@@ -162,8 +162,8 @@ updating linked memory proposal status.
 ## Memory Proposals
 
 ```bash
-memory loops memory-proposals --project memory --status pending
-memory loops create-memory-proposal \
+codifix loops memory-proposals --project memory --status pending
+codifix loops create-memory-proposal \
   --project memory \
   --loop-id context_pack_refresh \
   --proposal-type add \
@@ -171,9 +171,9 @@ memory loops create-memory-proposal \
   --evidence '[{"source_kind":"file","file_path":"docs/developer/architecture/overview.md","excerpt":"Relevant proof"}]' \
   --confidence 0.82 \
   --risk-notes "Needs human review before durable memory write"
-memory loops edit-memory-proposal <proposal-id> --candidate '{"canonical_text":"Reviewed fact.","summary":"Reviewed fact"}'
-memory loops approve-memory-proposal <proposal-id> --reviewer olivier --reason "Evidence checks out"
-memory loops reject-memory-proposal <proposal-id> --reviewer olivier --reason "Evidence is too weak"
+codifix loops edit-memory-proposal <proposal-id> --candidate '{"canonical_text":"Reviewed fact.","summary":"Reviewed fact"}'
+codifix loops approve-memory-proposal <proposal-id> --reviewer olivier --reason "Evidence checks out"
+codifix loops reject-memory-proposal <proposal-id> --reviewer olivier --reason "Evidence is too weak"
 ```
 
 Loop memory proposals are pending durable memory changes produced by loops. They
@@ -181,7 +181,7 @@ support `add`, `update`, `deprecate`, `merge`, `link`, and `consolidate`.
 
 Manual consolidation records its deterministic report and a durable background
 job reference (`run.output.background_job_id`). A successful control-plane run
-does not mean synthesis finished. Inspect `memory jobs --project PROJECT` for
+does not mean synthesis finished. Inspect `codifix jobs --project PROJECT` for
 execution, retries and failures. Explicit manual synthesis does not require
 automatic triggering to be enabled, but still observes current permissions,
 loop settings, cancellation, dry-run, provider, utility-floor and daily-cap
@@ -219,9 +219,9 @@ accepts `pending`, `edited`, `approved`, and `rejected`.
 ## Global Kill Switch
 
 ```bash
-memory loops global-kill-switch
-memory loops global-kill-switch --enabled true --updated-by olivier --reason "maintenance"
-memory loops global-kill-switch --enabled false --updated-by olivier --reason "maintenance complete"
+codifix loops global-kill-switch
+codifix loops global-kill-switch --enabled true --updated-by olivier --reason "maintenance"
+codifix loops global-kill-switch --enabled false --updated-by olivier --reason "maintenance complete"
 ```
 
 The global kill switch blocks loop execution across scopes. Use it for emergency stops, maintenance windows, or when loop policy behavior is under investigation.
@@ -231,19 +231,19 @@ The global kill switch blocks loop execution across scopes. Use it for emergency
 For logs that need to be human-readable:
 
 ```bash
-memory loops run context_pack_refresh --project memory --dry-run --reason "pre-merge check"
-memory loops runs --project memory --status blocked
+codifix loops run context_pack_refresh --project memory --dry-run --reason "pre-merge check"
+codifix loops runs --project memory --status blocked
 ```
 
 For automation that needs stable output:
 
 ```bash
-memory loops run context_pack_refresh --project memory --dry-run --json
-memory loops approvals --project memory --status pending --json
-memory loops edit-approval <approval-id> --proposed-action '{"proposal_id":"..."}' --json
-memory loops context-pack context_pack_refresh --project memory --repo-root "$PWD" --json
-memory loops memory-proposals --project memory --status pending --json
-memory loops approve-memory-proposal <proposal-id> --json
+codifix loops run context_pack_refresh --project memory --dry-run --json
+codifix loops approvals --project memory --status pending --json
+codifix loops edit-approval <approval-id> --proposed-action '{"proposal_id":"..."}' --json
+codifix loops context-pack context_pack_refresh --project memory --repo-root "$PWD" --json
+codifix loops memory-proposals --project memory --status pending --json
+codifix loops approve-memory-proposal <proposal-id> --json
 ```
 
-Loop commands require the Memory service to be reachable and use the configured local API token for write-capable operations.
+Loop commands require the Codifix service to be reachable and use the configured local API token for write-capable operations.

@@ -1,11 +1,11 @@
-# `memory agent`
+# `codifix agent`
 
-`memory agent` records which local agents are working on which branches or
+`codifix agent` records which local agents are working on which branches or
 worktrees. It is a coordination surface for running multiple Codex, Claude,
 OpenCode, or scripted agents against the same project without losing track of
 branch ownership, dirty file overlap, or stale work.
 
-The command stores coordination metadata in the Memory Layer service. It does
+The command stores coordination metadata in the Codifix service. It does
 not replace Git. Agents still need normal branches, commits, pushes, and merges.
 
 ## Workflow
@@ -13,35 +13,35 @@ not replace Git. Agents still need normal branches, commits, pushes, and merges.
 Start a workspace when an agent begins work:
 
 ```bash
-memory agent start --project memory --task "Graph UI follow-up"
+codifix agent start --project memory --task "Graph UI follow-up"
 ```
 
 Check active work before starting or merging another agent:
 
 ```bash
-memory agent status --project memory
-memory agent status --project memory --include-finished --json
+codifix agent status --project memory
+codifix agent status --project memory --include-finished --json
 ```
 
 Finish the workspace after pushing or intentionally abandoning the work:
 
 ```bash
-memory agent finish --project memory --summary "Pushed graph UI follow-up"
-memory agent finish --project memory --abandoned --summary "Superseded by main"
+codifix agent finish --project memory --summary "Pushed graph UI follow-up"
+codifix agent finish --project memory --abandoned --summary "Superseded by main"
 ```
 
 If multiple active workspaces match the same repository and branch, pass the
-workspace id from `memory agent status`:
+workspace id from `codifix agent status`:
 
 ```bash
-memory agent finish --project memory --workspace-id 00000000-0000-0000-0000-000000000000
+codifix agent finish --project memory --workspace-id 00000000-0000-0000-0000-000000000000
 ```
 
 ## Commands
 
 ### `start`
 
-`memory agent start` writes an active workspace record from the current Git
+`codifix agent start` writes an active workspace record from the current Git
 checkout.
 
 It records:
@@ -61,13 +61,13 @@ Useful options:
 - `--project <slug>`: required project slug.
 - `--task <text>`: short reason this agent exists.
 - `--agent-cli <name>`: defaults to `codex`; use `opencode`, `claude`, or another integration name when appropriate.
-- `--agent-session-id <id>`: stable session id. If omitted, Memory Layer checks common agent environment variables and falls back to the current process id.
+- `--agent-session-id <id>`: stable session id. If omitted, Codifix checks common agent environment variables and falls back to the current process id.
 - `--branch <name>`: override detected branch.
 - `--json`: emit the created workspace record.
 
 ### `status`
 
-`memory agent status` lists active workspaces for a project.
+`codifix agent status` lists active workspaces for a project.
 
 It reports warnings when active workspaces:
 
@@ -81,7 +81,7 @@ Use `--include-finished` to include completed and abandoned workspaces.
 
 ### `finish`
 
-`memory agent finish` marks one active workspace `completed` or `abandoned`.
+`codifix agent finish` marks one active workspace `completed` or `abandoned`.
 
 It refreshes the head commit and dirty file list from the current checkout,
 records an optional summary, and stores whether the branch appears pushed. The

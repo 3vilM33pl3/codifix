@@ -1,6 +1,6 @@
 ---
 title: "Global wizard"
-description: "Create or update machine-level Memory Layer configuration safely."
+description: "Create or update machine-level Codifix configuration safely."
 ---
 
 # Global wizard
@@ -10,7 +10,7 @@ description: "Create or update machine-level Memory Layer configuration safely."
 Create machine-level configuration for the service, database, and optional providers.
 
 ```bash
-memory wizard --global
+codifix wizard --global
 ```
 
 The global wizard should write configuration and secrets outside the repository. Re-running it is safe when you need to rotate providers or update database settings, but inspect any proposed change before accepting it.
@@ -18,8 +18,8 @@ The global wizard should write configuration and secrets outside the repository.
 ## Verify
 
 ```bash
-memory doctor
-memory health
+codifix doctor
+codifix health
 ```
 
 ## Next

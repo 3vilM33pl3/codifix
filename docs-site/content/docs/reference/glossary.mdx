@@ -1,6 +1,6 @@
 ---
 title: "Glossary"
-description: "Every Memory Layer term defined once, with a map of how the concepts connect."
+description: "Every Codifix term defined once, with a map of how the concepts connect."
 ---
 
 # Glossary
@@ -14,7 +14,7 @@ Every term the docs use, defined once. The map shows how they connect; the [thre
 | Term | Definition |
 |---|---|
 | **Project** | The scoping unit for all memory — usually one repository or working directory, identified by a slug. |
-| **Capture** | A raw record of completed work (`memory remember`, `memory capture`, watchers). Input to curation, never served directly. |
+| **Capture** | A raw record of completed work (`codifix remember`, `codifix capture`, watchers). Input to curation, never served directly. |
 | **Curation** | The pipeline that distills captures into canonical memories: extracts durable claims, drops noise, deduplicates, and decides replacements. |
 | **Memory (canonical)** | A short, citable durable fact with a summary, canonical text, type, tags, confidence, importance, and sources. Immutable per version; superseded rather than edited. |
 | **Memory type** | One of 17 classifications (decision, convention, incident, insight, …) that sharpen search and curation. See [memory types](/docs/how-it-works/memory-types). |
@@ -31,7 +31,7 @@ Every term the docs use, defined once. The map shows how they connect; the [thre
 | **Citation** | The specific memories an answer drew from, numbered in the response. Citations feed reinforcement. |
 | **insufficient_evidence** | The query response flag meaning "the evidence is too weak to answer" — the design prefers refusing over fabricating. |
 | **Replacement proposal** | A queued, human-reviewed suggestion that a new memory supersede an old one. Nothing durable changes without approval. |
-| **Review queue** | Where all proposals (replacements, corrections, merges, insights) wait for human approve/reject — in the TUI Review tab, web UI, or `memory review`. |
+| **Review queue** | Where all proposals (replacements, corrections, merges, insights) wait for human approve/reject — in the TUI Review tab, web UI, or `codifix review`. |
 
 ## The self-maintaining layer
 
@@ -49,13 +49,13 @@ Every term the docs use, defined once. The map shows how they connect; the [thre
 
 | Term | Definition |
 |---|---|
-| **Service** | The local backend (`memory service run` or Docker): PostgreSQL + pgvector storage, HTTP API, and the web UI. Everything stays on your machine. |
+| **Service** | The local backend (`codifix service run` or Docker): PostgreSQL + pgvector storage, HTTP API, and the web UI. Everything stays on your machine. |
 | **Code graph** | Files, symbols, and references extracted from the repository; powers graph-aware retrieval and the 3D graph view. |
 | **Embeddings** | Vector representations enabling semantic search. Optional — lexical retrieval works keyless. |
 | **Watcher** | A per-project daemon that observes repository activity and feeds captures. |
 | **Loop** | A built-in background automation (hygiene, CI triage, context packs, consolidation, evals…) that produces reports and proposals, never silent mutations. |
-| **Skill** | Repo-local instructions + helpers that teach a coding agent (Claude Code, Codex) to use Memory Layer well. |
+| **Skill** | Repo-local instructions + helpers that teach a coding agent (Claude Code, Codex) to use Codifix well. |
 | **MCP** | The built-in Model Context Protocol server exposing read-first memory tools to any MCP client. |
-| **Bundle** | A shareable, privacy-safe export of a project's memories (`memory bundle`). |
+| **Bundle** | A shareable, privacy-safe export of a project's memories (`codifix bundle`). |
 | **Checkpoint** | A saved execution state for plan-backed work (`memory checkpoint`), used by resume and plan verification. |
 | **Eval / gate** | The measurement harness: paired no-memory vs full-memory runs over reviewed suites, with release gates enforcing floors. |

@@ -1,16 +1,16 @@
-# `memory activities`
+# `codifix activities`
 
-`memory activities` lists persisted project activity events from the backend database.
+`codifix activities` lists persisted project activity events from the backend database.
 
-Use it when a human or agent needs to inspect what Memory Layer recently did: queries, scans, captures, curation, plan lifecycle events, watcher transitions, graph extraction, reindexing, re-embedding, archive/delete operations, bundle transfers, and get-up-to-speed briefings.
+Use it when a human or agent needs to inspect what Codifix recently did: queries, scans, captures, curation, plan lifecycle events, watcher transitions, graph extraction, reindexing, re-embedding, archive/delete operations, bundle transfers, and get-up-to-speed briefings.
 
 ## Common Usage
 
 ```bash
-memory activities --project memory
-memory activities --project memory --limit 50 --text
-memory activities --project memory --kind query
-memory activities --project memory --kind llm_audit
+codifix activities --project memory
+codifix activities --project memory --limit 50 --text
+codifix activities --project memory --kind query
+codifix activities --project memory --kind llm_audit
 ```
 
 JSON is the default so agents can consume it directly. Use `--text` for a compact human-readable timeline.
@@ -29,7 +29,7 @@ JSON is the default so agents can consume it directly. Use `--text` for a compac
 
 ## LLM Audit Mode
 
-Enable audit mode in the service config when you need to debug what Memory Layer sends to an LLM:
+Enable audit mode in the service config when you need to debug what Codifix sends to an LLM:
 
 ```toml
 [llm_audit]
@@ -39,7 +39,7 @@ max_message_chars = 8000
 max_total_chars = 32000
 ```
 
-Audit events are disabled by default. You can also toggle audit mode from the TUI Activity tab with `A`; the TUI updates the running service immediately and persists the same config setting. With `redact = true`, Memory Layer redacts common API key, bearer token, password, secret, and database URL credential patterns before storing the prompt messages.
+Audit events are disabled by default. You can also toggle audit mode from the TUI Activity tab with `A`; the TUI updates the running service immediately and persists the same config setting. With `redact = true`, Codifix redacts common API key, bearer token, password, secret, and database URL credential patterns before storing the prompt messages.
 
 Older events remain readable even if they were recorded before token and metadata columns existed; those fields appear as `null` or `-`.
 

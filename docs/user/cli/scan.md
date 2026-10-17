@@ -1,12 +1,12 @@
-# `memory scan`
+# `codifix scan`
 
-`memory scan` is a repository bootstrap command.
+`codifix scan` is a repository bootstrap command.
 
-Its job is to inspect an existing codebase, ask an LLM for durable project knowledge, validate the result, and then write that knowledge into Memory Layer through the normal capture and curate pipeline.
+Its job is to inspect an existing codebase, ask an LLM for durable project knowledge, validate the result, and then write that knowledge into Codifix through the normal capture and curate pipeline.
 
 This is not a generic "summarize my repo" command. It is specifically trying to extract project memory that should still be useful later.
 
-`scan` now sits on top of a local repository index. You can build that index explicitly with `memory repo index` and inspect it with `memory repo status`.
+`scan` now sits on top of a local repository index. You can build that index explicitly with `codifix repo index` and inspect it with `codifix repo status`.
 
 ## Table of Contents
 
@@ -38,7 +38,7 @@ At a high level, `scan` does this:
 5. send the dossier to an OpenAI-compatible or Ollama chat model
 6. require strict JSON back
 7. validate and deduplicate the returned candidates
-8. write them as a normal Memory Layer capture
+8. write them as a normal Codifix capture
 9. run curation so the resulting memories become searchable
 
 So `scan` is really:
@@ -47,7 +47,7 @@ So `scan` is really:
 - repository sampling
 - LLM extraction
 - strict validation
-- normal Memory Layer ingestion
+- normal Codifix ingestion
 
 It does not bypass the existing backend or write directly to PostgreSQL tables.
 
@@ -55,13 +55,13 @@ It does not bypass the existing backend or write directly to PostgreSQL tables.
 
 Before `scan` asks the LLM anything, it now works from a local repository index stored under the user-local project cache:
 
-- `~/.cache/memory-layer/projects/<project-key>/index/` on Linux local installs
+- `~/.cache/codifix/projects/<project-key>/index/` on Linux local installs
 
 You can manage that index directly:
 
 ```bash
-memory repo index --project my-project
-memory repo status --project my-project
+codifix repo index --project my-project
+codifix repo status --project my-project
 ```
 
 The current index includes:
@@ -74,19 +74,19 @@ The current index includes:
 - extracted symbol, import, reference, call, and test-link facts
 - evidence-bundle counts for debugging and future scan quality work
 
-Analyzer enablement comes from `.agents/memory-layer.toml`:
+Analyzer enablement comes from `.agents/codifix.toml`:
 
 ```toml
 [analysis]
 analyzers = ["rust", "typescript", "python"]
 ```
 
-When you run `memory scan`, it reuses the existing index if it still matches the current repo `HEAD` and the same `--since` window. Otherwise it rebuilds the index first.
+When you run `codifix scan`, it reuses the existing index if it still matches the current repo `HEAD` and the same `--since` window. Otherwise it rebuilds the index first.
 
 If you want to force a fresh index before scanning, use:
 
 ```bash
-memory scan --project my-project --rebuild-index
+codifix scan --project my-project --rebuild-index
 ```
 
 ## What It Reads
@@ -111,7 +111,7 @@ It skips obvious low-value or noisy paths such as:
 
 - `.git/`
 - `target/`
-- `.mem/`
+- `.codifix/`
 - `node_modules/`
 
 Implementation limits:
@@ -136,13 +136,13 @@ The current implementation:
 You can bound this with:
 
 ```bash
-memory scan --since "2 weeks ago"
+codifix scan --since "2 weeks ago"
 ```
 
 or:
 
 ```bash
-memory scan --since "2026-03-01"
+codifix scan --since "2026-03-01"
 ```
 
 ## What It Sends To The LLM
@@ -220,7 +220,7 @@ That request contains:
 
 Then `scan` does exactly what a normal high-level write should do:
 
-1. call `memory capture`
+1. call `codifix capture`
 2. call `curate`
 
 That means scan output goes through the same:
@@ -253,7 +253,7 @@ This means:
 Use this first if you want to inspect what `scan` is going to do:
 
 ```bash
-memory scan --project my-project --dry-run
+codifix scan --project my-project --dry-run
 ```
 
 In dry-run mode, `scan` still:
@@ -315,9 +315,9 @@ Run `ollama serve` and `ollama pull llama3.2` before scanning.
 For hosted providers, the API key must be available in:
 
 - process environment
-- user-local project `memory-layer.env`
-- legacy `.mem/memory-layer.env`
-- shared `memory-layer.env`
+- user-local project `codifix.env`
+- legacy `.codifix/codifix.env`
+- shared `codifix.env`
 
 If these are not present, `scan` fails before doing any repository work.
 
@@ -350,7 +350,7 @@ These are implementation limits, not user-facing flags.
 - setup and environment facts
 - repo-specific workflow knowledge
 
-It is especially useful when onboarding Memory Layer to an existing project that already has a lot of knowledge spread across README files, docs, and git history.
+It is especially useful when onboarding Codifix to an existing project that already has a lot of knowledge spread across README files, docs, and git history.
 
 ## What `scan` Is Not Good At
 
@@ -377,7 +377,7 @@ It is only as good as:
 
 Recommended usage:
 
-1. initialize the repo with `memory wizard` or `memory init`
+1. initialize the repo with `codifix wizard` or `codifix init`
 2. make sure `[llm]` is configured
 3. run a dry run first
 4. inspect the generated report
@@ -387,9 +387,9 @@ Recommended usage:
 Example:
 
 ```bash
-memory scan --project my-project --dry-run
-memory scan --project my-project
-memory tui --project my-project
+codifix scan --project my-project --dry-run
+codifix scan --project my-project
+codifix tui --project my-project
 ```
 
 ## Troubleshooting
@@ -405,8 +405,8 @@ Common failure cases:
 Useful checks:
 
 ```bash
-memory doctor
-memory scan --project my-project --dry-run
+codifix doctor
+codifix scan --project my-project --dry-run
 ```
 
 If you are debugging a specific scan result, the most useful artifact is the JSON report in the user-local project runtime `scan/` directory.
@@ -415,4 +415,4 @@ If you are debugging a specific scan result, the most useful artifact is the JSO
 
 - [Getting Started](../getting-started.md)
 - [Commit History](commits.md)
-- [How Memory Layer Works](../../developer/architecture/how-it-works.md)
+- [How Codifix Works](../../developer/architecture/how-it-works.md)

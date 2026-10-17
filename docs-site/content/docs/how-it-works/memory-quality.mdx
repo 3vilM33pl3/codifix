@@ -1,11 +1,11 @@
 ---
 title: "Memory quality"
-description: "Every mechanism Memory Layer uses to keep stored knowledge accurate and recall precise — from write-time curation to release-gated evals."
+description: "Every mechanism Codifix uses to keep stored knowledge accurate and recall precise — from write-time curation to release-gated evals."
 ---
 
 # Memory quality
 
-A memory layer is only useful if what it recalls is **true, current, and actually relevant**. Memory Layer treats that as a defense-in-depth problem: quality is enforced when memories are written, while they sit at rest, at the moment they are recalled, and by measurement gates that catch regressions before a release.
+A memory layer is only useful if what it recalls is **true, current, and actually relevant**. Codifix treats that as a defense-in-depth problem: quality is enforced when memories are written, while they sit at rest, at the moment they are recalled, and by measurement gates that catch regressions before a release.
 
 This page is the map. Each section summarizes one mechanism and links to the detailed description and reference material.
 
@@ -24,13 +24,13 @@ flowchart LR
 
 Raw captures never become memory directly. Curation extracts candidate assertions, drops noise, and checks each candidate against existing knowledge. An exact re-observation does not create a duplicate — it raises the existing memory's confidence and importance instead. When a candidate overlaps an existing memory strongly (shared wording, files, tags, or explicit update language), a replacement decision engine either supersedes the old memory in place or queues a human-reviewed proposal, governed by the per-repo `conservative` / `balanced` / `aggressive` replacement policy.
 
-**Read more:** [How it works — curation](/docs/how-it-works) · [`memory curate` and `memory proposals`](/docs/reference/cli/capture-curation) · [Project config](/docs/reference/config-project)
+**Read more:** [How it works — curation](/docs/how-it-works) · [`codifix curate` and `codifix proposals`](/docs/reference/cli/capture-curation) · [Project config](/docs/reference/config-project)
 
 ### Semantic dedup and conflict detection
 
 Lexical overlap misses paraphrases: "deploys ship after checks pass" and "releases publish once verification completes" share almost no words. Once chunk embeddings are built, a semantic pass compares new memories against the project by cosine similarity. Near-duplicates are linked and queued as human-gated merge proposals. Pairs with high embedding similarity but low lexical overlap *and* supersede/negation cues are flagged as likely **contradictions** — an old fact versus a new one — and routed to review as conflicts, never merged automatically.
 
-**Read more:** [`[curation]` config section](/docs/reference/config-global#curation-section) · [`memory proposals`](/docs/reference/cli/capture-curation#memory-proposals)
+**Read more:** [`[curation]` config section](/docs/reference/config-global#curation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#memory-proposals)
 
 ## At rest
 
@@ -58,7 +58,7 @@ Every memory earns an activation score from real usage: being cited in a synthes
 
 When a hot memory crosses the activation threshold, the pipeline gathers deterministic evidence — sources, provenance status, related memories, recent git history — and asks an LLM for a verdict under strict rules: it may cite only evidence it was shown, and any verdict citing anything else is rejected outright. The cardinal rule is that **weak or contradictory evidence never edits content**: corrections are always human-gated, and ambiguous verdicts only flag the memory `needs review`, which rank-penalizes it until a person resolves it.
 
-**Read more:** [Validation](/docs/how-it-works/reinforcement#validation) · [`memory validate` and `memory review`](/docs/reference/cli/reinforcement) · [TUI review queue](/docs/tui/review)
+**Read more:** [Validation](/docs/how-it-works/reinforcement#validation) · [`memory validate` and `codifix review`](/docs/reference/cli/reinforcement) · [TUI review queue](/docs/tui/review)
 
 ### Hygiene automations
 
@@ -74,7 +74,7 @@ Clusters are found by fusing three signals into one graph and running community 
 
 The mechanism is grounded in memory science — complementary learning systems and schema consolidation, sleep-replay gist extraction, the reflection trees of generative agents, and hierarchical summarization (RAPTOR, GraphRAG). It is off by default and dry-run first, like validation.
 
-**Read more:** [Consolidation and insights](/docs/how-it-works/consolidation) — the full mechanism, triggers, and cited science · [`[consolidation]` config section](/docs/reference/config-global#consolidation-section) · [`memory proposals`](/docs/reference/cli/capture-curation#memory-proposals)
+**Read more:** [Consolidation and insights](/docs/how-it-works/consolidation) — the full mechanism, triggers, and cited science · [`[consolidation]` config section](/docs/reference/config-global#consolidation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#memory-proposals)
 
 ## Recall
 
@@ -82,7 +82,7 @@ The mechanism is grounded in memory science — complementary learning systems a
 
 Recall quality starts with finding the right candidates: lexical full-text, semantic embedding, and code-graph retrieval run together and their results are fused. Ranking then combines match strength with quality signals — confidence, importance, recency, relation links, activation — and applies penalties: weak matches are damped, `needs review` memories are down-weighted, and missing-provenance decay pulls stale evidence down. Every result carries a score explanation so you can see exactly why it ranked where it did.
 
-**Read more:** [Retrieval and search](/docs/how-it-works/retrieval-search) · [`memory query`](/docs/reference/cli/query-briefings)
+**Read more:** [Retrieval and search](/docs/how-it-works/retrieval-search) · [`codifix query`](/docs/reference/cli/query-briefings)
 
 ### Answer synthesis guardrails
 

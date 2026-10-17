@@ -1,6 +1,6 @@
 ---
 title: "HTTP API"
-description: "The Memory Layer v2 REST API: authentication, stability markers, core endpoints, and the OpenAPI specification."
+description: "The Codifix v2 REST API: authentication, stability markers, core endpoints, and the OpenAPI specification."
 ---
 
 # HTTP API
@@ -8,7 +8,7 @@ description: "The Memory Layer v2 REST API: authentication, stability markers, c
 Everything the CLI, TUI, and web UI do goes through the local HTTP API — and you can call it directly. The full, machine-readable surface is the OpenAPI 3.1 specification:
 
 - **From a running service:** `GET /v1/openapi.yaml` (always describes exactly the build it came from)
-- **In the repository:** [`docs/api/openapi.yaml`](https://github.com/3vilM33pl3/memory/blob/main/docs/api/openapi.yaml)
+- **In the repository:** [`docs/api/openapi.yaml`](https://github.com/3vilM33pl3/codifix/blob/main/docs/api/openapi.yaml)
 
 A contract test keeps the specification's path inventory in sync with the router in both directions, so it cannot silently drift from the code.
 
@@ -17,11 +17,11 @@ A contract test keeps the specification's path inventory in sync with the router
 The service listens on localhost only by default (`127.0.0.1:4040` native,
 `localhost:4040` in the Docker stack). In the default `single_user` mode,
 clients use the installation token. In `multi_user` mode, non-browser clients
-use a scoped Memory Layer service token:
+use a scoped Codifix service token:
 
 ```bash
 curl -s http://127.0.0.1:4040/v1/query \
-  -H "Authorization: Bearer $MEMORY_LAYER_CLIENT_TOKEN" \
+  -H "Authorization: Bearer $CODIFIX_CLIENT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"project": "demo", "query": "How does reinforcement work?"}'
 ```
@@ -34,8 +34,8 @@ roles, token lifecycle, and migration.
 
 ## API version and stability
 
-The `/v1` prefix is the HTTP API namespace; it is not the Memory Layer product
-release number. Memory Layer v2.0.0 retained that namespace but made documented
+The `/v1` prefix is the HTTP API namespace; it is not the Codifix product
+release number. Codifix v2.0.0 retained that namespace but made documented
 breaking changes, including removing obsolete routes and consolidating loop and
 activity operations. Fetch the specification from the running service when
 upgrading a direct integration.
@@ -54,7 +54,7 @@ For v1-to-v2 route removals and migration steps, read the
 |---|---|
 | `POST /v1/query` | Query one project's memory: hybrid retrieval plus a cited, synthesized answer — or an honest refusal (`insufficient_evidence`). |
 | `POST /v1/query/global` | The same across every project. |
-| `POST /v1/capture/task` | Capture completed work — the HTTP write entry point, optionally with pre-distilled `structured_candidates`. The CLI spelling is `memory capture`. |
+| `POST /v1/capture/task` | Capture completed work — the HTTP write entry point, optionally with pre-distilled `structured_candidates`. The CLI spelling is `codifix capture`. |
 | `POST /v1/curate` | Curate raw captures into canonical memories. |
 | `GET /v1/memory/{id}` | One memory with tags, sources, relations, and scores. |
 | `GET /v1/memory/{id}/history` | Full version history, including tombstones. |
@@ -64,7 +64,7 @@ For v1-to-v2 route removals and migration steps, read the
 | `POST /v1/projects/{slug}/resume` | Resume briefing for project re-entry. |
 | `GET /v1/projects/{slug}/activities` | The activity timeline. |
 | `POST /v1/provenance/verify` | Verify source provenance against the filesystem. |
-| `POST /v1/projects/{slug}/bundle/export` · `import` | Shareable, privacy-safe memory bundles (with `/preview` variants). |
+| `POST /v1/projects/{slug}/bundle/export` · `import` | Shareable, privacy-safe codifix bundles (with `/preview` variants). |
 | `GET /healthz` | Health probe. |
 
 Capture requests still require `writer_id` as an advisory activity label, but
@@ -76,7 +76,7 @@ Changing the label does not impersonate another principal or grant access.
 ```python
 import requests
 
-BASE, TOKEN = "http://127.0.0.1:4040", "<your Memory Layer service token>"
+BASE, TOKEN = "http://127.0.0.1:4040", "<your Codifix service token>"
 r = requests.post(f"{BASE}/v1/query", json={"project": "demo", "query": "How does auth work?"},
                   headers={"Authorization": f"Bearer {TOKEN}"})
 print(r.json()["answer"], r.json()["answer_citations"])

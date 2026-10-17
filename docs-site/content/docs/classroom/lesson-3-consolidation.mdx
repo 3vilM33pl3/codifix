@@ -6,8 +6,8 @@ description: "Many related episodes become one general insight. Students run the
 # Lesson 3 — Consolidation
 
 **Duration:** ~45 min · **Mode:** per-student sandboxes (writes on) or a
-teacher-driven shared project · **Instrument:** `memory structure`,
-`memory consolidate --dry-run`, and the Memories tab
+teacher-driven shared project · **Instrument:** `codifix structure`,
+`codifix consolidate --dry-run`, and the Memories tab
 
 ## Learning objectives
 
@@ -22,7 +22,7 @@ Brains keep two learning systems: a fast one that records episodes and a
 slow one that gradually extracts what episodes share (McClelland,
 McNaughton & O'Reilly, 1995 — complementary learning systems). New facts
 consolidate dramatically faster when they attach to an existing *schema*
-(Tse et al., 2007). Memory Layer mirrors this: atomic memories are the fast
+(Tse et al., 2007). Codifix mirrors this: atomic memories are the fast
 store; a consolidation pass fuses three usage signals — explicit relations,
 text similarity, and *which memories get retrieved together* — into one
 weighted graph, finds communities in it, and a **value gate** accepts only
@@ -37,14 +37,14 @@ mechanism and citations.
 For the hands-on variant each student needs a sandbox:
 `./classroom/seed.sh <name>` with writes enabled. For the teacher-driven
 variant, one shared project on the projector is enough. A terminal with the
-`memory` CLI (or `docker compose exec memory memory …`).
+`codifix` CLI (or `docker compose exec memory memory …`).
 
 ## Guided activity
 
 **1. The hidden structure (10 min).** Run the read-only structure view:
 
 ```bash
-memory structure --project classroom
+codifix structure --project classroom
 ```
 
 It prints the clusters the deterministic scan discovers *right now*, with
@@ -64,7 +64,7 @@ rehearsed and the day's coherent-but-unprocessed both consolidate.
 **3. Dry run, then the real thing (12 min).**
 
 ```bash
-memory consolidate --project classroom --dry-run
+codifix consolidate --project classroom --dry-run
 ```
 
 shows exactly what would be proposed, no LLM involved. With a configured
@@ -73,7 +73,7 @@ LLM (teacher machine), run it for real: the accepted cluster becomes a
 tensions between members, and the open gaps. Show the proposal queue:
 
 ```bash
-memory loops memory-proposals --project classroom --status pending
+codifix loops memory-proposals --project classroom --status pending
 ```
 
 **4. The human gate debate (10 min).** The system will *never* write an
@@ -87,7 +87,7 @@ exactly that. Have students find it in the Memories tab.
 **5. Tiers (5 min).** Insights are themselves memories: later passes can
 consolidate insights into higher-tier insights — a schema tree that grows
 with the project (the reflection-tree idea from Park et al., 2023). Show
-`memory structure` again on a mature project if one is available.
+`codifix structure` again on a mature project if one is available.
 
 ## Exit ticket
 

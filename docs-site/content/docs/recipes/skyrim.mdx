@@ -8,10 +8,10 @@ description: "Give your Skyrim playthrough a memory: saves and in-game events be
 Come back to a save after three months and the first twenty minutes is
 archaeology: who is this character, where was I going, why is there a bounty
 in Riften? This recipe wires The Elder Scrolls V: Skyrim Special Edition into
-Memory Layer so the playthrough chronicles itself, and
+Codifix so the playthrough chronicles itself, and
 
 ```bash
-memory query --project skyrim --question "Where did I leave off and what was I doing?"
+codifix query --project skyrim --question "Where did I leave off and what was I doing?"
 ```
 
 answers with citations into your own play history. Because activation decays,
@@ -19,7 +19,7 @@ what you ask about most stays hot — the same reinforcement model your code
 memories use, applied to a save game.
 
 Everything ships in the repository under
-[`integrations/skyrim/`](https://github.com/3vilM33pl3/memory/tree/main/integrations/skyrim):
+[`integrations/skyrim/`](https://github.com/3vilM33pl3/codifix/tree/main/integrations/skyrim):
 a tiny quest mod, a bridge daemon, and build/install scripts that work on
 Linux (Steam/Proton) using the game's own Papyrus toolchain under
 `mono`/`wine`.
@@ -61,7 +61,7 @@ cd integrations/skyrim
 The installer is additive and idempotent; `./install.sh --uninstall` removes
 it. If your Steam library lives elsewhere, set `SKYRIM_DIR` and `SKYRIM_PFX`.
 
-Then start the bridge (against your running Memory Layer service):
+Then start the bridge (against your running Codifix service):
 
 ```bash
 python3 bridge/skyrim_memory_bridge.py --project skyrim
@@ -69,7 +69,7 @@ python3 bridge/skyrim_memory_bridge.py --project skyrim
 
 It uses the Python client from `clients/python` straight out of the repo and
 reads the service API token from `MEMORY_API_TOKEN` or your provisioned
-`memory-layer.env`. Add `--base-url http://127.0.0.1:4250` if you run the dev
+`codifix.env`. Add `--base-url http://127.0.0.1:4250` if you run the dev
 stack.
 
 ## Play, then ask
@@ -87,7 +87,7 @@ lands:
 Then:
 
 ```bash
-memory query --project skyrim --question "Where did I leave off in Skyrim and what level am I?"
+codifix query --project skyrim --question "Where did I leave off in Skyrim and what level am I?"
 ```
 
 > You last left off around Riverwood after resuming at Bleak Falls Barrow.

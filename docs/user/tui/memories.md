@@ -2,7 +2,7 @@
 
 Use **Memories** to browse the canonical project memory rather than relying on a summary alone.
 
-![Memory list and detail panes in the TUI](https://www.memory-layer.dev/images/tui/memories-tab.png)
+![Memory list and detail panes in the TUI](https://codifix.dev/images/tui/memories-tab.png)
 
 The left pane lists memories; the detail pane shows canonical text, type, confidence, tags, provenance, related memories, validation state, and any proposed replacement. Related memories are navigation hints computed from overlap, tags, provenance, and relationships, not a separate source of truth.
 
@@ -34,4 +34,4 @@ database. An unconfigured or publication-only project retains its local list.
 
 Use this tab before adding a duplicate, when inspecting source evidence, or when reviewing a fact that may be stale.
 
-See also: [Remember](https://www.memory-layer.dev/docs/reference/cli/capture-curation) and [Embeddings](https://www.memory-layer.dev/docs/tui/embeddings).
+See also: [Remember](https://codifix.dev/docs/reference/cli/capture-curation) and [Embeddings](https://codifix.dev/docs/tui/embeddings).

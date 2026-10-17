@@ -5,11 +5,11 @@ commit together. It does not wait for embedding or consolidation. The service
 recovers pending work from PostgreSQL after restart; polling is authoritative.
 
 ```bash
-memory jobs --project memory
-memory jobs --project memory list --status blocked --limit 20
-memory jobs --project memory inspect JOB_UUID
-memory jobs --project memory --json inspect JOB_UUID
-memory jobs --project memory retry JOB_UUID --request-id REQUEST_UUID --yes
+codifix jobs --project memory
+codifix jobs --project memory list --status blocked --limit 20
+codifix jobs --project memory inspect JOB_UUID
+codifix jobs --project memory --json inspect JOB_UUID
+codifix jobs --project memory retry JOB_UUID --request-id REQUEST_UUID --yes
 ```
 
 Use the returned `next_after` UUID with `list --after UUID` for another bounded

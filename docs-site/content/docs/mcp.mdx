@@ -12,8 +12,8 @@ The MCP server exposes read-only project memory tools to MCP-capable clients, in
 Run a local stdio MCP server for clients that spawn tools as child processes (Codex, Claude Code, etc.):
 
 ```bash
-memory mcp run    --project <slug>
-memory mcp status --project <slug>
+codifix mcp run    --project <slug>
+codifix mcp status --project <slug>
 ```
 
 Stdio mode writes only MCP JSON-RPC messages to stdout; diagnostics go to stderr.
@@ -31,21 +31,21 @@ The MCP surface is read-first and focused on project context.
 
 | Tool | Purpose |
 |---|---|
-| `memory_query` | Ask a project question and return answers with citations. |
-| `memory_search_all` | Search all projects and return project/repository routing metadata for each result. |
-| `memory_resume` | Generate a continuation briefing. |
-| `memory_up_to_speed` | Generate a new-agent briefing. |
-| `memory_overview` | Inspect counts and project state. |
-| `memory_list_memories` | Browse memory rows. |
-| `memory_get_memory` | Inspect one memory. |
-| `memory_memory_history` | Read memory version history. |
-| `memory_list_activities` | Inspect activity events. |
-| `memory_list_replacement_proposals` | Review pending proposals without approving them. |
+| `codifix_query` | Ask a project question and return answers with citations. |
+| `codifix_search_all` | Search all projects and return project/repository routing metadata for each result. |
+| `codifix_resume` | Generate a continuation briefing. |
+| `codifix_up_to_speed` | Generate a new-agent briefing. |
+| `codifix_overview` | Inspect counts and project state. |
+| `codifix_list_memories` | Browse memory rows. |
+| `codifix_get_memory` | Inspect one memory. |
+| `codifix_memory_history` | Read memory version history. |
+| `codifix_list_activities` | Inspect activity events. |
+| `codifix_list_replacement_proposals` | Review pending proposals without approving them. |
 
-Use `memory_search_all` when an agent can work across several repositories. The result JSON includes `project`, `project_name`, and `repo_root` fields when the service can identify them. After choosing a result, switch to that repository and continue with project-scoped tools or normal code actions.
+Use `codifix_search_all` when an agent can work across several repositories. The result JSON includes `project`, `project_name`, and `repo_root` fields when the service can identify them. After choosing a result, switch to that repository and continue with project-scoped tools or normal code actions.
 
 ```text
-When a task may belong to any repository, call memory_search_all first. Use the
+When a task may belong to any repository, call codifix_search_all first. Use the
 project and repo_root metadata from the strongest cited result to choose where
 follow-up actions should happen.
 ```
@@ -55,11 +55,11 @@ follow-up actions should happen.
 - Prefer stdio for local desktop or CLI clients.
 - Keep Streamable HTTP bound to local interfaces unless you add network controls.
 - Require token-bearing clients for HTTP MCP.
-- Create the token with `memory auth token create`; store it in the MCP client's secret configuration.
+- Create the token with `codifix auth token create`; store it in the MCP client's secret configuration.
 - Scope tools to explicit projects.
 - Do not expose MCP HTTP to the public internet.
 
-<Mermaid chart="sequenceDiagram\n    participant Client as MCP client\n    participant Server as Memory MCP server\n    participant API as Memory service API\n    Client->>Server: memory_search_all(question)\n    Server->>API: POST /v1/query/global\n    API-->>Server: answer, citations, project and repo metadata\n    Server-->>Client: structured MCP result" />
+<Mermaid chart="sequenceDiagram\n    participant Client as MCP client\n    participant Server as Codifix MCP server\n    participant API as Codifix service API\n    Client->>Server: codifix_search_all(question)\n    Server->>API: POST /v1/query/global\n    API-->>Server: answer, citations, project and repo metadata\n    Server-->>Client: structured MCP result" />
 
 ## Next
 

@@ -2,7 +2,7 @@
 
 Use **Query** to ask a scoped question and inspect the ranked evidence behind the answer.
 
-![Cited query answer and ranked memory results in the TUI](https://www.memory-layer.dev/images/tui/query-tab.png)
+![Cited query answer and ranked memory results in the TUI](https://codifix.dev/images/tui/query-tab.png)
 
 The result includes the answer, confidence, citations, timing, matching memories, ranking reasons, and graph context when a code graph is available. If configured LLM synthesis is unavailable or cannot cite valid evidence, the UI reports the deterministic fallback instead of hiding it.
 
@@ -17,4 +17,4 @@ The result includes the answer, confidence, citations, timing, matching memories
 
 `/` is the global filter shortcut, not a query shortcut. Use Query when you need a question answered; use the global filter to narrow what a tab displays.
 
-See also: [Daily workflow](https://www.memory-layer.dev/docs/daily-workflow) and [Query CLI](https://www.memory-layer.dev/docs/reference/cli/query-briefings).
+See also: [Daily workflow](https://codifix.dev/docs/daily-workflow) and [Query CLI](https://codifix.dev/docs/reference/cli/query-briefings).

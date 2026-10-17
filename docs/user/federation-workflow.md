@@ -8,8 +8,8 @@ Each process currently binds one local project to one explicitly enrolled
 instance/space. Remote identities, credentials, TLS roots and receipt keys remain
 administrator configuration; requests cannot replace them.
 
-Open **More → federation** in Web, `memory federation --project <slug> ...` in
-the CLI, or `memory federation --project <slug> tui` for the focused terminal
+Open **More → federation** in Web, `codifix federation --project <slug> ...` in
+the CLI, or `codifix federation --project <slug> tui` for the focused terminal
 workspace. See [commands and confirmation controls](cli/federation.md).
 
 Use the local service's existing authentication: a scoped service token, or a

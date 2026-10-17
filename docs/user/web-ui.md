@@ -1,11 +1,11 @@
 # Web UI
 
-The Web UI is the browser companion to the TUI. It is served by the same local Memory Layer service and reads the same project data: memory, cited queries, code graph context, activity, watchers, proposals, skills, embeddings, and resume briefings.
+The Web UI is the browser companion to the TUI. It is served by the same local Codifix service and reads the same project data: memory, cited queries, code graph context, activity, watchers, proposals, skills, embeddings, and resume briefings.
 
 Open the installed service at `http://127.0.0.1:4040/`. From a source checkout, start the isolated dev service with:
 
 ```bash
-cargo run --bin memory -- service run
+cargo run --bin codifix -- service run
 ```
 
 The dev service uses `http://127.0.0.1:4250/` and its header carries a **DEV MODE** badge. That badge means the browser is connected to the isolated source profile, not the packaged service.
@@ -38,7 +38,7 @@ The **More** menu holds the lower-frequency control surfaces:
 | Supervisor | Inspect instance-wide policy and bounded action metadata. |
 | Offline | Browse explicitly configured read-only laptop knowledge. |
 | Federation | Review private sharing and exact consent workflows. |
-| Bundles | Preview, export, and import portable memory bundles. |
+| Bundles | Preview, export, and import portable codifix bundles. |
 | Access | Administer Authentik-backed identity, service tokens, and project memberships. This is visible only to global administrators. |
 
 Automations, Bundles, and Access are not primary tabs. That keeps the everyday browser path focused while preserving the deeper controls when you need them.
@@ -54,7 +54,7 @@ The Graph tab is a WebGL-only 3D explorer with three independently visible layer
 The browser only reads graph data. Build or refresh the code layer from the CLI:
 
 ```bash
-memory graph extract --project <project-slug>
+codifix graph extract --project <project-slug>
 ```
 
 The initial view is a bounded neighborhood, not an unlimited repository render. You can filter it by text, file, symbol, edge kind, depth, node cap, and edge cap; the service caps depth at `2`, nodes at `1000`, and edges at `2000`, and reports truncation when a cap applies.
@@ -69,7 +69,7 @@ Memory and source selections expose their corresponding type, identifiers, metad
 - Browser identity uses an HttpOnly session; the browser does not download a service token. Service-token secrets are displayed once when created and should go into a secret manager.
 - Changes to loops, replacement proposals, embeddings, and access control write state. Review scope and confirmation controls before applying them.
 
-For terminal-oriented inspection, use the [TUI](https://www.memory-layer.dev/docs/tui). For service and login recovery, start with [Help](https://www.memory-layer.dev/docs/help) or [service diagnostics](https://www.memory-layer.dev/docs/reference/cli/service-health).
+For terminal-oriented inspection, use the [TUI](https://codifix.dev/docs/tui). For service and login recovery, start with [Help](https://codifix.dev/docs/help) or [service diagnostics](https://codifix.dev/docs/reference/cli/service-health).
 
 ## Synchronized knowledge and private sharing
 
@@ -100,7 +100,7 @@ does not enable edits, credential enrollment, installation, or synchronization.
 
 **More → jobs** provides filtered, bounded background-work inspection, dependency
 and attempt history, queue statistics and explicit retry confirmation. See
-[Background jobs](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/jobs.md). Enrichment is separate from curation success.
+[Background jobs](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/jobs.md). Enrichment is separate from curation success.
 
 Activity recovery polls bounded sequence-based pages every five seconds, even
 when live notifications are unavailable. The WebSocket reconnects automatically.
@@ -114,7 +114,7 @@ grants, authority enrollment, reviewed publication, shared citations, correction
 proposals, approval/rejection, subscriptions and sync controls. Mutations display
 their exact request and require confirmation. Drafts are cleared on project
 changes; imported text is escaped and never forwarded to a model from this view.
-See [Federation workflow](https://github.com/3vilM33pl3/memory/blob/main/docs/user/federation-workflow.md) for consent and offline-copy limits.
+See [Federation workflow](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/federation-workflow.md) for consent and offline-copy limits.
 
 On a single-user loopback installation, opening Federation establishes the local
 owner's revocable browser session before discovery, including read-only requests.
@@ -147,7 +147,7 @@ question**. Review the exact destination, collection revision, question, identit
 deadline and digest before checking the consent box and sending. Preparation does
 not send a question. No history, files or local search results are attached;
 ordinary queries remain local. The operator must enable the experimental browser
-policy and explicit grants described in [Federation runtime](https://github.com/3vilM33pl3/memory/blob/main/docs/user/federation-runtime.md).
+policy and explicit grants described in [Federation runtime](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/federation-runtime.md).
 
 Only deterministic excerpts and `local_human` output are supported here. Remote
 content is displayed as untrusted text with its citation/attribution data, never
@@ -224,7 +224,7 @@ scoped by the project selector. This build explicitly reports execution **not
 integrated** for full autonomous agency, even if a policy is enabled. Inspecting
 this operational feed never starts work or exposes private bodies. The separate
 project-private interaction panel below has its own permissions and explicit
-consent; see [Supervisor inspection](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/supervisor.md).
+consent; see [Supervisor inspection](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md).
 
 ### Workshop questions and saved proposals
 
@@ -279,7 +279,7 @@ An enabled policy, visible controls or queued request does not prove the worker
 is running. These are software/operator requirements, not a claim that paid
 question execution is already deployed. This workflow does not enable the other
 three areas or cross-area communication. See the
-[CLI/TUI and operator instructions](https://github.com/3vilM33pl3/memory/blob/main/docs/user/cli/supervisor.md#explicit-private-questions).
+[CLI/TUI and operator instructions](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md#explicit-private-questions).
 
 
 ## Local administration
@@ -347,8 +347,8 @@ or blocked runs surface their diagnostic summary and blocked reasons.
 
 ## Skills
 
-The Skills tab is the full inventory view for repo-local Memory Layer skills.
-It defaults to the `memory-layer` umbrella skill so the main health signal stays
+The Skills tab is the full inventory view for repo-local Codifix skills.
+It defaults to the `codifix` umbrella skill so the main health signal stays
 quiet, but the filter can switch to the full Memory-owned bundle when you need
 to inspect focused skills such as query, resume, remember, proposal review, or
 plan execution.
@@ -359,7 +359,7 @@ installed path, source/template versions, and rendered `SKILL.md` content so you
 can inspect exactly what an agent will read.
 
 Use `Repair skills` when the repo-local bundle is missing, stale, unversioned, or
-corrupt. The action uses the same repair path as `memory doctor --fix`: it
+corrupt. The action uses the same repair path as `codifix doctor --fix`: it
 downloads the current GitHub skill bundle when available, falls back to the
 installed template when offline, backs up replaced files, and only mutates
 Memory-owned skill directories.

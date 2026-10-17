@@ -83,16 +83,16 @@ if (!workspacePackage) {
     ['CHANGELOG.md', `## ${releaseVersion} -`],
     [
       'docs/user/release-compatibility.md',
-      `Memory Layer ${releaseLabel} is the current stable release.`,
+      `Codifix ${releaseLabel} is the current stable release.`,
     ],
-    ['docs-site/content/docs/index.mdx', `Memory Layer ${releaseLabel} is available.`],
+    ['docs-site/content/docs/index.mdx', `Codifix ${releaseLabel} is available.`],
     [
       'docs-site/content/docs/help/known-limitations.mdx',
-      `Memory Layer ${releaseLabel} is the current stable release.`,
+      `Codifix ${releaseLabel} is the current stable release.`,
     ],
     [
       'docs-site/content/docs/install/update.mdx',
-      `Memory Layer ${releaseLabel} is the current stable release.`,
+      `Codifix ${releaseLabel} is the current stable release.`,
     ],
     ['docs-site/content/docs/install/index.mdx', `[${releaseLabel}]`],
     ['docs-site/lib/layout.shared.tsx', `text: '${releaseLabel}'`],

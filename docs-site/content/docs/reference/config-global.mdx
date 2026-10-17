@@ -5,7 +5,7 @@ description: "Understand machine-level configuration and secrets handling."
 
 # Global config
 
-Global config is still needed for the installed or packaged Memory Layer stack. It holds machine-level defaults and secrets-adjacent settings shared by many projects: backend bind address, database URL, service token, LLM and embedding providers, MCP HTTP settings, retention, provenance, and automation defaults.
+Global config is still needed for the installed or packaged Codifix stack. It holds machine-level defaults and secrets-adjacent settings shared by many projects: backend bind address, database URL, service token, LLM and embedding providers, MCP HTTP settings, retention, provenance, and automation defaults.
 
 Dev-profile cargo runs are different: the dev stack ignores global config and uses a user-local project config plus `config.dev.toml`. See [Project config](/docs/reference/config-project) for that split; the deeper source-tree reference is `docs/developer/dev-stack.md`.
 
@@ -13,10 +13,10 @@ Dev-profile cargo runs are different: the dev stack ignores global config and us
 
 | Install mode | Config | Env file |
 | --- | --- | --- |
-| Debian/system package | `/etc/memory-layer/memory-layer.toml` | `/etc/memory-layer/memory-layer.env` |
-| Local Linux install | `~/.config/memory-layer/memory-layer.toml` | `~/.config/memory-layer/memory-layer.env` |
-| macOS app support | `~/Library/Application Support/memory-layer/memory-layer.toml` | `~/Library/Application Support/memory-layer/memory-layer.env` |
-| Explicit override | `memory --config <path> ...` | `<config-dir>/memory-layer.env` |
+| Debian/system package | `/etc/codifix/codifix.toml` | `/etc/codifix/codifix.env` |
+| Local Linux install | `~/.config/codifix/codifix.toml` | `~/.config/codifix/codifix.env` |
+| macOS app support | `~/Library/Application Support/codifix/codifix.toml` | `~/Library/Application Support/codifix/codifix.env` |
+| Explicit override | `memory --config <path> ...` | `<config-dir>/codifix.env` |
 
 The env file is loaded next to the config file and is the right place for generated service tokens and provider API keys.
 
@@ -45,7 +45,7 @@ bind_addr = "127.0.0.1:4040"
 request_timeout = "30s"
 
 [database]
-url = "postgres://memory_layer:<password>@127.0.0.1:5432/memory_layer"
+url = "postgres://codifix:<password>@127.0.0.1:5432/codifix"
 
 [auth]
 mode = "single_user"
@@ -58,10 +58,10 @@ require_token = true
 read_only = true
 ```
 
-The service API token is normally provisioned automatically into `memory-layer.env`:
+The service API token is normally provisioned automatically into `codifix.env`:
 
 ```bash
-memory service ensure-api-token --rotate-placeholder
+codifix service ensure-api-token --rotate-placeholder
 ```
 
 For multi-user browser login and scoped workload credentials, read
@@ -108,7 +108,7 @@ The full knob set (boosts, half-life, propagation depth, volatility, rank weight
 
 ## Curation section
 
-The `[curation]` section controls the semantic dedup pass that runs after chunk embeddings are built. When a newly curated memory is a near-duplicate of an existing one by embedding similarity, the pair is linked and a human-gated merge proposal is queued (`memory proposals`). Pairs that look like contradictions rather than paraphrases are flagged for review instead of merge.
+The `[curation]` section controls the semantic dedup pass that runs after chunk embeddings are built. When a newly curated memory is a near-duplicate of an existing one by embedding similarity, the pair is linked and a human-gated merge proposal is queued (`codifix proposals`). Pairs that look like contradictions rather than paraphrases are flagged for review instead of merge.
 
 ```toml
 [curation]
@@ -159,21 +159,21 @@ For prod/profile-installed commands, config is loaded from the explicit
 `--config` path if supplied, otherwise from the discovered global config and
 the current repo's user-local project config when available. Environment files
 beside later project config can override shared values, and process variables
-with the `MEMORY_LAYER__...` shape override TOML and env-file values.
+with the `CODIFIX__...` shape override TOML and env-file values.
 
-Keep `MEMORY_LAYER__SERVICE__API_TOKEN` in the shared env file unless a project
+Keep `CODIFIX__SERVICE__API_TOKEN` in the shared env file unless a project
 really targets a separate service. If a project env file defines that key, its
 token must authenticate the project-selected endpoint. `401` from repo-local
-commands while `memory health` succeeds is a strong sign that endpoint and
+commands while `codifix health` succeeds is a strong sign that endpoint and
 token overrides do not belong to the same profile; compare the resolved paths
-in `memory doctor --json` or pin the intended config with `--config`.
+in `codifix doctor --json` or pin the intended config with `--config`.
 
 Useful checks:
 
 ```bash
-memory doctor
-memory status --project <project-slug> --json
-memory service status
+codifix doctor
+codifix status --project <project-slug> --json
+codifix service status
 ```
 
 ## Next

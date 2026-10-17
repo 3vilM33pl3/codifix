@@ -2,7 +2,7 @@
 
 `memory up-to-speed` creates a short briefing for a new or returning agent so it can start productive work without manually reading the full memory database.
 
-It is broader than `memory resume`: resume is checkpoint-oriented, while up-to-speed is activity-oriented. It uses persisted activities, recent memory changes, useful durable memories, commits, warnings, and token-count summaries.
+It is broader than `codifix resume`: resume is checkpoint-oriented, while up-to-speed is activity-oriented. It uses persisted activities, recent memory changes, useful durable memories, commits, warnings, and token-count summaries.
 
 ## Common Usage
 

@@ -1,6 +1,6 @@
 ---
 title: "CLI: setup and bootstrap"
-description: "Configure Memory Layer globally, initialize projects, upgrade repo-local skills, and generate completion scripts."
+description: "Configure Codifix globally, initialize projects, upgrade repo-local skills, and generate completion scripts."
 ---
 
 # CLI: setup and bootstrap
@@ -9,84 +9,84 @@ These commands create or refresh configuration. Run dry-runs first when a comman
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory wizard` | Yes | Interactive global or project setup. |
-| `memory init` | Yes | Non-interactive repo-local bootstrap. |
-| `memory demo` | Yes | Load a disposable example project to try queries immediately. |
-| `memory tour` | No | Walk through the core setup, query, and resume workflow. |
-| `memory upgrade` | Yes | Refresh generated repo-local Memory Layer skill and instruction files. |
-| `memory completion` | No | Print shell completion scripts. |
-| `memory dev` | Mixed | Scaffold or inspect the dev-profile overlay used by contributors. |
+| `codifix wizard` | Yes | Interactive global or project setup. |
+| `codifix init` | Yes | Non-interactive repo-local bootstrap. |
+| `codifix demo` | Yes | Load a disposable example project to try queries immediately. |
+| `codifix tour` | No | Walk through the core setup, query, and resume workflow. |
+| `codifix upgrade` | Yes | Refresh generated repo-local Codifix skill and instruction files. |
+| `codifix completion` | No | Print shell completion scripts. |
+| `codifix dev` | Mixed | Scaffold or inspect the dev-profile overlay used by contributors. |
 
-## `memory wizard`
+## `codifix wizard`
 
 Use the wizard for first setup and for safe repo-local refreshes.
 
 ```bash
-memory wizard --global
+codifix wizard --global
 cd /path/to/project
-memory wizard --project my-project --dry-run
-memory wizard
+codifix wizard --project my-project --dry-run
+codifix wizard
 ```
 
-The global wizard stores machine-level settings such as the database URL, API token, and provider configuration. The project wizard writes a user-local project config plus repo-local `.mem/` and `.agents/` files so agents can discover the project slug, Memory Layer rules, and skills.
+The global wizard stores machine-level settings such as the database URL, API token, and provider configuration. The project wizard writes a user-local project config plus repo-local `.codifix/` and `.agents/` files so agents can discover the project slug, Codifix rules, and skills.
 
-## `memory init`
+## `codifix init`
 
 Use `init` when you want a scriptable project bootstrap instead of the interactive wizard.
 
 ```bash
-memory init
-memory init --project my-project --dry-run
-memory init --project my-project
-memory init --force
+codifix init
+codifix init --project my-project --dry-run
+codifix init --project my-project
+codifix init --force
 ```
 
 Prefer `wizard` for humans and `init` for repeatable repository setup. Both should be reviewed before committing generated files.
 
-## `memory demo` and `memory tour`
+## `codifix demo` and `codifix tour`
 
 Use the demo when you want data to explore without first capturing your own work. Use the tour when you want a short, guided explanation of the core commands.
 
 ```bash
-memory demo
-memory tour
+codifix demo
+codifix tour
 ```
 
 The demo is a reproducible learning path, not a replacement for initializing the repository where you will actually work.
 
-## `memory upgrade`
+## `codifix upgrade`
 
-Use `upgrade` after installing a newer Memory Layer version, especially when `.agents/` skills or generated instructions changed.
+Use `upgrade` after installing a newer Codifix version, especially when `.agents/` skills or generated instructions changed.
 
 ```bash
-memory upgrade --dry-run
-memory upgrade --dry-run --json
-memory upgrade
+codifix upgrade --dry-run
+codifix upgrade --dry-run --json
+codifix upgrade
 ```
 
 Real upgrade runs download the current Memory skill bundle from GitHub when possible and fall back to the installed `skill-template` when offline. Review generated diffs before committing. This command is expected to touch repo-local integration files, not the PostgreSQL database.
 
-## `memory completion`
+## `codifix completion`
 
 Generate shell completion for interactive use.
 
 ```bash
-memory completion bash
-memory completion zsh
-memory completion fish
+codifix completion bash
+codifix completion zsh
+codifix completion fish
 ```
 
 Install the generated script according to your shell’s completion path.
 
-## `memory dev`
+## `codifix dev`
 
-The dev command is for contributors running Memory Layer from source. Use it to inspect or scaffold the dev-profile overlay instead of editing installed-user config.
+The dev command is for contributors running Codifix from source. Use it to inspect or scaffold the dev-profile overlay instead of editing installed-user config.
 
 ```bash
-memory dev --help
-memory dev --copy-from-global
-memory dev --dry-run
-MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- doctor
+codifix dev --help
+codifix dev --copy-from-global
+codifix dev --dry-run
+CODIFIX_PROFILE=dev cargo run --bin codifix -- doctor
 ```
 
 The dev profile keeps source-tree experimentation separate from the packaged

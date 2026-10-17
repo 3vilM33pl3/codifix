@@ -1,15 +1,15 @@
 ---
 title: "Windows"
-description: "Install Memory Layer on Windows with the native x86_64 MSI/ZIP, Docker Desktop, or WSL2."
+description: "Install Codifix on Windows with the native x86_64 MSI/ZIP, Docker Desktop, or WSL2."
 ---
 
 # Windows
 
-Memory Layer 2.1.0 publishes native Windows x86_64 **preview** artifacts:
+Codifix 2.1.0 publishes native Windows x86_64 **preview** artifacts:
 
-- `memory-layer-2.1.0-windows-x86_64-build.1.msi`
-- `memory-layer-2.1.0-windows-x86_64-build.1.zip`
-- `memory-layer-2.1.0-windows-x86_64-build.1-server-tools.msi`
+- `codifix-2.1.0-windows-x86_64-build.1.msi`
+- `codifix-2.1.0-windows-x86_64-build.1.zip`
+- `codifix-2.1.0-windows-x86_64-build.1-server-tools.msi`
 
 The packages include client/operator executables, Web assets and skills, not a
 complete native PostgreSQL/PDS/Pi stack. The machine-level server-tools MSI does
@@ -21,20 +21,20 @@ Windows ARM64 is not a release target yet.
 ## Native MSI
 
 Download the MSI and matching checksum from the
-[v2.1.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0),
+[v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0),
 verify it, and run the installer. The per-user installer places
 `memory.exe`, the bundled web UI, skill templates, README, example config, and
-PowerShell completion under `%LOCALAPPDATA%\Programs\Memory Layer`, then adds
+PowerShell completion under `%LOCALAPPDATA%\Programs\Codifix`, then adds
 its `bin` directory to the user `PATH`.
 
 After installing:
 
 ```powershell
 memory --version
-memory wizard --global
-memory doctor
-memory health
-memory tui
+codifix wizard --global
+codifix doctor
+codifix health
+codifix tui
 ```
 
 The native package does not include PostgreSQL. Use an existing PostgreSQL
@@ -48,7 +48,7 @@ MSI. Extract the archive, add its directory to `PATH`, then run:
 
 ```powershell
 memory --version
-memory doctor
+codifix doctor
 ```
 
 ## Docker Desktop
@@ -56,17 +56,17 @@ memory doctor
 The bundled Compose stack runs under [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/):
 
 ```powershell
-git clone https://github.com/3vilM33pl3/memory
+git clone https://github.com/3vilM33pl3/codifix
 cd memory
 docker compose up
 ```
 
-That brings up PostgreSQL with pgvector, the Memory Layer service, and the web
+That brings up PostgreSQL with pgvector, the Codifix service, and the web
 UI at [http://localhost:4040](http://localhost:4040). Load the showcase project
 from inside the container:
 
 ```powershell
-docker compose exec memory memory demo
+docker compose exec memory codifix demo
 ```
 
 ## WSL2

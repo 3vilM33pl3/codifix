@@ -2,7 +2,7 @@
 
 **Watchers** shows live watcher processes for the active project.
 
-![Watcher health and ownership details in the TUI](https://www.memory-layer.dev/images/tui/watchers-tab.png)
+![Watcher health and ownership details in the TUI](https://codifix.dev/images/tui/watchers-tab.png)
 
 It reports watcher mode, repository root, owning agent session, heartbeat, restart attempts, and health such as `healthy`, `stale`, `restarting`, or `failed`. This is the liveness view; the Project tab is the broader summary.
 
@@ -18,4 +18,4 @@ label; older watchers without that metadata show **Session type unknown**.
 
 For normal Codex-linked work, prefer the watcher manager. Legacy service-managed and foreground watchers remain available for advanced cases.
 
-See also: [Watcher guide](https://www.memory-layer.dev/docs/watchers) and [watcher commands](https://www.memory-layer.dev/docs/reference/cli/integrations-evals).
+See also: [Watcher guide](https://codifix.dev/docs/watchers) and [watcher commands](https://codifix.dev/docs/reference/cli/integrations-evals).

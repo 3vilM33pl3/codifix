@@ -1,8 +1,8 @@
-# `memory eval capture-quality` (experimental)
+# `codifix eval capture-quality` (experimental)
 
 Evaluate candidate memory types and lasting value without writing memories or
 changing capture or curation behavior. The command reads a local JSON suite
-and writes a new local results directory. It does not require the Memory Layer
+and writes a new local results directory. It does not require the Codifix
 service or a database.
 
 ## Start offline
@@ -10,7 +10,7 @@ service or a database.
 Run the 40-case synthetic pilot with the existing rule classifier:
 
 ```bash
-memory eval capture-quality \
+codifix eval capture-quality \
   --suite evals/suites/capture-quality-pilot-v1/suite.json \
   --out target/memory-evals/capture-quality/rules-001
 ```
@@ -21,7 +21,7 @@ locally; it does not use a provider. It has no lasting-value prediction.
 Validate a paired run without reading a provider key or making network calls:
 
 ```bash
-memory eval capture-quality \
+codifix eval capture-quality \
   --suite evals/suites/capture-quality-pilot-v1/suite.json \
   --backend both --dry-run \
   --out target/memory-evals/capture-quality/preview-001
@@ -30,7 +30,7 @@ memory eval capture-quality \
 Each `--out` must name a new directory. Retain interrupted or failed evidence
 and choose a different directory for a subsequent attempt.
 
-When working from source, use `cargo run --locked --bin memory --` before
+When working from source, use `cargo run --locked --bin codifix --` before
 `eval capture-quality` in these examples. Avoid a large release build merely
 to run this experiment.
 
@@ -44,7 +44,7 @@ the process environment. Keep the key out of suite files, commands, and Git.
 Once the key is provisioned and this particular live run is approved:
 
 ```bash
-memory eval capture-quality \
+codifix eval capture-quality \
   --suite evals/suites/capture-quality-pilot-v1/suite.json \
   --backend both \
   --out target/memory-evals/capture-quality/jev-001
@@ -63,7 +63,7 @@ they cannot authorize a write, supersession, capture rejection, or disclosure.
 ## Replay saved responses
 
 ```bash
-memory eval capture-quality \
+codifix eval capture-quality \
   --suite evals/suites/capture-quality-pilot-v1/suite.json \
   --backend both \
   --replay target/memory-evals/capture-quality/jev-001/run.json \

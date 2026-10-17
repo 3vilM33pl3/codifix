@@ -1,20 +1,20 @@
-# `memory capture`
+# `codifix capture`
 
-`memory capture` sends structured task evidence to Memory Layer without relying on the higher-level `remember` wrapper.
+`codifix capture` sends structured task evidence to Codifix without relying on the higher-level `remember` wrapper.
 
-Right now the public capture surface is `memory capture`.
+Right now the public capture surface is `codifix capture`.
 
 ## Common Usage
 
 ```bash
-memory capture --file /tmp/task.json
-memory capture --file /tmp/task.json --dry-run
+codifix capture --file /tmp/task.json
+codifix capture --file /tmp/task.json --dry-run
 ```
 
 ## When To Use It
 
 - when another tool already produced a structured task payload
-- when you want lower-level control than `memory remember`
+- when you want lower-level control than `codifix remember`
 - when you need to validate a capture payload before sending it
 
 ## Related Docs

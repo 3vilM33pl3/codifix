@@ -137,7 +137,7 @@ Restarting the relay also stops its dependent question worker. After the relay
 and app are healthy, inspect current authority and explicitly start the question
 worker again if queued execution should resume. It does not auto-restart itself.
 
-Do not use `memory service restart-all` for this preview. Do not start the retained
+Do not use `codifix service restart-all` for this preview. Do not start the retained
 `memory-workshop-preview-app-initial-transport-20260918` or
 `memory-workshop-preview-app-before-interaction-59` or
 `memory-workshop-preview-app-before-questions-60` containers. They are stopped

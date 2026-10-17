@@ -1,17 +1,17 @@
-# `memory tui`
+# `codifix tui`
 
-`memory tui` opens the terminal UI for browsing, querying, operating, and diagnosing Memory Layer.
+`codifix tui` opens the terminal UI for browsing, querying, operating, and diagnosing Codifix.
 
 Use it for human inspection. Agents and scripts should prefer CLI commands with `--json` when they need parseable output.
 
 ## Common Usage
 
 ```bash
-memory tui
-memory tui --project memory
+codifix tui
+codifix tui --project memory
 ```
 
-`--project <slug>` opens a specific project first. Without it, Memory Layer tries to infer the current repository project.
+`--project <slug>` opens a specific project first. Without it, Codifix tries to infer the current repository project.
 
 ## What You Can Do
 
@@ -23,7 +23,7 @@ memory tui --project memory
 
 ## Related Docs
 
-The focused federation workspace is `memory federation --project <slug> tui`.
+The focused federation workspace is `codifix federation --project <slug> tui`.
 It supplies membership, exact publication review, proposals and synchronization
 controls through the same local API. See [Federation](federation.md).
 

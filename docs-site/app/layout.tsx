@@ -6,13 +6,13 @@ import { RootProvider } from 'fumadocs-ui/provider/next';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Memory Layer Docs',
-    template: '%s | Memory Layer Docs',
+    default: 'Codifix Docs',
+    template: '%s | Codifix Docs',
   },
   description: 'Local-first memory for coding agents.',
   icons: {
-    icon: '/images/memory-layer-logo.png',
-    apple: '/images/memory-layer-logo.png',
+    icon: '/images/codifix-logo.png',
+    apple: '/images/codifix-logo.png',
   },
 };
 
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           theme={{
             defaultTheme: 'system',
             enableSystem: true,
-            storageKey: 'memory-layer-theme',
+            storageKey: 'codifix-theme',
           }}
         >
           {children}

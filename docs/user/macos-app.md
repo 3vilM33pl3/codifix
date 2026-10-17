@@ -1,6 +1,6 @@
-# Memory Layer for macOS
+# Codifix for macOS
 
-Memory Layer for macOS is a native client for an existing Memory Layer service.
+Codifix for macOS is a native client for an existing Codifix service.
 It requires macOS 15 or later. The application does not install a service or
 create a database.
 
@@ -12,7 +12,7 @@ With Xcode installed, run from the repository root:
 xcodebuild -project apps/macos/MemoryLayer.xcodeproj -scheme MemoryLayer \
   -configuration Debug -derivedDataPath target/macos \
   CODE_SIGNING_ALLOWED=NO build
-open 'target/macos/Build/Products/Debug/Memory Layer.app'
+open 'target/macos/Build/Products/Debug/Codifix.app'
 ```
 
 This creates a local development application. Distribution signing and

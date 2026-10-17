@@ -2,9 +2,9 @@
 
 Memory can route local CLI, TUI and watcher traffic to independently operated
 areas. Install an operator-owned JSON file at
-`~/.config/memory-layer/area-routing.json` (or the equivalent XDG location), or
+`~/.config/codifix/area-routing.json` (or the equivalent XDG location), or
 select it with `--area-routing /absolute/path.json` /
-`MEMORY_LAYER_AREA_ROUTING`. On Unix the file must belong to the current user or
+`CODIFIX_AREA_ROUTING`. On Unix the file must belong to the current user or
 root and must not be group/world writable. Use mode `0600` or `0644`.
 
 ```json
@@ -14,11 +14,11 @@ root and must not be group/world writable. Use mode `0600` or `0644`.
   "areas": {
     "workshop": {
       "instance_id": "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85",
-      "config": "/etc/memory-layer/instances/workshop/client.toml"
+      "config": "/etc/codifix/instances/workshop/client.toml"
     },
     "general": {
       "instance_id": "11111111-1111-4111-8111-111111111111",
-      "config": "/etc/memory-layer/instances/general/client.toml"
+      "config": "/etc/codifix/instances/general/client.toml"
     },
     "trust": {
       "instance_id": "cc1bff80-d0e4-4687-9e62-9b8a5fe4bb16",
@@ -52,7 +52,7 @@ checks that the application's identity matches the routing entry.
 
 Selection order is:
 
-1. Explicit `--area workshop` / `MEMORY_LAYER_AREA`.
+1. Explicit `--area workshop` / `CODIFIX_AREA`.
 2. An exact repository identity route (shared Git common directory for linked
    worktrees, otherwise canonical path), additionally matching the project when
    the rule specifies one.
@@ -101,7 +101,7 @@ same filenames. No capture/event IDs are rewritten. Old unscoped offline queues
 and watcher state remain on disk for the reviewed cutover reconciliation; they
 are not automatically replayed into a newly selected area.
 
-For managed deployments pin `MEMORY_LAYER_AREA_ROUTING` to the installed file so
+For managed deployments pin `CODIFIX_AREA_ROUTING` to the installed file so
 its removal is an error. Without a routing file or area selection, legacy
 installations continue unchanged. Development binaries do not automatically
 discover the production routing file; explicit `--area-routing` opts them in.

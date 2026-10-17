@@ -1,4 +1,4 @@
-# `memory resume`
+# `codifix resume`
 
 Use `resume` when you return to a project after an interruption and want a fast briefing instead of manually reading activity, commits, and memory state.
 
@@ -72,13 +72,13 @@ memory checkpoint show --project my-project
 Generate a resume briefing:
 
 ```bash
-memory resume --project my-project
+codifix resume --project my-project
 ```
 
 JSON output for tools and agents:
 
 ```bash
-memory resume --project my-project --json
+codifix resume --project my-project --json
 ```
 
 ## What it uses
@@ -101,7 +101,7 @@ The main sections are:
 - `Current thread`
   - the most likely active work thread since your checkpoint
 - `Next step`
-  - the one action Memory Layer thinks you should take first
+  - the one action Codifix thinks you should take first
 - `What changed`
   - the most important recent project activity, commits, or memory changes
 - `Needs attention`
@@ -111,7 +111,7 @@ The main sections are:
 
 The CLI and TUI also keep the supporting timeline, warnings, and raw project state available below the briefing.
 
-If LLM configuration is available, Memory Layer synthesizes a concise briefing from that structured resume pack. If not, the deterministic resume pack is still returned.
+If LLM configuration is available, Codifix synthesizes a concise briefing from that structured resume pack. If not, the deterministic resume pack is still returned.
 
 ## TUI
 

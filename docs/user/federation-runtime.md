@@ -7,8 +7,8 @@ pass. Native Spaces alpha is not used.
 
 ## Enable deliberately
 
-`memory service run` starts no federation tasks by default. An administrator may
-set `MEMORY_LAYER_FEDERATION_CONFIG` to an absolute JSON file path. Each service
+`codifix service run` starts no federation tasks by default. An administrator may
+set `CODIFIX_FEDERATION_CONFIG` to an absolute JSON file path. Each service
 process runs one configured instance/space. IDs are stable, non-nil UUIDs selected at
 enrollment, not regenerated on restart. Use separate PostgreSQL databases for
 each instance and the gateway. The general service refuses the gateway role;
@@ -169,7 +169,7 @@ grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
 Provision that identity through the explicitly confirmed
-[`memory auth expertise-answerer` installation command](cli/auth.md#internal-expertise-answerer-installation-operator),
+[`codifix auth expertise-answerer` installation command](cli/auth.md#internal-expertise-answerer-installation-operator),
 not fixture SQL, a service token or the local-owner administrator. The command
 creates only local read/export permissions and protected audit. Remote
 membership, local space and collection grants remain separate; no worker or
@@ -275,13 +275,13 @@ or executable endpoint belongs in an advertisement. Changing operator policy
 requires restarting/reloading the explicitly configured runtime; origin workers
 recheck it before answering and before each release.
 
-MCP offers `memory_expertise_discover`, `memory_expertise_prepare`,
-`memory_expertise_ask` and `memory_expertise_result`. The bridge marks every call
+MCP offers `codifix_expertise_discover`, `codifix_expertise_prepare`,
+`codifix_expertise_ask` and `codifix_expertise_result`. The bridge marks every call
 as onward model disclosure, and the service denies local-human credentials on
 this path. Submission additionally requires `[mcp] read_only = false` and exact
 review confirmation. The operator, not the assistant, must verify that the token
 is installed only in the intended destination. The marker can restrict access
-but cannot authorize a destination. Ordinary `memory_query` is unchanged.
+but cannot authorize a destination. Ordinary `codifix_query` is unchanged.
 
 The dedicated gateway JSON accepts an optional `expertise_fleet` array of
 `["INSTANCE-UUID", 3]` pairs for every enrolled credential, including authority.

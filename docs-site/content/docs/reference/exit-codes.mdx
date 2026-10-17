@@ -5,7 +5,7 @@ description: "Interpret command success and failure status in scripts."
 
 # Exit codes
 
-Memory Layer follows normal CLI conventions: `0` means success, non-zero means the command did not complete the requested operation. Treat command output contracts (`--json`, stdout/stderr) as more important than hard-coding every possible failure number.
+Codifix follows normal CLI conventions: `0` means success, non-zero means the command did not complete the requested operation. Treat command output contracts (`--json`, stdout/stderr) as more important than hard-coding every possible failure number.
 
 ## Common cases
 
@@ -22,8 +22,8 @@ Some subcommands may return other non-zero values through wrapped tools or platf
 Use `--json` where available. Machine-readable output is written to stdout; diagnostics and errors should be treated as stderr.
 
 ```bash
-if ! memory status --project memory --json >status.json; then
-  echo "Memory Layer status failed" >&2
+if ! codifix status --project memory --json >status.json; then
+  echo "Codifix status failed" >&2
   exit 1
 fi
 ```
@@ -31,24 +31,24 @@ fi
 Usage errors are quick to detect:
 
 ```bash
-memory query --project memory
+codifix query --project memory
 # exits 2 because --question is required
 ```
 
 Operational failures need diagnostics:
 
 ```bash
-memory doctor
-memory health
-memory service status
+codifix doctor
+codifix health
+codifix service status
 ```
 
 For write-capable commands, run dry-runs first when supported:
 
 ```bash
-memory scan --project memory --dry-run --json
-memory embeddings reindex --project memory --dry-run
-memory bundle import --project memory ./memory.mlbundle.zip --dry-run
+codifix scan --project memory --dry-run --json
+codifix embeddings reindex --project memory --dry-run
+codifix bundle import --project memory ./memory.mlbundle.zip --dry-run
 ```
 
 ## Next

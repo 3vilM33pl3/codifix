@@ -9,34 +9,34 @@ These commands are the read path agents should use before making project-specifi
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory query` | Audit only | Ask a project-specific question against curated memory. |
-| `memory resume` | Audit only | Generate a briefing for returning to interrupted work. |
+| `codifix query` | Audit only | Ask a project-specific question against curated memory. |
+| `codifix resume` | Audit only | Generate a briefing for returning to interrupted work. |
 | `memory up-to-speed` | Audit only | Generate a broader new-agent project briefing. |
-| `memory activities` | No | List persisted project activity events. |
-| `memory history` | No | Show memory version history, including tombstones. |
+| `codifix activities` | No | List persisted project activity events. |
+| `codifix history` | No | Show memory version history, including tombstones. |
 | `memory verify-provenance` | No | Check memory source evidence against the filesystem. |
 
-## `memory query`
+## `codifix query`
 
 Ask concrete project questions and inspect the cited memories.
 
 ```bash
-memory query --project memory --question "How does the MCP server resolve projects?"
-memory query --project memory --question "What changed in the docs site?" --json
+codifix query --project memory --question "How does the MCP server resolve projects?"
+codifix query --project memory --question "What changed in the docs site?" --json
 ```
 
-Useful options vary by version, so check `memory query --help`; common knobs include result limits, confidence thresholds, output modes, graph-aware retrieval, and LLM-backed answer synthesis.
+Useful options vary by version, so check `codifix query --help`; common knobs include result limits, confidence thresholds, output modes, graph-aware retrieval, and LLM-backed answer synthesis.
 Current common filters include `--type`, `--tag`, `--limit`, `--min-confidence`, `--include-stale`, `--history`, and `--json`.
 
 Good questions name the project object, subsystem, file, workflow, or decision you care about. Avoid vague prompts like “what do you know?” when you need actionable context.
 
-## `memory resume`
+## `codifix resume`
 
 Resume is for returning after interruptions.
 
 ```bash
-memory resume --project memory
-memory resume --project memory --limit 20
+codifix resume --project memory
+codifix resume --project memory --limit 20
 ```
 
 It combines recent activity, changed memories, warnings, next actions, and checkpoint context when available.
@@ -52,24 +52,24 @@ memory up-to-speed --project memory --llm
 
 It is broader than `resume` and should be run at task start when the agent lacks project continuity.
 
-## `memory activities`
+## `codifix activities`
 
 Activities are persisted audit events.
 
 ```bash
-memory activities --project memory --limit 30
-memory activities --project memory --kind checkpoint
+codifix activities --project memory --limit 30
+codifix activities --project memory --kind checkpoint
 ```
 
 Use activity output to verify whether captures, curation, proposals, embedding jobs, watcher events, or checkpoints actually happened.
 
-## `memory history`
+## `codifix history`
 
 History shows how canonical memories evolved.
 
 ```bash
-memory history <memory-id>
-memory history <memory-id> --json
+codifix history <memory-id>
+codifix history <memory-id> --json
 ```
 
 Use it when a remembered fact seems stale, replaced, or tombstoned.

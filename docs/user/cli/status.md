@@ -1,10 +1,10 @@
-# `memory status`
+# `codifix status`
 
-`memory status` is the recommended first diagnostic command for humans and agents.
+`codifix status` is the recommended first diagnostic command for humans and agents.
 
 ```bash
-memory status --project memory
-memory status --project memory --json
+codifix status --project memory
+codifix status --project memory --json
 ```
 
 It aggregates:
@@ -16,7 +16,7 @@ It aggregates:
 - MCP service/project status and exposed surface counts
 - doctor checks, including config and skill-bundle checks
 - runtime component status; the default skill row is filtered to the
-  `memory-layer` umbrella skill so headers stay focused
+  `codifix` umbrella skill so headers stay focused
 
 ## Output Contract
 
@@ -27,19 +27,19 @@ It aggregates:
 
 Use the narrower commands when you already know which subsystem you need:
 
-- `memory doctor --project memory` for the full setup checklist and repair hints
-- `memory upgrade --dry-run` for the full repo-local focused-skill bundle view
-- `memory health` for only `/healthz`
-- `memory service status` for the packaged service manager
-- `memory watcher manager status` for the Codex-linked watcher manager
-- `memory mcp status --project memory` for MCP-only status
+- `codifix doctor --project memory` for the full setup checklist and repair hints
+- `codifix upgrade --dry-run` for the full repo-local focused-skill bundle view
+- `codifix health` for only `/healthz`
+- `codifix service status` for the packaged service manager
+- `codifix watcher manager status` for the Codex-linked watcher manager
+- `codifix mcp status --project memory` for MCP-only status
 
 ## Agent Guidance
 
 For automation, use:
 
 ```bash
-memory status --project memory --json
+codifix status --project memory --json
 ```
 
 Then inspect `summary.overall`, `summary.doctor_failures`, `health.ok`, `stats.ok`, and `mcp.service_reachable` before deciding whether to run a narrower command.

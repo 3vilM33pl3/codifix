@@ -1,6 +1,6 @@
 # Memory Bundles
 
-Use memory bundles to export a project's curated memories and import them into another project.
+Use codifix bundles to export a project's curated memories and import them into another project.
 
 ## Table of Contents
 
@@ -31,13 +31,13 @@ By default, a bundle does **not** export:
 CLI:
 
 ```bash
-memory bundle export --project my-project --out my-project.mlbundle.zip
+codifix bundle export --project my-project --out my-project.mlbundle.zip
 ```
 
 Optional source/provenance fields:
 
 ```bash
-memory bundle export \
+codifix bundle export \
   --project my-project \
   --out my-project.mlbundle.zip \
   --include-archived \
@@ -57,13 +57,13 @@ Web UI:
 Preview first:
 
 ```bash
-memory bundle import --project target-project ./my-project.mlbundle.zip --dry-run
+codifix bundle import --project target-project ./my-project.mlbundle.zip --dry-run
 ```
 
 Import:
 
 ```bash
-memory bundle import --project target-project ./my-project.mlbundle.zip
+codifix bundle import --project target-project ./my-project.mlbundle.zip
 ```
 
 Import behavior:
@@ -73,9 +73,9 @@ Import behavior:
 - repeated import of the same unchanged bundle entries is skipped
 - if an imported entry changes for the same bundle lineage, the previous imported copy is replaced with a new immutable memory
 
-After import, Memory Layer rebuilds search chunks for the target project. Embeddings are not shipped inside the bundle.
+After import, Codifix rebuilds search chunks for the target project. Embeddings are not shipped inside the bundle.
 
-`memory bundle export` and `memory bundle import` both support `--dry-run`.
+`codifix bundle export` and `codifix bundle import` both support `--dry-run`.
 For export, dry-run computes the bundle preview and intended output path without writing the archive file.
 For import, dry-run is the preview mode and does not change the target project.
 

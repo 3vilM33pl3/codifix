@@ -5,7 +5,7 @@ export const docsSiteRoot = process.cwd();
 export const contentRoot = path.join(docsSiteRoot, 'content/docs');
 export const publicRoot = path.join(docsSiteRoot, 'public');
 export const repositoryRoot = path.resolve(docsSiteRoot, '..');
-export const publicSiteOrigin = 'https://www.memory-layer.dev';
+export const publicSiteOrigin = 'https://codifix.dev';
 
 export function walk(dir, predicate = () => true) {
   const entries = [];

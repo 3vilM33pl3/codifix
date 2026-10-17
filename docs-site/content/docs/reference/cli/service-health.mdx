@@ -9,71 +9,71 @@ Use these commands before debugging query, TUI, watcher, MCP, or embedding behav
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory service` | Mixed | Run or manage the HTTP backend and web UI. |
-| `memory status` | No | Show aggregate diagnostic status for a project. |
-| `memory doctor` | No | Inspect config, database, service, tools, and environment. |
-| `memory health` | No | Check backend API health. |
-| `memory watcher` | Mixed | Inspect and flush automation state. |
+| `codifix service` | Mixed | Run or manage the HTTP backend and web UI. |
+| `codifix status` | No | Show aggregate diagnostic status for a project. |
+| `codifix doctor` | No | Inspect config, database, service, tools, and environment. |
+| `codifix health` | No | Check backend API health. |
+| `codifix watcher` | Mixed | Inspect and flush automation state. |
 
-## `memory service`
+## `codifix service`
 
 The service hosts the HTTP API, web UI, and optional Streamable HTTP MCP route.
 
 ```bash
-memory service run
-memory service enable --dry-run
-memory service status
-memory service enable
-memory service disable
-memory service restart-all
-memory service ensure-api-token
+codifix service run
+codifix service enable --dry-run
+codifix service status
+codifix service enable
+codifix service disable
+codifix service restart-all
+codifix service ensure-api-token
 ```
 
-`memory service run` is a foreground command. A development `cargo run --bin memory -- service run` should not daemonize itself. Packaged installs use systemd on Linux or launchd on macOS for background operation.
+`codifix service run` is a foreground command. A development `cargo run --bin codifix -- service run` should not daemonize itself. Packaged installs use systemd on Linux or launchd on macOS for background operation.
 
-Development defaults commonly use `127.0.0.1:4250`; packaged installs commonly use `127.0.0.1:4040`. Check your config and `memory service status` instead of assuming a port.
+Development defaults commonly use `127.0.0.1:4250`; packaged installs commonly use `127.0.0.1:4040`. Check your config and `codifix service status` instead of assuming a port.
 
-## `memory status`
+## `codifix status`
 
 Use status for a combined project-level view.
 
 ```bash
-memory status --project memory
-memory status --project memory --json
+codifix status --project memory
+codifix status --project memory --json
 ```
 
 Status is the fastest single command for checking service reachability, project config, watcher state, MCP status, and common doctor diagnostics.
 
-## `memory doctor`
+## `codifix doctor`
 
 Doctor performs a deeper environment inspection.
 
 ```bash
-memory doctor
-memory doctor --project memory
-memory doctor --json
-memory doctor --fix
+codifix doctor
+codifix doctor --project memory
+codifix doctor --json
+codifix doctor --fix
 ```
 
 Run it after config edits, package upgrades, database migrations, token changes, or provider changes.
 
-## `memory health`
+## `codifix health`
 
-Use health to confirm the backend responds; use `memory status` to confirm the expected project has data.
+Use health to confirm the backend responds; use `codifix status` to confirm the expected project has data.
 
 ```bash
-memory health
+codifix health
 ```
 
-If health is green but a project command is empty or unauthorized, verify the project slug and credential with `memory status --project <slug>` and `memory doctor --project <slug>`.
+If health is green but a project command is empty or unauthorized, verify the project slug and credential with `codifix status --project <slug>` and `codifix doctor --project <slug>`.
 
-## `memory watcher`
+## `codifix watcher`
 
 Watchers inspect background work and can flush queued work when supported.
 
 ```bash
-memory watcher --help
-memory watcher status --project memory
+codifix watcher --help
+codifix watcher status --project memory
 ```
 
-Treat `memory watcher flush` as a write operation. Capture logs before changing queue state when diagnosing failures. The historic `memory automation flush` spelling is no longer a command.
+Treat `codifix watcher flush` as a write operation. Capture logs before changing queue state when diagnosing failures. The historic `memory automation flush` spelling is no longer a command.

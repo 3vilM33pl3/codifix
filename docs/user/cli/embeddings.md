@@ -1,6 +1,6 @@
 # Embedding Operations
 
-This page explains the commands used to build, refresh, swap, and clean up semantic search embeddings in Memory Layer, and how to configure multiple embedding backends in parallel.
+This page explains the commands used to build, refresh, swap, and clean up semantic search embeddings in Codifix, and how to configure multiple embedding backends in parallel.
 
 ## Table of Contents
 
@@ -23,13 +23,13 @@ Use these commands when:
 
 ## How Embeddings Work
 
-Memory Layer stores chunk embeddings in PostgreSQL with `pgvector`.
+Codifix stores chunk embeddings in PostgreSQL with `pgvector`.
 
 Every embedding row is keyed by a **space key** of the form `provider|base_url|model`, so vectors from different providers and models coexist without collision. A single chunk can have vectors in several spaces at once.
 
-At any time, one configured backend can be **active**: that's the one `memory query` uses for semantic retrieval. You can disable semantic retrieval with `enabled = false`, which leaves configured backends and stored vectors in place while semantic retrieval is off. Swapping activation is a constant-time metadata flip — no recomputation — as long as the target space is already populated.
+At any time, one configured backend can be **active**: that's the one `codifix query` uses for semantic retrieval. You can disable semantic retrieval with `enabled = false`, which leaves configured backends and stored vectors in place while semantic retrieval is off. Swapping activation is a constant-time metadata flip — no recomputation — as long as the target space is already populated.
 
-When a backend has `create_enabled = true`, every new memory is embedded into that backend automatically. The curate step that runs after `memory remember` (and after the watcher's idle captures) writes chunks into every enabled space declared under `[[embeddings.backends]]`, not just the active one. So configuring two enabled backends from the start means you never have to run `reembed` later just to switch.
+When a backend has `create_enabled = true`, every new memory is embedded into that backend automatically. The curate step that runs after `codifix remember` (and after the watcher's idle captures) writes chunks into every enabled space declared under `[[embeddings.backends]]`, not just the active one. So configuring two enabled backends from the start means you never have to run `reembed` later just to switch.
 
 Set `create_enabled = false` on a backend to stop automatic provider embedding calls for that backend after curation or bundle import. Explicit `reembed` and `reindex` commands still work so you can backfill manually when you are ready.
 
@@ -70,7 +70,7 @@ model = "nomic-embed-text"
 batch_size = 16
 ```
 
-The `name` field is your activation handle and must be unique. If you leave `name` empty, Memory Layer derives one from `{provider}-{model}` at load time.
+The `name` field is your activation handle and must be unique. If you leave `name` empty, Codifix derives one from `{provider}-{model}` at load time.
 
 Set `enabled = false` under `[embeddings]` to keep backend declarations available while turning semantic retrieval off. The TUI Embeddings tab writes that flag when you press `Enter` on the currently active backend row, and writes `enabled = true` again when you activate a backend.
 
@@ -87,7 +87,7 @@ model = "voyage-code-3"
 api_key_env = "VOYAGE_API_KEY"
 ```
 
-Internally this is normalized to a one-element `backends` list with an auto-derived name, so `memory embeddings list` will show the same information.
+Internally this is normalized to a one-element `backends` list with an auto-derived name, so `codifix embeddings list` will show the same information.
 
 `base_url = ""` falls back to the provider's well-known endpoint (`https://api.openai.com/v1`, `https://api.voyageai.com`, `http://127.0.0.1:11434/v1`, etc.).
 
@@ -96,7 +96,7 @@ Internally this is normalized to a one-element `backends` list with an auto-deri
 List configured backends and show which is active:
 
 ```bash
-memory embeddings list
+codifix embeddings list
 ```
 
 Output marks the active backend with `*` and any backend that didn't resolve at startup (missing API key, empty model) with `!`.
@@ -106,19 +106,19 @@ The same information, plus per-project chunk and memory counts, is available int
 Switch which backend search uses:
 
 ```bash
-memory embeddings activate voyage-code
+codifix embeddings activate voyage-code
 ```
 
 The service rewrites `[embeddings].active` in the config file and updates its in-memory state without restarting. Existing embeddings for the new space are used immediately; nothing is recomputed.
 
-To turn embeddings off interactively, open `memory tui`, go to the Embeddings tab, highlight the active row, and press `Enter`. The service rewrites `[embeddings].enabled = false`; pressing `Enter` on any ready backend turns it back on.
+To turn embeddings off interactively, open `codifix tui`, go to the Embeddings tab, highlight the active row, and press `Enter`. The service rewrites `[embeddings].enabled = false`; pressing `Enter` on any ready backend turns it back on.
 
 To stop only automatic creation of new embeddings for one provider, highlight that backend in the Embeddings tab and press `c`. Manual `reembed` and `reindex` still create embeddings.
 
 Build chunks and embeddings for a project:
 
 ```bash
-memory embeddings reindex --project my-project
+codifix embeddings reindex --project my-project
 ```
 
 This is the heavy rebuild path. It recreates the project's shared chunks and
@@ -127,7 +127,7 @@ then populates **every** configured backend so all spaces stay in sync.
 `--backend` is available for compatibility, but it is intentionally safe:
 
 ```bash
-memory embeddings reindex --project my-project --backend voyage-code
+codifix embeddings reindex --project my-project --backend voyage-code
 ```
 
 With `--backend`, `reindex` does **not** delete or recreate shared chunks.
@@ -138,15 +138,15 @@ backend. Use the no-`--backend` form when you really want to rebuild chunks.
 Preview without writing:
 
 ```bash
-memory embeddings reindex --project my-project --dry-run
+codifix embeddings reindex --project my-project --dry-run
 ```
 
 Refresh only the embeddings of configured backends for a project (does not rebuild chunks):
 
 ```bash
-memory embeddings reembed --project my-project
-memory embeddings reembed --project my-project --backend voyage-code
-memory embeddings reembed --project my-project --dry-run
+codifix embeddings reembed --project my-project
+codifix embeddings reembed --project my-project --backend voyage-code
+codifix embeddings reembed --project my-project --dry-run
 ```
 
 Use `reembed` when:
@@ -160,23 +160,23 @@ Use `reembed` when:
 Delete embedding rows whose space isn't in any configured backend:
 
 ```bash
-memory embeddings prune --project my-project
-memory embeddings prune --project my-project --dry-run
+codifix embeddings prune --project my-project
+codifix embeddings prune --project my-project --dry-run
 ```
 
 `prune` operates relative to the **set** of currently configured backends (not just the active one), so removing a backend from config before pruning is the right order when you want to retire a model completely.
 
 ## Typical Workflows
 
-Your config files live in the locations listed under [Getting Started → File Locations](../getting-started.md#file-locations) — on Debian that's `/etc/memory-layer/memory-layer.toml` and `/etc/memory-layer/memory-layer.env`; on Linux user-level installs it's `~/.config/memory-layer/memory-layer.toml` and `~/.config/memory-layer/memory-layer.env`.
+Your config files live in the locations listed under [Getting Started → File Locations](../getting-started.md#file-locations) — on Debian that's `/etc/codifix/codifix.toml` and `/etc/codifix/codifix.env`; on Linux user-level installs it's `~/.config/codifix/codifix.toml` and `~/.config/codifix/codifix.env`.
 
 ### Enable embeddings for the first time (single backend)
 
-1. Add your API key to `memory-layer.env`:
+1. Add your API key to `codifix.env`:
    ```dotenv
    OPENAI_API_KEY=sk-proj-...
    ```
-2. Add an `[embeddings]` block to `memory-layer.toml`:
+2. Add an `[embeddings]` block to `codifix.toml`:
    ```toml
    [embeddings]
    provider = "openai"
@@ -187,24 +187,24 @@ Your config files live in the locations listed under [Getting Started → File L
    ```
 3. Restart the service. Confirm the setup:
    ```bash
-   memory doctor
-   memory embeddings list          # should show one backend, no "!"
+   codifix doctor
+   codifix embeddings list          # should show one backend, no "!"
    ```
 4. Backfill embeddings for existing memories:
    ```bash
-   memory embeddings reindex --project my-project
+   codifix embeddings reindex --project my-project
    ```
 
 ### Enable two backends from day one
 
 Do this if you know up-front you want the option to switch models freely — it avoids having to reembed the whole corpus later.
 
-1. Put both API keys in `memory-layer.env`:
+1. Put both API keys in `codifix.env`:
    ```dotenv
    OPENAI_API_KEY=sk-proj-...
    VOYAGE_API_KEY=pa-...
    ```
-2. Declare both backends in `memory-layer.toml` and pick one with `active`:
+2. Declare both backends in `codifix.toml` and pick one with `active`:
    ```toml
    [embeddings]
    active = "voyage-code"
@@ -227,59 +227,59 @@ Do this if you know up-front you want the option to switch models freely — it 
    ```
 3. Restart the service. Confirm both resolved:
    ```bash
-   memory embeddings list          # both listed; active marked with *; neither marked with !
+   codifix embeddings list          # both listed; active marked with *; neither marked with !
    ```
 4. Backfill every existing memory into both spaces (default behavior — no `--backend` flag):
    ```bash
-   memory embeddings reindex --project my-project
+   codifix embeddings reindex --project my-project
    ```
 5. From here on, every new memory is embedded into both spaces automatically. Swap which one search uses any time:
    ```bash
-   memory embeddings activate openai-3-small
-   memory embeddings activate voyage-code
+   codifix embeddings activate openai-3-small
+   codifix embeddings activate voyage-code
    ```
 
 ### Add a second backend to an existing install
 
 Same end state as the two-backend workflow, just applied incrementally:
 
-1. Add the new `[[embeddings.backends]]` block and its API key line in `memory-layer.env`.
-2. Restart the service. `memory embeddings list` should show both.
+1. Add the new `[[embeddings.backends]]` block and its API key line in `codifix.env`.
+2. Restart the service. `codifix embeddings list` should show both.
 3. Backfill existing memories into the new space:
    ```bash
-   memory embeddings reembed --project my-project
+   codifix embeddings reembed --project my-project
    ```
 4. Switch search to the new backend whenever you're ready:
    ```bash
-   memory embeddings activate <new-backend-name>
+   codifix embeddings activate <new-backend-name>
    ```
 
 ### Retire a backend
 
 1. Remove its `[[embeddings.backends]]` block from config. Restart the service.
-2. `memory embeddings prune --project my-project` drops the orphaned space.
+2. `codifix embeddings prune --project my-project` drops the orphaned space.
 
 ## Troubleshooting
 
 If semantic search is not working:
 
-- run `memory doctor`
+- run `codifix doctor`
 - confirm `pgvector` is installed and the `vector` extension exists in the target database
 - confirm at least one `[[embeddings.backends]]` entry has a non-empty `model`
-- confirm the API key env var referenced by `api_key_env` is present in `memory-layer.env`
-- `memory embeddings list` — the active backend should not be marked with `!`
+- confirm the API key env var referenced by `api_key_env` is present in `codifix.env`
+- `codifix embeddings list` — the active backend should not be marked with `!`
 
 If the active space's vectors are missing for some memories (semantic search returns fewer results than lexical), run:
 
 ```bash
-memory embeddings reembed --project my-project --backend <active-name>
+codifix embeddings reembed --project my-project --backend <active-name>
 ```
 
-If a newly-added backend is marked `!` even after a restart, check that the referenced API key env var is populated in `memory-layer.env` and that `model` is non-empty.
+If a newly-added backend is marked `!` even after a restart, check that the referenced API key env var is populated in `codifix.env` and that `model` is non-empty.
 
 ## Related Docs
 
 - [Getting Started](../getting-started.md)
 - [Scan Command](scan.md)
 - [Embeddings and Search](../../developer/architecture/embeddings-and-search.md)
-- [How Memory Layer Works](../../developer/architecture/how-it-works.md)
+- [How Codifix Works](../../developer/architecture/how-it-works.md)

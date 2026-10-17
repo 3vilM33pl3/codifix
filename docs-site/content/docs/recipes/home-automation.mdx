@@ -51,7 +51,7 @@ Run `curl .../v1/curate -d '{"project": "house"}'` on a schedule (or after each 
 ## Ask the house
 
 ```bash
-memory query --project house --question "Why did the heating turn on in the studio last night?"
+codifix query --project house --question "Why did the heating turn on in the studio last night?"
 ```
 
 The answer cites the exact decision memory, with the trigger reading as provenance. Durable configuration knowledge belongs here too — capture threshold changes and device quirks as `decision`/`environment` memories, and six months later "why is the frost guard at 15 degrees?" has a real answer.

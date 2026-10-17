@@ -1,8 +1,8 @@
 # Activity Tab
 
-**Activity** is the persisted timeline for work that Memory Layer has seen: queries, captures, curation, checkpoints, watcher transitions, graph work, embedding work, and briefings.
+**Activity** is the persisted timeline for work that Codifix has seen: queries, captures, curation, checkpoints, watcher transitions, graph work, embedding work, and briefings.
 
-![Persisted activity and briefing controls in the TUI](https://www.memory-layer.dev/images/tui/activity-tab.png)
+![Persisted activity and briefing controls in the TUI](https://codifix.dev/images/tui/activity-tab.png)
 
 Each event can show IDs, source metadata, durations, token usage, graph diagnostics, and linked memory. Use it when a new person or agent needs evidence of what happened, not just the current answer.
 
@@ -15,4 +15,4 @@ Each event can show IDs, source metadata, durations, token usage, graph diagnost
 
 LLM audit data can contain sensitive memory content. Enable it only when you need troubleshooting evidence and keep redaction enabled.
 
-See also: [Activities CLI](https://www.memory-layer.dev/docs/reference/cli/query-briefings) and [Resume](https://www.memory-layer.dev/docs/tui/resume).
+See also: [Activities CLI](https://codifix.dev/docs/reference/cli/query-briefings) and [Resume](https://codifix.dev/docs/tui/resume).

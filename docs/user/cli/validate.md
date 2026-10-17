@@ -29,7 +29,7 @@ suggested replacement as a diff before applying it.
   version (only with `reinforcement.auto_apply_rewording = true` and high
   confidence).
 - `correction_pending` — a proposed correction awaits human review
-  (`memory review list` / `apply` / `reject`).
+  (`codifix review list` / `apply` / `reject`).
 - `flagged_needs_review` — evidence was weak, ambiguous, or contradictory;
   the memory is flagged and rank-penalized, and content is never modified.
 

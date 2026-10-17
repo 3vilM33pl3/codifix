@@ -11,7 +11,7 @@ These commands operate the [self-maintaining memory](/docs/how-it-works/reinforc
 |---|---:|---|
 | `memory scores` | No | Show activation scores, volatility, and review flags for a project. |
 | `memory validate` | Yes | Run evidence-backed validation for one memory (LLM call). |
-| `memory review` | Yes | List, apply, or reject corrections proposed by validation. |
+| `codifix review` | Yes | List, apply, or reject corrections proposed by validation. |
 
 ## `memory scores`
 
@@ -39,17 +39,17 @@ Outcomes: `revalidated` (accurate and clear), `reworded` (wording improved as a 
 
 Memories captured with `--file-changed` provenance validate best: the pipeline can check their source files and git history. Memories without file sources usually come back `unsupported` — that is the system refusing to guess, not a failure.
 
-## `memory review`
+## `codifix review`
 
 Corrections proposed by validation wait here for a human decision.
 
 ```bash
-memory review list --project memory          # pending corrections
-memory review list --project memory --all    # every validation run
-memory review apply <run-id>                 # write the proposal as a new memory version
-memory review reject <run-id>                # record the rejection
+codifix review list --project memory          # pending corrections
+codifix review list --project memory --all    # every validation run
+codifix review apply <run-id>                 # write the proposal as a new memory version
+codifix review reject <run-id>                # record the rejection
 ```
 
-Both resolutions clear a standing needs-review flag. Applying creates a new immutable version under the same canonical memory, so `memory history` shows the full chain and any change can be reverted.
+Both resolutions clear a standing needs-review flag. Applying creates a new immutable version under the same canonical memory, so `codifix history` shows the full chain and any change can be reverted.
 
-Not to be confused with [`memory proposals`](/docs/reference/cli/capture-curation#memory-proposals), which reviews *curation replacement proposals* (new captures that overlap existing memories). `memory review` handles *validation corrections* (existing memories found outdated or unclear).
+Not to be confused with [`codifix proposals`](/docs/reference/cli/capture-curation#memory-proposals), which reviews *curation replacement proposals* (new captures that overlap existing memories). `codifix review` handles *validation corrections* (existing memories found outdated or unclear).

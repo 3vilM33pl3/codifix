@@ -1,6 +1,6 @@
 # Structure Command
 
-`memory structure` shows a project's meta-memory structure in two parts:
+`codifix structure` shows a project's meta-memory structure in two parts:
 
 1. **The committed insight tree** — every active `insight` memory with the
    memories it `summarizes`, nested recursively: insights that summarize
@@ -8,7 +8,7 @@
    graph.
 2. **Currently discovered groups** — the clusters the deterministic
    consolidation scan finds right now that pass the value gate and are not
-   yet covered by an insight. This is what `memory consolidate` would
+   yet covered by an insight. This is what `codifix consolidate` would
    synthesize next.
 
 The command is read-only and makes no LLM calls.
@@ -16,8 +16,8 @@ The command is read-only and makes no LLM calls.
 ## Usage
 
 ```bash
-memory structure --project memory
-memory structure --project memory --json
+codifix structure --project memory
+codifix structure --project memory --json
 ```
 
 `--project` defaults to the current repository's project.
@@ -33,5 +33,5 @@ memory structure --project memory --json
   mass — followed by its members.
 
 An empty insight tree simply means no consolidation proposals have been
-approved yet; run `memory consolidate` and review the queued proposals
-with `memory loops memory-proposals`.
+approved yet; run `codifix consolidate` and review the queued proposals
+with `codifix loops memory-proposals`.

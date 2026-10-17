@@ -5,7 +5,7 @@ description: "Measure whether memory changes retrieval, answers, cost, latency, 
 
 # Evaluations
 
-Memory systems should be evaluated by the behavior they improve. Memory Layer includes a repeatable evaluation harness for testing whether memory changes agent outcomes, retrieval quality, cost, and latency.
+Memory systems should be evaluated by the behavior they improve. Codifix includes a repeatable evaluation harness for testing whether memory changes agent outcomes, retrieval quality, cost, and latency.
 
 ## What the eval harness protects against
 
@@ -20,15 +20,15 @@ Always dry-run first, then run the real suite only after reviewing scripts and f
 
 ```bash
 # dry run
-memory eval run --suite evals/examples/memory-smoke \
+codifix eval run --suite evals/examples/memory-smoke \
   --condition full-memory --profile offline --dry-run
 
 # paired run: no-memory vs full-memory
-memory eval run --suite evals/suites/memory-improvement-v1 \
+codifix eval run --suite evals/suites/memory-improvement-v1 \
   --condition no-memory --condition full-memory --allow-shell --repeat 5
 
 # compare
-memory eval compare \
+codifix eval compare \
   --baseline  'target/memory-evals/*no-memory*.json' \
   --candidate 'target/memory-evals/*full-memory*.json' --text
 ```
@@ -62,7 +62,7 @@ Common item types:
 Plug in your own retrieval backend for comparison:
 
 ```bash
-memory eval run --suite evals/suites/memory-improvement-v1 \
+codifix eval run --suite evals/suites/memory-improvement-v1 \
   --condition full-memory --retriever-cmd './my-retriever' --allow-shell
 ```
 

@@ -1,15 +1,15 @@
 ---
 title: "Update"
-description: "Upgrade to Memory Layer v2.1.0 safely, including backups, breaking changes, migrations, and verification."
+description: "Upgrade to Codifix v2.1.0 safely, including backups, breaking changes, migrations, and verification."
 ---
 
 # Update
 
-Memory Layer v2.1.0 is the current stable release. It is a breaking major
+Codifix v2.1.0 is the current stable release. It is a breaking major
 upgrade from v1: PostgreSQL data migrates in place and old bundles still import,
 but direct API clients, configuration, and renamed CLI commands need review.
 
-Read the [v2.1.0 release notes](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
+Read the [v2.1.0 release notes](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
 before upgrading a production installation.
 
 ## 1. Back up and inspect
@@ -18,53 +18,53 @@ Stop if either diagnostic already reports a database or authentication problem:
 
 ```bash
 memory --version
-memory status --project <project-slug>
-memory doctor
-memory health
+codifix status --project <project-slug>
+codifix doctor
+codifix health
 ```
 
 Back up PostgreSQL before starting the v2 binary:
 
 ```bash
-pg_dump "$DATABASE_URL" > memory-layer-before-v2.sql
+pg_dump "$DATABASE_URL" > codifix-before-v2.sql
 ```
 
-If `DATABASE_URL` is stored only in `memory-layer.env`, load it through your
+If `DATABASE_URL` is stored only in `codifix.env`, load it through your
 normal secret-management workflow rather than copying it into shell history.
 For a portable memory-level backup, also export important projects:
 
 ```bash
-memory bundle export --project <project-slug> --out <project-slug>-before-v2.mlbundle.zip
+codifix bundle export --project <project-slug> --out <project-slug>-before-v2.mlbundle.zip
 ```
 
 ## 2. Review the v2 breaks
 
 - Delete `capnp_unix_socket` and `capnp_tcp_addr`; the TUI and clients now use
   the `/ws` WebSocket stream.
-- Replace `memory automation flush` with `memory watcher flush`,
-  `memory capture task` with `memory capture`, and `memory dev init` with
-  `memory dev`. Use `memory wizard` instead of the removed `memory setup`.
+- Replace `memory automation flush` with `codifix watcher flush`,
+  `codifix capture task` with `codifix capture`, and `codifix dev init` with
+  `codifix dev`. Use `codifix wizard` instead of the removed `memory setup`.
 - Update direct HTTP integrations from the running service's
   `GET /v1/openapi.yaml`. v2 removed `/v1/stats`, `/v1/offline/pending`, and the
   browser auth-token handoff, and consolidated loop/activity routes.
-- Treat `[writer]`, `--writer-id`, and `MEMORY_LAYER_WRITER_ID` as advisory
+- Treat `[writer]`, `--writer-id`, and `CODIFIX_WRITER_ID` as advisory
   labels. The authenticated principal supplies durable authorship.
 - Expect new bundle exports to use deterministic schema v2. Existing schema v1
   bundles remain importable.
 
 ## 3. Install v2.1.0
 
-Choose the command for the way you installed Memory Layer.
+Choose the command for the way you installed Codifix.
 
 ### Debian or Ubuntu
 
 Download the matching v2.1.0 `.deb` and checksum from
-[GitHub Releases](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0),
+[GitHub Releases](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0),
 verify the checksum, then install it:
 
 ```bash
-sha256sum -c memory-layer_2.1.0_amd64.deb.sha256
-sudo dpkg -i memory-layer_2.1.0_amd64.deb
+sha256sum -c codifix_2.1.0_amd64.deb.sha256
+sudo dpkg -i codifix_2.1.0_amd64.deb
 ```
 
 Use the `arm64` filenames on 64-bit ARM Linux.
@@ -73,7 +73,7 @@ Use the `arm64` filenames on 64-bit ARM Linux.
 
 ```bash
 brew update
-brew upgrade 3vilM33pl3/memory/memory-layer
+brew upgrade 3vilM33pl3/codifix/codifix
 ```
 
 ### macOS package or Windows MSI
@@ -84,7 +84,7 @@ existing PostgreSQL/runtime tree. The standard package requires separately
 provisioned dependencies and refuses to overwrite a bundled runtime.
 
 Windows is a **preview**. Use the exact `-build.1` filenames in the release;
-the per-user installer uses `%LOCALAPPDATA%\Programs\Memory Layer`. Its separate
+the per-user installer uses `%LOCALAPPDATA%\Programs\Codifix`. Its separate
 server-tools MSI does not install the complete PostgreSQL/PDS/Pi stack.
 Signing and notarization status are stated in the release notes.
 
@@ -96,10 +96,10 @@ service restart and verification steps as your original source installation.
 ## 4. Restart and migrate
 
 ```bash
-memory service restart
-memory doctor
-memory health
-memory status --project <project-slug>
+codifix service restart
+codifix doctor
+codifix health
+codifix status --project <project-slug>
 ```
 
 The service embeds append-only migrations through 0084 and applies pending
@@ -110,22 +110,22 @@ Do not run an older binary against the migrated database. Once new writes have
 been accepted, preserve them and recover forward rather than restoring stale
 state as authority.
 
-Refresh repo-local Memory Layer skills only after reviewing the preview:
+Refresh repo-local Codifix skills only after reviewing the preview:
 
 ```bash
 cd /path/to/project
-memory upgrade --dry-run
-memory upgrade
+codifix upgrade --dry-run
+codifix upgrade
 ```
 
 ## 5. Verify integrations
 
 ```bash
 memory --version
-memory query --project <project-slug> --question "What changed recently?"
-memory resume --project <project-slug>
-memory watcher status --project <project-slug>
-memory mcp status
+codifix query --project <project-slug> --question "What changed recently?"
+codifix resume --project <project-slug>
+codifix watcher status --project <project-slug>
+codifix mcp status
 ```
 
 Direct API clients should fetch `GET /v1/openapi.yaml` from the upgraded

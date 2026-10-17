@@ -1,14 +1,14 @@
-# `memory federation`
+# `codifix federation`
 
 The Web, CLI and focused TUI use the same authenticated **local** federation API.
 Only administrator configuration selects the gateway, credentials and trust.
 This is the private-gateway profile, not native Spaces interoperability.
 
 ```bash
-memory federation --project example discover
-memory federation --project example status
-memory federation --project example catalog --offset 0
-memory federation --project example tui
+codifix federation --project example discover
+codifix federation --project example status
+codifix federation --project example catalog --offset 0
+codifix federation --project example tui
 ```
 
 All non-TUI responses are JSON. `--space UUID` optionally asserts the discovered
@@ -31,8 +31,8 @@ For a person using a local single-user instance, explicitly add
 `--local-human-session` before the subcommand:
 
 ```bash
-memory federation --project homelab --local-human-session capabilities
-memory federation --project memory --local-human-session tui
+codifix federation --project homelab --local-human-session capabilities
+codifix federation --project memory --local-human-session tui
 ```
 
 This checks the configured literal loopback address and local owner credential,
@@ -63,11 +63,11 @@ existing protected client configuration or secret-handling environment, never
 command-line arguments or review files.
 
 The synthetic real-client regression is opt-in: build the CLI first, set
-`MEMORY_LAYER_TEST_CLI_BINARY` to its absolute path and configure the documented
+`CODIFIX_TEST_CLI_BINARY` to its absolute path and configure the documented
 disposable PostgreSQL test database, then run:
 
 ```bash
-cargo test -p mem-service --lib --no-default-features federation_local_human_cli_real_session_and_csrf --locked -- --ignored --test-threads=1
+cargo test -p codifix-service --lib --no-default-features federation_local_human_cli_real_session_and_csrf --locked -- --ignored --test-threads=1
 ```
 
 This starts temporary loopback HTTP servers and checks session exchange,
@@ -100,8 +100,8 @@ CorrectionProposal: `target: {origin, canonical}`, `base_version`, `content`
 references. Only the origin owner can resolve it:
 
 ```bash
-memory federation --project example proposal --publisher UUID --record UUID
-memory federation --project example resolve --publisher UUID --record UUID --approve --request-id UUID --confirm
+codifix federation --project example proposal --publisher UUID --record UUID
+codifix federation --project example resolve --publisher UUID --record UUID --approve --request-id UUID --confirm
 ```
 
 Omitting `--approve` explicitly rejects the proposal. Approval advances the
@@ -133,9 +133,9 @@ CLI capability names are `pull`, `publish`, `manage-membership`,
 instance and permissions:
 
 ```bash
-memory federation --project example member --member UUID --capability ask-expertise --request-id UUID --confirm
-memory federation --project example member --member UUID --capability answer-expertise --revoke --request-id UUID --confirm
-memory federation --project example grant --principal UUID --capabilities pull,ask-expertise --confirm
+codifix federation --project example member --member UUID --capability ask-expertise --request-id UUID --confirm
+codifix federation --project example member --member UUID --capability answer-expertise --revoke --request-id UUID --confirm
+codifix federation --project example grant --principal UUID --capabilities pull,ask-expertise --confirm
 ```
 
 Use actual UUIDs and a distinct request ID for each new action; reuse the exact
@@ -153,16 +153,16 @@ a CLI token, and a client cannot choose an output destination flag.
 
 ## Explicit expertise workflow
 
-Watched Codex/Claude agents can use the separate `memory_expertise_agent_ask`
+Watched Codex/Claude agents can use the separate `codifix_expertise_agent_ask`
 MCP tool only when an operator has bound their exact service-token identity to
 a non-local output destination and an allowlist of reviewed collections. This
 is standing, task-driven consent, not the human per-question confirmation
 below. The question is deterministic-only, capped by the configured daily
 limit (at most 20), and its result is read with
-`memory_expertise_agent_result`. Exact retries retain the request UUID and
+`codifix_expertise_agent_result`. Exact retries retain the request UUID and
 bytes. Neither tool is a fallback for an unavailable addressed transport.
 
-`memory federation --project PROJECT agent-exchanges` shows the latest twenty
+`codifix federation --project PROJECT agent-exchanges` shows the latest twenty
 agent exchanges as request IDs, recipients, times and observed states only.
 The federation TUI has the same metadata-only view. `unknown` means the
 gateway could not verify current status; it is not a successful answer.
@@ -192,18 +192,18 @@ when a filtered page is empty. Select the answering instance and collection.
 Put only the exact question into a private UTF-8 file (1–4096 bytes), then:
 
 ```bash
-memory federation --project example ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
-memory federation --project example ask submit --file question-review.json --confirm
-memory federation --project example answer --request-id UUID
+codifix federation --project example ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
+codifix federation --project example ask submit --file question-review.json --confirm
+codifix federation --project example answer --request-id UUID
 ```
 
 On a single-user instance, add `--local-human-session` to **each** command before
 `ask` or `answer`; use it for collection administration as well. For example:
 
 ```bash
-memory federation --project homelab --local-human-session ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
-memory federation --project homelab --local-human-session ask submit --file question-review.json --confirm
-memory federation --project homelab --local-human-session answer --request-id UUID
+codifix federation --project homelab --local-human-session ask prepare --publisher UUID --collection UUID --request-id UUID --question-file question.txt
+codifix federation --project homelab --local-human-session ask submit --file question-review.json --confirm
+codifix federation --project homelab --local-human-session answer --request-id UUID
 ```
 
 Omit `--model-destination` for deterministic excerpts. Add
@@ -229,7 +229,7 @@ destination, gateway policy and reviewed collection consent.
 
 ## Focused terminal workspace
 
-`memory federation --project example tui` offers the same workflows without
+`codifix federation --project example tui` offers the same workflows without
 editing HTTP envelopes. F2/F3 select an operation, Tab changes fields, Ctrl-U
 clears a field, and typing edits it. F5 performs reads or displays an **exact
 mutation preview**; F6 confirms only that prepared body. PgUp/PgDn inspect the

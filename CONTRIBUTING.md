@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Memory Layer.
+Thanks for helping improve Codifix.
 
 ## License
 
@@ -26,13 +26,13 @@ Start with the code map: [docs/developer/architecture/code-map.md](docs/develope
 
 Pick the smallest PR shape that proves the change:
 
-- CLI command or output: `crates/mem-cli`, focused command tests, and the matching page under `docs/user/cli/`
-- service route or API behavior: `crates/mem-service`, `crates/mem-api`, route tests, and API/client docs
-- search or retrieval behavior: `crates/mem-search`, query diagnostics tests, and query docs
-- curation behavior: `crates/mem-curate`, replacement-proposal tests, and memory type docs
-- TUI tab: `crates/mem-cli/src/tui.rs` or the `crates/mem-cli/src/tui/` helpers, with TUI tests
+- CLI command or output: `crates/codifix-cli`, focused command tests, and the matching page under `docs/user/cli/`
+- service route or API behavior: `crates/codifix-service`, `crates/codifix-api`, route tests, and API/client docs
+- search or retrieval behavior: `crates/codifix-search`, query diagnostics tests, and query docs
+- curation behavior: `crates/codifix-curate`, replacement-proposal tests, and memory type docs
+- TUI tab: `crates/codifix-cli/src/tui.rs` or the `crates/codifix-cli/src/tui/` helpers, with TUI tests
 - browser tab: `web/src/features/<feature>/`, a component smoke test, and `npm --prefix web run build`
-- eval suite or scoring: `crates/mem-eval`, `memory eval doctor`, and `memory eval run --dry-run`
+- eval suite or scoring: `crates/codifix-eval`, `codifix eval doctor`, and `codifix eval run --dry-run`
 - migrations or DB behavior: a migration, repository/service tests, and pgvector-backed integration coverage when behavior depends on Postgres
 
 The refactor roadmap lives in [docs/reviews/refactor/README.md](docs/reviews/refactor/README.md).
@@ -53,9 +53,9 @@ npm --prefix web run build
 For a smaller Rust loop, test only the affected crates:
 
 ```bash
-cargo test -p mem-cli --all-targets --locked
-cargo test -p mem-service --all-targets --locked
-cargo test -p mem-eval --all-targets --locked
+cargo test -p codifix-cli --all-targets --locked
+cargo test -p codifix-service --all-targets --locked
+cargo test -p codifix-eval --all-targets --locked
 ```
 
 ### Build Disk Usage
@@ -85,22 +85,22 @@ with `CARGO_TARGET_DIR` can relieve a full filesystem, but does not reduce total
 storage usage.
 
 The repository's Memory helpers explicitly use the installed Workshop API for
-durable project notes through `.agents/memory-layer-command.json`. Dev helper
-tests can set `MEMCTL_BIN` to a preserved source executable to avoid rebuilding;
+durable project notes through `.agents/codifix-command.json`. Dev helper
+tests can set `CODIFIX_BIN` to a preserved source executable to avoid rebuilding;
 an explicit `cargo run` override may trigger a full rebuild. See
 [routing and recovery](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 
 ## Database Tests
 
 Most unit tests do not require a database. Pgvector-backed integration tests run
-when `MEMORY_LAYER_TEST_DATABASE_URL` is set.
+when `CODIFIX_TEST_DATABASE_URL` is set.
 
 Use a dedicated disposable database with the `vector` extension installed:
 
 ```bash
-export MEMORY_LAYER_TEST_DATABASE_URL='postgresql://memory:memory@127.0.0.1:5432/memory_test'
-export MEMORY_LAYER_TEST_REQUIRE_DB=1
-cargo test -p mem-test-support -p mem-graph -p mem-curate --locked
+export CODIFIX_TEST_DATABASE_URL='postgresql://memory:memory@127.0.0.1:5432/memory_test'
+export CODIFIX_TEST_REQUIRE_DB=1
+cargo test -p codifix-test-support -p codifix-graph -p codifix-curate --locked
 ```
 
 If your change touches migrations, SQL, graph persistence, curation persistence,
@@ -113,13 +113,13 @@ Eval suites are code execution inputs. Suites with `command_task`,
 explicit consent:
 
 ```bash
-memory eval run --suite evals/examples/app-build-smoke --profile offline --allow-shell
+codifix eval run --suite evals/examples/app-build-smoke --profile offline --allow-shell
 ```
 
 Use `--dry-run` first when reviewing a new suite:
 
 ```bash
-memory eval run --suite evals/examples/memory-smoke --profile offline --dry-run
+codifix eval run --suite evals/examples/memory-smoke --profile offline --dry-run
 ```
 
 ## PR Expectations

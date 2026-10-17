@@ -1,6 +1,6 @@
-# Memory Layer docs site
+# Codifix docs site
 
-This directory contains the Fumadocs / Next.js documentation website for Memory Layer. It is separate from the repository's existing `docs/` tree, which remains the source for internal/user/developer Markdown docs.
+This directory contains the Fumadocs / Next.js documentation website for Codifix. It is separate from the repository's existing `docs/` tree, which remains the source for internal/user/developer Markdown docs.
 
 The site is intended for Vercel deployment with `docs-site` as the project root. The canonical route prefix is `/docs`; the root page redirects there.
 

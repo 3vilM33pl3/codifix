@@ -1,6 +1,6 @@
 # Watcher Health
 
-This page explains how watcher liveness and recovery show up in Memory Layer.
+This page explains how watcher liveness and recovery show up in Codifix.
 
 ## Table of Contents
 
@@ -12,12 +12,12 @@ This page explains how watcher liveness and recovery show up in Memory Layer.
 
 ## What The Watcher Does
 
-`memory watcher` is the background process that watches a project and sends useful work context to `memory service`.
+`codifix watcher` is the background process that watches a project and sends useful work context to `codifix service`.
 
 On Linux, macOS, and Windows, the recommended path is the Codex-linked watcher manager:
 
 ```bash
-memory watcher manager enable
+codifix watcher manager enable
 ```
 
 That installs a persistent user manager service:
@@ -59,7 +59,7 @@ Watcher state is replaced atomically. If an older or interrupted watcher left in
 Legacy per-project service-managed watchers can still be installed with:
 
 ```bash
-memory watcher enable --project my-project
+codifix watcher enable --project my-project
 ```
 
 On Windows, manual tasks also support operator-owned area routing:
@@ -81,14 +81,14 @@ Linux/macOS routed installations continue to use the watcher manager.
 Manual foreground watchers can still be run with:
 
 ```bash
-memory watcher run --project my-project
+codifix watcher run --project my-project
 ```
 
-Treat the legacy service-managed and foreground watcher commands as advanced flows. For normal Codex-linked operation, prefer the watcher manager and use `memory status --project my-project` for a combined service, watcher, MCP, and doctor snapshot.
+Treat the legacy service-managed and foreground watcher commands as advanced flows. For normal Codex-linked operation, prefer the watcher manager and use `codifix status --project my-project` for a combined service, watcher, MCP, and doctor snapshot.
 
 ## Watcher Health States
 
-Memory Layer tracks watcher health with a heartbeat and watchdog.
+Codifix tracks watcher health with a heartbeat and watchdog.
 
 The main states are:
 
@@ -135,51 +135,51 @@ That makes it easier to tell the difference between:
 Enable the watcher manager:
 
 ```bash
-memory watcher manager enable
+codifix watcher manager enable
 ```
 
 Check watcher manager status:
 
 ```bash
-memory watcher manager status
+codifix watcher manager status
 ```
 
-The status output includes the manager mode, last reconcile reason and duration, process scan count, and lock owner PID. If another manager is already running, `memory watcher manager run` exits with the active PID instead of starting a duplicate.
+The status output includes the manager mode, last reconcile reason and duration, process scan count, and lock owner PID. If another manager is already running, `codifix watcher manager run` exits with the active PID instead of starting a duplicate.
 
 Enable a legacy service-managed watcher:
 
 ```bash
-memory watcher enable --project my-project
+codifix watcher enable --project my-project
 ```
 
 Check legacy watcher service status:
 
 ```bash
-memory watcher status --project my-project
+codifix watcher status --project my-project
 ```
 
 Disable the service-managed watcher:
 
 ```bash
-memory watcher disable --project my-project
+codifix watcher disable --project my-project
 ```
 
 Run a watcher manually:
 
 ```bash
-memory watcher run --project my-project
+codifix watcher run --project my-project
 ```
 
-## `memory watcher flush`
+## `codifix watcher flush`
 
 Flushes pending watcher-collected work into a capture (and optional curation)
 run immediately, instead of waiting for the idle threshold.
 
 **Migration note:** older documentation called this `memory automation flush`.
-Use `memory watcher flush`; `memory watcher status` replaces the old status
+Use `codifix watcher flush`; `codifix watcher status` replaces the old status
 guidance.
 
 ```bash
-memory watcher flush --project memory --dry-run
-memory watcher flush --project memory --curate
+codifix watcher flush --project memory --dry-run
+codifix watcher flush --project memory --curate
 ```

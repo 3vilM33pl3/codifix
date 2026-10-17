@@ -26,7 +26,7 @@ memory scores --project memory --limit 50 --json
   shortens the revalidation interval.
 - `VALIDATED` — date of the last successful validation.
 - Memories flagged by validation show `[NEEDS REVIEW]` and rank lower in
-  query results until resolved with `memory review`.
+  query results until resolved with `codifix review`.
 
 See `docs/developer/architecture/memory-reinforcement.md` for the scoring
 model and tuning knobs.

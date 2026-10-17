@@ -5,7 +5,7 @@ description: "Fix frequent setup, database, MCP, watcher, and eval failures."
 
 # Common errors
 
-![Memory Layer errors tab](/images/tui/errors-tab.png)
+![Codifix errors tab](/images/tui/errors-tab.png)
 
 ## `connection refused`
 
@@ -27,13 +27,13 @@ Fix: open a new shell, check the package install, and run `memory --version`.
 
 ## `Project not configured`
 
-The current repository has not been initialised for Memory Layer.
+The current repository has not been initialised for Codifix.
 
-Fix: run `memory wizard --dry-run` and then `memory wizard` from the project root.
+Fix: run `codifix wizard --dry-run` and then `codifix wizard` from the project root.
 
 ## Verify
 
 ```bash
-memory doctor
-memory status --project <project-slug>
+codifix doctor
+codifix status --project <project-slug>
 ```

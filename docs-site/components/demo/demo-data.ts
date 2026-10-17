@@ -90,7 +90,7 @@ export const demoSnapshot = {
       summary: "Docs site deploys from docs-site on Vercel",
       preview: "The public website is a separate Next/Fumadocs app with docs-site as the project root.",
       canonicalText:
-        "The Memory Layer website is deployed from the docs-site directory. Public docs live under /docs, static images live under docs-site/public/images, and app routes live under docs-site/app.",
+        "The Codifix website is deployed from the docs-site directory. Public docs live under /docs, static images live under docs-site/public/images, and app routes live under docs-site/app.",
       type: "documentation",
       status: "active",
       confidence: 0.9,
@@ -154,7 +154,7 @@ export const demoSnapshot = {
       summary: "Repo-local skills prefer the dev CLI",
       preview: "The Go skill helper resolves the source checkout before an installed memory binary.",
       canonicalText:
-        "Repo-local Memory Layer skills call the checkout CLI with cargo when they run inside the Memory source tree. This keeps dev-mode helpers on the dev service and avoids mixing installed CLI tokens with the repo dev endpoint.",
+        "Repo-local Codifix skills call the checkout CLI with cargo when they run inside the Memory source tree. This keeps dev-mode helpers on the dev service and avoids mixing installed CLI tokens with the repo dev endpoint.",
       type: "implementation",
       status: "active",
       confidence: 0.91,
@@ -163,8 +163,8 @@ export const demoSnapshot = {
       sources: [
         {
           kind: "file",
-          path: ".agents/skills/memory-layer/scripts/main.go",
-          excerpt: "The resolver checks the source Cargo.toml and crates/mem-cli manifest before falling back to PATH.",
+          path: ".agents/skills/codifix/scripts/main.go",
+          excerpt: "The resolver checks the source Cargo.toml and crates/codifix-cli manifest before falling back to PATH.",
         },
       ],
       related: [
@@ -198,7 +198,7 @@ export const demoSnapshot = {
       summary: "MCP adapter is read-first",
       preview: "The built-in MCP server exposes query, resume, overview, activities, and memory inspection tools.",
       canonicalText:
-        "The built-in MCP server is a protocol adapter over the existing Memory service API. The v1 surface is read-first and does not expose remember, curate, archive, delete, reindex, or proposal approval tools.",
+        "The built-in MCP server is a protocol adapter over the existing Codifix service API. The v1 surface is read-first and does not expose remember, curate, archive, delete, reindex, or proposal approval tools.",
       type: "architecture",
       status: "active",
       confidence: 0.87,
@@ -207,7 +207,7 @@ export const demoSnapshot = {
       sources: [
         {
           kind: "file",
-          path: "crates/mem-mcp/src/lib.rs",
+          path: "crates/codifix-mcp/src/lib.rs",
           excerpt: "MCP tools call the Memory API client instead of touching persistence directly.",
         },
       ],
@@ -251,7 +251,7 @@ export const demoSnapshot = {
       sources: [
         {
           kind: "file",
-          path: "crates/mem-cli/src/tui/tabs/memories.rs",
+          path: "crates/codifix-cli/src/tui/tabs/memories.rs",
           excerpt: "Selection and detail rendering are handled together in the Memories tab.",
         },
       ],
@@ -306,9 +306,9 @@ export const demoSnapshot = {
     {
       id: "mem-watchers-dev",
       summary: "Dev watcher state is project-scoped",
-      preview: "The Memory repo dev profile uses project-local runtime paths and foreground cargo services.",
+      preview: "The Codifix repo dev profile uses project-local runtime paths and foreground cargo services.",
       canonicalText:
-        "When running the Memory repo in dev mode, service and watcher state is scoped to the project dev runtime. A cargo-run service is foreground and should not be treated as a background packaged service.",
+        "When running the Codifix repo in dev mode, service and watcher state is scoped to the project dev runtime. A cargo-run service is foreground and should not be treated as a background packaged service.",
       type: "environment",
       status: "active",
       confidence: 0.85,
@@ -317,7 +317,7 @@ export const demoSnapshot = {
       sources: [
         {
           kind: "file",
-          path: ".mem/config.dev.toml",
+          path: ".codifix/config.dev.toml",
           excerpt: "The dev profile binds to the project-specific 4250/4251 endpoints.",
         },
       ],
@@ -335,7 +335,7 @@ export const demoSnapshot = {
       tokens: "92k / 256k",
       contextPressure: "36%",
       session: "web-demo-build",
-      childProcesses: ["next dev", "cargo run --bin memory -- service run"],
+      childProcesses: ["next dev", "cargo run --bin codifix -- service run"],
       ports: ["3001", "4040"],
       rateLimit: "normal",
     },
@@ -371,7 +371,7 @@ export const demoSnapshot = {
       tokens: "17k / 128k",
       contextPressure: "13%",
       session: "loop-control-plane",
-      childProcesses: ["memory loops run --dry-run"],
+      childProcesses: ["codifix loops run --dry-run"],
       ports: [],
       rateLimit: "low",
     },
@@ -379,7 +379,7 @@ export const demoSnapshot = {
   query: {
     question: "How does the graph tab decide what memory to show?",
     answer:
-      "The Graph tab starts from the selected code node, finds matching memory source records, and expands through the memory graph by the selected degree. Direct attachments are shown as code-to-memory links in the browser.",
+      "The Graph tab starts from the selected code node, finds matching memory source records, and expands through the codifix graph by the selected degree. Direct attachments are shown as code-to-memory links in the browser.",
     confidence: 0.88,
     diagnostics: [
       "lexical 64 / 23 ms",
@@ -405,13 +405,13 @@ export const demoSnapshot = {
       { id: "code-api", label: "getMemoryGraph", kind: "code", group: "api", detail: "web/src/api.ts" },
       { id: "code-demo", label: "WebUiDemoApp", kind: "code", group: "docs-site", detail: "docs-site/components/demo/demo-app.tsx" },
       { id: "code-demo-data", label: "demoSnapshot", kind: "code", group: "docs-site", detail: "docs-site/components/demo/demo-data.ts" },
-      { id: "code-mcp", label: "MCP server", kind: "code", group: "api", detail: "crates/mem-mcp/src/lib.rs" },
-      { id: "code-service-auth", label: "require_token", kind: "code", group: "api", detail: "crates/mem-service/src/auth.rs" },
-      { id: "code-skill-helper", label: "skill helper", kind: "code", group: "skills", detail: ".agents/skills/memory-layer/scripts/main.go" },
-      { id: "code-curator", label: "curator", kind: "code", group: "service", detail: "crates/mem-service/src/repository/handlers/curation.rs" },
-      { id: "code-tui-memories", label: "TUI memories", kind: "code", group: "tui", detail: "crates/mem-cli/src/tui/tabs/memories.rs" },
-      { id: "code-loop", label: "loop control", kind: "code", group: "service", detail: "crates/mem-service/src/repository/handlers/loops.rs" },
-      { id: "code-embeddings", label: "embeddings", kind: "code", group: "search", detail: "crates/mem-search/src/lib.rs" },
+      { id: "code-mcp", label: "MCP server", kind: "code", group: "api", detail: "crates/codifix-mcp/src/lib.rs" },
+      { id: "code-service-auth", label: "require_token", kind: "code", group: "api", detail: "crates/codifix-service/src/auth.rs" },
+      { id: "code-skill-helper", label: "skill helper", kind: "code", group: "skills", detail: ".agents/skills/codifix/scripts/main.go" },
+      { id: "code-curator", label: "curator", kind: "code", group: "service", detail: "crates/codifix-service/src/repository/handlers/curation.rs" },
+      { id: "code-tui-memories", label: "TUI memories", kind: "code", group: "tui", detail: "crates/codifix-cli/src/tui/tabs/memories.rs" },
+      { id: "code-loop", label: "loop control", kind: "code", group: "service", detail: "crates/codifix-service/src/repository/handlers/loops.rs" },
+      { id: "code-embeddings", label: "embeddings", kind: "code", group: "search", detail: "crates/codifix-search/src/lib.rs" },
       { id: "memory-radius", label: "Graph radius memory", kind: "memory", group: "memory", detail: "Client-side degree filtering" },
       { id: "memory-docs", label: "Docs site memory", kind: "memory", group: "memory", detail: "Vercel docs-site deployment" },
       { id: "memory-auth", label: "Auth helper memory", kind: "memory", group: "memory", detail: "Dev CLI resolver behavior" },
@@ -425,7 +425,7 @@ export const demoSnapshot = {
       { id: "memory-watchers-dev", label: "Dev watcher state", kind: "memory", group: "memory", detail: "Project-scoped dev runtime" },
       { id: "source-graph", label: "GraphTab.tsx source", kind: "source", group: "source", detail: "Verified file source" },
       { id: "source-demo", label: "Demo component source", kind: "source", group: "source", detail: "docs-site/components/demo/demo-app.tsx" },
-      { id: "source-helper", label: "Helper source", kind: "source", group: "source", detail: ".agents/skills/memory-layer/scripts/main.go" },
+      { id: "source-helper", label: "Helper source", kind: "source", group: "source", detail: ".agents/skills/codifix/scripts/main.go" },
       { id: "source-schema", label: "Graph schema", kind: "source", group: "source", detail: "migrations/0015_code_graph.sql" },
       { id: "source-docs", label: "CLI docs source", kind: "source", group: "source", detail: "docs-site/content/docs/reference/cli/index.mdx" },
     ] satisfies DemoGraphNode[],
@@ -469,16 +469,16 @@ export const demoSnapshot = {
     { kind: "graph_extract", summary: "Extracted 846 graph nodes and 1421 edges", duration: "31 s", tokens: "n/a" },
     { kind: "checkpoint", summary: "Saved direct task checkpoint for docs-site demo work", duration: "139 ms", tokens: "n/a" },
     { kind: "watcher_health", summary: "Watcher manager reported one active project watcher", duration: "48 ms", tokens: "n/a" },
-    { kind: "mcp", summary: "Listed read-only MCP tools for memory project", duration: "411 ms", tokens: "n/a" },
+    { kind: "mcp", summary: "Listed read-only MCP tools for codifix project", duration: "411 ms", tokens: "n/a" },
     { kind: "embedding", summary: "Reindexed 217 stale memory chunks", duration: "18 s", tokens: "n/a" },
-    { kind: "bundle_export", summary: "Previewed memory bundle with relations and provenance", duration: "531 ms", tokens: "n/a" },
+    { kind: "bundle_export", summary: "Previewed codifix bundle with relations and provenance", duration: "531 ms", tokens: "n/a" },
   ],
   errors: [
     {
       code: "service_auth_failed",
       severity: "error",
       message: "401 Unauthorized invalid api token",
-      fix: "Run memory doctor and verify the service api token in local config.",
+      fix: "Run codifix doctor and verify the service api token in local config.",
     },
     {
       code: "webgl_unavailable",
@@ -490,13 +490,13 @@ export const demoSnapshot = {
       code: "service_down",
       severity: "error",
       message: "Could not reach http://127.0.0.1:4250/healthz",
-      fix: "Start the foreground dev service with cargo run --bin memory -- service run.",
+      fix: "Start the foreground dev service with cargo run --bin codifix -- service run.",
     },
     {
       code: "stale_skill_bundle",
       severity: "warning",
       message: "Repo-local skills do not match the installed template.",
-      fix: "Run memory doctor --repair-skills after reviewing the diff.",
+      fix: "Run codifix doctor --repair-skills after reviewing the diff.",
     },
   ],
   proposals: [
@@ -540,13 +540,13 @@ export const demoSnapshot = {
     { repo: "/workspace/memory-loop", state: "paused", heartbeat: "18m ago", owner: "loop automation", restarts: 0 },
   ],
   skills: [
-    { name: "memory-layer", status: "current", version: "0.9.5", path: ".agents/skills/memory-layer/SKILL.md" },
-    { name: "memory-query-resume", status: "current", version: "0.9.5", path: ".agents/skills/memory-query-resume/SKILL.md" },
-    { name: "memory-review-proposals", status: "outdated", version: "0.9.4", path: ".agents/skills/memory-review-proposals/SKILL.md" },
-    { name: "memory-direct-task-start", status: "current", version: "0.9.5", path: ".agents/skills/memory-direct-task-start/SKILL.md" },
-    { name: "memory-plan-execution", status: "current", version: "0.9.5", path: ".agents/skills/memory-plan-execution/SKILL.md" },
-    { name: "memory-remember", status: "current", version: "0.9.5", path: ".agents/skills/memory-remember/SKILL.md" },
-    { name: "memory-project-init", status: "current", version: "0.9.5", path: ".agents/skills/memory-project-init/SKILL.md" },
+    { name: "codifix", status: "current", version: "0.9.5", path: ".agents/skills/codifix/SKILL.md" },
+    { name: "codifix-query-resume", status: "current", version: "0.9.5", path: ".agents/skills/codifix-query-resume/SKILL.md" },
+    { name: "codifix-review-proposals", status: "outdated", version: "0.9.4", path: ".agents/skills/codifix-review-proposals/SKILL.md" },
+    { name: "codifix-direct-task-start", status: "current", version: "0.9.5", path: ".agents/skills/codifix-direct-task-start/SKILL.md" },
+    { name: "codifix-plan-execution", status: "current", version: "0.9.5", path: ".agents/skills/codifix-plan-execution/SKILL.md" },
+    { name: "codifix-remember", status: "current", version: "0.9.5", path: ".agents/skills/codifix-remember/SKILL.md" },
+    { name: "codifix-project-init", status: "current", version: "0.9.5", path: ".agents/skills/codifix-project-init/SKILL.md" },
   ],
   embeddings: [
     { provider: "openai", model: "text-embedding-3-large", search: true, creation: true, fresh: 2860, stale: 109 },

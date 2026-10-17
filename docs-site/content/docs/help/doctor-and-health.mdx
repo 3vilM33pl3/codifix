@@ -1,29 +1,29 @@
 ---
 title: "Doctor and health"
-description: "Use `memory doctor`, `memory health`, and `memory status` correctly."
+description: "Use `codifix doctor`, `codifix health`, and `codifix status` correctly."
 ---
 
 # Doctor and health
 
-`memory doctor` checks configuration, database, providers, skills, and environment readiness.
+`codifix doctor` checks configuration, database, providers, skills, and environment readiness.
 
-`memory health` checks whether the backend service is reachable.
+`codifix health` checks whether the backend service is reachable.
 
-`memory status --project <project-slug>` combines service, project, watcher, MCP, and diagnostic state into one payload.
+`codifix status --project <project-slug>` combines service, project, watcher, MCP, and diagnostic state into one payload.
 
 ## When to run each
 
 | Situation | Command |
 |---|---|
-| Fresh install | `memory doctor` then `memory health` |
-| Service outage | `memory health` |
-| Agent cannot find project memory | `memory status --project <project-slug>` |
-| Provider or embedding problem | `memory doctor` |
-| Repo-local skills are missing or stale | `memory doctor --fix` |
+| Fresh install | `codifix doctor` then `codifix health` |
+| Service outage | `codifix health` |
+| Agent cannot find project memory | `codifix status --project <project-slug>` |
+| Provider or embedding problem | `codifix doctor` |
+| Repo-local skills are missing or stale | `codifix doctor --fix` |
 
 ## Skill checks
 
-Doctor compares repo-local `.agents/skills/` with the local installed template and, when reachable, the current GitHub skill bundle. `memory doctor --fix` downloads the GitHub bundle, repairs missing or outdated Memory-owned skills, and falls back to the installed template when offline.
+Doctor compares repo-local `.agents/skills/` with the local installed template and, when reachable, the current GitHub skill bundle. `codifix doctor --fix` downloads the GitHub bundle, repairs missing or outdated Memory-owned skills, and falls back to the installed template when offline.
 
 The TUI and Web UI Skills tabs expose the same inventory and repair path when you want to inspect the exact `SKILL.md` file before fixing it.
 

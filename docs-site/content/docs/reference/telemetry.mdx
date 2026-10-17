@@ -5,7 +5,7 @@ description: "Strictly opt-in usage counts. Off by default, no default collector
 
 # Telemetry
 
-Memory Layer ships with usage telemetry that is **off by default and stays off** unless you explicitly turn it on. There is deliberately **no default collector endpoint**: even setting `enabled = true` sends nothing until you also configure where events should go.
+Codifix ships with usage telemetry that is **off by default and stays off** unless you explicitly turn it on. There is deliberately **no default collector endpoint**: even setting `enabled = true` sends nothing until you also configure where events should go.
 
 ```toml
 # global config — both keys are required before anything is sent
@@ -20,10 +20,10 @@ When fully opted in, exactly these events are recorded, as counts:
 
 | Event | When |
 |---|---|
-| `demo_completed` | `memory demo` finished seeding the showcase project. |
-| `tour_completed` | `memory tour` ran all three steps. |
+| `demo_completed` | `codifix demo` finished seeding the showcase project. |
+| `tour_completed` | `codifix tour` ran all three steps. |
 
-Each payload contains only: the event name, the Memory Layer version, the operating system name (`linux` / `macos`), and an anonymous instance id — a random UUID generated locally and stored in your state directory, carrying no machine or user information.
+Each payload contains only: the event name, the Codifix version, the operating system name (`linux` / `macos`), and an anonymous instance id — a random UUID generated locally and stored in your state directory, carrying no machine or user information.
 
 **Never sent:** project names, queries, answers, memory content, file paths, hostnames, usernames, tokens, or anything derived from your data.
 

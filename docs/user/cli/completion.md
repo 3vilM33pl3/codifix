@@ -1,13 +1,13 @@
 # Shell Completion
 
-Use `memory completion` to generate shell completion scripts from the same command metadata that powers `memory --help`.
+Use `codifix completion` to generate shell completion scripts from the same command metadata that powers `memory --help`.
 
 Supported shells:
 
 ```bash
-memory completion bash
-memory completion zsh
-memory completion fish
+codifix completion bash
+codifix completion zsh
+codifix completion fish
 ```
 
 ## Package Installs
@@ -29,20 +29,20 @@ Bash:
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions
-memory completion bash > ~/.local/share/bash-completion/completions/memory
+codifix completion bash > ~/.local/share/bash-completion/completions/memory
 ```
 
 For the current bash session only:
 
 ```bash
-source <(memory completion bash)
+source <(codifix completion bash)
 ```
 
 Zsh:
 
 ```bash
 mkdir -p ~/.zfunc
-memory completion zsh > ~/.zfunc/_memory
+codifix completion zsh > ~/.zfunc/_memory
 ```
 
 Add this before `compinit` in `~/.zshrc` if `~/.zfunc` is not already in `fpath`:
@@ -57,7 +57,7 @@ Fish:
 
 ```fish
 mkdir -p ~/.config/fish/completions
-memory completion fish > ~/.config/fish/completions/memory.fish
+codifix completion fish > ~/.config/fish/completions/memory.fish
 ```
 
 ## Development Builds
@@ -65,12 +65,12 @@ memory completion fish > ~/.config/fish/completions/memory.fish
 When running from source, generate completions with the development binary:
 
 ```bash
-cargo run --bin memory -- completion bash
-cargo run --bin memory -- completion zsh
-cargo run --bin memory -- completion fish
+cargo run --bin codifix -- completion bash
+cargo run --bin codifix -- completion zsh
+cargo run --bin codifix -- completion fish
 ```
 
-The generated scripts include root commands such as `memory service`, `memory watcher`, `memory query`, and nested subcommands such as `memory watcher manager`.
+The generated scripts include root commands such as `codifix service`, `codifix watcher`, `codifix query`, and nested subcommands such as `codifix watcher manager`.
 
 ## Related Docs
 

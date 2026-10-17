@@ -1,6 +1,6 @@
 ---
 title: "Install"
-description: "Install Memory Layer, configure PostgreSQL with pgvector, and initialise your first project."
+description: "Install Codifix, configure PostgreSQL with pgvector, and initialise your first project."
 ---
 
 # Install
@@ -8,13 +8,13 @@ description: "Install Memory Layer, configure PostgreSQL with pgvector, and init
 The fastest paths are the [five-minute quickstart](/docs/quickstart) or the one-line installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/3vilM33pl3/memory/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/3vilM33pl3/codifix/main/scripts/install.sh | sh
 ```
 
 The installer detects your platform, checks whether PostgreSQL is reachable, and points you at the bundled Docker stack when none is found.
 
 The current stable release is
-[v2.1.0](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0). If you are
+[v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0). If you are
 upgrading from v1, stop here and use the [Update guide](/docs/install/update)
 before restarting the service.
 
@@ -32,7 +32,7 @@ before restarting the service.
   </Card>
 </CardGroup>
 
-Memory Layer runs as a native background service (`memory-layer.service` on Linux, a launchd agent on macOS) that manages the database connection, curation pipeline, and embedding backends. The `memory` CLI and TUI communicate with this service over a local socket, so nothing leaves your machine unless you configure an external embedding or LLM provider.
+Codifix runs as a native background service (`codifix.service` on Linux, a launchd agent on macOS) that manages the database connection, curation pipeline, and embedding backends. The `codifix` CLI and TUI communicate with this service over a local socket, so nothing leaves your machine unless you configure an external embedding or LLM provider.
 
 ## Prerequisites
 
@@ -42,25 +42,25 @@ You need a PostgreSQL database with the pgvector extension enabled. See [Postgre
 |---|---|---|
 | PostgreSQL | Durable storage for projects, captures, memories, activity, and history. | `psql "$DATABASE_URL" -c "SELECT 1;"` |
 | pgvector | Vector storage for semantic retrieval. | `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` |
-| `memory` binary | CLI, TUI launcher, service management, MCP, evals. | `memory --version` (current release: `2.1.0`) |
-| Optional LLM provider | Better curation, summaries, and answer synthesis. | `memory doctor` |
-| Optional embedding provider | Semantic search and graph-enhanced retrieval quality. | `memory embeddings list` |
+| `codifix` binary | CLI, TUI launcher, service management, MCP, evals. | `memory --version` (current release: `2.1.0`) |
+| Optional LLM provider | Better curation, summaries, and answer synthesis. | `codifix doctor` |
+| Optional embedding provider | Semantic search and graph-enhanced retrieval quality. | `codifix embeddings list` |
 
 ## Configure
 
 ```bash
 cd /path/to/project
-memory wizard
+codifix wizard
 ```
 
-`memory wizard` runs the setup flow once, covering the machine configuration and, when run inside a repository, the repo-local project setup. Secrets are written outside your repository so they are never committed. Use `memory wizard --dry-run` to preview every file and service action first.
+`codifix wizard` runs the setup flow once, covering the machine configuration and, when run inside a repository, the repo-local project setup. Secrets are written outside your repository so they are never committed. Use `codifix wizard --dry-run` to preview every file and service action first.
 
 ## Verify
 
 ```bash
-memory doctor
-memory health
-memory status --project <project-slug>
+codifix doctor
+codifix health
+codifix status --project <project-slug>
 ```
 
 `doctor` checks configuration and dependencies. `health` checks the backend service. `status` combines service, project, watcher, and MCP diagnostics.

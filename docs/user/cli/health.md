@@ -1,13 +1,13 @@
-# `memory health`
+# `codifix health`
 
 These two commands are lightweight operational checks.
 
-For first-line diagnosis, prefer [`memory status`](status.md). It aggregates service reachability, config, watcher state, MCP status, and doctor checks. `health` remains useful for narrow service-health scripts; there is no separate `memory stats` command.
+For first-line diagnosis, prefer [`codifix status`](status.md). It aggregates service reachability, config, watcher state, MCP status, and doctor checks. `health` remains useful for narrow service-health scripts; there is no separate `memory stats` command.
 
-## `memory health`
+## `codifix health`
 
 ```bash
-memory health
+codifix health
 ```
 
 Returns backend service health, database status, instance identity, and version information.

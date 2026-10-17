@@ -1,52 +1,52 @@
 ---
 title: "CLI: integrations, automations, and evals"
-description: "Open the TUI, manage watchers, operate loop automations, run MCP, and evaluate Memory Layer behavior."
+description: "Open the TUI, manage watchers, operate loop automations, run MCP, and evaluate Codifix behavior."
 ---
 
 # CLI: integrations, automations, and evals
 
-These commands connect Memory Layer to humans, agents, built-in loop automations, MCP clients, and evaluation suites.
+These commands connect Codifix to humans, agents, built-in loop automations, MCP clients, and evaluation suites.
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory tui` | Mostly read | Open the terminal UI. |
-| `memory auth` | Mixed | Inspect identity and administer scoped service access. |
-| `memory agent` | Yes | Coordinate concurrent agent branches and worktrees. |
-| `memory watcher` | Yes | Manage project watchers and watcher daemons. |
-| `memory loops` | Mixed | Inspect and operate built-in automation loops. |
-| `memory mcp` | Mixed | Run and inspect the built-in Memory MCP server. |
-| `memory eval` | Yes | Run automated Memory quality evaluations. |
+| `codifix tui` | Mostly read | Open the terminal UI. |
+| `codifix auth` | Mixed | Inspect identity and administer scoped service access. |
+| `codifix agent` | Yes | Coordinate concurrent agent branches and worktrees. |
+| `codifix watcher` | Yes | Manage project watchers and watcher daemons. |
+| `codifix loops` | Mixed | Inspect and operate built-in automation loops. |
+| `codifix mcp` | Mixed | Run and inspect the built-in Codifix MCP server. |
+| `codifix eval` | Yes | Run automated Memory quality evaluations. |
 
-## `memory tui`
+## `codifix tui`
 
 Open the main terminal interface.
 
 ```bash
-memory tui
-memory tui --project memory
+codifix tui
+codifix tui --project memory
 ```
 
 The TUI gives humans a dense view of memories, query evidence, replacement proposals, agents, watchers, activities, embeddings, errors, and project status.
 
-## `memory auth`
+## `codifix auth`
 
 Use `auth` to verify the credential seen by the backend and to administer scoped service tokens. For browser identity, project membership, and Authentik setup, see [Authentication](/docs/reference/authentication).
 
 ```bash
-memory auth whoami
-memory auth token list
+codifix auth whoami
+codifix auth token list
 ```
 
-## `memory agent`
+## `codifix agent`
 
 Record which local agents are working on which branches or worktrees.
 
 ```bash
-memory agent start --project memory --task "Graph UI follow-up"
-memory agent status --project memory
-memory agent status --project memory --include-finished --json
-memory agent finish --project memory --summary "Pushed graph UI follow-up"
-memory agent finish --project memory --abandoned --summary "Superseded by main"
+codifix agent start --project memory --task "Graph UI follow-up"
+codifix agent status --project memory
+codifix agent status --project memory --include-finished --json
+codifix agent finish --project memory --summary "Pushed graph UI follow-up"
+codifix agent finish --project memory --abandoned --summary "Superseded by main"
 ```
 
 `start` reads local Git metadata and records the repository root, worktree path,
@@ -57,69 +57,69 @@ heartbeats. `finish` marks one workspace completed or abandoned and records the
 final head, dirty files, pushed state, optional summary, and optional merge
 commit.
 
-## `memory watcher`
+## `codifix watcher`
 
 Watchers attach to active agent sessions and record useful runtime state.
 
 ```bash
-memory watcher manager enable --dry-run
-memory watcher manager status
-memory watcher run --project memory
-memory watcher status --project memory
-memory status --project memory
+codifix watcher manager enable --dry-run
+codifix watcher manager status
+codifix watcher run --project memory
+codifix watcher status --project memory
+codifix status --project memory
 ```
 
 The watcher manager is the preferred local automation path for Codex-linked sessions. Legacy per-project watcher services and foreground watcher runs remain compatibility paths.
 
-## `memory loops`
+## `codifix loops`
 
 Operate the built-in loop automation control plane.
 
 ```bash
-memory loops list
-memory loops show memory_hygiene --project memory
-memory loops enable memory_hygiene --project memory --mode suggest_only --explicit-user-approval
-memory loops run memory_hygiene --project memory --dry-run --reason "inspect cleanup candidates"
-memory loops runs --project memory
-memory loops inspect <run-id>
-memory loops approvals --project memory
-memory loops memory-proposals --project memory --status pending
+codifix loops list
+codifix loops show memory_hygiene --project memory
+codifix loops enable memory_hygiene --project memory --mode suggest_only --explicit-user-approval
+codifix loops run memory_hygiene --project memory --dry-run --reason "inspect cleanup candidates"
+codifix loops runs --project memory
+codifix loops inspect <run-id>
+codifix loops approvals --project memory
+codifix loops memory-proposals --project memory --status pending
 ```
 
-Use `memory loops` for the Automations tab workflows from a terminal: definitions, settings, trigger routing, manual runs, context packs, approvals, and loop-produced memory proposals. See [Automations](/docs/automations) for the built-in loop catalog and safety model.
+Use `codifix loops` for the Automations tab workflows from a terminal: definitions, settings, trigger routing, manual runs, context packs, approvals, and loop-produced memory proposals. See [Automations](/docs/automations) for the built-in loop catalog and safety model.
 
-## `memory watcher flush`
+## `codifix watcher flush`
 
 Flush pending watcher-collected work into captures when waiting for the idle threshold is not useful. This writes state, so start with a dry run.
 
 ```bash
-memory watcher flush --project memory --dry-run
-memory watcher flush --project memory --curate
+codifix watcher flush --project memory --dry-run
+codifix watcher flush --project memory --curate
 ```
 
-**Migration note:** older documentation used `memory automation flush`. The current command is `memory watcher flush`. Use `memory loops` for the built-in automation control plane.
+**Migration note:** older documentation used `memory automation flush`. The current command is `codifix watcher flush`. Use `codifix loops` for the built-in automation control plane.
 
-## `memory mcp`
+## `codifix mcp`
 
 Run the local stdio MCP server or inspect service-mounted HTTP MCP.
 
 ```bash
-memory mcp run --project memory
-memory mcp status --project memory
-memory mcp status --project memory --json
+codifix mcp run --project memory
+codifix mcp status --project memory
+codifix mcp status --project memory --json
 ```
 
 Stdio mode is the normal local Codex/Claude path and must write only MCP JSON-RPC messages to stdout. HTTP MCP is local-first and should require token-bearing clients.
 
-## `memory eval`
+## `codifix eval`
 
 Run repeatable memory-quality suites.
 
 ```bash
-memory eval doctor --suite evals/examples/memory-smoke
-memory eval run --suite evals/suites/memory-improvement-v1 --condition full-memory --dry-run
-memory eval compare --baseline target/memory-evals/no-memory.json --candidate target/memory-evals/full-memory.json --text
-memory eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
+codifix eval doctor --suite evals/examples/memory-smoke
+codifix eval run --suite evals/suites/memory-improvement-v1 --condition full-memory --dry-run
+codifix eval compare --baseline target/memory-evals/no-memory.json --candidate target/memory-evals/full-memory.json --text
+codifix eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml
 ```
 
 Use dry-runs before shell-enabled suites. Evaluation artifacts are evidence for bounded claims about the suite, model, commit, configuration, retrieval settings, token cost, and latency.

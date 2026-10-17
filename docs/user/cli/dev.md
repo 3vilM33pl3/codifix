@@ -1,20 +1,20 @@
-# `memory dev`
+# `codifix dev`
 
-`memory dev` manages the isolated development-profile overlay used when running Memory Layer from a source checkout.
+`codifix dev` manages the isolated development-profile overlay used when running Codifix from a source checkout.
 
-Use it only when developing Memory Layer itself. Normal users should use `memory wizard --global`, `memory wizard`, and the packaged service commands.
+Use it only when developing Codifix itself. Normal users should use `codifix wizard --global`, `codifix wizard`, and the packaged service commands.
 
 ## Common Usage
 
 ```bash
-memory dev --copy-from-global
-memory dev --dry-run
-memory dev --no-copy-from-global
+codifix dev --copy-from-global
+codifix dev --dry-run
+codifix dev --no-copy-from-global
 ```
 
 ## What It Creates
 
-`memory dev` creates the user-local project `config.dev.toml` and dev runtime directory. Dev-profile binaries use separate defaults from installed packages:
+`codifix dev` creates the user-local project `config.dev.toml` and dev runtime directory. Dev-profile binaries use separate defaults from installed packages:
 
 | Stack | HTTP |
 |---|---|

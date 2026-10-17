@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "From nothing to a working Memory Layer with a demo project in about five minutes."
+description: "From nothing to a working Codifix with a demo project in about five minutes."
 ---
 
 # Quickstart
@@ -15,22 +15,22 @@ From a clone of the repository:
 docker compose up
 ```
 
-That starts PostgreSQL with pgvector, the Memory Layer service, and the web UI. When it settles, the service is listening on `http://localhost:4040`.
+That starts PostgreSQL with pgvector, the Codifix service, and the web UI. When it settles, the service is listening on `http://localhost:4040`.
 
 ## 2. Load the demo project
 
 In another terminal:
 
 ```bash
-docker compose exec memory memory demo
+docker compose exec memory codifix demo
 ```
 
-This seeds a project called `demo` with a small, curated set of memories about Memory Layer itself.
+This seeds a project called `demo` with a small, curated set of memories about Codifix itself.
 
 ## 3. Ask it something
 
 ```bash
-docker compose exec memory memory query --project demo --question "How does reinforcement work?"
+docker compose exec memory codifix query --project demo --question "How does reinforcement work?"
 ```
 
 You get a short, cited answer drawn from the demo memories, with a confidence score and an honest signal when the evidence is thin.
@@ -38,10 +38,10 @@ You get a short, cited answer drawn from the demo memories, with a confidence sc
 ## 4. Explore
 
 ```bash
-docker compose exec memory memory tui
+docker compose exec memory codifix tui
 ```
 
-The terminal UI lets you browse and search every memory, inspect where each came from, and open the memory graph. The [web UI](/docs/web-ui) at `http://localhost:4040` shows the same data with wider panes and a 3D graph view.
+The terminal UI lets you browse and search every memory, inspect where each came from, and open the codifix graph. The [web UI](/docs/web-ui) at `http://localhost:4040` shows the same data with wider panes and a 3D graph view.
 
 ## Next steps
 

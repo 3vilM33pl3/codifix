@@ -5,7 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import { type DemoGraphLink, type DemoGraphNode, type DemoMemory, type DemoTab, demoSnapshot, demoTabs } from "./demo-data";
 import { type DemoQueryResponse, runDemoQuery } from "./demo-search";
 
-const backendOnlyMessage = "Demo only: this action needs a running local Memory Layer service.";
+const backendOnlyMessage = "Demo only: this action needs a running local Codifix service.";
 
 export function WebUiDemoApp() {
   const [tab, setTab] = useState<DemoTab>("memories");
@@ -72,10 +72,10 @@ export function WebUiDemoApp() {
     <main className="demo-shell">
       <header className="demo-topbar">
         <div>
-          <p className="demo-eyebrow">Memory Layer Web demo</p>
+          <p className="demo-eyebrow">Codifix Web demo</p>
           <h1>Explore the browser UI without a backend</h1>
           <p>
-            This is a sanitized static snapshot of the local Memory project. It shows every Web UI surface and simulates
+            This is a sanitized static snapshot of the local Codifix project. It shows every Web UI surface and simulates
             browser-only interactions.
           </p>
         </div>
@@ -806,7 +806,7 @@ function ErrorsDemo({ onBackendOnly }: { onBackendOnly: (action: string) => void
     <section className="demo-panel demo-detail">
       <div className="demo-detail-header">
         <div><h2>Diagnostics</h2><p>Persisted and browser-session errors with concrete repair hints.</p></div>
-        <button type="button" onClick={() => onBackendOnly("Running memory doctor requires local CLI access.")}>Run doctor</button>
+        <button type="button" onClick={() => onBackendOnly("Running codifix doctor requires local CLI access.")}>Run doctor</button>
       </div>
       <div className="demo-card-stack">
         {demoSnapshot.errors.map((error) => (
@@ -894,7 +894,7 @@ function SkillsDemo({ selectedIndex, onSelect, onBackendOnly }: { selectedIndex:
       detail={() => (
         <>
           <MiniCard title="Location" text={skill.path} />
-          <MiniCard title="SKILL.md preview" text={`${skill.name} provides repo-local Memory Layer workflow instructions and helper command routing.`} />
+          <MiniCard title="SKILL.md preview" text={`${skill.name} provides repo-local Codifix workflow instructions and helper command routing.`} />
           <button type="button" onClick={() => onBackendOnly("Repairing skills downloads files and is disabled in the public demo.")}>Repair skills</button>
         </>
       )}

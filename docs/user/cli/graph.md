@@ -1,14 +1,14 @@
-# `memory graph`
+# `codifix graph`
 
-`memory graph` extracts parser-backed code structure into graph tables. It is additive: Memory Layer still works without graph data, but query and TUI search can use the latest completed graph extraction to improve retrieval explanations and ranking.
+`codifix graph` extracts parser-backed code structure into graph tables. It is additive: Codifix still works without graph data, but query and TUI search can use the latest completed graph extraction to improve retrieval explanations and ranking.
 
 ## Extract
 
 ```bash
-memory graph extract --project memory
-memory graph extract --project memory --dry-run
-memory graph extract --project memory --rebuild-index
-memory graph extract --project memory --force --text
+codifix graph extract --project memory
+codifix graph extract --project memory --dry-run
+codifix graph extract --project memory --rebuild-index
+codifix graph extract --project memory --force --text
 ```
 
 The command reuses the local repository index when possible, resolves symbols and references conservatively, then stores code symbols, code references, graph nodes, graph edges, and evidence.
@@ -25,8 +25,8 @@ Important flags:
 ## Status
 
 ```bash
-memory graph status --project memory
-memory graph status --project memory --text
+codifix graph status --project memory
+codifix graph status --project memory --text
 ```
 
 Shows the latest completed extraction run, analyzer version, strategy version, symbol counts, reference counts, graph node/edge counts, evidence counts, and unresolved/ambiguous reference counts.
@@ -44,7 +44,7 @@ activities can open the Graph tab with matching filters.
 
 ## Use In Query
 
-After a completed extraction exists, `memory query` and the TUI `Query` tab automatically use it. The query pipeline looks for code symbols, references, and one-hop graph neighbors that match the question, then maps those graph hits back to memories through `memory_sources.file_path` provenance.
+After a completed extraction exists, `codifix query` and the TUI `Query` tab automatically use it. The query pipeline looks for code symbols, references, and one-hop graph neighbors that match the question, then maps those graph hits back to memories through `memory_sources.file_path` provenance.
 
 Graph matches are used as ranking evidence:
 

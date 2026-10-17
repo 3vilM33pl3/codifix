@@ -55,13 +55,13 @@ const socialLinks = [
   {
     label: 'GitHub repository',
     text: 'GitHub',
-    href: 'https://github.com/3vilM33pl3/memory',
+    href: 'https://github.com/3vilM33pl3/codifix',
     icon: <GitHubIcon />,
   },
   {
-    label: 'Memory Layer v2.1.0 release',
+    label: 'Codifix v2.1.0 release',
     text: 'v2.1.0',
-    href: 'https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0',
+    href: 'https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0',
     icon: <ReleaseIcon />,
   },
   {
@@ -100,8 +100,8 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <Image
-          src="/images/memory-layer-logo.png"
-          alt="Memory Layer"
+          src="/images/codifix-logo.png"
+          alt="Codifix"
           className="memory-site-logo"
           height={32}
           priority

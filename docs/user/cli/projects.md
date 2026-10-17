@@ -4,7 +4,7 @@
 package for synchronization; lean builds report the missing capability explicitly.
 The complete native Mac installation still requires real-Mac acceptance.
 
-First enroll with `memory auth login --company https://company.example --name laptop`.
+First enroll with `codifix auth login --company https://company.example --name laptop`.
 Browser approval and the OS credential store (macOS Keychain or Windows
 Credential Manager) are separate from Git credentials. The Windows candidate
 still requires its native onboarding acceptance; a compiled credential adapter
@@ -39,7 +39,7 @@ session bodies stay local. Pending uploads are not accepted owner versions, and
 corrections never overwrite another origin's history directly.
 
 Inspect downloaded history with
-`memory history CANONICAL_UUID --subscription SUBSCRIPTION_UUID`.
+`codifix history CANONICAL_UUID --subscription SUBSCRIPTION_UUID`.
 Company enrollment commands use their explicit company origin; local correction
 staging and history use the selected local area/configuration.
 

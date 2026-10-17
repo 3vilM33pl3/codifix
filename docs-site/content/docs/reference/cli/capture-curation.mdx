@@ -9,25 +9,25 @@ These commands write or modify memory state. Use `--dry-run` where available, ke
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory remember` | Yes | Capture and curate completed work into memory. |
-| `memory capture` | Yes | Store structured raw task context from a file. |
-| `memory scan` | Yes | Scan a repo for candidate durable memories. |
+| `codifix remember` | Yes | Capture and curate completed work into memory. |
+| `codifix capture` | Yes | Store structured raw task context from a file. |
+| `codifix scan` | Yes | Scan a repo for candidate durable memories. |
 | `memory ingest` | Yes | Import documents from a directory, with or without a Git repository. |
-| `memory curate` | Yes | Convert raw captures into canonical memories. |
-| `memory proposals` | Yes | Review, approve, or reject memory replacement proposals. |
-| `memory consolidate` | Mixed | Find related memories and prepare higher-level insight proposals. |
-| `memory structure` | No | Inspect the insight tree and discovered consolidation groups. |
-| `memory review` | Mixed | Review validation corrections proposed for existing memories. |
+| `codifix curate` | Yes | Convert raw captures into canonical memories. |
+| `codifix proposals` | Yes | Review, approve, or reject memory replacement proposals. |
+| `codifix consolidate` | Mixed | Find related memories and prepare higher-level insight proposals. |
+| `codifix structure` | No | Inspect the insight tree and discovered consolidation groups. |
+| `codifix review` | Mixed | Review validation corrections proposed for existing memories. |
 | `memory archive` | Yes | Archive low-signal memories by confidence and importance. |
 | `memory prune-history` | Yes | Prune old versions and tombstoned canonicals. |
 | `memory checkpoint` | Yes | Save, inspect, and verify execution checkpoints. |
 
-## `memory remember`
+## `codifix remember`
 
 Use this after meaningful completed work.
 
 ```bash
-memory remember --project memory \
+codifix remember --project memory \
   --title "Expanded docs-site CLI reference" \
   --type documentation \
   --summary "Grouped the CLI docs into setup, service, query, capture, repository, and integration pages." \
@@ -37,26 +37,26 @@ memory remember --project memory \
 
 Remember should store durable, human-readable text with evidence. It is not a substitute for committing code or writing user docs.
 
-## `memory capture` and `memory curate`
+## `codifix capture` and `codifix curate`
 
 Capture stores raw context; curate turns raw captures into canonical memories.
 
 ```bash
-memory capture --file task-context.json
-memory curate --project memory
-memory curate --project memory --batch-size 10 --dry-run
+codifix capture --file task-context.json
+codifix curate --project memory
+codifix curate --project memory --batch-size 10 --dry-run
 ```
 
 Use this split when another tool produces structured capture payloads or when curation needs to be retried separately.
 
-## `memory scan`
+## `codifix scan`
 
 Scan asks the repository what durable memories can be inferred from code, docs, and history.
 
 ```bash
-memory scan --project memory --dry-run
-memory scan --project memory --rebuild-index
-memory scan --project memory --dry-run --json
+codifix scan --project memory --dry-run
+codifix scan --project memory --rebuild-index
+codifix scan --project memory --dry-run --json
 ```
 
 Scan is useful for onboarding an existing repository, but it is not a replacement for human review. Prefer smaller scans when investigating a subsystem.
@@ -70,33 +70,33 @@ memory ingest ./research --project memory --dry-run
 memory ingest ./research --project memory
 ```
 
-## `memory proposals`
+## `codifix proposals`
 
-Not to be confused with [`memory review`](/docs/reference/cli/reinforcement#memory-review), which handles corrections proposed by memory validation. `memory proposals` reviews curation replacement decisions for newly captured memories.
+Not to be confused with [`codifix review`](/docs/reference/cli/reinforcement#memory-review), which handles corrections proposed by memory validation. `codifix proposals` reviews curation replacement decisions for newly captured memories.
 
 Proposals protect existing canonical memories from automatic replacement.
 
 ```bash
-memory proposals list --project memory --json
-memory proposals show --project memory --id <uuid>
-memory proposals approve --project memory --id <uuid> --json
-memory proposals reject  --project memory --id <uuid> --json
+codifix proposals list --project memory --json
+codifix proposals show --project memory --id <uuid>
+codifix proposals approve --project memory --id <uuid> --json
+codifix proposals reject  --project memory --id <uuid> --json
 ```
 
 Approve only when the replacement is better supported and more current. Reject when the old memory remains correct or the proposal lacks enough evidence.
 
-## `memory consolidate` and `memory structure`
+## `codifix consolidate` and `codifix structure`
 
 Consolidation discovers clusters of related memories and synthesizes each accepted cluster into a higher-level [insight memory](/docs/how-it-works/consolidation) — always as a human-gated proposal, never a direct write.
 
 ```bash
-memory consolidate --project memory --dry-run   # deterministic scan, no LLM
-memory consolidate --project memory             # scan + synthesize proposals
-memory loops memory-proposals --project memory --status pending
-memory structure --project memory               # insight tree + discovered groups
+codifix consolidate --project memory --dry-run   # deterministic scan, no LLM
+codifix consolidate --project memory             # scan + synthesize proposals
+codifix loops memory-proposals --project memory --status pending
+codifix structure --project memory               # insight tree + discovered groups
 ```
 
-`memory structure` is the read-only view of the result: the committed insight tree (`summarizes` relations, recursive across tiers) plus the clusters a scan would currently propose. Requires the `memory_consolidation` loop to be enabled for non-dry runs.
+`codifix structure` is the read-only view of the result: the committed insight tree (`summarizes` relations, recursive across tiers) plus the clusters a scan would currently propose. Requires the `memory_consolidation` loop to be enabled for non-dry runs.
 
 ## `memory archive` and `memory prune-history`
 

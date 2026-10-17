@@ -12,15 +12,15 @@ Run a development copy from this repository while keeping it isolated from any p
 ## Steps
 
 ```bash
-cargo run --bin memory -- init
-cargo run --bin memory -- dev --copy-from-global
-cargo run --bin memory -- service run
+cargo run --bin codifix -- init
+cargo run --bin codifix -- dev --copy-from-global
+cargo run --bin codifix -- service run
 ```
 
 In another terminal:
 
 ```bash
-cargo run --bin memory -- tui
+cargo run --bin codifix -- tui
 ```
 
 The dev profile uses different ports and runtime paths from the installed service. The TUI header includes `[dev]` when connected to the dev stack.
@@ -28,10 +28,10 @@ The dev profile uses different ports and runtime paths from the installed servic
 ## Verify
 
 ```bash
-MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- health
-MEMORY_LAYER_PROFILE=dev cargo run --bin memory -- doctor
+CODIFIX_PROFILE=dev cargo run --bin codifix -- health
+CODIFIX_PROFILE=dev cargo run --bin codifix -- doctor
 ```
 
 ## Next
 
-Read [Developer docs](https://github.com/3vilM33pl3/memory/tree/main/docs/developer) for deeper contributor workflows.
+Read [Developer docs](https://github.com/3vilM33pl3/codifix/tree/main/docs/developer) for deeper contributor workflows.

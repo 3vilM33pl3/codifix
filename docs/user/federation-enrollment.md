@@ -36,7 +36,7 @@ This is one operator step, not a complete deployment tool. Read the
 Build the operator without changing a running service:
 
 ```sh
-cargo build --locked -p mem-federation-runtime --bin memory-federation-enroll
+cargo build --locked -p codifix-federation-runtime --bin codifix-federation-enroll
 ```
 
 ## Prepare and review

@@ -72,7 +72,7 @@ page. See [OpenAPI](../api/openapi.yaml) and [CLI commands](cli/federation.md).
 ## Daily use and recovery
 
 Web provides collection review, service grants, discovery, question confirmation
-and results under Federation. `memory federation --project homelab tui` provides
+and results under Federation. `codifix federation --project homelab tui` provides
 the focused terminal equivalent: F5 prepares/reads and F6 confirms only the exact
 prepared mutation. CLI `collections`, `capabilities`, `ask prepare`, `ask submit`
 and `answer` use the same project-scoped API and policy.
@@ -91,8 +91,8 @@ PostgreSQL. Expired leases cannot overwrite accepted results. Payloads expire
 after 24 hours; metadata/idempotency receipts after 30 days. Reads enforce expiry
 even before the minute-based cleanup. Holds preserve storage, not access.
 
-MCP exposes dedicated `memory_expertise_discover`, `memory_expertise_prepare`,
-`memory_expertise_ask` and `memory_expertise_result` tools. Submission requires
+MCP exposes dedicated `codifix_expertise_discover`, `codifix_expertise_prepare`,
+`codifix_expertise_ask` and `codifix_expertise_result` tools. Submission requires
 `[mcp] read_only = false`, operator-bound onward destination and exact consent.
 An assistant cannot self-authorize by supplying a provider name. Answers are
 untrusted data, not instructions; no remote tools, recursive requests or work

@@ -1,4 +1,4 @@
-# `memory eval`
+# `codifix eval`
 
 Run automated evaluation suites that measure whether Memory improves retrieval,
 grounding, resume quality, task success, latency, and token cost.
@@ -45,12 +45,12 @@ inspect retained evidence before deciding how to reconcile it. Older offline
 artifacts without this contract remain readable but cannot become official R3
 evidence.
 
-`memory eval campaign plan --manifest <campaign.json> [--split development|held-out]`
+`codifix eval campaign plan --manifest <campaign.json> [--split development|held-out]`
 validates asset hashes, suite items, split sizes and deterministic condition
 ordering without querying a service. It reports unresolved label/model/budget
 gates rather than treating a draft as approved.
 
-`memory eval campaign check-approvals --manifest <campaign.json>
+`codifix eval campaign check-approvals --manifest <campaign.json>
 --approval <labels.json> --approval <development-spend.json> [--split development|held-out]`
 checks existing operator approval files against the exact manifest and verified
 assets. Missing/stale approvals, insufficient spending caps and unresolved
@@ -60,7 +60,7 @@ or enable the paid runner. Held-out execution requires its own official-spend
 approval. This point-in-time check must be repeated after configuration changes;
 its JSON output is not a transferable execution authorization.
 
-`memory eval campaign report --manifest <campaign.json> --artifact <artifact.json>`
+`codifix eval campaign report --manifest <campaign.json> --artifact <artifact.json>`
 validates task-level observations and reports scenario-clustered comparisons.
 Offline results cannot pass the product-quality gate. Incomplete legacy run
 files must use the existing `compare`/`report` commands instead.
@@ -104,7 +104,7 @@ citations and conflicting decisions. Missing or unresolved reviews invalidate
 official evidence. Older offline smoke artifacts remain readable. Preparation,
 review and privacy instructions are in the R3 README linked above.
 
-`memory eval campaign review --manifest <campaign.json> --artifact <artifact.json>
+`codifix eval campaign review --manifest <campaign.json> --artifact <artifact.json>
 --out <new-directory>` exports blinded packets and blank ballots. Give reviewers
 only `packets/` and `ballots/`; keep the artifact and execution mapping private.
 Collect genuine decisions into the exported batch template, then add
@@ -129,10 +129,10 @@ new diagnostics and should be regenerated from the original artifacts.
 ## Suite Format
 
 For the separate experimental candidate-classification suite, use
-[`memory eval capture-quality`](capture-quality.md). It compares the existing
+[`codifix eval capture-quality`](capture-quality.md). It compares the existing
 rules with optional Jev type and lasting-value judgments on a local fixture
 file. Its offline default, dry-run, and saved-response replay require neither
-a Memory Layer service nor provider credentials. It never writes memories.
+a Codifix service nor provider credentials. It never writes memories.
 
 Create a directory containing `suite.toml` and `items.jsonl`:
 
@@ -154,8 +154,8 @@ Suite manifest fields:
 - `label_status` should be `draft` while labels are still being tuned and `reviewed` before using `--fail-on-unreviewed-labels`.
 - `fixture` names the fixture/corpus used for reproducibility.
 - `default_profile` is usually `llm` for official evidence and `offline` for CI fixtures.
-- `default_repeats` is the minimum repeat count `memory eval run` should use for that suite.
-- `min_items` is checked by `memory eval doctor` so undersized suites are visible before expensive runs.
+- `default_repeats` is the minimum repeat count `codifix eval run` should use for that suite.
+- `min_items` is checked by `codifix eval doctor` so undersized suites are visible before expensive runs.
 
 Each JSONL row is one eval item. Supported `eval_type` values are:
 
@@ -191,7 +191,7 @@ Every item may also include optional benchmark metadata:
 }
 ```
 
-`memory eval compare` groups results by `eval_type`, `reasoning_mode`, and
+`codifix eval compare` groups results by `eval_type`, `reasoning_mode`, and
 `memory_capability` when those fields are present.
 
 `agent_build_task` rows are for app/website build simulations. They use a
@@ -274,7 +274,7 @@ is captured, because cost is part of the benchmark evidence.
 Reproduce a published suite result end-to-end with one command — seed the fixture, run the no-memory baseline and full-memory candidate under the keyless offline profile, compare, and check the release gate:
 
 ```bash
-memory eval reproduce --suite evals/suites/memory-quality-v1
+codifix eval reproduce --suite evals/suites/memory-quality-v1
 ```
 
 Artifacts land under `--out` (default `target/memory-evals/reproduce/<suite>`); `--policy` overrides the gate file, `--skip-seed` skips fixture seeding. This is the scientist-facing path: no API keys, deterministic retrieval and synthesis, and a pass/fail gate verdict at the end.
@@ -282,25 +282,25 @@ Artifacts land under `--out` (default `target/memory-evals/reproduce/<suite>`); 
 Check a suite and environment before spending provider tokens:
 
 ```bash
-memory eval doctor --suite evals/suites/research-v1 --text
+codifix eval doctor --suite evals/suites/research-v1 --text
 ```
 
 Scaffold a starter suite from recent memories:
 
 ```bash
-memory eval scaffold --project memory --out evals/suites/memory-smoke
+codifix eval scaffold --project memory --out evals/suites/memory-smoke
 ```
 
 Preview a run without LLM calls or shell task execution:
 
 ```bash
-memory eval run --suite evals/examples/memory-smoke --condition full-memory --dry-run --text
+codifix eval run --suite evals/examples/memory-smoke --condition full-memory --dry-run --text
 ```
 
 Run the build-simulation smoke suite without provider cost:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/examples/app-build-smoke \
   --condition no-memory \
   --condition full-memory \
@@ -313,7 +313,7 @@ Run the real Codex-backed build simulation suite:
 
 ```bash
 MEMORY_EVAL_CODEX_MODEL=gpt-5.4-mini \
-memory eval run \
+codifix eval run \
   --suite evals/suites/app-build-codex-v1 \
   --condition no-memory \
   --condition full-memory \
@@ -327,7 +327,7 @@ Use the dev binary form inside this repository:
 
 ```bash
 MEMORY_EVAL_CODEX_MODEL=gpt-5.4-mini \
-cargo run --bin memory -- eval run \
+cargo run --bin codifix -- eval run \
   --suite evals/suites/app-build-codex-v1 \
   --condition no-memory \
   --condition full-memory \
@@ -342,7 +342,7 @@ wrap `codex exec`, write `codex-final.md`, and stop once the final message is
 stable. Set `MEMORY_EVAL_CODEX_WATCHDOG_SECONDS` if a local Codex run needs a
 longer watchdog. Set `MEMORY_EVAL_CODEX_SANDBOX` to override the Codex sandbox;
 the real app-build suite defaults to `danger-full-access` because the evaluated
-Codex process must reach the local Memory service on localhost. In that default
+Codex process must reach the local Codifix service on localhost. In that default
 mode the wrapper uses Codex's explicit sandbox-bypass flag; only run this suite
 against disposable fixtures.
 
@@ -352,7 +352,7 @@ plugins, session state, history, or logs into benchmark containers, because
 those files can introduce non-benchmark instructions and skew token totals.
 
 Run the longer Dockerized sequence suite when you want an isolated full-stack
-evaluation with PostgreSQL, pgvector, Memory service, seeded memories, and real
+evaluation with PostgreSQL, pgvector, Codifix service, seeded memories, and real
 Codex agents:
 
 ```bash
@@ -406,7 +406,7 @@ docker compose -f evals/docker/memory-improvement/compose.yml run --rm eval
 Run paired conditions:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/suites/research-v1 \
   --condition no-memory \
   --condition full-memory \
@@ -432,7 +432,7 @@ Use `--retriever-cmd` to benchmark an external retriever against Memory's eval
 scoring without changing production query code:
 
 ```bash
-memory eval run \
+codifix eval run \
   --suite evals/suites/memory-improvement-v1 \
   --condition full-memory \
   --retriever-cmd './my-retriever' \
@@ -545,7 +545,7 @@ pipeline without provider calls.
 Compare two run artifacts:
 
 ```bash
-memory eval compare \
+codifix eval compare \
   --baseline target/memory-evals/no-memory.json \
   --candidate target/memory-evals/full-memory.json \
   --text
@@ -554,7 +554,7 @@ memory eval compare \
 Compare repeated run artifacts with globs:
 
 ```bash
-memory eval compare \
+codifix eval compare \
   --baseline 'target/memory-evals/*no-memory*.json' \
   --candidate 'target/memory-evals/*full-memory*.json' \
   --out target/memory-evals/comparison.json \
@@ -564,7 +564,7 @@ memory eval compare \
 Render a Markdown report:
 
 ```bash
-memory eval report \
+codifix eval report \
   --comparison target/memory-evals/comparison.json \
   --markdown \
   --out target/memory-evals/report.md
@@ -573,7 +573,7 @@ memory eval report \
 Gate a comparison before release:
 
 ```bash
-memory eval gate \
+codifix eval gate \
   --comparison target/memory-evals/comparison.json \
   --policy evals/gates/research-v1.toml \
   --text
@@ -597,7 +597,7 @@ These totals cover paired, non-skipped tasks with reported usage, not every
 provider charge; missing token usage is not evidence of zero cost.
 
 Comparisons generated before task-level accounting remain readable but fail
-release gates with a recomparison message. Run `memory eval compare` again on
+release gates with a recomparison message. Run `codifix eval compare` again on
 the original run files (no model rerun is needed just to fix aggregation). Update
 any deliberately step-level group policy to its `step:` key; do not reduce a
 whole-task sample-size requirement to preserve an old pass.

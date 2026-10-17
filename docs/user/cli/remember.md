@@ -1,8 +1,8 @@
-# `memory remember`
+# `codifix remember`
 
 Use `remember` when you want to store a durable project fact or task outcome directly from the CLI.
 
-`remember` is the simplest write path into Memory Layer. It captures task context and runs curation so the result becomes queryable without a separate manual curate step.
+`remember` is the simplest write path into Codifix. It captures task context and runs curation so the result becomes queryable without a separate manual curate step.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ completion to record the `implementation` memory.
 This is the normal direct write command for users. Agents often use the higher-level repo-local helper through:
 
 ```bash
-go run ./.agents/skills/memory-layer/scripts/main.go remember-task ...
+go run ./.agents/skills/codifix/scripts/main.go remember-task ...
 ```
 
 That helper ultimately drives the same write path.
@@ -44,7 +44,7 @@ In v2, durable authorship comes from the authenticated principal. The CLI also
 sends a writer ID as advisory runtime metadata, but it cannot substitute for
 the principal or grant access.
 
-By default, Memory Layer derives that advisory label from the writing tool,
+By default, Codifix derives that advisory label from the writing tool,
 local user, and host name. Set an explicit writer only when a custom label
 makes activity and diagnostics easier to distinguish across tools or machines.
 
@@ -58,7 +58,7 @@ id = "codex-cli-main"
 or:
 
 ```bash
-export MEMORY_LAYER_WRITER_ID=codex-cli-main
+export CODIFIX_WRITER_ID=codex-cli-main
 ```
 
 CLI and environment overrides take precedence over config and the derived
@@ -69,19 +69,19 @@ fallback. They change the label, not the authenticated author.
 Store one durable fact:
 
 ```bash
-memory remember --project my-project --note "Deployment uses a systemd service."
+codifix remember --project my-project --note "Deployment uses a systemd service."
 ```
 
 Preview the capture and curate steps without writing:
 
 ```bash
-memory remember --project my-project --note "Deployment uses a systemd service." --dry-run
+codifix remember --project my-project --note "Deployment uses a systemd service." --dry-run
 ```
 
 Store a more explicit remembered task:
 
 ```bash
-memory remember \
+codifix remember \
   --project my-project \
   --title "Document deploy convention" \
   --summary "Captured the deploy convention for later reuse." \
@@ -91,7 +91,7 @@ memory remember \
 Store a documentation memory:
 
 ```bash
-memory remember \
+codifix remember \
   --project my-project \
   --type documentation \
   --title "Document PostgreSQL setup" \
@@ -102,13 +102,13 @@ memory remember \
 Store a distilled code explanation after answering an explanation request:
 
 ```bash
-memory remember \
+codifix remember \
   --project my-project \
   --type project \
-  --title "Explained crates/mem-cli/src/main.rs" \
+  --title "Explained crates/codifix-cli/src/main.rs" \
   --prompt "Explain how CLI help is generated." \
   --summary "Explained the Clap-based help constants and command metadata." \
-  --note "CLI help is generated from Clap command metadata and after_help constants in crates/mem-cli/src/main.rs."
+  --note "CLI help is generated from Clap command metadata and after_help constants in crates/codifix-cli/src/main.rs."
 ```
 
 Explanation memories should capture stable reusable understanding, not the full chat answer. Do not use `--file-changed` for explanation-only turns unless files actually changed.
@@ -123,7 +123,7 @@ It:
 2. runs curation
 3. produces canonical durable memory with provenance
 
-That means the result still follows the normal Memory Layer data model:
+That means the result still follows the normal Codifix data model:
 
 - raw capture as evidence
 - curated memory as the searchable durable result
@@ -143,19 +143,19 @@ may already be stored, and curation may already have produced queryable memory.
 Check for a captured task:
 
 ```bash
-memory activities --project my-project --kind capture_task --limit 10
+codifix activities --project my-project --kind capture_task --limit 10
 ```
 
 If you see the capture but no queryable memory yet, run a bounded curation pass:
 
 ```bash
-memory curate --project my-project --batch-size 5
+codifix curate --project my-project --batch-size 5
 ```
 
 Then verify with a targeted query:
 
 ```bash
-memory query \
+codifix query \
   --project my-project \
   --question "What did we just remember about deployment?" \
   --limit 5 \
@@ -165,7 +165,7 @@ memory query \
 Use `--dry-run` to isolate argument and payload problems without writing:
 
 ```bash
-memory remember --project my-project --note "Deployment uses systemd." --dry-run
+codifix remember --project my-project --note "Deployment uses systemd." --dry-run
 ```
 
 Interpretation:

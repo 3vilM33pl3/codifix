@@ -1,17 +1,17 @@
 ---
 title: "Retrieval and search"
-description: "How Memory Layer finds relevant memory with text search, embeddings, graph context, and ranking diagnostics."
+description: "How Codifix finds relevant memory with text search, embeddings, graph context, and ranking diagnostics."
 ---
 
 # Retrieval and search
 
-Memory Layer uses more than one retrieval path because project questions come in different forms. Some questions mention exact files or commands. Others describe behavior in natural language. Some need code relationships rather than text similarity alone.
+Codifix uses more than one retrieval path because project questions come in different forms. Some questions mention exact files or commands. Others describe behavior in natural language. Some need code relationships rather than text similarity alone.
 
 ## Retrieval paths
 
 | Path | Best at | Example query |
 |---|---|---|
-| Full-text search | Exact identifiers, commands, paths, tags, and known wording | “Where is `memory mcp run` implemented?” |
+| Full-text search | Exact identifiers, commands, paths, tags, and known wording | “Where is `codifix mcp run` implemented?” |
 | Semantic search | Related concepts with different wording | “How do agents recover context after interruption?” |
 | Graph context | Files, symbols, references, and code ownership links | “What memories are affected by the route split?” |
 | Activity lookup | Recent work and operational events | “What happened in the last docs-site session?” |
@@ -32,8 +32,8 @@ Typical reasons to rebuild embeddings:
 Use:
 
 ```bash
-memory embeddings list
-memory embeddings reindex --project <project-slug>
+codifix embeddings list
+codifix embeddings reindex --project <project-slug>
 ```
 
 ## Graph-aware retrieval
@@ -69,8 +69,8 @@ Use these diagnostics to decide whether an answer is grounded. A high-quality an
 
 | Symptom | Likely cause | First check |
 |---|---|---|
-| Good exact query returns nothing | Wrong project slug or missing memory | `memory status --project <slug>` |
-| Semantic search is empty | Embeddings missing or provider down | `memory embeddings list` |
-| File-specific query misses context | Repo index or graph stale | `memory repo status --project <slug>`, `memory graph status --project <slug>` |
-| Answer cites old facts | Memory needs replacement review | TUI Review tab or `memory proposals` |
-| Query works in CLI but not UI | Service or API token mismatch | `memory status --project <slug>` |
+| Good exact query returns nothing | Wrong project slug or missing memory | `codifix status --project <slug>` |
+| Semantic search is empty | Embeddings missing or provider down | `codifix embeddings list` |
+| File-specific query misses context | Repo index or graph stale | `codifix repo status --project <slug>`, `codifix graph status --project <slug>` |
+| Answer cites old facts | Memory needs replacement review | TUI Review tab or `codifix proposals` |
+| Query works in CLI but not UI | Service or API token mismatch | `codifix status --project <slug>` |

@@ -1,9 +1,9 @@
-# `memory commits`
+# `codifix commits`
 
-`memory commits` manages stored git history for a project.
+`codifix commits` manages stored git history for a project.
 
 It does **not** turn every commit into canonical memory.
-Instead, it stores commits as project-scoped evidence so Memory Layer can keep:
+Instead, it stores commits as project-scoped evidence so Codifix can keep:
 
 - full commit hashes
 - commit messages
@@ -21,40 +21,40 @@ while still keeping `memory_entries` selective and curated.
 
 ## Commands
 
-Sync commit history into Memory Layer:
+Sync commit history into Codifix:
 
 ```bash
-memory commits sync --project my-project
+codifix commits sync --project my-project
 ```
 
 Limit the import:
 
 ```bash
-memory commits sync --project my-project --limit 100
-memory commits sync --project my-project --since "2 weeks ago"
+codifix commits sync --project my-project --limit 100
+codifix commits sync --project my-project --since "2 weeks ago"
 ```
 
 Preview the import counts without writing stored commit evidence:
 
 ```bash
-memory commits sync --project my-project --since "2 weeks ago" --dry-run
+codifix commits sync --project my-project --since "2 weeks ago" --dry-run
 ```
 
 List stored commits:
 
 ```bash
-memory commits list --project my-project
+codifix commits list --project my-project
 ```
 
 Show one stored commit:
 
 ```bash
-memory commits show --project my-project <commit-hash>
+codifix commits show --project my-project <commit-hash>
 ```
 
 ## What Gets Stored
 
-For each imported commit, Memory Layer stores:
+For each imported commit, Codifix stores:
 
 - full hash
 - short hash
@@ -72,7 +72,7 @@ This feature is meant to preserve git history as evidence without degrading norm
 
 Default query behavior remains memory-first:
 
-- normal `memory query` returns curated memories
+- normal `codifix query` returns curated memories
 - commit history is separate evidence you can inspect directly
 - curated memories can still cite commits as provenance
 
@@ -80,4 +80,4 @@ Default query behavior remains memory-first:
 
 - [Getting Started](../getting-started.md)
 - [Scan Command](scan.md)
-- [How Memory Layer Works](../../developer/architecture/how-it-works.md)
+- [How Codifix Works](../../developer/architecture/how-it-works.md)

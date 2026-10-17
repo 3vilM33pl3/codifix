@@ -5,7 +5,7 @@ description: "Read the storage model at a high level without depending on unstab
 
 # Database schema
 
-Memory Layer stores durable state in PostgreSQL. This page explains the stable storage concepts and table groups; exact columns and indexes are implementation details owned by the migrations in `migrations/`.
+Codifix stores durable state in PostgreSQL. This page explains the stable storage concepts and table groups; exact columns and indexes are implementation details owned by the migrations in `migrations/`.
 
 The service runs migrations at startup. PostgreSQL must have `pgvector` installed and the target database must allow `CREATE EXTENSION vector`.
 
@@ -34,13 +34,13 @@ The service runs migrations at startup. PostgreSQL must have `pgvector` installe
 | Curation and review | `curation_runs`, `memory_replacement_proposals` | Curation batches and queued replacements that require approve/reject review. |
 | Git evidence | `project_commits` | Imported commit history used as evidence without turning every commit into memory. |
 | Activities | `project_timeline_events` | Query, scan, curate, checkpoint, watcher, graph, embedding, and LLM-audit events. |
-| Bundles | `memory_bundle_imports`, `imported_memory_entries` | Portable memory import lineage and idempotency. |
+| Bundles | `memory_bundle_imports`, `imported_memory_entries` | Portable codifix import lineage and idempotency. |
 | Code graph | `graph_extraction_runs`, `graph_nodes`, `graph_edges`, `graph_evidence`, `code_symbols`, `code_references` | Parser-backed repository facts used by graph-aware retrieval. |
 | Provenance checks | `memory_source_verifications` | File/source verification status used to de-rank stale memories. |
 
 ## Memory versioning model
 
-`memory_entries` rows are immutable versions. `canonical_id` groups all versions of the same logical memory, `version_no` orders them, and `is_tombstone` marks a deleted sentinel. Normal query paths use latest non-tombstone versions by default; `memory history <memory-id>` shows the full chain.
+`memory_entries` rows are immutable versions. `canonical_id` groups all versions of the same logical memory, `version_no` orders them, and `is_tombstone` marks a deleted sentinel. Normal query paths use latest non-tombstone versions by default; `codifix history <memory-id>` shows the full chain.
 
 Approving a replacement proposal creates a new version of the target canonical memory. Rejecting a proposal leaves the active version unchanged.
 
@@ -51,9 +51,9 @@ Approving a replacement proposal creates a new version of the target canonical m
 Use:
 
 ```bash
-memory embeddings list
-memory embeddings reindex --project <project-slug> --dry-run
-memory embeddings reembed --project <project-slug> --backend <name> --dry-run
+codifix embeddings list
+codifix embeddings reindex --project <project-slug> --dry-run
+codifix embeddings reembed --project <project-slug> --backend <name> --dry-run
 ```
 
 ## Safe inspection
@@ -76,7 +76,7 @@ psql "$DATABASE_URL" -c "\\d memory_entries"
 psql "$DATABASE_URL" -c "SELECT version, description FROM _sqlx_migrations ORDER BY version;"
 ```
 
-Do not edit Memory Layer tables manually unless you are deliberately repairing a database from backup. Prefer CLI commands and migrations.
+Do not edit Codifix tables manually unless you are deliberately repairing a database from backup. Prefer CLI commands and migrations.
 
 ## Next
 

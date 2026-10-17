@@ -5,27 +5,27 @@ description: "The whole mental model in one page: memories, retrieval, reinforce
 
 # Three things to know
 
-Memory Layer has many features, but its mental model is three ideas. If you understand this page, you can use the product; everything else is optional depth.
+Codifix has many features, but its mental model is three ideas. If you understand this page, you can use the product; everything else is optional depth.
 
 <Mermaid chart="flowchart LR\n    W[Your work] -->|remember| M[(Memories)]\n    M -->|query / resume| A[Answers & briefings]\n    A -->|every use strengthens\nwhat helped| M" />
 
 ## 1. Memories — durable facts, not chat logs
 
-When work completes, `memory remember` captures it. Curation distills the capture into short, citable **memories**: a durable claim, its scope, and the evidence behind it (files, commits, notes). Raw conversation is never stored as memory — only what stays true tomorrow.
+When work completes, `codifix remember` captures it. Curation distills the capture into short, citable **memories**: a durable claim, its scope, and the evidence behind it (files, commits, notes). Raw conversation is never stored as memory — only what stays true tomorrow.
 
 ```bash
-memory remember --project app --title "Switched auth to sessions" \
+codifix remember --project app --title "Switched auth to sessions" \
   --summary "JWTs replaced with server-side sessions" \
   --note "Session cookies are HttpOnly; TTL 24h; see auth/session.rs"
 ```
 
 ## 2. Retrieval — ask, get a cited answer or an honest refusal
 
-`memory query` searches those memories three ways at once — keywords, meaning (embeddings), and the code graph — and synthesizes a short answer that **cites the exact memories it used**. When the evidence is weak, it says so (`insufficient_evidence`) instead of guessing. `memory resume` uses the same retrieval to build a briefing that gets you back into flow after time away.
+`codifix query` searches those memories three ways at once — keywords, meaning (embeddings), and the code graph — and synthesizes a short answer that **cites the exact memories it used**. When the evidence is weak, it says so (`insufficient_evidence`) instead of guessing. `codifix resume` uses the same retrieval to build a briefing that gets you back into flow after time away.
 
 ```bash
-memory query --project app --question "How does auth work now?"
-memory resume --project app
+codifix query --project app --question "How does auth work now?"
+codifix resume --project app
 ```
 
 ## 3. Reinforcement — memory maintains itself
@@ -36,7 +36,7 @@ You don't run reinforcement. It happens because you use the system.
 
 ## That's the loop
 
-**remember → query/resume → (automatic) reinforcement.** Three commands cover daily use — try them live with `memory tour`.
+**remember → query/resume → (automatic) reinforcement.** Three commands cover daily use — try them live with `codifix tour`.
 
 ## When you want more depth
 

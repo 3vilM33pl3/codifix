@@ -1,6 +1,6 @@
 # Proposals Command
 
-`memory proposals` reviews pending memory replacement proposals produced by curation. It is the CLI surface behind the agent-facing `memory-review-proposals` skill and mirrors the TUI Review tab semantics.
+`codifix proposals` reviews pending memory replacement proposals produced by curation. It is the CLI surface behind the agent-facing `codifix-review-proposals` skill and mirrors the TUI Review tab semantics.
 
 Use it when an agent or human wants to inspect why a candidate memory might replace an existing memory before approving or rejecting it.
 
@@ -9,22 +9,22 @@ Use it when an agent or human wants to inspect why a candidate memory might repl
 List pending proposals:
 
 ```bash
-memory proposals list --project memory
-memory proposals list --project memory --limit 5 --json
+codifix proposals list --project memory
+codifix proposals list --project memory --limit 5 --json
 ```
 
 Show one proposal:
 
 ```bash
-memory proposals show --project memory --id <proposal-id>
-memory proposals show --project memory --id <proposal-id> --json
+codifix proposals show --project memory --id <proposal-id>
+codifix proposals show --project memory --id <proposal-id> --json
 ```
 
 Resolve a proposal after review:
 
 ```bash
-memory proposals approve --project memory --id <proposal-id> --json
-memory proposals reject --project memory --id <proposal-id> --json
+codifix proposals approve --project memory --id <proposal-id> --json
+codifix proposals reject --project memory --id <proposal-id> --json
 ```
 
 ## Review Meaning
@@ -41,4 +41,4 @@ Approving and rejecting mutate memory state. Agents should explain the proposal,
 
 - [Review Tab](../tui/review.md)
 - [Curate Command](curate.md)
-- [Memory Layer Skill Bundle](../../developer/skills/memory-layer-skill.md)
+- [Codifix Skill Bundle](../../developer/skills/codifix-skill.md)

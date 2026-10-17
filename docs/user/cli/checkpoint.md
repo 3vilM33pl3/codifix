@@ -53,7 +53,7 @@ Use this for actionable implementation work that begins directly from a user req
 
 The command curates the raw capture it just wrote and verifies that an active `task` memory with the expected `task-thread:<thread_key>` tag exists before reporting success. If that postcondition fails, the command exits with an actionable error instead of silently leaving only raw capture evidence.
 
-After the direct task is complete, use `memory remember --type implementation`, `memory remember --type refactor`, or the repo-local remember skill to record what was actually delivered.
+After the direct task is complete, use `codifix remember --type implementation`, `codifix remember --type refactor`, or the repo-local remember skill to record what was actually delivered.
 
 ### Finish Execution
 

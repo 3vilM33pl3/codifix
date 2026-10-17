@@ -5,15 +5,15 @@ description: "Point any MCP client — Claude Desktop, Codex — at a chats proj
 
 # Memory for your AI chats
 
-The cheapest integration of all: Memory Layer already ships an [MCP server](/docs/mcp), so giving your AI assistant durable memory across conversations is configuration, not code.
+The cheapest integration of all: Codifix already ships an [MCP server](/docs/mcp), so giving your AI assistant durable memory across conversations is configuration, not code.
 
 ## 1. Create a chats project and seed it
 
 ```bash
-memory remember --project chats --type user \
+codifix remember --project chats --type user \
   --title "Working preferences" \
   --summary "Baseline preferences for AI assistants" \
-  --note "Prefers concise answers with sources; working hours Europe/London; primary projects: memory-layer, rillforge."
+  --note "Prefers concise answers with sources; working hours Europe/London; primary projects: codifix, rillforge."
 ```
 
 Add anything an assistant should durably know: preferences, ongoing projects, decisions, people. `memory ingest` works too if you keep such notes as files.
@@ -24,7 +24,7 @@ Add anything an assistant should durably know: preferences, ongoing projects, de
 // claude_desktop_config.json
 {
   "mcpServers": {
-    "memory-layer": {
+    "codifix": {
       "command": "memory",
       "args": ["mcp", "run", "--project", "chats"]
     }
@@ -47,10 +47,10 @@ The MCP tools return cited memories, and the same honest-refusal contract applie
 Since the MCP surface is read-only, write back at the end of a conversation yourself:
 
 ```bash
-memory remember --project chats --type project \
+codifix remember --project chats --type project \
   --title "Chat outcome: holiday planning" \
   --summary "Settled on the Dolomites for September" \
   --note "Week 2 of September; basecamp in Val Gardena; needs the cabin booked by July."
 ```
 
-One project, every assistant: because the memory lives in Memory Layer rather than in any one vendor's chat history, Claude Desktop, Codex, and your CLI all read the same durable knowledge.
+One project, every assistant: because the memory lives in Codifix rather than in any one vendor's chat history, Claude Desktop, Codex, and your CLI all read the same durable knowledge.

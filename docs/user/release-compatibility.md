@@ -1,6 +1,6 @@
 # Release Compatibility And Known Limitations
 
-Memory Layer v2.1.0 is the current stable release. It adds private federation,
+Codifix v2.1.0 is the current stable release. It adds private federation,
 project/device onboarding, curated project synchronization and durable jobs.
 Windows packages remain a preview of client/operator functionality, not a
 complete native PostgreSQL/PDS/Pi installation. Existing PostgreSQL databases
@@ -19,7 +19,7 @@ See the [2.1.0 changelog](../../CHANGELOG.md) and
 The unpatched upstream RSA advisory is retained, not suppressed; the inspected
 OIDC path uses public-key verification rather than private-key operations.
 
-Read the [v2.0.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
+Read the [v2.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.0.0)
 and [changelog](../../CHANGELOG.md) before updating a v1 production installation.
 
 ## v2.0.1 schema compatibility repair
@@ -39,9 +39,9 @@ database health:
 
 ```bash
 memory --version
-memory service restart-all
-memory doctor
-memory health
+codifix service restart-all
+codifix doctor
+codifix health
 ```
 
 ## The v2 compatibility boundary
@@ -68,10 +68,10 @@ Review these breaking changes before restarting the service:
 
 - Remove `capnp_unix_socket` and `capnp_tcp_addr`; clients now receive live
   updates from the `/ws` WebSocket stream.
-- Replace `memory automation flush` with `memory watcher flush`,
-  `memory capture task` with `memory capture`, and `memory dev init` with
-  `memory dev`. The duplicate `memory setup` command is gone; use
-  `memory wizard`.
+- Replace `memory automation flush` with `codifix watcher flush`,
+  `codifix capture task` with `codifix capture`, and `codifix dev init` with
+  `codifix dev`. The duplicate `memory setup` command is gone; use
+  `codifix wizard`.
 - Update direct API integrations against the running service's
   `GET /v1/openapi.yaml`. v2 removed `/v1/stats`, `/v1/offline/pending`, and the
   browser auth-token handoff, and consolidated several loop/activity routes.
@@ -88,9 +88,9 @@ Review these breaking changes before restarting the service:
 Before upgrading:
 
 ```bash
-memory status --project <project-slug>
-memory doctor
-pg_dump "$DATABASE_URL" > memory-layer-before-upgrade.sql
+codifix status --project <project-slug>
+codifix doctor
+pg_dump "$DATABASE_URL" > codifix-before-upgrade.sql
 ```
 
 Debian installation does not start/restart services or rotate credentials. After
@@ -98,17 +98,17 @@ reviewing schema compatibility, restart only the selected installation. For the
 legacy system singleton (not a user service or named instance):
 
 ```bash
-sudo systemctl restart memory-layer.service
-memory doctor
-memory health
-memory status --project <project-slug>
-memory upgrade --dry-run
+sudo systemctl restart codifix.service
+codifix doctor
+codifix health
+codifix status --project <project-slug>
+codifix upgrade --dry-run
 ```
 
 The v2.0.1 service embeds migrations through version 52 and applies any pending
 migrations when it starts. Do not downgrade the binary against a migrated
 database; restore the pre-upgrade database backup if you must roll back. Run
-`memory upgrade` only after reviewing the dry run because it can refresh
+`codifix upgrade` only after reviewing the dry run because it can refresh
 repo-local `.agents/` skills and instructions.
 
 For independently pinned named instances, package installation does not change
@@ -121,12 +121,12 @@ writer stop and cannot be undone by blindly selecting an older executable.
 
 GitHub Releases publish the supported native installer set:
 
-- Debian x86_64: `memory-layer_<version>_amd64.deb`
-- Debian arm64: `memory-layer_<version>_arm64.deb`
-- macOS Intel: `memory-layer-<version>-macos-x86_64.pkg`
-- macOS Apple Silicon: `memory-layer-<version>-macos-aarch64.pkg`
-- Windows x86_64: `memory-layer-<version>-windows-x86_64.msi`
-- Windows x86_64 portable archive: `memory-layer-<version>-windows-x86_64.zip`
+- Debian x86_64: `codifix_<version>_amd64.deb`
+- Debian arm64: `codifix_<version>_arm64.deb`
+- macOS Intel: `codifix-<version>-macos-x86_64.pkg`
+- macOS Apple Silicon: `codifix-<version>-macos-aarch64.pkg`
+- Windows x86_64: `codifix-<version>-windows-x86_64.msi`
+- Windows x86_64 portable archive: `codifix-<version>-windows-x86_64.zip`
 - Homebrew source archive: `memory-<version>.tar.gz`
 
 For v2.1.0, replace `<version>` with `2.1.0`. Mac application-update installers
@@ -141,8 +141,8 @@ OS are not release targets yet.
 
 ## Current limitations
 
-- Run `memory doctor` and `memory health` after every package upgrade.
-- Review `memory upgrade --dry-run` before refreshing repo-local skills or
+- Run `codifix doctor` and `codifix health` after every package upgrade.
+- Review `codifix upgrade --dry-run` before refreshing repo-local skills or
   instructions.
 - Verify the installer architecture before installing: Debian publishes `amd64`
   and `arm64`, macOS publishes Intel and Apple Silicon packages, and Windows

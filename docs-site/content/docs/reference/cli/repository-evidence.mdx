@@ -1,78 +1,78 @@
 ---
 title: "CLI: repository, evidence, and search"
-description: "Import commit history, build repository and code graph indexes, maintain embeddings, and exchange memory bundles."
+description: "Import commit history, build repository and code graph indexes, maintain embeddings, and exchange codifix bundles."
 ---
 
 # CLI: repository, evidence, and search
 
-These commands maintain the evidence Memory Layer uses for retrieval, provenance, and graph-aware context. They are usually run after onboarding, large refactors, provider changes, or repository history imports.
+These commands maintain the evidence Codifix uses for retrieval, provenance, and graph-aware context. They are usually run after onboarding, large refactors, provider changes, or repository history imports.
 
 | Command | Writes | Purpose |
 |---|---:|---|
-| `memory commits` | Yes | Import and inspect git commit history. |
-| `memory repo` | Yes | Build and inspect the repository index. |
-| `memory graph` | Yes | Extract and inspect the project code graph. |
-| `memory embeddings` | Yes | Rebuild and maintain embedding spaces. |
-| `memory bundle` | Mixed | Export and import shareable project memory bundles. |
+| `codifix commits` | Yes | Import and inspect git commit history. |
+| `codifix repo` | Yes | Build and inspect the repository index. |
+| `codifix graph` | Yes | Extract and inspect the project code graph. |
+| `codifix embeddings` | Yes | Rebuild and maintain embedding spaces. |
+| `codifix bundle` | Mixed | Export and import shareable project codifix bundles. |
 
-## `memory commits`
+## `codifix commits`
 
 Import git history when commit context matters for future questions.
 
 ```bash
-memory commits sync --project memory
-memory commits sync --project memory --limit 100 --dry-run
-memory commits list --project memory --limit 20
-memory commits show <commit-hash> --project memory
+codifix commits sync --project memory
+codifix commits sync --project memory --limit 100 --dry-run
+codifix commits list --project memory --limit 20
+codifix commits show <commit-hash> --project memory
 ```
 
 Commit sync is evidence, not curation by itself. Pair it with query, scan, or explicit memories when decisions should become durable project knowledge.
 
-## `memory repo`
+## `codifix repo`
 
 The repository index records files and metadata used by scan and provenance workflows.
 
 ```bash
-memory repo index --project memory
-memory repo index --project memory --since 2026-04-01 --dry-run
-memory repo status --project memory --json
+codifix repo index --project memory
+codifix repo index --project memory --since 2026-04-01 --dry-run
+codifix repo status --project memory --json
 ```
 
 Run it after major file moves or when scan/provenance output looks stale.
 
-## `memory graph`
+## `codifix graph`
 
 The graph command extracts parser-backed code symbols, references, and edges.
 
 ```bash
-memory graph extract --project memory
-memory graph extract --project memory --force --text
-memory graph status --project memory
+codifix graph extract --project memory
+codifix graph extract --project memory --force --text
+codifix graph status --project memory
 ```
 
 Graph data helps query connect memory facts to code structure. It is especially useful after refactors where names or modules move without intended behavior changes.
 
-## `memory embeddings`
+## `codifix embeddings`
 
 Embedding commands maintain semantic search spaces.
 
 ```bash
-memory embeddings list
-memory embeddings activate voyage-code
-memory embeddings reindex --project memory --dry-run
-memory embeddings reembed --project memory --backend voyage-code
-memory embeddings prune --project memory --dry-run
+codifix embeddings list
+codifix embeddings activate voyage-code
+codifix embeddings reindex --project memory --dry-run
+codifix embeddings reembed --project memory --backend voyage-code
+codifix embeddings prune --project memory --dry-run
 ```
 
 Use `list` before rebuilds. `reindex` rebuilds chunks and embeddings, while `reembed` fills configured embedding spaces without rebuilding chunks.
 
-## `memory bundle`
+## `codifix bundle`
 
 Bundles move project memory between systems or preserve a point-in-time export.
 
 ```bash
-memory bundle export --project memory --out memory.mlbundle.zip
-memory bundle import --project memory ./memory.mlbundle.zip --dry-run
+codifix bundle export --project memory --out memory.mlbundle.zip
+codifix bundle import --project memory ./memory.mlbundle.zip --dry-run
 ```
 
 Review bundle contents before import. Treat bundles as sensitive project data.

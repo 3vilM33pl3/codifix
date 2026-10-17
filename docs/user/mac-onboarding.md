@@ -14,7 +14,7 @@ for the installed candidate and owner changes.
 
 ## Using an already configured laptop
 
-From a selected repository, run `memory tui`; its operator-owned routing chooses
+From a selected repository, run `codifix tui`; its operator-owned routing chooses
 the corresponding local area. Outside a mapped repository, use
 `memory --area homelab tui` or `memory --area workshop tui`. An unavailable area
 does not redirect writes somewhere else.
@@ -25,7 +25,7 @@ status in the Web UI. The Web **Memories** tab's local count is not the number
 of downloaded owner versions. The updated TUI **Memories** tab combines local
 and synchronized records, clearly marking owner copies read-only. Its **Offline**
 tab remains available for detailed subscription status and cache history.
-`memory urls` lists configuration-derived entry points; their presence alone
+`codifix urls` lists configuration-derived entry points; their presence alone
 does not assert live service health.
 
 The watcher captures local work. Only curated additions and explicitly staged
@@ -44,7 +44,7 @@ With your existing projects folder, start:
 memory-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
   --runtime /ABS/INSTALLED-RUNTIME/runtime-prerequisites.json \
   --name "My Mac" --workspace-parent "$HOME/Projects" \
-  --state "$HOME/Library/Application Support/memory-layer/onboarding"
+  --state "$HOME/Library/Application Support/codifix/onboarding"
 ```
 
 Sign in in the browser, select authorized offline projects by number, and press
@@ -135,8 +135,8 @@ new review, not automatic substitution. After the journey completes, separately
 approve the owning-human Codex/OpenAI and Claude/Anthropic grants with:
 
 ```bash
-memory-onboard journey-agents --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
-memory-onboard journey-status --journal "$HOME/Library/Application Support/memory-layer/onboarding/journey.json"
+memory-onboard journey-agents --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
+memory-onboard journey-status --journal "$HOME/Library/Application Support/codifix/onboarding/journey.json"
 ```
 
 These commands enable no paid model calls. Current implementation supports the
@@ -262,7 +262,7 @@ unverified.
 In a native Mac candidate, start the existing browser-assisted login with:
 
 ```bash
-memory auth login --company https://<company-origin> --name "My Mac"
+codifix auth login --company https://<company-origin> --name "My Mac"
 ```
 
 After browser approval, a TUI-enabled build can prepare one project interactively:
@@ -369,10 +369,10 @@ complete repository commitment.
 For a provisioned development laptop with a reviewed private replica profile:
 
 ```bash
-memory projects sync --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json
-memory projects sync --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json --watch
-memory projects sync-status --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json
-memory projects offline-search --profile /Users/<you>/.config/memory-layer/subscriptions/<project>.json \
+memory projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
+memory projects sync --profile /Users/<you>/.config/codifix/subscriptions/<project>.json --watch
+memory projects sync-status --profile /Users/<you>/.config/codifix/subscriptions/<project>.json
+memory projects offline-search --profile /Users/<you>/.config/codifix/subscriptions/<project>.json \
   --question "What is the approved procedure?" --limit 8
 ```
 
@@ -421,11 +421,11 @@ credential or a server database connection:
 memory projects subscription --company https://<company-origin> \
   --area workshop --owner-instance <instance-uuid> \
   --project <project-uuid> --revision <reviewed-revision> \
-  --output /Users/<you>/.config/memory-layer/subscription.json
+  --output /Users/<you>/.config/codifix/subscription.json
 memory projects subscription --company https://<company-origin> \
   --area workshop --owner-instance <instance-uuid> \
   --project <project-uuid> --revision <reviewed-revision> \
-  --output /Users/<you>/.config/memory-layer/subscription.json \
+  --output /Users/<you>/.config/codifix/subscription.json \
   --bootstrap-sha256 <digest-from-preview> --confirm
 ```
 
@@ -435,7 +435,7 @@ the file. The operator consumes this metadata and adds only its separately
 generated loopback database credential.
 
 The candidate package bundles `onboard.py` and its operator instructions under
-`/usr/local/share/memory-layer/onboarding/operator/`. Follow the
+`/usr/local/share/codifix/onboarding/operator/`. Follow the
 [native operator runbook](../../packaging/macos/operator-README.md) for the exact
 reviewed input, preview and confirmed apply. It currently requires an installed,
 architecture-matched Memory binary, Python 3.11+ and a reviewed native
@@ -456,9 +456,9 @@ repository/skill preparation and native provisioning. Once those stages are
 recorded, run the separate agent setup using the same private journey journal:
 
 ```bash
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   journey-agents --journal /ABS/PRIVATE/journey.json
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   journey-status --journal /ABS/PRIVATE/journey.json
 ```
 
@@ -477,13 +477,13 @@ Restart/reload the respective agent to use its new project tools, and accept its
 normal project/MCP trust prompt. Those entries contain public IDs and local
 profile paths, never bearer tokens or database URLs.
 
-The MCP bridge exposes only `memory_project_cache_status` and
-`memory_project_cache_search`: read-only, cited lexical search of that exact
+The MCP bridge exposes only `codifix_project_cache_status` and
+`codifix_project_cache_search`: read-only, cited lexical search of that exact
 project's approved cache. It cannot select another project, invoke ordinary query
 tools, perform mutations, call a model or make a Trust expertise request. Results
 are untrusted source data, not agent instructions. Remote F1 integration with
 these new credentials remains work; existing approved remote expertise is not
-automatically inherited. This scopes Memory MCP calls; it is not an operating-
+automatically inherited. This scopes Codifix MCP calls; it is not an operating-
 system sandbox against an assistant with unrestricted same-user filesystem or
 database access. Keep private installation/profile directories outside agent
 workspaces, and review the agent's own filesystem/tool permissions separately.
@@ -496,7 +496,7 @@ after transmission. The current grant has a maximum 24-hour lifetime, and
 renewal is never automatic:
 
 ```bash
-/ABS/PYTHON3 -I -S -B /usr/local/share/memory-layer/onboarding/operator/onboard.py \
+/ABS/PYTHON3 -I -S -B /usr/local/share/codifix/onboarding/operator/onboard.py \
   journey-agents --journal /ABS/PRIVATE/journey.json --renew-grant OLD_AGENT_UUID
 ```
 
@@ -526,7 +526,7 @@ definitively denied request; it cannot renew a still-active grant silently.
 
 ## Identity and project access
 
-The company console uses Authentik for human accounts. Memory project roles,
+The company console uses Authentik for human accounts. Codifix project roles,
 Git repository access, federation membership and model-disclosure consent are
 separate permissions. A project assignment is not a Git credential or a grant to
 send project contents to an assistant.

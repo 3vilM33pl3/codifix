@@ -1,15 +1,15 @@
-# `memory repo`
+# `codifix repo`
 
-`memory repo` manages the local repository index used by `memory scan` and related analysis flows.
+`codifix repo` manages the local repository index used by `codifix scan` and related analysis flows.
 
 ## Subcommands
 
 ### Index
 
 ```bash
-memory repo index --project memory
-memory repo index --project memory --since 2026-04-01
-memory repo index --project memory --dry-run
+codifix repo index --project memory
+codifix repo index --project memory --since 2026-04-01
+codifix repo index --project memory --dry-run
 ```
 
 Builds or refreshes the local index.
@@ -17,8 +17,8 @@ Builds or refreshes the local index.
 ### Status
 
 ```bash
-memory repo status --project memory
-memory repo status --project memory --json
+codifix repo status --project memory
+codifix repo status --project memory --json
 ```
 
 Shows analyzer coverage, fact counts, and local index status.

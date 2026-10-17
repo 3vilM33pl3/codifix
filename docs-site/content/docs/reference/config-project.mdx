@@ -11,24 +11,24 @@ Project config is still needed, but most operational project settings are no lon
 
 | File or directory | Purpose | Commit? |
 | --- | --- | --- |
-| `.mem/project.toml` | Repo-local project marker, usually just the slug. | Usually yes |
-| `.agents/memory-layer.toml` | Agent-facing behavior: capture include/ignore paths, analyzers, retrieval, replacement policy. | Usually yes |
-| `.agents/skills/` | Repo-local Memory Layer skill bundle copied by `wizard`, `init`, or `upgrade`. | Usually yes |
+| `.codifix/project.toml` | Repo-local project marker, usually just the slug. | Usually yes |
+| `.agents/codifix.toml` | Agent-facing behavior: capture include/ignore paths, analyzers, retrieval, replacement policy. | Usually yes |
+| `.agents/skills/` | Repo-local Codifix skill bundle copied by `wizard`, `init`, or `upgrade`. | Usually yes |
 | User-local `projects/<project-key>/config.toml` | Per-project runtime overrides and optional service/database/advisory writer settings. | No |
-| User-local `projects/<project-key>/memory-layer.env` | Per-project secrets or provider env values. | No |
+| User-local `projects/<project-key>/codifix.env` | Per-project secrets or provider env values. | No |
 | User-local state/cache dirs | Runtime state, indexes, automation state, logs. | No |
 
-Legacy `.mem/config.toml`, `.mem/memory-layer.env`, and `.mem/runtime/` remain readable as fallbacks. Use `memory doctor --fix` to migrate missing legacy config/env values into the current user-local layout.
+Legacy `.codifix/config.toml`, `.codifix/codifix.env`, and `.codifix/runtime/` remain readable as fallbacks. Use `codifix doctor --fix` to migrate missing legacy config/env values into the current user-local layout.
 
 ## What belongs where
 
 | Need | Put it in |
 | --- | --- |
 | Shared database URL, service token, LLM/embedding provider defaults | Global config/env |
-| Project slug | `.mem/project.toml` |
+| Project slug | `.codifix/project.toml` |
 | Project-specific runtime override, custom project DB, custom ports | User-local project `config.toml` |
 | Dev cargo-run isolation values | User-local project `config.dev.toml` |
-| Agent scan/curation/retrieval behavior that should travel with the repo | `.agents/memory-layer.toml` |
+| Agent scan/curation/retrieval behavior that should travel with the repo | `.agents/codifix.toml` |
 | API keys and secrets | Env files, not git |
 
 ## Repo marker example
@@ -60,12 +60,12 @@ Available replacement policies are `conservative`, `balanced`, and `aggressive`.
 
 ## Dev overlay
 
-From a source checkout, `cargo run --bin memory -- ...` activates the dev profile. Dev reads the user-local project `config.toml` and layers `config.dev.toml` on top; it does not read global config. Bootstrap it with:
+From a source checkout, `cargo run --bin codifix -- ...` activates the dev profile. Dev reads the user-local project `config.toml` and layers `config.dev.toml` on top; it does not read global config. Bootstrap it with:
 
 ```bash
-cargo run --bin memory -- init
-cargo run --bin memory -- dev --copy-from-global
-cargo run --bin memory -- service run
+cargo run --bin codifix -- init
+cargo run --bin codifix -- dev --copy-from-global
+cargo run --bin codifix -- service run
 ```
 
 The default dev endpoint is `127.0.0.1:4250` for HTTP; live updates use `/ws`
@@ -73,7 +73,7 @@ on the same listener. The old `capnp_tcp_addr` and `capnp_unix_socket` settings
 were removed in v2.
 
 The adjacent project env file overrides shared env values. Define
-`MEMORY_LAYER__SERVICE__API_TOKEN` there only when the project deliberately
+`CODIFIX__SERVICE__API_TOKEN` there only when the project deliberately
 uses a separate service; otherwise omit it so production commands keep the
 shared service credential. If you do run a separate dev backend, make sure its
 token and the dev client's token match.
@@ -81,10 +81,10 @@ token and the dev client's token match.
 ## Commands
 
 ```bash
-memory init --project my-project --dry-run
-memory wizard --dry-run
-memory upgrade --dry-run
-memory doctor --project my-project
+codifix init --project my-project --dry-run
+codifix wizard --dry-run
+codifix upgrade --dry-run
+codifix doctor --project my-project
 ```
 
-Use `wizard` for guided setup, `init` for scriptable repo bootstrap, and `upgrade` after installing a newer Memory Layer version.
+Use `wizard` for guided setup, `init` for scriptable repo bootstrap, and `upgrade` after installing a newer Codifix version.

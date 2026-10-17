@@ -7,7 +7,7 @@ description: "Install the Debian package, enable the service, and verify the CLI
 
 ## What you will do
 
-Install the Debian package for your CPU architecture, configure Memory Layer,
+Install the Debian package for your CPU architecture, configure Codifix,
 enable the backend service, and run health checks.
 
 ## Before you start
@@ -16,8 +16,8 @@ Install PostgreSQL and pgvector first, or use a reachable PostgreSQL server with
 
 Release packages are published for:
 
-- x86_64 Debian/Ubuntu: `memory-layer_2.0.0_amd64.deb`
-- arm64 Debian/Ubuntu: `memory-layer_2.0.0_arm64.deb`
+- x86_64 Debian/Ubuntu: `codifix_2.0.0_amd64.deb`
+- arm64 Debian/Ubuntu: `codifix_2.0.0_arm64.deb`
 
 The arm64 package is the Raspberry Pi 4/5 path when the Pi runs a 64-bit
 Debian-family OS. 32-bit Raspberry Pi OS is not a release target yet.
@@ -26,22 +26,22 @@ Debian-family OS. 32-bit Raspberry Pi OS is not a release target yet.
 
 ```bash
 # x86_64
-sudo dpkg -i memory-layer_2.0.0_amd64.deb
+sudo dpkg -i codifix_2.0.0_amd64.deb
 
 # arm64 / Raspberry Pi 4/5 with a 64-bit OS
-sudo dpkg -i memory-layer_2.0.0_arm64.deb
+sudo dpkg -i codifix_2.0.0_arm64.deb
 
-memory wizard --global
+codifix wizard --global
 cd /path/to/project
-memory wizard --dry-run
-memory wizard
-sudo systemctl enable --now memory-layer.service
-memory doctor
-memory health
-memory tui
+codifix wizard --dry-run
+codifix wizard
+sudo systemctl enable --now codifix.service
+codifix doctor
+codifix health
+codifix tui
 ```
 
-Use the [v2.0.0 GitHub release assets](https://github.com/3vilM33pl3/memory/releases/tag/v2.0.0)
+Use the [v2.0.0 GitHub release assets](https://github.com/3vilM33pl3/codifix/releases/tag/v2.0.0)
 and verify the matching `.sha256` file before installation. If `dpkg` reports
 missing dependencies, install those packages with your normal package manager
 and rerun the package install.
@@ -50,8 +50,8 @@ and rerun the package install.
 
 ```bash
 memory --version
-systemctl status memory-layer.service
-memory status --project <project-slug>
+systemctl status codifix.service
+codifix status --project <project-slug>
 ```
 
 ## Troubleshooting

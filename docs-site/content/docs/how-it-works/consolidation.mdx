@@ -1,6 +1,6 @@
 ---
 title: "Consolidation and insights"
-description: "How Memory Layer discovers clusters of related memories and synthesizes higher-level insight memories — the mechanism, the triggers, and the science behind it."
+description: "How Codifix discovers clusters of related memories and synthesizes higher-level insight memories — the mechanism, the triggers, and the science behind it."
 ---
 
 # Consolidation and insights
@@ -15,16 +15,16 @@ Consolidation is **off by default and dry-run first**, like [validation](/docs/h
 
 The design is not an ad-hoc pipeline; it follows how brains turn episodic experience into durable, generalized knowledge.
 
-- **Complementary learning systems** ([McClelland, McNaughton & O'Reilly 1995](https://doi.org/10.1037/0033-295X.102.3.419)): a fast store that captures individual episodes, and a slow store that gradually extracts the structure shared across them. Memory Layer's atomic memories are the fast store; insights are the slow, generalized one.
+- **Complementary learning systems** ([McClelland, McNaughton & O'Reilly 1995](https://doi.org/10.1037/0033-295X.102.3.419)): a fast store that captures individual episodes, and a slow store that gradually extracts the structure shared across them. Codifix's atomic memories are the fast store; insights are the slow, generalized one.
 - **Schema consolidation** ([Tse et al. 2007](https://doi.org/10.1126/science.1135935)): new information consolidates far faster and more durably when it can attach to an existing *schema*. An insight is that schema — and because insights are themselves memories, later runs consolidate them into higher-level schemas.
-- **Sleep-replay gist extraction**: overlapping replay of recently co-activated memories abstracts their shared "gist." Memory Layer's offline consolidation pass is the analogue, and its **co-access** signal is the analogue of prioritized replay — the memories used *together* are the ones consolidated together.
+- **Sleep-replay gist extraction**: overlapping replay of recently co-activated memories abstracts their shared "gist." Codifix's offline consolidation pass is the analogue, and its **co-access** signal is the analogue of prioritized replay — the memories used *together* are the ones consolidated together.
 - **Reflection** ([Park et al. 2023, *Generative Agents*](https://arxiv.org/abs/2304.03442)): the two-step "surface the salient themes, then synthesize the insights" pattern, and the idea that reflections can be reflected upon to form a tree, come directly from this work.
 
 The retrieval-side structure follows the RAG literature on hierarchical summarization: [RAPTOR](https://arxiv.org/abs/2401.18059) (recursively embed, cluster, and summarize) and [GraphRAG](https://arxiv.org/abs/2404.16130) (community detection over a knowledge graph, then per-community summaries for "global" sensemaking).
 
 ## Discovering the hidden structure
 
-The hard part is finding which memories belong together. Memory Layer fuses **three independent signals** into a single weighted graph over memories, then runs one community-detection pass over it. Using three signals means a cluster can be discovered by content, by explicit links, or by usage — whichever reveals it.
+The hard part is finding which memories belong together. Codifix fuses **three independent signals** into a single weighted graph over memories, then runs one community-detection pass over it. Using three signals means a cluster can be discovered by content, by explicit links, or by usage — whichever reveals it.
 
 | Signal | Edge means | Source |
 |---|---|---|
@@ -66,7 +66,7 @@ An insight and its links cannot be written as separate steps — the insight doe
 2. links it to each member's current version with a `summarizes` relation;
 3. records each member as first-class `memory` provenance on the insight.
 
-Members are never deleted or archived — they stay active and simply cool as the insight absorbs the cluster's retrievals. Everything is reversible through memory history, and the proposal is reviewed in the standard queue (`memory proposals` or the TUI) exactly like every other write.
+Members are never deleted or archived — they stay active and simply cool as the insight absorbs the cluster's retrievals. Everything is reversible through codifix history, and the proposal is reviewed in the standard queue (`codifix proposals` or the TUI) exactly like every other write.
 
 ## A schema tree that grows with the project
 

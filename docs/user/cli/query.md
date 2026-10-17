@@ -1,6 +1,6 @@
-# `memory query`
+# `codifix query`
 
-`memory query` asks a project-specific question against curated Memory Layer data.
+`codifix query` asks a project-specific question against curated Codifix data.
 
 Use it when you want a direct answer from durable project memory instead of browsing the TUI.
 The answer is synthesized from the returned memories and includes citation numbers that map back to the ranked results.
@@ -8,12 +8,12 @@ The answer is synthesized from the returned memories and includes citation numbe
 ## Common Usage
 
 ```bash
-memory query --project memory --question "How does resume work?"
-memory query --project memory --question "What changed recently?" --type plan
-memory query --project memory --question "What was actually implemented for the watcher manager?" --type implementation
-memory query --project memory --question "What code was refactored recently?" --type refactor
-memory query --project memory --question "How is PostgreSQL setup documented?" --type documentation
-memory query --project memory --question "What are the watcher health states?" --tag watcher
+codifix query --project memory --question "How does resume work?"
+codifix query --project memory --question "What changed recently?" --type plan
+codifix query --project memory --question "What was actually implemented for the watcher manager?" --type implementation
+codifix query --project memory --question "What code was refactored recently?" --type refactor
+codifix query --project memory --question "How is PostgreSQL setup documented?" --type documentation
+codifix query --project memory --question "What are the watcher health states?" --tag watcher
 ```
 
 ## Useful Flags
@@ -34,11 +34,11 @@ The default text output shows:
 - cited memory numbers, matching the ranked result list
 - retrieval diagnostics and provenance highlights
 
-If LLM answering is configured, the backend asks the model to answer using only the returned memories. Supported LLM providers are `openai_compatible` and `ollama`; Ollama uses `http://127.0.0.1:11434/v1` and no API key by default. If the model is unavailable or returns invalid citations, Memory Layer falls back to deterministic summary synthesis and reports the fallback reason.
+If LLM answering is configured, the backend asks the model to answer using only the returned memories. Supported LLM providers are `openai_compatible` and `ollama`; Ollama uses `http://127.0.0.1:11434/v1` and no API key by default. If the model is unavailable or returns invalid citations, Codifix falls back to deterministic summary synthesis and reports the fallback reason.
 
 ## Graph-Aware Retrieval
 
-When a project has a completed `memory graph extract` run, `memory query` automatically uses the latest completed code graph as an additional retrieval signal. No extra flag is needed.
+When a project has a completed `codifix graph extract` run, `codifix query` automatically uses the latest completed code graph as an additional retrieval signal. No extra flag is needed.
 
 Graph retrieval is additive:
 

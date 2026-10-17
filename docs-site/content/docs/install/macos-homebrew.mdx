@@ -1,43 +1,43 @@
 ---
 title: "macOS"
-description: "Install Memory Layer with Homebrew or a native .pkg and run the first health checks."
+description: "Install Codifix with Homebrew or a native .pkg and run the first health checks."
 ---
 
 # macOS
 
 ## What you will do
 
-Install Memory Layer through Homebrew or the native `.pkg`, configure global and
+Install Codifix through Homebrew or the native `.pkg`, configure global and
 project settings, and verify the service.
 
 ## Homebrew
 
 ```bash
-brew tap 3vilM33pl3/memory https://github.com/3vilM33pl3/memory
-brew install 3vilM33pl3/memory/memory-layer
-memory wizard --global
+brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
+brew install 3vilM33pl3/codifix/codifix
+codifix wizard --global
 cd /path/to/project
-memory wizard --dry-run
-memory wizard
-memory service enable
-memory doctor
-memory health
-memory tui
+codifix wizard --dry-run
+codifix wizard
+codifix service enable
+codifix doctor
+codifix health
+codifix tui
 ```
 
 For unreleased changes, use:
 
 ```bash
-brew install --HEAD 3vilM33pl3/memory/memory-layer
+brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
 
 ## Native .pkg
 
-The [v2.1.0 release](https://github.com/3vilM33pl3/memory/releases/tag/v2.1.0)
+The [v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
 publishes separate native installers and matching checksums:
 
-- Intel Mac: `memory-layer-2.1.0-macos-x86_64.pkg`
-- Apple Silicon Mac: `memory-layer-2.1.0-macos-aarch64.pkg`
+- Intel Mac: `codifix-2.1.0-macos-x86_64.pkg`
+- Apple Silicon Mac: `codifix-2.1.0-macos-aarch64.pkg`
 
 These standard packages require separately configured PostgreSQL/pgvector. If
 Memory already has a bundled runtime, choose the architecture-matched
@@ -49,14 +49,14 @@ Download the package for your Mac, run it, then continue with the same setup
 commands:
 
 ```bash
-memory wizard --global
+codifix wizard --global
 cd /path/to/project
-memory wizard --dry-run
-memory wizard
-memory service enable
-memory doctor
-memory health
-memory tui
+codifix wizard --dry-run
+codifix wizard
+codifix service enable
+codifix doctor
+codifix health
+codifix tui
 ```
 
 If a release notes that the `.pkg` is unsigned, macOS may require an explicit
@@ -67,8 +67,8 @@ when you want the fewest Gatekeeper prompts.
 
 ```bash
 memory --version
-memory service status
-memory status --project <project-slug>
+codifix service status
+codifix status --project <project-slug>
 ```
 
 ## Next

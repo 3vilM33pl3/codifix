@@ -5,7 +5,7 @@ description: "Ingest reading notes, query across them with citations, and share 
 
 # Research-paper corpus
 
-Keep one Markdown note per paper (abstract, key claims, your critique) and Memory Layer becomes a cited, queryable literature memory.
+Keep one Markdown note per paper (abstract, key claims, your critique) and Codifix becomes a cited, queryable literature memory.
 
 ## Ingest the corpus
 
@@ -21,7 +21,7 @@ The `--tag` marks the whole corpus so it can be filtered, re-ingested, or bulk-a
 ## Query across the literature
 
 ```bash
-memory query --project lit-review \
+codifix query --project lit-review \
   --question "Which papers found spacing effects in procedural learning?"
 ```
 
@@ -33,7 +33,7 @@ For higher-precision recall, post distilled claims per paper through the [HTTP A
 
 ```bash
 curl -s http://127.0.0.1:4040/v1/capture/task \
-  -H "Authorization: Bearer $MEMORY_LAYER_CLIENT_TOKEN" -H "Content-Type: application/json" -d '{
+  -H "Authorization: Bearer $CODIFIX_CLIENT_TOKEN" -H "Content-Type: application/json" -d '{
   "project": "lit-review", "task_title": "Cepeda 2006 notes",
   "user_prompt": "Distill Cepeda et al. 2006", "writer_id": "reading-notes",
   "agent_summary": "Distilled distributed-practice meta-analysis.",
@@ -45,7 +45,7 @@ curl -s http://127.0.0.1:4040/v1/capture/task \
     "sources": [{"source_kind": "note", "excerpt": "Cepeda, Pashler, Vul, Wixted & Rohrer (2006)"}]
   }]}'
 curl -s http://127.0.0.1:4040/v1/curate \
-  -H "Authorization: Bearer $MEMORY_LAYER_CLIENT_TOKEN" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CODIFIX_CLIENT_TOKEN" -H "Content-Type: application/json" \
   -d '{"project": "lit-review"}'
 ```
 
@@ -55,7 +55,7 @@ principal remains the authoritative author in v2.
 ## Share it
 
 ```bash
-memory bundle export --project lit-review --out lit-review.mlbundle.zip
+codifix bundle export --project lit-review --out lit-review.mlbundle.zip
 ```
 
-Bundles are privacy-safe by default (no raw captures, writer IDs, or local paths) and import idempotently — a colleague can `memory bundle import` your corpus and query it immediately. In the **Graph** tab, co-cited papers cluster visibly as relation edges accumulate between frequently co-retrieved notes.
+Bundles are privacy-safe by default (no raw captures, writer IDs, or local paths) and import idempotently — a colleague can `codifix bundle import` your corpus and query it immediately. In the **Graph** tab, co-cited papers cluster visibly as relation edges accumulate between frequently co-retrieved notes.

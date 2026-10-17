@@ -5,12 +5,12 @@ description: "How activation scoring, volatility tracking, and evidence-backed v
 
 # Self-maintaining memory
 
-Stored knowledge rots: code changes, decisions get revisited, and the memories agents rely on most are exactly the ones that drift out of date first. Memory Layer counters this with a reinforcement system that watches how memories are *used* and re-checks the important ones against your project.
+Stored knowledge rots: code changes, decisions get revisited, and the memories agents rely on most are exactly the ones that drift out of date first. Codifix counters this with a reinforcement system that watches how memories are *used* and re-checks the important ones against your project.
 
 It has two halves:
 
 1. **Activation scoring** — always on, deterministic, no LLM cost. Every memory earns an activation score from real usage.
-2. **Evidence-backed validation** — opt-in. When a memory's activation crosses a threshold, Memory Layer gathers evidence from your repository and asks an LLM whether the memory is still true, improving or flagging it under strict rules.
+2. **Evidence-backed validation** — opt-in. When a memory's activation crosses a threshold, Codifix gathers evidence from your repository and asks an LLM whether the memory is still true, improving or flagging it under strict rules.
 
 ## Activation scoring
 
@@ -47,14 +47,14 @@ When activation crosses the configured threshold (or you run `memory validate <m
 | Outdated, with a proposed correction | Correction queued for human review; the memory is never edited automatically |
 | Ambiguous, unsupported, or low confidence | Memory flagged **needs review** and rank-penalized; content untouched |
 
-The cardinal rule: **weak or contradictory evidence never modifies memory content**. Every change is a new immutable version, so anything applied can be reverted through memory history.
+The cardinal rule: **weak or contradictory evidence never modifies memory content**. Every change is a new immutable version, so anything applied can be reverted through codifix history.
 
 Review queued corrections with:
 
 ```bash
-memory review list --project <slug>
-memory review apply <run-id>
-memory review reject <run-id>
+codifix review list --project <slug>
+codifix review apply <run-id>
+codifix review reject <run-id>
 ```
 
 ## Configuration
@@ -77,13 +77,13 @@ With the defaults, a memory that is retrieved *and cited* three or four times wi
 
 Activation ranks *memories* by how they are used; **procedural utility** ranks the *automation loops* by how their output is received — the other half of the ACT-R declarative/procedural split. Every loop proposal decision teaches the loop's utility via the ACT-R delta rule `U ← U + α·(R − U)`: an approval rewards it (+1.0), an approval that needed human editing rewards it partially (+0.4), a rejection penalizes it (−1.0), and a loop-produced memory later cited in an answer earns a delayed bonus (+0.5). The update runs in the same transaction as the decision and every change is audited.
 
-Utility is **advisory only**: `memory loops list --project <slug>` shows each loop's learned utility, decision count, and a recommendation ("consistently rejected; consider snoozing" / "high-value loop") once enough decisions accumulate — but it never changes a loop's mode or permission gates. The one opt-in runtime effect (`utility_floor_enabled`, default off) can suppress an *automatic* trigger for a loop whose utility has collapsed; manual runs are always unaffected. Deliberately unlike ACT-R, there is no noise term — utility is deterministic and clock-free, moved only by decisions.
+Utility is **advisory only**: `codifix loops list --project <slug>` shows each loop's learned utility, decision count, and a recommendation ("consistently rejected; consider snoozing" / "high-value loop") once enough decisions accumulate — but it never changes a loop's mode or permission gates. The one opt-in runtime effect (`utility_floor_enabled`, default off) can suppress an *automatic* trigger for a loop whose utility has collapsed; manual runs are always unaffected. Deliberately unlike ACT-R, there is no noise term — utility is deterministic and clock-free, moved only by decisions.
 
 Configuration lives in the [`[procedural]` section](/docs/reference/config-global#procedural-section).
 
 ## Rollout advice
 
 1. Leave scoring on and watch `memory scores` for a while — no cost, useful signal.
-2. Enable `validation_enabled` with dry-run on; check `memory review list --all` to see what validation *would* do.
+2. Enable `validation_enabled` with dry-run on; check `codifix review list --all` to see what validation *would* do.
 3. Turn off dry-run once the verdicts look right.
 4. Enable `auto_apply_rewording` only when you trust the verdicts — corrections always stay human-gated regardless.

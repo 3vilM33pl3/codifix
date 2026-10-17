@@ -5,21 +5,21 @@ description: "Configure Authentik browser login, scoped service tokens, roles, a
 
 # Authentication and access
 
-Memory Layer defaults to `single_user`, preserving existing local installs. Set
+Codifix defaults to `single_user`, preserving existing local installs. Set
 `auth.mode = "multi_user"` to use Authentik for browser identity and scoped
-Memory Layer service tokens for CLI, TUI, watchers, relays, and HTTP MCP.
+Codifix service tokens for CLI, TUI, watchers, relays, and HTTP MCP.
 
 ## Identity split
 
 | Actor | Authentication | Secret location |
 |---|---|---|
-| Browser user | Authentik OIDC Authorization Code + PKCE | HttpOnly Memory Layer session cookie |
-| CLI, TUI, watcher, agent | Memory Layer `mlt_...` service token | Process environment or secret manager |
-| HTTP MCP | Memory Layer service token; cookies ignored | MCP client secret configuration |
+| Browser user | Authentik OIDC Authorization Code + PKCE | HttpOnly Codifix session cookie |
+| CLI, TUI, watcher, agent | Codifix `mlt_...` service token | Process environment or secret manager |
+| HTTP MCP | Codifix service token; cookies ignored | MCP client secret configuration |
 | Relay | Original caller credential forwarded to primary | No privilege substitution |
 
 Authentik authenticates people. OpenBao is recommended for distributing machine
-secrets, but Memory Layer does not call OpenBao at runtime.
+secrets, but Codifix does not call OpenBao at runtime.
 
 ## Permission sets and role presets
 
@@ -65,8 +65,8 @@ multi_user_legacy_token_enabled = false
 
 [auth.oidc]
 issuer_url = "https://auth.example.com/application/o/memory/"
-client_id = "memory-layer"
-client_secret_env = "MEMORY_LAYER_OIDC_CLIENT_SECRET"
+client_id = "codifix"
+client_secret_env = "CODIFIX_OIDC_CLIENT_SECRET"
 scopes = ["openid", "profile", "email"]
 groups_claim = "groups"
 
@@ -84,34 +84,34 @@ project = "memory"
 Put the client secret in the adjacent environment file:
 
 ```dotenv
-MEMORY_LAYER_OIDC_CLIENT_SECRET=replace-with-authentik-client-secret
+CODIFIX_OIDC_CLIENT_SECRET=replace-with-authentik-client-secret
 ```
 
 `public_base_url` must be the browser-visible URL, including the HTTPS scheme.
-Memory Layer uses it for the callback URI and exact Origin checks.
+Codifix uses it for the callback URI and exact Origin checks.
 
 ## Service principals
 
 ```bash
-memory auth whoami
+codifix auth whoami
 
-memory auth token create \
+codifix auth token create \
   --name hermes \
   --project memory \
   --role writer \
   --ttl 30d
 
-export MEMORY_LAYER_CLIENT_TOKEN='mlt_...'
-memory auth whoami --json
+export CODIFIX_CLIENT_TOKEN='mlt_...'
+codifix auth whoami --json
 ```
 
-The raw token is displayed once. Memory Layer stores only its SHA-256 hash.
+The raw token is displayed once. Codifix stores only its SHA-256 hash.
 Store it in OpenBao or another secret manager before closing the output.
 
 Grant the same principal another project:
 
 ```bash
-memory auth membership grant \
+codifix auth membership grant \
   --principal <principal-uuid> \
   --project another-project \
   --role reader
@@ -135,7 +135,7 @@ migration; retaining the rows preserves the audit trail.
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `401` | Credential missing, invalid, expired, or revoked | Set `MEMORY_LAYER_CLIENT_TOKEN`, sign in again, or rotate the token. |
+| `401` | Credential missing, invalid, expired, or revoked | Set `CODIFIX_CLIENT_TOKEN`, sign in again, or rotate the token. |
 | `403` | Identity is valid but role/project access is insufficient | Check group mapping or explicit membership. |
 | Login returns `503` | Authentik discovery or client secret unavailable | Check issuer URL, provider health, and `client_secret_env`. |
 | Browser write returns `403` | Origin or CSRF check failed | Verify `public_base_url`, HTTPS proxy headers, and cookies. |

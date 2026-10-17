@@ -1,14 +1,14 @@
-# `memory urls`
+# `codifix urls`
 
 List configured Memory entry points with descriptions. Web interfaces appear
 first, followed by API/agent interfaces and known federation gateways.
 
 ```bash
-memory urls
-memory urls --json
-memory urls --area workshop
-memory urls --config /path/to/config.toml
-memory urls --federation-config /path/to/participant.json
+codifix urls
+codifix urls --json
+codifix urls --area workshop
+codifix urls --config /path/to/config.toml
+codifix urls --federation-config /path/to/participant.json
 ```
 
 The command reads operator-owned area routing plus existing explicit, global,
@@ -16,7 +16,7 @@ repository and repository-development configurations. Use `--area-routing` to
 select a routing file. `--area` filters local configurations; areas without a
 local configuration, such as Trust on another host, appear as remote-only notices.
 The optional participant configuration can also be selected through
-`MEMORY_LAYER_FEDERATION_CONFIG`; only its gateway URL is displayed, not PDS
+`CODIFIX_FEDERATION_CONFIG`; only its gateway URL is displayed, not PDS
 internals or credentials.
 
 Web entries explain navigation, including **More → Access** for administration.

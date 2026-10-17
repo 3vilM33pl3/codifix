@@ -1,17 +1,17 @@
-# `memory history`
+# `codifix history`
 
-`memory history` shows every version in one canonical memory chain, including tombstones.
+`codifix history` shows every version in one canonical memory chain, including tombstones.
 
 Use it when a memory looks wrong, replaced, deleted, or superseded and you need to inspect how it changed over time.
 
 ## Common Usage
 
 ```bash
-memory history <memory-id>
-memory history <memory-id> --json
+codifix history <memory-id>
+codifix history <memory-id> --json
 ```
 
-`<memory-id>` can be any version in the chain. Memory Layer resolves the canonical id and returns the same history for current, superseded, or tombstone versions.
+`<memory-id>` can be any version in the chain. Codifix resolves the canonical id and returns the same history for current, superseded, or tombstone versions.
 
 ## What It Shows
 

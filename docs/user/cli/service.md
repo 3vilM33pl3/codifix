@@ -1,4 +1,4 @@
-# `memory service`
+# `codifix service`
 
 Use the `service` commands to enable, start, and inspect the shared backend service installed on your machine.
 
@@ -11,25 +11,25 @@ Use the `service` commands to enable, start, and inspect the shared backend serv
 
 ## What It Controls
 
-These commands manage the installed shared `memory service` backend.
+These commands manage the installed shared `codifix service` backend.
 
-They are for the normal packaged setup, not for source-level development runs like `cargo run --bin memory -- service run`, which activate a fully isolated dev profile on different ports. See [Dev Stack vs Installed Stack](../../developer/dev-stack.md) for the full contract.
+They are for the normal packaged setup, not for source-level development runs like `cargo run --bin codifix -- service run`, which activate a fully isolated dev profile on different ports. See [Dev Stack vs Installed Stack](../../developer/dev-stack.md) for the full contract.
 
 ## Common Commands
 
 Enable or start the service:
 
 ```bash
-memory service enable
+codifix service enable
 ```
 
 Preview the service action without changing the machine:
 
 ```bash
-memory service enable --dry-run
-memory service disable --dry-run
-memory service ensure-api-token --rotate-placeholder --dry-run
-memory service restart-all --dry-run --json
+codifix service enable --dry-run
+codifix service disable --dry-run
+codifix service ensure-api-token --rotate-placeholder --dry-run
+codifix service restart-all --dry-run --json
 ```
 
 This command also provisions the shared service API token automatically if it is missing or still set to the old development placeholder.
@@ -37,30 +37,30 @@ This command also provisions the shared service API token automatically if it is
 Check service status:
 
 ```bash
-memory service status
+codifix service status
 ```
 
 Rotate an old placeholder token manually:
 
 ```bash
-memory service ensure-api-token --rotate-placeholder
+codifix service ensure-api-token --rotate-placeholder
 ```
 
 Restart active services after an install or upgrade:
 
 ```bash
-memory service restart-all --mark-tui-restart --json
+codifix service restart-all --mark-tui-restart --json
 ```
 
-`restart-all` restarts only services that are already active or loaded. It does not start services that the user intentionally stopped. On Linux it checks the system backend service and active user watcher services. When run as root during a package install, it also checks logged-in user systemd sessions under `/run/user/*`. On macOS it checks loaded Memory Layer LaunchAgents. On Windows it checks the current user's `MemoryLayer-*` scheduled tasks.
+`restart-all` restarts only services that are already active or loaded. It does not start services that the user intentionally stopped. On Linux it checks the system backend service and active user watcher services. When run as root during a package install, it also checks logged-in user systemd sessions under `/run/user/*`. On macOS it checks loaded Codifix LaunchAgents. On Windows it checks the current user's `MemoryLayer-*` scheduled tasks.
 
 Installers pass `--mark-tui-restart` so a TUI that is already open can show `restart` in red in the bottom status bar. Restarting the TUI is still a user action; the installer does not kill the running terminal UI.
 
 Health checks from the client side:
 
 ```bash
-memory health
-memory doctor
+codifix health
+codifix doctor
 ```
 
 ## API Token Security
@@ -69,15 +69,15 @@ The HTTP API does not trust `Origin` or `Referer` headers as authentication, eve
 
 ## Platform Notes
 
-On macOS, `memory service enable` manages the LaunchAgent.
+On macOS, `codifix service enable` manages the LaunchAgent.
 
-On Windows, `memory service enable` registers and starts the current-user, least-privilege `MemoryLayer-Backend` Task Scheduler task. It starts at sign-in and is configured to restart after failures. Use the same CLI commands to inspect, restart, or remove it; no administrator shell is required.
+On Windows, `codifix service enable` registers and starts the current-user, least-privilege `MemoryLayer-Backend` Task Scheduler task. It starts at sign-in and is configured to restart after failures. Use the same CLI commands to inspect, restart, or remove it; no administrator shell is required.
 
 Native named server instances are separate from that legacy per-user task.
 Select the exact installed configuration to inspect one:
 
 ```powershell
-memory --config "C:\ProgramData\MemoryLayer\configurations\homelab\memory-layer.toml" service status
+memory --config "C:\ProgramData\MemoryLayer\configurations\homelab\codifix.toml" service status
 ```
 
 The actual installation root comes from Windows' native known folders. Status
@@ -96,22 +96,22 @@ for installation/upgrades; named start/stop integration is separate work.
 On Linux, the packaged service is usually managed with:
 
 ```bash
-sudo systemctl enable --now memory-layer.service
-memory service restart-all --mark-tui-restart
+sudo systemctl enable --now codifix.service
+codifix service restart-all --mark-tui-restart
 ```
 
 Use `systemctl` directly only when debugging a specific unit.
 
 ## Development And Source Use
 
-When working from source, `cargo run --bin memory -- service run` starts a **dev** backend that is fully isolated from any installed service on the same machine: a different HTTP port (`4250` vs `4040`) and its own user-local project runtime state. The dev profile ignores the installed global config entirely.
+When working from source, `cargo run --bin codifix -- service run` starts a **dev** backend that is fully isolated from any installed service on the same machine: a different HTTP port (`4250` vs `4040`) and its own user-local project runtime state. The dev profile ignores the installed global config entirely.
 
 Bootstrap is one-time per checkout:
 
 ```bash
-cargo run --bin memory -- init
-cargo run --bin memory -- dev --copy-from-global
-cargo run --bin memory -- service run
+cargo run --bin codifix -- init
+cargo run --bin codifix -- dev --copy-from-global
+cargo run --bin codifix -- service run
 ```
 
 `--copy-from-global` lifts the database URL and LLM/embedding endpoints out of the installed config into the dev overlay. Without it (and without a TTY) you will need to populate those sections in the user-local project `config.dev.toml` by hand.
@@ -124,7 +124,7 @@ An isolated instance that explicitly disables offline storage can build the
 service and TUI without DuckDB:
 
 ```bash
-cargo build -p mem-cli --bin memory --no-default-features --features tui,embedded-service-postgres --locked
+cargo build -p codifix-cli --bin codifix --no-default-features --features tui,embedded-service-postgres --locked
 ```
 
 Set `[offline] enabled = false` in its explicit configuration. Database outages
