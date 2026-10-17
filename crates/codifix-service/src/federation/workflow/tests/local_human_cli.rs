@@ -12,11 +12,10 @@ impl Drop for Files {
 }
 
 #[tokio::test]
-#[ignore = "requires explicit MEMORY_LAYER_TEST_CLI_BINARY and disposable PostgreSQL"]
+#[ignore = "requires explicit CODIFIX_TEST_CLI_BINARY and disposable PostgreSQL"]
 async fn federation_local_human_cli_real_session_and_csrf() {
     let binary = std::fs::canonicalize(
-        std::env::var_os("MEMORY_LAYER_TEST_CLI_BINARY")
-            .expect("set the explicitly built CLI binary"),
+        std::env::var_os("CODIFIX_TEST_CLI_BINARY").expect("set the explicitly built CLI binary"),
     )
     .unwrap();
     let mut f = Fixture::with_expertise(true)
@@ -53,7 +52,7 @@ async fn federation_local_human_cli_real_session_and_csrf() {
     crate::auth::ensure_local_owner_principal(&f.pool)
         .await
         .unwrap();
-    let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
+    let owner = codifix_record::LOCAL_OWNER_PRINCIPAL_ID;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let url = format!("http://{address}");
@@ -92,7 +91,7 @@ async fn federation_local_human_cli_real_session_and_csrf() {
                 std::time::Duration::from_secs(30),
                 tokio::process::Command::new(binary)
                     .env_clear()
-                    .env("MEMORY_LAYER_PROFILE", "prod")
+                    .env("CODIFIX_PROFILE", "prod")
                     .env("HOME", &directory)
                     .current_dir(directory)
                     .arg("--config")

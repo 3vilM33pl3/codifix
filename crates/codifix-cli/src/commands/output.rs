@@ -628,7 +628,7 @@ pub(crate) fn write_headers(config: &AppConfig) -> Result<HeaderMap> {
 }
 
 pub(crate) fn client_api_token(config: &AppConfig) -> String {
-    std::env::var("MEMORY_LAYER_CLIENT_TOKEN")
+    std::env::var("CODIFIX_CLIENT_TOKEN")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| config.service.api_token.clone())

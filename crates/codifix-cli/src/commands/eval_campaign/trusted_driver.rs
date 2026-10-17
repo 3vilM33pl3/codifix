@@ -56,7 +56,7 @@ pub(super) async fn run(
             .env_clear()
             .env("PATH", "/usr/local/bin:/usr/bin:/bin")
             .env("HOME", dir.join("home"))
-            .env("MEMORY_LAYER_PROFILE", "prod")
+            .env("CODIFIX_PROFILE", "prod")
             .env("MEMORY_R3_OFFLINE", if offline { "1" } else { "0" })
             .stdin(Stdio::null())
             .stdout(stdout)
@@ -160,7 +160,7 @@ pub(super) async fn run(
                     .as_os_str()
                     .to_owned(),
             ),
-            ("MEMORY_LAYER_PROFILE".into(), "prod".into()),
+            ("CODIFIX_PROFILE".into(), "prod".into()),
             (
                 "MEMORY_R3_OFFLINE".into(),
                 if offline { "1" } else { "0" }.into(),

@@ -149,7 +149,7 @@ fn redirect_test_local_app_data(root: &Path) -> Option<String> {
 #[cfg(target_os = "windows")]
 #[test]
 fn windows_service_dry_runs_describe_task_scheduler_actions() {
-    let config = Path::new(r"C:\Users\tester\AppData\Local\memory-layer\memory-layer.toml");
+    let config = Path::new(r"C:\Users\tester\AppData\Local\codifix\codifix.toml");
     assert!(preview_enable_backend_service(config).contains("MemoryLayer-Backend"));
     assert!(preview_disable_backend_service(config).contains("stop and delete"));
 
@@ -169,9 +169,9 @@ fn windows_service_dry_runs_describe_task_scheduler_actions() {
 #[test]
 fn project_defaults_to_repo_metadata_when_present() {
     let repo_root = unique_temp_dir("mem-cli-project-slug");
-    fs::create_dir_all(repo_root.join(".mem")).unwrap();
+    fs::create_dir_all(repo_root.join(".codifix")).unwrap();
     fs::write(
-        repo_root.join(".mem").join("project.toml"),
+        repo_root.join(".codifix").join("project.toml"),
         "slug = \"sctp\"\nrepo_root = \"/tmp/sctp-conformance\"\n",
     )
     .unwrap();
@@ -614,9 +614,9 @@ fn health_and_watcher_flush_help_name_current_commands() {
 #[test]
 fn grouped_help_includes_subcommand_descriptions() {
     let output = rendered_help(&["memory", "service", "--help"]);
-    assert!(output.contains("Manage the Memory Layer backend service"));
+    assert!(output.contains("Manage the Codifix backend service"));
     assert!(output.contains("Run the backend service in the foreground"));
-    assert!(output.contains("Restart active Memory Layer services after an install or upgrade"));
+    assert!(output.contains("Restart active Codifix services after an install or upgrade"));
     assert!(output.contains("Agent notes:"));
     assert!(output.contains("browser web UI"));
     assert!(output.contains("127.0.0.1:4250"));
@@ -667,7 +667,7 @@ fn verify_provenance_help_includes_dry_run_guidance() {
 #[test]
 fn status_help_defines_agent_output_contract() {
     let output = rendered_help(&["memory", "status", "--help"]);
-    assert!(output.contains("Show the aggregate Memory Layer diagnostic status"));
+    assert!(output.contains("Show the aggregate Codifix diagnostic status"));
     assert!(output.contains("Recommended first diagnostic command"));
     assert!(output.contains("aggregate payload on stdout"));
     assert!(output.contains("warnings must go to stderr"));
@@ -992,16 +992,16 @@ fn loops_run_parses_dry_run_and_trigger_payload() {
 #[test]
 fn systemd_unit_parser_finds_memory_watch_services() {
     let units = parse_systemd_unit_names(
-        "memory-watch-manager.service loaded active running Manager\n\
-             memory-watch-codex-abc.service loaded active running Watcher\n\
+        "codifix-watch-manager.service loaded active running Manager\n\
+             codifix-watch-codex-abc.service loaded active running Watcher\n\
              ssh.service loaded active running SSH\n",
     );
 
     assert_eq!(
         units,
         vec![
-            "memory-watch-manager.service".to_string(),
-            "memory-watch-codex-abc.service".to_string()
+            "codifix-watch-manager.service".to_string(),
+            "codifix-watch-codex-abc.service".to_string()
         ]
     );
 }
@@ -1017,7 +1017,7 @@ fn restart_notice_detects_newer_or_different_marker() {
         marked_at: startup_at - chrono::Duration::seconds(30),
         reason: "install-or-upgrade".to_string(),
         binary_path: "memory".to_string(),
-        restarted_services: vec!["memory-layer.service".to_string()],
+        restarted_services: vec!["codifix.service".to_string()],
     };
     fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
 
@@ -1042,7 +1042,7 @@ fn restart_notice_ignores_older_stale_marker() {
         marked_at: startup_at - chrono::Duration::days(1),
         reason: "install-or-upgrade".to_string(),
         binary_path: "memory".to_string(),
-        restarted_services: vec!["memory-layer.service".to_string()],
+        restarted_services: vec!["codifix.service".to_string()],
     };
     fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
 
@@ -1084,7 +1084,7 @@ fn restart_notice_ignores_prod_marker_for_dev_tui() {
         marked_at: startup_at + chrono::Duration::seconds(30),
         reason: "install-or-upgrade".to_string(),
         binary_path: "memory".to_string(),
-        restarted_services: vec!["memory-layer.service".to_string()],
+        restarted_services: vec!["codifix.service".to_string()],
     };
     fs::write(&marker_path, serde_json::to_string(&marker).unwrap()).unwrap();
 
@@ -1104,7 +1104,7 @@ fn native_installers_do_not_restart_unrelated_services() {
     let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
     let mac_postinstall =
         fs::read_to_string(workspace.join("packaging/macos/postinstall.sh")).unwrap();
-    let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
+    let formula = fs::read_to_string(workspace.join("Formula/codifix.rb")).unwrap();
 
     assert!(!postinst.contains("service restart-all"));
     assert!(!postinst.contains("ensure-api-token"));
@@ -1127,7 +1127,7 @@ fn packaging_installs_shell_completions() {
     let local = fs::read_to_string(workspace.join("scripts/install-local.sh")).unwrap();
     let deb = fs::read_to_string(workspace.join("packaging/build-deb.sh")).unwrap();
     let pkg = fs::read_to_string(workspace.join("packaging/build-pkg.sh")).unwrap();
-    let formula = fs::read_to_string(workspace.join("Formula/memory-layer.rb")).unwrap();
+    let formula = fs::read_to_string(workspace.join("Formula/codifix.rb")).unwrap();
 
     for contents in [local, deb, pkg, formula] {
         assert!(contents.contains("completion\", \"bash") || contents.contains("completion bash"));
@@ -1550,7 +1550,7 @@ fn agent_build_prompt_adds_memory_questions_for_memory_conditions() {
         artifacts_root: PathBuf::from("target/memory-evals"),
         memory_command: "/tmp/memory".to_string(),
         memory_base_url: "http://127.0.0.1:4250".to_string(),
-        memory_config_path: Some(PathBuf::from(".mem/config.toml")),
+        memory_config_path: Some(PathBuf::from(".codifix/config.toml")),
         llm_judge: false,
         retriever_cmd: None,
         command_cwd: PathBuf::from("."),
@@ -1864,16 +1864,16 @@ fn finish_execution_request_auto_detects_refactor_type() {
 #[test]
 fn writer_identity_falls_back_to_derived_value() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let old_user = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_USER").ok();
-    let old_host = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_HOST").ok();
-    let old_writer = std::env::var("MEMORY_LAYER_WRITER_ID").ok();
-    let old_agent = std::env::var("MEMORY_LAYER_AGENT_ID").ok();
+    let old_user = std::env::var("CODIFIX_WRITER_IDENTITY_USER").ok();
+    let old_host = std::env::var("CODIFIX_WRITER_IDENTITY_HOST").ok();
+    let old_writer = std::env::var("CODIFIX_WRITER_ID").ok();
+    let old_agent = std::env::var("CODIFIX_AGENT_ID").ok();
 
     unsafe {
-        std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_USER", "cli-user");
-        std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", "cli-host");
-        std::env::remove_var("MEMORY_LAYER_WRITER_ID");
-        std::env::remove_var("MEMORY_LAYER_AGENT_ID");
+        std::env::set_var("CODIFIX_WRITER_IDENTITY_USER", "cli-user");
+        std::env::set_var("CODIFIX_WRITER_IDENTITY_HOST", "cli-host");
+        std::env::remove_var("CODIFIX_WRITER_ID");
+        std::env::remove_var("CODIFIX_AGENT_ID");
     }
 
     let config: AppConfig =
@@ -1881,10 +1881,10 @@ fn writer_identity_falls_back_to_derived_value() {
             .expect("parse minimal config");
     let writer = resolve_writer_identity(&config, None).expect("resolve writer identity");
 
-    restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_USER", old_user);
-    restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", old_host);
-    restore_env_var("MEMORY_LAYER_WRITER_ID", old_writer);
-    restore_env_var("MEMORY_LAYER_AGENT_ID", old_agent);
+    restore_env_var("CODIFIX_WRITER_IDENTITY_USER", old_user);
+    restore_env_var("CODIFIX_WRITER_IDENTITY_HOST", old_host);
+    restore_env_var("CODIFIX_WRITER_ID", old_writer);
+    restore_env_var("CODIFIX_AGENT_ID", old_agent);
 
     assert_eq!(writer.id, "memory-cli-user-cli-host");
     assert_eq!(writer.name, None);
@@ -1897,8 +1897,8 @@ fn init_print_describes_repo_layout() {
     let normalized_summary = summary.replace('\\', "/");
 
     assert!(normalized_summary.contains("user-local project config"));
-    assert!(normalized_summary.contains(".mem/project.toml"));
-    assert!(normalized_summary.contains(".agents/memory-layer.toml"));
+    assert!(normalized_summary.contains(".codifix/project.toml"));
+    assert!(normalized_summary.contains(".agents/codifix.toml"));
     assert!(normalized_summary.contains(".agents/skills"));
     assert!(normalized_summary.contains("bundled memory skills"));
     if cfg!(target_os = "macos") {
@@ -1930,14 +1930,10 @@ fn init_creates_repo_files_and_gitignore_entry() {
 
     assert!(paths.config_path().is_file());
     assert!(paths.project_path().is_file());
-    assert!(repo_root.join(".mem/project.toml").is_file());
-    assert!(repo_root.join(".agents/memory-layer.toml").is_file());
+    assert!(repo_root.join(".codifix/project.toml").is_file());
+    assert!(repo_root.join(".agents/codifix.toml").is_file());
     assert!(paths.runtime_dir().is_dir());
-    assert!(
-        repo_root
-            .join(".agents/skills/memory-layer/SKILL.md")
-            .is_file()
-    );
+    assert!(repo_root.join(".agents/skills/codifix/SKILL.md").is_file());
     assert!(
         repo_root
             .join(".agents/skills/memory-query-resume/SKILL.md")
@@ -1975,12 +1971,12 @@ fn init_creates_repo_files_and_gitignore_entry() {
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-layer/scripts/go.mod")
+            .join(".agents/skills/codifix/scripts/go.mod")
             .is_file()
     );
     assert!(
         repo_root
-            .join(".agents/skills/memory-layer/scripts/main.go")
+            .join(".agents/skills/codifix/scripts/main.go")
             .is_file()
     );
     assert!(
@@ -1989,7 +1985,7 @@ fn init_creates_repo_files_and_gitignore_entry() {
             .contains("[automation]")
     );
     assert_eq!(
-        fs::read_to_string(repo_root.join(".mem/.gitignore")).unwrap(),
+        fs::read_to_string(repo_root.join(".codifix/.gitignore")).unwrap(),
         "*\n!.gitignore\n!project.toml\n"
     );
     assert!(!root_gitignore_contains_mem(&repo_root).unwrap());
@@ -2016,13 +2012,13 @@ fn init_migrates_legacy_mem_gitignore() {
         std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
         std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
     }
-    fs::create_dir_all(repo_root.join(".mem")).unwrap();
-    fs::write(repo_root.join(".mem/.gitignore"), "runtime/\n").unwrap();
+    fs::create_dir_all(repo_root.join(".codifix")).unwrap();
+    fs::write(repo_root.join(".codifix/.gitignore"), "runtime/\n").unwrap();
 
     initialize_repo(&repo_root, "memory", false, false).unwrap();
 
     assert_eq!(
-        fs::read_to_string(repo_root.join(".mem/.gitignore")).unwrap(),
+        fs::read_to_string(repo_root.join(".codifix/.gitignore")).unwrap(),
         "*\n!.gitignore\n!project.toml\n"
     );
 
@@ -2109,14 +2105,14 @@ fn repair_repo_bootstrap_creates_missing_files() {
     let old_state = std::env::var("XDG_STATE_HOME").ok();
     let old_cache = std::env::var("XDG_CACHE_HOME").ok();
     let old_local_app_data = redirect_test_local_app_data(&xdg_root);
-    let old_archive = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
+    let old_archive = std::env::var("CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
     write_test_skill_archive(&archive_path, "0.4.0");
     unsafe {
         std::env::set_var("XDG_CONFIG_HOME", xdg_root.join("config"));
         std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
         std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
         std::env::set_var(
-            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+            "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
             format!("file://{}", archive_path.display()),
         );
     }
@@ -2127,14 +2123,10 @@ fn repair_repo_bootstrap_creates_missing_files() {
 
     assert!(paths.config_path().is_file());
     assert!(paths.project_path().is_file());
-    assert!(repo_root.join(".mem/project.toml").is_file());
-    assert!(repo_root.join(".agents/memory-layer.toml").is_file());
+    assert!(repo_root.join(".codifix/project.toml").is_file());
+    assert!(repo_root.join(".agents/codifix.toml").is_file());
     assert!(paths.runtime_dir().is_dir());
-    assert!(
-        repo_root
-            .join(".agents/skills/memory-layer/SKILL.md")
-            .is_file()
-    );
+    assert!(repo_root.join(".agents/skills/codifix/SKILL.md").is_file());
     assert!(
         repo_root
             .join(".agents/skills/memory-query-resume/SKILL.md")
@@ -2171,10 +2163,7 @@ fn repair_repo_bootstrap_creates_missing_files() {
     restore_env_var("XDG_STATE_HOME", old_state);
     restore_env_var("XDG_CACHE_HOME", old_cache);
     restore_env_var("LOCALAPPDATA", old_local_app_data);
-    restore_env_var(
-        "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
-        old_archive,
-    );
+    restore_env_var("CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL", old_archive);
     let _ = fs::remove_dir_all(repo_root);
     let _ = fs::remove_dir_all(xdg_root);
 }
@@ -2193,9 +2182,9 @@ fn init_preserves_existing_memory_skills_without_force() {
         std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
         std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
     }
-    fs::create_dir_all(repo_root.join(".agents/skills/memory-layer")).unwrap();
+    fs::create_dir_all(repo_root.join(".agents/skills/codifix")).unwrap();
     fs::write(
-        repo_root.join(".agents/skills/memory-layer/SKILL.md"),
+        repo_root.join(".agents/skills/codifix/SKILL.md"),
         "custom umbrella skill\n",
     )
     .unwrap();
@@ -2203,7 +2192,7 @@ fn init_preserves_existing_memory_skills_without_force() {
     initialize_repo(&repo_root, "memory", false, false).unwrap();
 
     assert_eq!(
-        fs::read_to_string(repo_root.join(".agents/skills/memory-layer/SKILL.md")).unwrap(),
+        fs::read_to_string(repo_root.join(".agents/skills/codifix/SKILL.md")).unwrap(),
         "custom umbrella skill\n"
     );
     assert!(
@@ -2257,7 +2246,7 @@ fn agent_project_config_mentions_project_customization() {
 
 #[test]
 fn generated_toml_escapes_windows_paths() {
-    let windows_path = r"C:\Users\Test User\AppData\Local\memory-layer";
+    let windows_path = r"C:\Users\Test User\AppData\Local\codifix";
     let rendered = format!("path = {}", render_toml_string(windows_path));
     let parsed: toml::Value = toml::from_str(&rendered).unwrap();
     assert_eq!(parsed["path"].as_str(), Some(windows_path));
@@ -2285,8 +2274,7 @@ fn init_copies_code_explanation_memory_rule_to_skills() {
 
     initialize_repo(&repo_root, "memory", false, false).unwrap();
 
-    let umbrella =
-        fs::read_to_string(repo_root.join(".agents/skills/memory-layer/SKILL.md")).unwrap();
+    let umbrella = fs::read_to_string(repo_root.join(".agents/skills/codifix/SKILL.md")).unwrap();
     let github_init =
         fs::read_to_string(repo_root.join(".agents/skills/memory-github-init/SKILL.md")).unwrap();
     let query_resume =
@@ -2311,10 +2299,10 @@ fn init_copies_code_explanation_memory_rule_to_skills() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn watch_unit_name_is_project_scoped() {
-    assert_eq!(watch_unit_name("homelab"), "memory-watch-homelab.service");
+    assert_eq!(watch_unit_name("homelab"), "codifix-watch-homelab.service");
     assert_eq!(
         watch_unit_name("customer portal"),
-        "memory-watch-customer-portal.service"
+        "codifix-watch-customer-portal.service"
     );
 }
 
@@ -2323,11 +2311,11 @@ fn watch_unit_name_is_project_scoped() {
 fn managed_watch_unit_name_is_profile_scoped() {
     assert_eq!(
         managed_watch_service_name(Profile::Prod, "session 123"),
-        "memory-watch-codex-session-123.service"
+        "codifix-watch-codex-session-123.service"
     );
     assert_eq!(
         managed_watch_service_name(Profile::Dev, "session 123"),
-        "memory-watch-codex-dev-session-123.service"
+        "codifix-watch-codex-dev-session-123.service"
     );
 }
 
@@ -2529,7 +2517,7 @@ fn watch_unit_uses_repo_root_and_project() {
     fs::create_dir_all(&repo_root).unwrap();
     let unit = render_watch_unit(&repo_root, "homelab").unwrap();
 
-    assert!(unit.contains("Description=Memory Layer Watcher (homelab)"));
+    assert!(unit.contains("Description=Codifix Watcher (homelab)"));
     assert!(unit.contains(&format!("WorkingDirectory={}", repo_root.display())));
     assert!(unit.contains("EnvironmentFile=-"));
     assert!(unit.contains("run --project homelab"));
@@ -2540,7 +2528,7 @@ fn watch_unit_uses_repo_root_and_project() {
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn watch_manager_unit_uses_manager_subcommand() {
-    let unit = render_watch_manager_unit(Path::new("/tmp/memory-layer.toml")).unwrap();
+    let unit = render_watch_manager_unit(Path::new("/tmp/codifix.toml")).unwrap();
     assert!(unit.contains("watcher manager run"));
     assert!(unit.contains("Restart=always"));
 }
@@ -2569,9 +2557,9 @@ fn agent_watcher_start_logic_reuses_loaded_active_units() {
 fn watcher_manager_resolves_one_initialized_repo_beneath_a_workspace() {
     let workspace = unique_temp_dir("mem-watch-workspace");
     let repo = workspace.join("memory");
-    fs::create_dir_all(repo.join(".mem")).unwrap();
+    fs::create_dir_all(repo.join(".codifix")).unwrap();
     fs::write(
-        repo.join(".mem").join("project.toml"),
+        repo.join(".codifix").join("project.toml"),
         "project = \"memory\"\n",
     )
     .unwrap();
@@ -2595,22 +2583,22 @@ fn watcher_manager_resolves_one_initialized_repo_beneath_a_workspace() {
 #[cfg(target_os = "macos")]
 #[test]
 fn launch_agent_labels_are_project_scoped() {
-    assert_eq!(backend_launch_agent_label(), "com.memory-layer.mem-service");
+    assert_eq!(backend_launch_agent_label(), "dev.codifix.service");
     assert_eq!(
         watch_manager_launch_agent_label(),
-        "com.memory-layer.memory-watch-manager"
+        "dev.codifix.watch-manager"
     );
     assert_eq!(
         watch_launch_agent_label("customer portal"),
-        "com.memory-layer.memory-watch.customer-portal"
+        "dev.codifix.watch.customer-portal"
     );
     assert_eq!(
         managed_watch_launch_agent_label(Profile::Prod, "session 123"),
-        "com.memory-layer.memory-watch.codex.session-123"
+        "dev.codifix.watch.codex.session-123"
     );
     assert_eq!(
         managed_watch_launch_agent_label(Profile::Dev, "session 123"),
-        "com.memory-layer.memory-watch.codex.dev.session-123"
+        "dev.codifix.watch.codex.dev.session-123"
     );
     assert_eq!(
         sanitize_service_fragment("customer portal"),
@@ -2623,10 +2611,10 @@ fn launch_agent_labels_are_project_scoped() {
 fn backend_launch_agent_uses_global_config_path() {
     let plist = render_backend_launch_agent(&default_global_config_path()).unwrap();
 
-    assert!(plist.contains("<string>com.memory-layer.mem-service</string>"));
+    assert!(plist.contains("<string>dev.codifix.service</string>"));
     assert!(plist.contains("<string>/bin/zsh</string>"));
     assert!(plist.contains("--config"));
-    assert!(plist.contains("memory-layer.toml"));
+    assert!(plist.contains("codifix.toml"));
     assert!(plist.contains("mem-service.stdout.log"));
 }
 
@@ -2637,10 +2625,10 @@ fn watch_launch_agent_uses_repo_root_and_project() {
     fs::create_dir_all(&repo_root).unwrap();
     let plist = render_watch_launch_agent(&repo_root, "homelab").unwrap();
 
-    assert!(plist.contains("<string>com.memory-layer.memory-watch.homelab</string>"));
+    assert!(plist.contains("<string>dev.codifix.watch.homelab</string>"));
     assert!(plist.contains(&repo_root.display().to_string()));
     assert!(plist.contains("<string>/bin/zsh</string>"));
-    assert!(plist.contains("memory-watch"));
+    assert!(plist.contains("codifix-watch"));
     assert!(plist.contains("--project"));
     assert!(plist.contains("homelab"));
 
@@ -2652,12 +2640,12 @@ fn watch_launch_agent_uses_repo_root_and_project() {
 fn watch_manager_launch_agent_uses_manager_subcommand() {
     let plist = render_watch_manager_launch_agent(&default_global_config_path()).unwrap();
 
-    assert!(plist.contains("<string>com.memory-layer.memory-watch-manager</string>"));
+    assert!(plist.contains("<string>dev.codifix.watch-manager</string>"));
     assert!(plist.contains("<string>/bin/zsh</string>"));
     assert!(plist.contains("watcher"));
     assert!(plist.contains("manager"));
     assert!(plist.contains("run"));
-    assert!(plist.contains("memory-watch-manager.stdout.log"));
+    assert!(plist.contains("codifix-watch-manager.stdout.log"));
 }
 
 #[cfg(target_os = "macos")]
@@ -2687,7 +2675,7 @@ fn managed_watch_launch_agent_uses_agent_metadata() {
     )
     .unwrap();
 
-    assert!(plist.contains("<string>com.memory-layer.memory-watch.codex.session-123</string>"));
+    assert!(plist.contains("<string>dev.codifix.watch.codex.session-123</string>"));
     assert!(plist.contains("--agent-session-id"));
     assert!(plist.contains("session-123"));
     assert!(plist.contains("--agent-pid"));
@@ -2702,7 +2690,7 @@ fn managed_watch_launch_agent_uses_agent_metadata() {
 fn shared_env_lookup_reads_key() {
     let dir = unique_temp_dir("mem-shared-env");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.env");
+    let path = dir.join("codifix.env");
     fs::write(&path, "OPENAI_API_KEY=test-key\n").unwrap();
 
     assert_eq!(
@@ -2717,7 +2705,7 @@ fn shared_env_lookup_reads_key() {
 fn ensure_shared_service_api_token_creates_missing_token() {
     let dir = unique_temp_dir("mem-token-create");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.env");
+    let path = dir.join("codifix.env");
 
     let result = ensure_shared_service_api_token(&path, None, true).unwrap();
     let token = shared_env_lookup(&path, SERVICE_API_TOKEN_KEY).unwrap();
@@ -2734,7 +2722,7 @@ fn ensure_shared_service_api_token_creates_missing_token() {
 fn cluster_enabled_is_added_when_missing() {
     let dir = unique_temp_dir("mem-cluster-config");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.toml");
+    let path = dir.join("codifix.toml");
     fs::write(&path, "[service]\nbind_addr = \"127.0.0.1:4040\"\n").unwrap();
 
     set_cluster_enabled_in_shared_config(&path, true).unwrap();
@@ -2750,7 +2738,7 @@ fn cluster_enabled_is_added_when_missing() {
 fn ensure_shared_service_api_token_rotates_placeholder() {
     let dir = unique_temp_dir("mem-token-rotate");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.env");
+    let path = dir.join("codifix.env");
     fs::write(
         &path,
         format!("{SERVICE_API_TOKEN_KEY}={DEV_API_TOKEN}\nOPENAI_API_KEY=test-key\n"),
@@ -2773,7 +2761,7 @@ fn ensure_shared_service_api_token_rotates_placeholder() {
 fn cluster_enabled_is_updated_in_existing_section() {
     let dir = unique_temp_dir("mem-cluster-existing");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.toml");
+    let path = dir.join("codifix.toml");
     fs::write(
         &path,
         "[cluster]\nenabled = false\npriority = 50\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n",
@@ -2792,7 +2780,7 @@ fn cluster_enabled_is_updated_in_existing_section() {
 fn ensure_shared_service_api_token_preserves_existing_non_placeholder() {
     let dir = unique_temp_dir("mem-token-preserve");
     fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("memory-layer.env");
+    let path = dir.join("codifix.env");
     fs::write(&path, format!("{SERVICE_API_TOKEN_KEY}=ml_existingtoken\n")).unwrap();
 
     let result = ensure_shared_service_api_token(&path, None, true).unwrap();
@@ -2808,16 +2796,16 @@ fn ensure_shared_service_api_token_preserves_existing_non_placeholder() {
 #[test]
 fn write_headers_sends_token_for_loopback_service() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
     unsafe {
-        std::env::remove_var("MEMORY_LAYER_CLIENT_TOKEN");
+        std::env::remove_var("CODIFIX_CLIENT_TOKEN");
     }
     let mut config = test_app_config();
     config.service.bind_addr = "127.0.0.1:4040".to_string();
     config.service.api_token = "ml_testtoken".to_string();
 
     let headers = write_headers(&config).unwrap();
-    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
@@ -2831,16 +2819,16 @@ fn write_headers_sends_token_for_loopback_service() {
 #[test]
 fn write_headers_sends_token_for_non_loopback_service() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
     unsafe {
-        std::env::remove_var("MEMORY_LAYER_CLIENT_TOKEN");
+        std::env::remove_var("CODIFIX_CLIENT_TOKEN");
     }
     let mut config = test_app_config();
     config.service.bind_addr = "10.22.6.42:4140".to_string();
     config.service.api_token = "ml_testtoken".to_string();
 
     let headers = write_headers(&config).unwrap();
-    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
@@ -2854,13 +2842,13 @@ fn write_headers_sends_token_for_non_loopback_service() {
 #[test]
 fn write_headers_prefers_scoped_client_token_environment_variable() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("MEMORY_LAYER_CLIENT_TOKEN").ok();
+    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
     unsafe {
-        std::env::set_var("MEMORY_LAYER_CLIENT_TOKEN", "mlt_scoped-client-token");
+        std::env::set_var("CODIFIX_CLIENT_TOKEN", "mlt_scoped-client-token");
     }
     let config = test_app_config();
     let headers = write_headers(&config).unwrap();
-    restore_env_var("MEMORY_LAYER_CLIENT_TOKEN", previous);
+    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
@@ -2912,7 +2900,7 @@ fn watcher_manager_uses_resolved_project_config_for_children() {
 #[test]
 fn watcher_manager_uses_cli_fallback_without_resolved_config() {
     let config = test_app_config();
-    let fallback = PathBuf::from("/tmp/memory-layer.toml");
+    let fallback = PathBuf::from("/tmp/codifix.toml");
 
     let path = effective_watcher_manager_config_path(&config, Some(fallback.clone()));
 
@@ -3005,7 +2993,7 @@ fn skill_version_prefers_skill_frontmatter_over_agent_hint() {
 fn skill_inventory_marks_outdated_and_missing_skills() {
     let repo = unique_temp_dir("mem-skill-inventory");
     let project_root = repo.join("project");
-    let template_root = repo.join("memory-layer/skill-template");
+    let template_root = repo.join("codifix/skill-template");
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
     }
@@ -3057,7 +3045,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
     }
 
     let project_root = repo.join("project");
-    let template_root = repo.join("memory-layer/skill-template");
+    let template_root = repo.join("codifix/skill-template");
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
     }
@@ -3132,7 +3120,7 @@ fn visible_skill_inventory_classifies_repo_home_codex_and_plugin_skills() {
 fn skill_upgrade_dry_run_does_not_replace_project_skill() {
     let repo = unique_temp_dir("mem-skill-upgrade-dry-run");
     let project_root = repo.join("project");
-    let template_root = repo.join("memory-layer/skill-template");
+    let template_root = repo.join("codifix/skill-template");
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
@@ -3171,7 +3159,7 @@ fn skill_upgrade_replaces_outdated_skill_and_creates_backup() {
         std::env::set_var("XDG_CACHE_HOME", xdg_root.join("cache"));
     }
     let project_root = repo.join("project");
-    let template_root = repo.join("memory-layer/skill-template");
+    let template_root = repo.join("codifix/skill-template");
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&template_root.join(name), "0.2.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.1.0");
@@ -3212,7 +3200,7 @@ fn skill_upgrade_replaces_outdated_skill_and_creates_backup() {
 fn skill_inventory_reports_ok_for_matching_bundle_version() {
     let repo = unique_temp_dir("mem-skill-bundle-ok");
     let project_root = repo.join("project");
-    let template_root = repo.join("memory-layer/skill-template");
+    let template_root = repo.join("codifix/skill-template");
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&template_root.join(name), env!("CARGO_PKG_VERSION"));
         write_test_skill(
@@ -3237,14 +3225,14 @@ fn github_skill_version_report_detects_outdated_project_skills() {
     let repo = unique_temp_dir("mem-github-skill-versions");
     let project_root = repo.join("project");
     let github_root = repo.join("github-skills");
-    let old_raw = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE").ok();
+    let old_raw = std::env::var("CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE").ok();
     for name in MEMORY_SKILL_NAMES {
         write_test_skill(&github_root.join(name), "0.3.0");
         write_test_skill(&project_root.join(".agents/skills").join(name), "0.2.0");
     }
     unsafe {
         std::env::set_var(
-            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE",
+            "CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE",
             format!("file://{}", github_root.display()),
         );
     }
@@ -3255,7 +3243,7 @@ fn github_skill_version_report_detects_outdated_project_skills() {
     assert_eq!(report.skills[0].status, SkillVersionStatus::Outdated);
     assert_eq!(report.skills[0].github_version.as_deref(), Some("0.3.0"));
 
-    restore_env_var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE", old_raw);
+    restore_env_var("CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE", old_raw);
     let _ = fs::remove_dir_all(repo);
 }
 
@@ -3265,13 +3253,13 @@ fn download_github_skill_template_extracts_archive_to_state_cache() {
     let repo = unique_temp_dir("mem-github-skill-archive");
     let xdg_root = unique_temp_dir("mem-github-skill-archive-xdg");
     let archive_path = repo.join("memory-main.zip");
-    let old_archive = std::env::var("MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
+    let old_archive = std::env::var("CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL").ok();
     let old_state = std::env::var("XDG_STATE_HOME").ok();
     let old_local_app_data = redirect_test_local_app_data(&xdg_root);
     write_test_skill_archive(&archive_path, "0.4.0");
     unsafe {
         std::env::set_var(
-            "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
+            "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
             format!("file://{}", archive_path.display()),
         );
         std::env::set_var("XDG_STATE_HOME", xdg_root.join("state"));
@@ -3287,10 +3275,7 @@ fn download_github_skill_template_extracts_archive_to_state_cache() {
         );
     }
 
-    restore_env_var(
-        "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL",
-        old_archive,
-    );
+    restore_env_var("CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL", old_archive);
     restore_env_var("XDG_STATE_HOME", old_state);
     restore_env_var("LOCALAPPDATA", old_local_app_data);
     let _ = fs::remove_dir_all(repo);

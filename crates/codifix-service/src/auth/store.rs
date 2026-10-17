@@ -180,7 +180,7 @@ pub(crate) fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
 /// Stable identity of the machine-local owner in single-user mode. The row
 /// is bootstrapped at startup so single-user actions are attributable.
 pub(crate) fn local_owner_id() -> Uuid {
-    Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner")
+    codifix_record::LOCAL_OWNER_PRINCIPAL_ID
 }
 
 /// Ensures the local-owner principal row exists (idempotent).
@@ -221,7 +221,7 @@ fn single_user_reader() -> AuthenticatedPrincipal {
 
 fn legacy_principal() -> AuthenticatedPrincipal {
     AuthenticatedPrincipal {
-        id: Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-legacy-service-token"),
+        id: codifix_record::LEGACY_SERVICE_PRINCIPAL_ID,
         kind: AuthPrincipalKind::LegacyServiceToken,
         display_name: "legacy service token".to_string(),
         email: None,

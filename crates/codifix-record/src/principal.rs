@@ -360,3 +360,29 @@ mod permission_tests {
         }
     }
 }
+
+/// Stable pre-rename machine-local owner identity. Never derive from the product name.
+pub const LOCAL_OWNER_PRINCIPAL_ID: uuid::Uuid =
+    uuid::Uuid::from_u128(0x1a96d51dc4c556c9a16650e8ea987918);
+
+/// Stable pre-rename service-token identity.
+pub const LEGACY_SERVICE_PRINCIPAL_ID: uuid::Uuid =
+    uuid::Uuid::from_u128(0x8a0cc985a24351418ca66d65d52ab793);
+
+#[cfg(test)]
+mod stable_identity_tests {
+    #[test]
+    fn rename_preserves_existing_principal_ids() {
+        assert_eq!(
+            super::LOCAL_OWNER_PRINCIPAL_ID,
+            uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, b"memory-layer-local-owner")
+        );
+        assert_eq!(
+            super::LEGACY_SERVICE_PRINCIPAL_ID,
+            uuid::Uuid::new_v5(
+                &uuid::Uuid::NAMESPACE_OID,
+                b"memory-layer-legacy-service-token"
+            )
+        );
+    }
+}

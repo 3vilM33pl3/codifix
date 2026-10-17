@@ -33,11 +33,11 @@ pub enum Profile {
 }
 
 impl Profile {
-    /// Resolve the active profile from (1) `MEMORY_LAYER_PROFILE` env var,
+    /// Resolve the active profile from (1) `CODIFIX_PROFILE` env var,
     /// otherwise (2) the location of the running binary — a path under a
     /// `target/{debug,release}/` directory counts as dev.
     pub fn detect() -> Self {
-        if let Ok(value) = env::var("MEMORY_LAYER_PROFILE") {
+        if let Ok(value) = env::var("CODIFIX_PROFILE") {
             match value.trim().to_ascii_lowercase().as_str() {
                 "dev" | "development" => return Profile::Dev,
                 "prod" | "production" | "" => return Profile::Prod,

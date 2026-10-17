@@ -50,6 +50,7 @@ impl BuiltinLoopDefinition {
     pub fn stable_id(&self) -> Uuid {
         Uuid::new_v5(
             &Uuid::NAMESPACE_URL,
+            // Persisted loop identities retain this original UUID-v5 input across renames.
             format!("memory-layer:loop:{}:{}", self.loop_id, self.version).as_bytes(),
         )
     }

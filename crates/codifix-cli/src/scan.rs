@@ -542,7 +542,7 @@ fn build_repo_index(
 fn repo_index_path(repo_root: &Path, project: &str) -> PathBuf {
     project_paths_for_repo(repo_root)
         .map(|paths| paths.cache_index_dir())
-        .unwrap_or_else(|| repo_root.join(".mem").join("runtime").join("index"))
+        .unwrap_or_else(|| repo_root.join(".codifix").join("runtime").join("index"))
         .join(format!("{project}-repo-index.json"))
 }
 
@@ -1118,7 +1118,7 @@ fn preview_scan_report_path(repo_root: &Path, project: &str) -> Result<PathBuf> 
 fn scan_report_dir(repo_root: &Path) -> PathBuf {
     project_paths_for_repo(repo_root)
         .map(|paths| paths.runtime_dir().join("scan"))
-        .unwrap_or_else(|| repo_root.join(".mem").join("runtime").join("scan"))
+        .unwrap_or_else(|| repo_root.join(".codifix").join("runtime").join("scan"))
 }
 
 fn git_output<I, S>(repo_root: &Path, args: I) -> Result<String>
@@ -1145,7 +1145,7 @@ where
 fn is_ignored_path(path: &str, settings: &AgentProjectConfig) -> bool {
     path.starts_with(".git/")
         || path.starts_with("target/")
-        || path.starts_with(".mem/")
+        || path.starts_with(".codifix/")
         || path.starts_with("node_modules/")
         || path.contains("/node_modules/")
         || matches_path_prefix(path, &settings.capture.ignore_paths)
@@ -1341,10 +1341,10 @@ mod tests {
         let old_state_home = std::env::var("XDG_STATE_HOME").ok();
         let old_cache_home = std::env::var("XDG_CACHE_HOME").ok();
         let old_local_app_data = std::env::var("LOCALAPPDATA").ok();
-        fs::create_dir_all(repo_root.join(".mem")).unwrap();
+        fs::create_dir_all(repo_root.join(".codifix")).unwrap();
         fs::create_dir_all(&home).unwrap();
         fs::write(
-            repo_root.join(".mem").join("project.toml"),
+            repo_root.join(".codifix").join("project.toml"),
             "slug = \"demo\"\n",
         )
         .unwrap();
@@ -1390,8 +1390,8 @@ mod tests {
             assert!(index_path.starts_with(local_root.join("cache").join("projects")));
             assert!(report_dir.starts_with(local_root.join("projects")));
         }
-        assert!(!index_path.starts_with(repo_root.join(".mem")));
-        assert!(!report_dir.starts_with(repo_root.join(".mem")));
+        assert!(!index_path.starts_with(repo_root.join(".codifix")));
+        assert!(!report_dir.starts_with(repo_root.join(".codifix")));
 
         restore_env_var("HOME", old_home);
         restore_env_var("XDG_CONFIG_HOME", old_config_home);

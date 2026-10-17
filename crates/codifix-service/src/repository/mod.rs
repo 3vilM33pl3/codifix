@@ -1411,7 +1411,7 @@ mod tests {
     }
 
     async fn test_pool() -> Option<PgPool> {
-        let url = std::env::var("MEMORY_LAYER_TEST_DATABASE_URL")
+        let url = std::env::var("CODIFIX_TEST_DATABASE_URL")
             .ok()
             .or_else(read_local_test_database_url)?;
         let pool = PgPool::connect(&url).await.unwrap();

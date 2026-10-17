@@ -256,7 +256,7 @@ fn resolve_agent_session_id(value: Option<String>) -> String {
 fn agent_session_id_from_env() -> Option<String> {
     [
         "CODEX_SESSION_ID",
-        "MEMORY_LAYER_AGENT_SESSION_ID",
+        "CODIFIX_AGENT_SESSION_ID",
         "CLAUDE_SESSION_ID",
     ]
     .iter()

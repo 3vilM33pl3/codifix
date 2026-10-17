@@ -49,7 +49,7 @@ impl AreaIdentityConfig {
         let stem = base
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or("memory-layer");
+            .unwrap_or("codifix");
         if stem.ends_with(&suffix) {
             return base.to_owned();
         }
@@ -272,7 +272,7 @@ pub fn discover_area_routing_path(explicit: Option<PathBuf>, profile: Profile) -
     if explicit.is_some() {
         return explicit;
     }
-    if let Some(path) = std::env::var_os("MEMORY_LAYER_AREA_ROUTING") {
+    if let Some(path) = std::env::var_os("CODIFIX_AREA_ROUTING") {
         return Some(path.into());
     }
     if profile == Profile::Dev {

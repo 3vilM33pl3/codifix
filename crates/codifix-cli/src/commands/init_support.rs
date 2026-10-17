@@ -31,7 +31,7 @@ pub(crate) fn initialize_repo(
     force: bool,
     print_only: bool,
 ) -> Result<String> {
-    let mem_dir = repo_root.join(".mem");
+    let mem_dir = repo_root.join(".codifix");
     let project_paths = codifix_platform::project_paths(repo_root, project)
         .ok_or_else(|| anyhow::anyhow!("could not resolve user project config paths"))?;
     let runtime_dir = project_paths.runtime_dir();
@@ -40,12 +40,12 @@ pub(crate) fn initialize_repo(
     let home_project_path = project_paths.project_path();
     let project_path = mem_dir.join("project.toml");
     let legacy_config_path = mem_dir.join("config.toml");
-    let legacy_env_path = mem_dir.join("memory-layer.env");
+    let legacy_env_path = mem_dir.join("codifix.env");
     let local_gitignore_path = mem_dir.join(".gitignore");
-    let agent_config_path = repo_root.join(".agents").join("memory-layer.toml");
+    let agent_config_path = repo_root.join(".agents").join("codifix.toml");
     let skill_root = repo_root.join(".agents").join("skills");
     let skill_template_dir = discover_skill_template_dir()
-        .ok_or_else(|| anyhow::anyhow!("could not locate packaged memory-layer skill template"))?;
+        .ok_or_else(|| anyhow::anyhow!("could not locate packaged codifix skill template"))?;
 
     let config_contents = render_repo_config(repo_root, &project_paths);
     let project_contents = render_project_metadata(project, repo_root);
@@ -76,16 +76,16 @@ pub(crate) fn initialize_repo(
             fs::write(&home_project_path, &project_contents)
                 .with_context(|| format!("write {}", home_project_path.display()))?;
         }
-        fs::create_dir_all(&mem_dir).context("create .mem")?;
+        fs::create_dir_all(&mem_dir).context("create .codifix")?;
         if force || !project_path.exists() {
-            fs::write(&project_path, project_contents).context("write .mem/project.toml")?;
+            fs::write(&project_path, project_contents).context("write .codifix/project.toml")?;
         }
         if let Some(parent) = agent_config_path.parent() {
             fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
         }
         if force || !agent_config_path.exists() {
             fs::write(&agent_config_path, agent_project_contents)
-                .context("write .agents/memory-layer.toml")?;
+                .context("write .agents/codifix.toml")?;
         }
         ensure_mem_gitignore(&local_gitignore_path, force)?;
         sync_memory_skill_bundle(&skill_template_dir, &skill_root, force)?;
@@ -106,11 +106,11 @@ pub(crate) fn initialize_repo(
 pub(crate) fn ensure_mem_gitignore(path: &Path, force: bool) -> Result<()> {
     const CONTENTS: &str = "*\n!.gitignore\n!project.toml\n";
     if force || !path.exists() {
-        fs::write(path, CONTENTS).context("write .mem/.gitignore")?;
+        fs::write(path, CONTENTS).context("write .codifix/.gitignore")?;
         return Ok(());
     }
 
-    let current = fs::read_to_string(path).context("read .mem/.gitignore")?;
+    let current = fs::read_to_string(path).context("read .codifix/.gitignore")?;
     let lines: Vec<&str> = current
         .lines()
         .map(str::trim)
@@ -122,7 +122,7 @@ pub(crate) fn ensure_mem_gitignore(path: &Path, force: bool) -> Result<()> {
         .all(|required| lines.contains(&required));
     let has_only_safe_rules = lines.iter().all(|line| allowed.contains(line));
     if !has_safe_default || !has_only_safe_rules {
-        fs::write(path, CONTENTS).context("migrate .mem/.gitignore")?;
+        fs::write(path, CONTENTS).context("migrate .codifix/.gitignore")?;
     }
 
     Ok(())
@@ -136,7 +136,7 @@ pub(in crate::commands) fn initialize_dev_overlay(
     let project_paths = codifix_platform::project_paths(repo_root, &project)
         .ok_or_else(|| anyhow::anyhow!("could not resolve user project config paths"))?;
     let base_config_path = project_paths.config_path();
-    if !base_config_path.is_file() && !repo_root.join(".mem").join("config.toml").is_file() {
+    if !base_config_path.is_file() && !repo_root.join(".codifix").join("config.toml").is_file() {
         anyhow::bail!(
             "no project config found at {}. Run `memory init` first to bootstrap the \
              base config before layering the dev overlay on top.",
@@ -155,7 +155,7 @@ pub(in crate::commands) fn initialize_dev_overlay(
 
     let mut contents = format!(
         "# Overlay on top of the user-local project config for the dev profile.\n\
-         # Active when MEMORY_LAYER_PROFILE=dev or the binary runs from a cargo target/ directory.\n\
+         # Active when CODIFIX_PROFILE=dev or the binary runs from a cargo target/ directory.\n\
          # The dev profile does NOT read the global config — anything shared (database URL,\n\
          # LLM endpoints) lives here. Re-run `memory dev --copy-from-global` to refresh.\n\
          \n\
@@ -167,7 +167,7 @@ pub(in crate::commands) fn initialize_dev_overlay(
          audit_log_path = {audit_log_path_toml}\n\
          \n\
          [cluster]\n\
-         service_id = \"memory-layer-dev\"\n",
+         service_id = \"codifix-dev\"\n",
     );
     if !shared_snippet.is_empty() {
         contents.push('\n');

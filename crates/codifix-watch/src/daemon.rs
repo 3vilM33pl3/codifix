@@ -389,7 +389,7 @@ fn log_heartbeat_transition(
 }
 
 fn watcher_is_service_managed() -> bool {
-    std::env::var("MEMORY_LAYER_WATCH_SERVICE_MANAGED")
+    std::env::var("CODIFIX_WATCH_SERVICE_MANAGED")
         .ok()
         .map(|value| {
             let normalized = value.trim().to_ascii_lowercase();
@@ -445,13 +445,13 @@ fn resolve_writer_id(config: &AppConfig, cli_writer_id: Option<String>) -> Resul
             return Ok(trimmed.to_string());
         }
     }
-    if let Ok(writer_id) = std::env::var("MEMORY_LAYER_WRITER_ID") {
+    if let Ok(writer_id) = std::env::var("CODIFIX_WRITER_ID") {
         let trimmed = writer_id.trim();
         if !trimmed.is_empty() {
             return Ok(trimmed.to_string());
         }
     }
-    if let Ok(writer_id) = std::env::var("MEMORY_LAYER_AGENT_ID") {
+    if let Ok(writer_id) = std::env::var("CODIFIX_AGENT_ID") {
         let trimmed = writer_id.trim();
         if !trimmed.is_empty() {
             return Ok(trimmed.to_string());
@@ -461,7 +461,7 @@ fn resolve_writer_id(config: &AppConfig, cli_writer_id: Option<String>) -> Resul
     if !trimmed.is_empty() {
         return Ok(trimmed.to_string());
     }
-    Ok(platform::derive_default_writer_id("memory-watch"))
+    Ok(platform::derive_default_writer_id("codifix-watch"))
 }
 
 #[cfg(test)]
@@ -557,9 +557,9 @@ mod tests {
     #[test]
     fn resolve_project_uses_repo_metadata_when_present() {
         let repo_root = unique_temp_dir("mem-watch-project-slug");
-        fs::create_dir_all(repo_root.join(".mem")).expect("create .mem directory");
+        fs::create_dir_all(repo_root.join(".codifix")).expect("create .codifix directory");
         fs::write(
-            repo_root.join(".mem").join("project.toml"),
+            repo_root.join(".codifix").join("project.toml"),
             "slug = \"sctp\"\nrepo_root = \"/tmp/sctp-conformance\"\n",
         )
         .expect("write project metadata");
@@ -658,16 +658,16 @@ mod tests {
     #[test]
     fn writer_id_falls_back_to_derived_value() {
         let _guard = ENV_LOCK.lock().expect("lock test environment");
-        let old_user = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_USER").ok();
-        let old_host = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_HOST").ok();
-        let old_writer = std::env::var("MEMORY_LAYER_WRITER_ID").ok();
-        let old_agent = std::env::var("MEMORY_LAYER_AGENT_ID").ok();
+        let old_user = std::env::var("CODIFIX_WRITER_IDENTITY_USER").ok();
+        let old_host = std::env::var("CODIFIX_WRITER_IDENTITY_HOST").ok();
+        let old_writer = std::env::var("CODIFIX_WRITER_ID").ok();
+        let old_agent = std::env::var("CODIFIX_AGENT_ID").ok();
 
         unsafe {
-            std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_USER", "watch-user");
-            std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", "watch-host");
-            std::env::remove_var("MEMORY_LAYER_WRITER_ID");
-            std::env::remove_var("MEMORY_LAYER_AGENT_ID");
+            std::env::set_var("CODIFIX_WRITER_IDENTITY_USER", "watch-user");
+            std::env::set_var("CODIFIX_WRITER_IDENTITY_HOST", "watch-host");
+            std::env::remove_var("CODIFIX_WRITER_ID");
+            std::env::remove_var("CODIFIX_AGENT_ID");
         }
 
         let config: AppConfig =
@@ -675,12 +675,12 @@ mod tests {
                 .expect("parse minimal config");
         let writer_id = resolve_writer_id(&config, None).expect("resolve writer id");
 
-        restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_USER", old_user);
-        restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", old_host);
-        restore_env_var("MEMORY_LAYER_WRITER_ID", old_writer);
-        restore_env_var("MEMORY_LAYER_AGENT_ID", old_agent);
+        restore_env_var("CODIFIX_WRITER_IDENTITY_USER", old_user);
+        restore_env_var("CODIFIX_WRITER_IDENTITY_HOST", old_host);
+        restore_env_var("CODIFIX_WRITER_ID", old_writer);
+        restore_env_var("CODIFIX_AGENT_ID", old_agent);
 
-        assert_eq!(writer_id, "memory-watch-watch-user-watch-host");
+        assert_eq!(writer_id, "codifix-watch-watch-user-watch-host");
     }
 
     fn unique_temp_dir(name: &str) -> std::path::PathBuf {

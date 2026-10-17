@@ -1328,10 +1328,10 @@ fn compare_ranked(left: &RankedCandidate, right: &RankedCandidate) -> std::cmp::
 }
 
 /// Upper bound for the graph retrieval channel (default 8s). Override with
-/// `MEMORY_LAYER_GRAPH_TIMEOUT_SECS`; values must be a positive integer
+/// `CODIFIX_GRAPH_TIMEOUT_SECS`; values must be a positive integer
 /// number of seconds.
 fn graph_channel_timeout() -> std::time::Duration {
-    let secs = std::env::var("MEMORY_LAYER_GRAPH_TIMEOUT_SECS")
+    let secs = std::env::var("CODIFIX_GRAPH_TIMEOUT_SECS")
         .ok()
         .and_then(|value| value.trim().parse::<u64>().ok())
         .filter(|value| *value > 0)
@@ -1786,10 +1786,10 @@ mod tests {
 
     #[test]
     fn extracts_lexical_terms_and_paths() {
-        let intent = QueryIntent::from_query("memory watch .mem/config.toml project");
+        let intent = QueryIntent::from_query("memory watch .codifix/config.toml project");
         assert!(intent.lexical_terms.contains(&"memory".to_string()));
         assert!(
-            intent.path_terms.contains(&".mem".to_string())
+            intent.path_terms.contains(&".codifix".to_string())
                 || intent
                     .path_terms
                     .iter()

@@ -176,7 +176,7 @@ mod tests {
     async fn synchronized_browse_rejects_changed_pages_and_preserves_protected_transport() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
-        let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
+        let owner = codifix_record::LOCAL_OWNER_PRINCIPAL_ID;
         let row = |id| serde_json::json!({"id":id,"summary":"one","preview":"one","memory_type":"domain_fact","status":"active","confidence":0.8,"importance":1,"updated_at":chrono::Utc::now(),"tags":[],"tag_count":0,"source_count":0});
         let page = |id, revision| {
             serde_json::json!({"project":"local","total":2,"items":[row(id)],"browse_revision":revision}).to_string()
@@ -284,7 +284,7 @@ mod tests {
             uploads: Default::default(),
             sync_error: None,
         };
-        let owner = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner");
+        let owner = codifix_record::LOCAL_OWNER_PRINCIPAL_ID;
         let list = serde_json::json!({"schema_version":1,"area":"workshop","instance_id":Uuid::new_v4(),"projects":[p]}).to_string();
         let result = serde_json::json!({"schema_version":1,"project":p,"hits":[]}).to_string();
         let server = tokio::spawn(serve(listener, vec![

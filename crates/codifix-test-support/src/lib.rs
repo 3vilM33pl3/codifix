@@ -23,7 +23,7 @@ pub fn unique_project_slug(prefix: &str) -> String {
 }
 
 pub async fn migrated_pool() -> Option<PgPool> {
-    let configured = std::env::var_os("MEMORY_LAYER_TEST_DATABASE_URL").is_some();
+    let configured = std::env::var_os("CODIFIX_TEST_DATABASE_URL").is_some();
     match try_migrated_pool().await {
         Ok(pool) => Some(pool),
         Err(error) if configured || require_database() => panic!("{error:#}"),
@@ -32,14 +32,14 @@ pub async fn migrated_pool() -> Option<PgPool> {
 }
 
 pub async fn try_migrated_pool() -> Result<PgPool> {
-    let database_url = std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").with_context(
-        || "MEMORY_LAYER_TEST_DATABASE_URL must point at a PostgreSQL test database with pgvector",
+    let database_url = std::env::var("CODIFIX_TEST_DATABASE_URL").with_context(
+        || "CODIFIX_TEST_DATABASE_URL must point at a PostgreSQL test database with pgvector",
     )?;
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
         .await
-        .context("connect to MEMORY_LAYER_TEST_DATABASE_URL")?;
+        .context("connect to CODIFIX_TEST_DATABASE_URL")?;
     run_migrations(&pool).await?;
     Ok(pool)
 }
@@ -274,7 +274,7 @@ pub async fn cleanup_project(pool: &PgPool, slug: &str) -> Result<()> {
 }
 
 fn require_database() -> bool {
-    std::env::var("MEMORY_LAYER_TEST_REQUIRE_DB").is_ok_and(|value| value == "1")
+    std::env::var("CODIFIX_TEST_REQUIRE_DB").is_ok_and(|value| value == "1")
 }
 
 #[cfg(test)]

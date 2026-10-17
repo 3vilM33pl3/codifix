@@ -315,7 +315,7 @@ impl WizardDraft {
                 .unwrap_or_else(|| {
                     "postgresql://memory:<password>@localhost:5432/memory".to_string()
                 }),
-            api_token: shared_env_lookup(&shared_env_path, "MEMORY_LAYER__SERVICE__API_TOKEN")
+            api_token: shared_env_lookup(&shared_env_path, "CODIFIX__SERVICE__API_TOKEN")
                 .or_else(|| {
                     global_config
                         .as_ref()
@@ -394,7 +394,7 @@ impl WizardDraft {
                 .as_ref()
                 .map(|config| config.automation.ignored_paths.join(", "))
                 .filter(|value| !value.trim().is_empty())
-                .unwrap_or_else(|| ".git/, target/, .mem/".to_string()),
+                .unwrap_or_else(|| ".git/, target/, .codifix/".to_string()),
             enable_backend_service: ToggleChoice::No,
             enable_watcher_service: if cfg!(target_os = "macos") {
                 ToggleChoice::No
@@ -1430,12 +1430,12 @@ fn step_status(step: Step, draft: &WizardDraft) -> &'static str {
 
 fn wizard_title(step: Step) -> &'static str {
     match step {
-        Step::Welcome => "Memory Layer Wizard: Scope",
-        Step::Shared => "Memory Layer Wizard: Shared Config",
-        Step::Repo => "Memory Layer Wizard: Repo Config",
-        Step::Services => "Memory Layer Wizard: Services",
-        Step::Review => "Memory Layer Wizard: Review",
-        Step::Result => "Memory Layer Wizard: Result",
+        Step::Welcome => "Codifix Wizard: Scope",
+        Step::Shared => "Codifix Wizard: Shared Config",
+        Step::Repo => "Codifix Wizard: Repo Config",
+        Step::Services => "Codifix Wizard: Services",
+        Step::Review => "Codifix Wizard: Review",
+        Step::Result => "Codifix Wizard: Result",
     }
 }
 
@@ -1505,7 +1505,7 @@ async fn apply_draft(draft: &WizardDraft, dry_run: bool) -> Result<WizardResult>
         if draft.applies_repo_setup() {
             if dry_run {
                 lines.push(format!(
-                    "Would update repo-local Memory Layer config for project `{}` at {}.",
+                    "Would update repo-local Codifix config for project `{}` at {}.",
                     draft.project,
                     repo_root.display()
                 ));
@@ -1514,18 +1514,18 @@ async fn apply_draft(draft: &WizardDraft, dry_run: bool) -> Result<WizardResult>
                 } else {
                     lines.push(format!(
                         "Would update repo-local env override at {}",
-                        repo_root.join(".mem").join("memory-layer.env").display()
+                        repo_root.join(".codifix").join("codifix.env").display()
                     ));
                 }
             } else {
                 apply_repo_setup(repo_root, draft)?;
                 lines.push(format!(
-                    "Updated repo-local Memory Layer config for project `{}` at {}.",
+                    "Updated repo-local Codifix config for project `{}` at {}.",
                     draft.project,
                     repo_root.display()
                 ));
                 write_optional_env_file(
-                    &repo_root.join(".mem").join("memory-layer.env"),
+                    &repo_root.join(".codifix").join("codifix.env"),
                     &draft.llm_api_key_env,
                     &draft.local_llm_api_key_value,
                 )?;
@@ -1534,7 +1534,7 @@ async fn apply_draft(draft: &WizardDraft, dry_run: bool) -> Result<WizardResult>
                 } else {
                     lines.push(format!(
                         "Updated repo-local env override at {}",
-                        repo_root.join(".mem").join("memory-layer.env").display()
+                        repo_root.join(".codifix").join("codifix.env").display()
                     ));
                 }
             }
@@ -1601,11 +1601,11 @@ async fn apply_draft(draft: &WizardDraft, dry_run: bool) -> Result<WizardResult>
                 .repo_root
                 .as_deref()
                 .ok_or_else(|| anyhow::anyhow!("scan requested without a repository"))?;
-            let writer_id = std::env::var("MEMORY_LAYER_WRITER_ID")
+            let writer_id = std::env::var("CODIFIX_WRITER_ID")
                 .ok()
                 .filter(|value| !value.trim().is_empty())
                 .or_else(|| {
-                    std::env::var("MEMORY_LAYER_AGENT_ID")
+                    std::env::var("CODIFIX_AGENT_ID")
                         .ok()
                         .filter(|value| !value.trim().is_empty())
                 })
@@ -1650,25 +1650,25 @@ async fn apply_draft(draft: &WizardDraft, dry_run: bool) -> Result<WizardResult>
 fn apply_repo_setup(repo_root: &Path, draft: &WizardDraft) -> Result<()> {
     repair_repo_bootstrap(repo_root, &draft.project)?;
     fs::write(
-        repo_root.join(".mem").join("config.toml"),
+        repo_root.join(".codifix").join("config.toml"),
         render_local_repo_config(repo_root, draft),
     )
-    .with_context(|| format!("write {}", repo_root.join(".mem/config.toml").display()))?;
+    .with_context(|| format!("write {}", repo_root.join(".codifix/config.toml").display()))?;
     fs::write(
-        repo_root.join(".mem").join("project.toml"),
+        repo_root.join(".codifix").join("project.toml"),
         render_project_metadata(&draft.project, repo_root),
-    )
-    .with_context(|| format!("write {}", repo_root.join(".mem/project.toml").display()))?;
-    fs::write(
-        repo_root.join(".agents").join("memory-layer.toml"),
-        render_agent_project_config(&draft.project, repo_root),
     )
     .with_context(|| {
         format!(
             "write {}",
-            repo_root.join(".agents/memory-layer.toml").display()
+            repo_root.join(".codifix/project.toml").display()
         )
-    })
+    })?;
+    fs::write(
+        repo_root.join(".agents").join("codifix.toml"),
+        render_agent_project_config(&draft.project, repo_root),
+    )
+    .with_context(|| format!("write {}", repo_root.join(".agents/codifix.toml").display()))
 }
 
 fn write_global_config(draft: &WizardDraft) -> Result<()> {
@@ -1683,7 +1683,7 @@ fn write_global_config(draft: &WizardDraft) -> Result<()> {
 
 fn render_global_config(draft: &WizardDraft) -> String {
     format!(
-        "# Shared Memory Layer defaults and secrets.\n# Per-project overrides are written by `memory init` to the user-local project\n# config directory. `.mem/config.toml` is only read as a legacy fallback.\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n# service API token is provisioned automatically into memory-layer.env\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"{}\"\n\n[cluster]\nenabled = {}\n# advertise_addr = \"192.168.1.50:4040\"\n# discovery_multicast_addr = \"239.255.42.99:4042\"\n# announce_interval = \"5s\"\n# peer_ttl = \"15s\"\n# priority = 100\n\n# Optional shared writer label. If omitted, Memory Layer derives a writer id automatically.\n# [writer]\n# id = \"codex-cli-main\"\n# name = \"Codex CLI\"\n\n[features]\nllm_curation = false\n\n[llm]\nprovider = \"{}\"\nbase_url = \"{}\"\napi_key_env = \"{}\"\nmodel = \"{}\"\ntemperature = 0.0\nmax_input_bytes = 120000\nmax_output_tokens = 3000\n\n# Opt-in debug trail for service-side LLM calls. Prompt messages are redacted before persistence.\n[llm_audit]\nenabled = false\nredact = true\nmax_message_chars = 8000\nmax_total_chars = 32000\n\n[embeddings]\nprovider = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key_env = \"{}\"\nmodel = \"\"\nbatch_size = 16\n\n[automation]\nenabled = false\nmode = \"suggest\"\nfile_events = true\npoll_interval = \"60s\"\ncapture_idle_threshold = \"10m\"\nmin_changed_files = 2\nrequire_passing_test = false\ncurate_after_captures = 3\ncurate_on_explicit_flush = true\nignored_paths = [\".git/\", \"target/\", \".memory-layer/\"]\n# repo_root = \"/path/to/repo\"\n# audit_log_path = \"/path/to/repo/.memory-layer/automation.log\"\n# state_file_path = \"/path/to/repo/.memory-layer/automation-state.json\"\n",
+        "# Shared Codifix defaults and secrets.\n# Per-project overrides are written by `memory init` to the user-local project\n# config directory. `.codifix/config.toml` is only read as a legacy fallback.\n\n[service]\nbind_addr = \"127.0.0.1:4040\"\n# service API token is provisioned automatically into codifix.env\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"{}\"\n\n[cluster]\nenabled = {}\n# advertise_addr = \"192.168.1.50:4040\"\n# discovery_multicast_addr = \"239.255.42.99:4042\"\n# announce_interval = \"5s\"\n# peer_ttl = \"15s\"\n# priority = 100\n\n# Optional shared writer label. If omitted, Codifix derives a writer id automatically.\n# [writer]\n# id = \"codex-cli-main\"\n# name = \"Codex CLI\"\n\n[features]\nllm_curation = false\n\n[llm]\nprovider = \"{}\"\nbase_url = \"{}\"\napi_key_env = \"{}\"\nmodel = \"{}\"\ntemperature = 0.0\nmax_input_bytes = 120000\nmax_output_tokens = 3000\n\n# Opt-in debug trail for service-side LLM calls. Prompt messages are redacted before persistence.\n[llm_audit]\nenabled = false\nredact = true\nmax_message_chars = 8000\nmax_total_chars = 32000\n\n[embeddings]\nprovider = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key_env = \"{}\"\nmodel = \"\"\nbatch_size = 16\n\n[automation]\nenabled = false\nmode = \"suggest\"\nfile_events = true\npoll_interval = \"60s\"\ncapture_idle_threshold = \"10m\"\nmin_changed_files = 2\nrequire_passing_test = false\ncurate_after_captures = 3\ncurate_on_explicit_flush = true\nignored_paths = [\".git/\", \"target/\", \".codifix/\"]\n# repo_root = \"/path/to/repo\"\n# audit_log_path = \"/path/to/repo/.codifix/automation.log\"\n# state_file_path = \"/path/to/repo/.codifix/automation-state.json\"\n",
         draft.database_url,
         draft.relay_discovery_enabled.is_yes(),
         draft.llm_provider,
@@ -1717,7 +1717,7 @@ fn render_local_repo_config(repo_root: &Path, draft: &WizardDraft) -> String {
         ));
     }
     content.push_str(&format!(
-        "[automation]\nenabled = {}\nmode = \"{}\"\nrepo_root = \"{}\"\nfile_events = true\npoll_interval = \"{}\"\ncapture_idle_threshold = \"{}\"\nmin_changed_files = {}\nrequire_passing_test = {}\ncurate_after_captures = {}\ncurate_on_explicit_flush = {}\nignored_paths = [{}]\naudit_log_path = \"{}/.mem/runtime/automation.log\"\nstate_file_path = \"{}/.mem/runtime/automation-state.json\"\n",
+        "[automation]\nenabled = {}\nmode = \"{}\"\nrepo_root = \"{}\"\nfile_events = true\npoll_interval = \"{}\"\ncapture_idle_threshold = \"{}\"\nmin_changed_files = {}\nrequire_passing_test = {}\ncurate_after_captures = {}\ncurate_on_explicit_flush = {}\nignored_paths = [{}]\naudit_log_path = \"{}/.codifix/runtime/automation.log\"\nstate_file_path = \"{}/.codifix/runtime/automation-state.json\"\n",
         draft.automation_enabled.is_yes(),
         automation_mode_label(&draft.automation_mode),
         repo_root.display(),
@@ -1848,7 +1848,7 @@ fn ensure_runnable_profile(profile: Profile) -> Result<()> {
         Profile::Dev => anyhow::bail!(
             "memory wizard edits the installed config, but this binary is running in the \
              dev profile (current_exe is inside a cargo target/ directory). Rerun with the \
-             installed binary, or set MEMORY_LAYER_PROFILE=prod to bypass if you know what \
+             installed binary, or set CODIFIX_PROFILE=prod to bypass if you know what \
              you're doing."
         ),
     }
@@ -1862,8 +1862,8 @@ fn field_description(field: FieldKey) -> &'static str {
     match field {
         FieldKey::IncludeGlobal => {
             "Whether this run also edits machine-wide settings at \
-            ~/.config/memory-layer/memory-layer.toml (the shared DB URL, LLM endpoints, \
-            backend service). Pick No to only touch the current repo's .mem/ files."
+            ~/.config/codifix/codifix.toml (the shared DB URL, LLM endpoints, \
+            backend service). Pick No to only touch the current repo's .codifix/ files."
         }
         FieldKey::DatabaseUrl => {
             "Postgres URL the service will connect to. Format: \
@@ -1871,7 +1871,7 @@ fn field_description(field: FieldKey) -> &'static str {
             that runs the service; used by both the installed and dev stacks unless overridden."
         }
         FieldKey::ApiToken => {
-            "Overrides MEMORY_LAYER__SERVICE__API_TOKEN for HTTP clients. \
+            "Overrides CODIFIX__SERVICE__API_TOKEN for HTTP clients. \
             Leave empty to keep the generated or existing token. Stored in the shared env \
             file, not the TOML config, so it doesn't land in version control."
         }
@@ -1899,7 +1899,7 @@ fn field_description(field: FieldKey) -> &'static str {
             in config and the *value* in a neighbouring env file."
         }
         FieldKey::LlmApiKeyValue => {
-            "Secret value written to the shared memory-layer.env. \
+            "Secret value written to the shared codifix.env. \
             Leave empty to keep whatever's already on disk. Never committed; env files live \
             outside version control."
         }
@@ -1914,7 +1914,7 @@ fn field_description(field: FieldKey) -> &'static str {
             different credential than the installed stack."
         }
         FieldKey::LocalLlmApiKeyValue => {
-            "Per-repo LLM API key. Written to .mem/memory-layer.env. \
+            "Per-repo LLM API key. Written to .codifix/codifix.env. \
             Empty means inherit the shared key. Useful when a repo should use a different \
             model provider or account than the machine default."
         }
@@ -1934,8 +1934,8 @@ fn field_description(field: FieldKey) -> &'static str {
             unreachable. Pick No for a single-host install."
         }
         FieldKey::ApplyRepoSetup => {
-            "When Yes, the wizard writes .mem/config.toml and \
-            .mem/project.toml for this repo. Pick No if you only want to configure the shared \
+            "When Yes, the wizard writes .codifix/config.toml and \
+            .codifix/project.toml for this repo. Pick No if you only want to configure the shared \
             settings and leave the repo untouched."
         }
         FieldKey::AutomationEnabled => {
@@ -1976,7 +1976,7 @@ fn field_description(field: FieldKey) -> &'static str {
         }
         FieldKey::AutomationIgnoredPaths => {
             "Comma-separated list of path prefixes the \
-            watcher skips (e.g. .git/, target/, .mem/). Runtime-only metadata directories \
+            watcher skips (e.g. .git/, target/, .codifix/). Runtime-only metadata directories \
             belong here; source trees do not."
         }
         FieldKey::EnableBackendService => {
@@ -2077,7 +2077,7 @@ fn read_project_slug(repo_root: &Path) -> Option<String> {
 }
 
 fn read_local_database_override(repo_root: &Path) -> Option<String> {
-    let config_path = repo_root.join(".mem").join("config.toml");
+    let config_path = repo_root.join(".codifix").join("config.toml");
     let content = fs::read_to_string(config_path).ok()?;
     let mut in_database = false;
     for line in content.lines() {
@@ -2094,7 +2094,7 @@ fn read_local_database_override(repo_root: &Path) -> Option<String> {
 }
 
 fn read_local_env_override(repo_root: &Path, key: &str) -> Option<String> {
-    shared_env_lookup(&repo_root.join(".mem").join("memory-layer.env"), key)
+    shared_env_lookup(&repo_root.join(".codifix").join("codifix.env"), key)
 }
 
 fn default_include_global(repo_available: bool, prefer_global: bool) -> ToggleChoice {
@@ -2193,7 +2193,7 @@ mod tests {
             "expected refusal to name the profile, got: {message}"
         );
         assert!(
-            message.contains("MEMORY_LAYER_PROFILE=prod"),
+            message.contains("CODIFIX_PROFILE=prod"),
             "expected refusal to point at the env-var bypass, got: {message}"
         );
     }
@@ -2275,9 +2275,9 @@ mod tests {
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ));
-        fs::create_dir_all(repo_root.join(".mem")).unwrap();
+        fs::create_dir_all(repo_root.join(".codifix")).unwrap();
         fs::write(
-            repo_root.join(".mem/project.toml"),
+            repo_root.join(".codifix/project.toml"),
             "slug = \"homelab\"\nrepo_root = \"/tmp/homelab\"\n",
         )
         .unwrap();
@@ -2378,10 +2378,10 @@ mod tests {
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
         ));
-        fs::create_dir_all(repo_root.join(".mem")).unwrap();
+        fs::create_dir_all(repo_root.join(".codifix")).unwrap();
         fs::create_dir_all(repo_root.join(".git")).unwrap();
         fs::write(
-            repo_root.join(".mem/config.toml"),
+            repo_root.join(".codifix/config.toml"),
             "[service]\nbind_addr = \"127.0.0.1:4140\"\n",
         )
         .unwrap();

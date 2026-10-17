@@ -16,7 +16,7 @@ async fn repair() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 5 || args[0] != "--apply" {
         eprintln!(
-            "Usage: repair-post-curation --apply PROJECT_UUID OPERATION_UUID PRINCIPAL_UUID VERSION_UUID... (1-200 versions); requires MEMORY_LAYER_REPAIR_DATABASE_URL"
+            "Usage: repair-post-curation --apply PROJECT_UUID OPERATION_UUID PRINCIPAL_UUID VERSION_UUID... (1-200 versions); requires CODIFIX_REPAIR_DATABASE_URL"
         );
         return Err("explicit repair confirmation and identifiers required".into());
     }
@@ -29,7 +29,7 @@ async fn repair() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Result<_, _>>()?;
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(1)
-        .connect(&std::env::var("MEMORY_LAYER_REPAIR_DATABASE_URL")?)
+        .connect(&std::env::var("CODIFIX_REPAIR_DATABASE_URL")?)
         .await?;
     let mut tx = pool.begin().await?;
     let work = codifix_store::post_curation::request_repair(

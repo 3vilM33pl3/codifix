@@ -1019,7 +1019,7 @@ pub struct MemoryApiClient {
 
 impl MemoryApiClient {
     pub fn new(config: AppConfig) -> Self {
-        let token = std::env::var("MEMORY_LAYER_CLIENT_TOKEN")
+        let token = std::env::var("CODIFIX_CLIENT_TOKEN")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or(config.service.api_token);

@@ -60,7 +60,7 @@ async fn database(admin: &PgPool) -> (PgPool, String) {
         .await
         .unwrap();
     let mut url =
-        reqwest::Url::parse(&std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()).unwrap();
+        reqwest::Url::parse(&std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()).unwrap();
     url.set_path(&name);
     let pool = PgPoolOptions::new()
         .max_connections(5)

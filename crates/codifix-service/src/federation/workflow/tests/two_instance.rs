@@ -55,7 +55,7 @@ impl Database {
             .await
             .unwrap();
         let mut url =
-            reqwest::Url::parse(&std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()).unwrap();
+            reqwest::Url::parse(&std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()).unwrap();
         url.set_path(&name);
         let owner = PgPoolOptions::new()
             .max_connections(3)
@@ -227,8 +227,8 @@ pub(super) async fn app(
             .join(format!("memory{}", std::env::consts::EXE_SUFFIX));
         let child = std::process::Command::new(executable)
             .args(["--config", config_path.to_str().unwrap(), "service", "run"])
-            .env("MEMORY_LAYER_PROFILE", "prod")
-            .env("MEMORY_LAYER_FEDERATION_CONFIG", runtime_path)
+            .env("CODIFIX_PROFILE", "prod")
+            .env("CODIFIX_FEDERATION_CONFIG", runtime_path)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()

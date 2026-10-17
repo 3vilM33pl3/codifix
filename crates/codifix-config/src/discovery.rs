@@ -79,10 +79,10 @@ pub fn memory_layer_env_file_values(path: &Path) -> Result<HashMap<String, Strin
             continue;
         };
         let key = name.trim();
-        if !key.starts_with("MEMORY_LAYER__") {
+        if !key.starts_with("CODIFIX__") {
             continue;
         }
-        let config_key = key["MEMORY_LAYER__".len()..]
+        let config_key = key["CODIFIX__".len()..]
             .split("__")
             .map(|segment| segment.trim().to_ascii_lowercase())
             .collect::<Vec<_>>()
@@ -111,7 +111,7 @@ pub fn exact_env_file_value(path: &Path, key: &str) -> Option<String> {
 pub fn env_path_for_config(path: &Path) -> PathBuf {
     path.parent()
         .unwrap_or_else(|| Path::new("."))
-        .join("memory-layer.env")
+        .join("codifix.env")
 }
 
 pub fn discover_repo_config_path() -> Option<PathBuf> {
@@ -132,7 +132,7 @@ pub fn discover_repo_dev_config_path() -> Option<PathBuf> {
         return Some(paths.dev_config_path());
     }
     for directory in cwd.ancestors() {
-        let candidate = directory.join(".mem").join("config.dev.toml");
+        let candidate = directory.join(".codifix").join("config.dev.toml");
         if candidate.is_file() {
             return Some(candidate);
         }
@@ -147,7 +147,7 @@ pub fn dev_overlay_missing_message(base: Option<&Path>) -> String {
     };
     format!(
         "dev profile active but {hint} is missing. Run `memory dev init` to \
-         scaffold it, or set MEMORY_LAYER_PROFILE=prod to opt out."
+         scaffold it, or set CODIFIX_PROFILE=prod to opt out."
     )
 }
 
@@ -173,7 +173,7 @@ pub fn find_repo_config_path(start: &Path) -> Option<PathBuf> {
         return Some(paths.config_path());
     }
     for directory in start.ancestors() {
-        let candidate = directory.join(".mem").join("config.toml");
+        let candidate = directory.join(".codifix").join("config.toml");
         if candidate.is_file() {
             return Some(candidate);
         }
@@ -205,7 +205,7 @@ pub fn env_lookup(path: &Path, key: &str) -> Option<String> {
 }
 
 /// Bool that also accepts the string forms the env config source produces
-/// (`MEMORY_LAYER__…=true` arrives as the string "true", not a boolean).
+/// (`CODIFIX__…=true` arrives as the string "true", not a boolean).
 pub fn deserialize_env_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: serde::Deserializer<'de>,

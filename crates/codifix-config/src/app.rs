@@ -192,14 +192,14 @@ impl AppConfig {
                     env_files.push(env_path_for_config(&path));
                     builder = builder.add_source(File::from(path).required(false));
                 } else {
-                    builder = builder.add_source(File::with_name("memory-layer").required(false));
+                    builder = builder.add_source(File::with_name("codifix").required(false));
                 }
             }
             if let Some(path) = discover_repo_config_path() {
                 env_files.push(
                     path.parent()
                         .unwrap_or_else(|| Path::new("."))
-                        .join("memory-layer.env"),
+                        .join("codifix.env"),
                 );
                 resolved_config_path = Some(path.clone());
                 builder = builder.add_source(File::from(path).required(false));
@@ -231,7 +231,7 @@ impl AppConfig {
         }
 
         let config = builder
-            .add_source(Environment::with_prefix("MEMORY_LAYER").separator("__"))
+            .add_source(Environment::with_prefix("CODIFIX").separator("__"))
             .build()?;
         let mut value: serde_json::Value = config.try_deserialize()?;
         normalize_legacy_config_keys(&mut value);
@@ -256,14 +256,11 @@ impl AppConfig {
                         .resolved_dev_overlay_path
                         .as_ref()
                         .or(config.resolved_config_path.as_ref())
-                        .and_then(|path| {
-                            path.parent()
-                                .map(|parent| parent.join("memory-layer.duckdb"))
-                        })
+                        .and_then(|path| path.parent().map(|parent| parent.join("codifix.duckdb")))
                 })
                 .or_else(|| {
                     codifix_platform::preferred_user_state_dir()
-                        .map(|dir| dir.join("memory-layer.duckdb"))
+                        .map(|dir| dir.join("codifix.duckdb"))
                 })
                 .ok_or_else(|| {
                     ConfigError::Message(
@@ -323,7 +320,7 @@ pub struct ServiceConfig {
     /// Student / kiosk mode: reject every mutating HTTP endpoint while
     /// keeping reads, queries, and briefings available. Activation still
     /// evolves with use (reinforcement is internal); only content writes are
-    /// blocked. Env override: `MEMORY_LAYER__SERVICE__READ_ONLY=true`.
+    /// blocked. Env override: `CODIFIX__SERVICE__READ_ONLY=true`.
     #[serde(default, deserialize_with = "deserialize_env_bool")]
     pub read_only: bool,
 }

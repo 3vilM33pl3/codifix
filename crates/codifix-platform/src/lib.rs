@@ -201,37 +201,37 @@ pub fn windows_data_dir() -> Option<PathBuf> {
                 .map(PathBuf::from)
         })
         .or_else(|| user_home_dir().map(|home| home.join("AppData").join("Local")))
-        .map(|base| base.join("memory-layer"))
+        .map(|base| base.join("codifix"))
 }
 
 pub fn preferred_global_config_path() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         windows_data_dir()
-            .unwrap_or_else(|| PathBuf::from(r"C:\Users\Default\AppData\Local\memory-layer"))
-            .join("memory-layer.toml")
+            .unwrap_or_else(|| PathBuf::from(r"C:\Users\Default\AppData\Local\codifix"))
+            .join("codifix.toml")
     }
 
     #[cfg(not(target_os = "windows"))]
     {
         if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
             return PathBuf::from(config_home)
-                .join("memory-layer")
-                .join("memory-layer.toml");
+                .join("codifix")
+                .join("codifix.toml");
         }
 
         #[cfg(target_os = "macos")]
         if let Some(path) = macos_app_support_dir() {
-            return path.join("memory-layer.toml");
+            return path.join("codifix.toml");
         }
 
         if let Ok(home) = env::var("HOME") {
             PathBuf::from(home)
                 .join(".config")
-                .join("memory-layer")
-                .join("memory-layer.toml")
+                .join("codifix")
+                .join("codifix.toml")
         } else {
-            PathBuf::from("/etc/memory-layer/memory-layer.toml")
+            PathBuf::from("/etc/codifix/codifix.toml")
         }
     }
 }
@@ -239,7 +239,7 @@ pub fn preferred_global_config_path() -> PathBuf {
 pub fn discover_existing_global_config_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        let candidate = windows_data_dir()?.join("memory-layer.toml");
+        let candidate = windows_data_dir()?.join("codifix.toml");
         candidate.is_file().then_some(candidate)
     }
 
@@ -247,15 +247,15 @@ pub fn discover_existing_global_config_path() -> Option<PathBuf> {
     {
         if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
             let candidate = PathBuf::from(config_home)
-                .join("memory-layer")
-                .join("memory-layer.toml");
+                .join("codifix")
+                .join("codifix.toml");
             if candidate.is_file() {
                 return Some(candidate);
             }
         }
 
         #[cfg(target_os = "macos")]
-        if let Some(candidate) = macos_app_support_dir().map(|dir| dir.join("memory-layer.toml")) {
+        if let Some(candidate) = macos_app_support_dir().map(|dir| dir.join("codifix.toml")) {
             if candidate.is_file() {
                 return Some(candidate);
             }
@@ -264,14 +264,14 @@ pub fn discover_existing_global_config_path() -> Option<PathBuf> {
         if let Ok(home) = env::var("HOME") {
             let candidate = PathBuf::from(home)
                 .join(".config")
-                .join("memory-layer")
-                .join("memory-layer.toml");
+                .join("codifix")
+                .join("codifix.toml");
             if candidate.is_file() {
                 return Some(candidate);
             }
         }
 
-        let system_candidate = PathBuf::from("/etc/memory-layer/memory-layer.toml");
+        let system_candidate = PathBuf::from("/etc/codifix/codifix.toml");
         if system_candidate.is_file() {
             return Some(system_candidate);
         }
@@ -283,12 +283,12 @@ pub fn discover_existing_global_config_path() -> Option<PathBuf> {
 pub fn preferred_user_env_path() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        Some(windows_data_dir()?.join("memory-layer.env"))
+        Some(windows_data_dir()?.join("codifix.env"))
     }
 
     #[cfg(target_os = "macos")]
     {
-        return Some(macos_app_support_dir()?.join("memory-layer.env"));
+        return Some(macos_app_support_dir()?.join("codifix.env"));
     }
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
@@ -296,16 +296,16 @@ pub fn preferred_user_env_path() -> Option<PathBuf> {
         if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
             return Some(
                 PathBuf::from(config_home)
-                    .join("memory-layer")
-                    .join("memory-layer.env"),
+                    .join("codifix")
+                    .join("codifix.env"),
             );
         }
         let home = env::var("HOME").ok()?;
         Some(
             PathBuf::from(home)
                 .join(".config")
-                .join("memory-layer")
-                .join("memory-layer.env"),
+                .join("codifix")
+                .join("codifix.env"),
         )
     }
 }
@@ -324,14 +324,14 @@ pub fn preferred_user_state_dir() -> Option<PathBuf> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         if let Ok(state_home) = env::var("XDG_STATE_HOME") {
-            return Some(PathBuf::from(state_home).join("memory-layer"));
+            return Some(PathBuf::from(state_home).join("codifix"));
         }
         let home = env::var("HOME").ok()?;
         Some(
             PathBuf::from(home)
                 .join(".local")
                 .join("state")
-                .join("memory-layer"),
+                .join("codifix"),
         )
     }
 }
@@ -344,7 +344,7 @@ pub fn preferred_user_cache_dir() -> Option<PathBuf> {
             PathBuf::from(home)
                 .join("Library")
                 .join("Caches")
-                .join("memory-layer"),
+                .join("codifix"),
         );
     }
 
@@ -356,10 +356,10 @@ pub fn preferred_user_cache_dir() -> Option<PathBuf> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         if let Ok(cache_home) = env::var("XDG_CACHE_HOME") {
-            return Some(PathBuf::from(cache_home).join("memory-layer"));
+            return Some(PathBuf::from(cache_home).join("codifix"));
         }
         let home = env::var("HOME").ok()?;
-        Some(PathBuf::from(home).join(".cache").join("memory-layer"))
+        Some(PathBuf::from(home).join(".cache").join("codifix"))
     }
 }
 
@@ -381,7 +381,7 @@ impl ProjectPaths {
     }
 
     pub fn env_path(&self) -> PathBuf {
-        self.config_dir.join("memory-layer.env")
+        self.config_dir.join("codifix.env")
     }
 
     pub fn project_path(&self) -> PathBuf {
@@ -424,17 +424,13 @@ pub fn preferred_project_config_base_dir() -> Option<PathBuf> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         if let Ok(config_home) = env::var("XDG_CONFIG_HOME") {
-            return Some(
-                PathBuf::from(config_home)
-                    .join("memory-layer")
-                    .join("projects"),
-            );
+            return Some(PathBuf::from(config_home).join("codifix").join("projects"));
         }
         let home = env::var("HOME").ok()?;
         Some(
             PathBuf::from(home)
                 .join(".config")
-                .join("memory-layer")
+                .join("codifix")
                 .join("projects"),
         )
     }
@@ -450,11 +446,8 @@ pub fn project_storage_key(repo_root: &Path, slug: &str) -> String {
 
 pub fn discover_project_root(start: &Path) -> Option<PathBuf> {
     for directory in start.ancestors() {
-        if directory.join(".mem").join("project.toml").is_file()
-            || directory
-                .join(".agents")
-                .join("memory-layer.toml")
-                .is_file()
+        if directory.join(".codifix").join("project.toml").is_file()
+            || directory.join(".agents").join("codifix.toml").is_file()
             || directory.join(".git").exists()
         {
             return Some(directory.to_path_buf());
@@ -532,7 +525,7 @@ pub fn sanitize_service_fragment(value: &str) -> String {
 }
 
 pub fn current_username() -> String {
-    env::var("MEMORY_LAYER_WRITER_IDENTITY_USER")
+    env::var("CODIFIX_WRITER_IDENTITY_USER")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .or_else(|| env::var("USER").ok())
@@ -544,7 +537,7 @@ pub fn current_username() -> String {
 }
 
 pub fn current_hostname() -> String {
-    let hostname = env::var("MEMORY_LAYER_WRITER_IDENTITY_HOST")
+    let hostname = env::var("CODIFIX_WRITER_IDENTITY_HOST")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .or_else(|| {
@@ -638,7 +631,7 @@ pub fn watch_service_unit_name(project: &str) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         format!(
-            "memory-watch-{}.service",
+            "codifix-watch-{}.service",
             sanitize_service_fragment(project)
         )
     }
@@ -658,7 +651,7 @@ pub fn managed_watch_service_name(session_id: &str) -> String {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         format!(
-            "memory-watch-codex-{}.service",
+            "codifix-watch-codex-{}.service",
             sanitize_service_fragment(session_id)
         )
     }
@@ -686,12 +679,12 @@ pub fn current_exe_share_subdir(name: &str) -> Option<PathBuf> {
 
 fn packaged_share_subdir_for_exe(current_exe: &Path, name: &str) -> Option<PathBuf> {
     let bin_dir = current_exe.parent()?;
-    let adjacent = bin_dir.join("share").join("memory-layer").join(name);
+    let adjacent = bin_dir.join("share").join("codifix").join(name);
     if adjacent.is_dir() {
         return Some(adjacent);
     }
     let prefix = bin_dir.parent()?;
-    let candidate = prefix.join("share").join("memory-layer").join(name);
+    let candidate = prefix.join("share").join("codifix").join(name);
     candidate.is_dir().then_some(candidate)
 }
 
@@ -708,8 +701,8 @@ pub fn packaged_system_service_available() -> bool {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        Path::new("/lib/systemd/system/memory-layer.service").is_file()
-            || Path::new("/etc/systemd/system/memory-layer.service").is_file()
+        Path::new("/lib/systemd/system/codifix.service").is_file()
+            || Path::new("/etc/systemd/system/codifix.service").is_file()
     }
 }
 
@@ -1067,7 +1060,7 @@ pub fn macos_app_support_dir() -> Option<PathBuf> {
         PathBuf::from(home)
             .join("Library")
             .join("Application Support")
-            .join("memory-layer"),
+            .join("codifix"),
     )
 }
 
@@ -1079,26 +1072,23 @@ pub fn user_launch_agents_dir() -> Option<PathBuf> {
 
 #[cfg(target_os = "macos")]
 pub fn backend_launch_agent_label() -> &'static str {
-    "com.memory-layer.mem-service"
+    "dev.codifix.service"
 }
 
 #[cfg(target_os = "macos")]
 pub fn watch_launch_agent_label(project: &str) -> String {
-    format!(
-        "com.memory-layer.memory-watch.{}",
-        sanitize_service_fragment(project)
-    )
+    format!("dev.codifix.watch.{}", sanitize_service_fragment(project))
 }
 
 #[cfg(target_os = "macos")]
 pub fn watch_manager_launch_agent_label() -> &'static str {
-    "com.memory-layer.memory-watch-manager"
+    "dev.codifix.watch-manager"
 }
 
 #[cfg(target_os = "macos")]
 pub fn managed_watch_launch_agent_label(session_id: &str) -> String {
     format!(
-        "com.memory-layer.memory-watch.codex.{}",
+        "dev.codifix.watch.codex.{}",
         sanitize_service_fragment(session_id)
     )
 }
@@ -1110,7 +1100,11 @@ pub fn user_memory_layer_log_dir() -> Option<PathBuf> {
 
 #[cfg(target_os = "macos")]
 pub fn backend_pid_file_path() -> Option<PathBuf> {
-    Some(macos_app_support_dir()?.join("run").join("mem-service.pid"))
+    Some(
+        macos_app_support_dir()?
+            .join("run")
+            .join("codifix-service.pid"),
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -1167,18 +1161,18 @@ mod tests {
     #[test]
     fn derive_default_writer_id_uses_overrides_and_sanitizes_values() {
         let _guard = ENV_LOCK.lock().unwrap();
-        let old_user = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_USER").ok();
-        let old_host = std::env::var("MEMORY_LAYER_WRITER_IDENTITY_HOST").ok();
+        let old_user = std::env::var("CODIFIX_WRITER_IDENTITY_USER").ok();
+        let old_host = std::env::var("CODIFIX_WRITER_IDENTITY_HOST").ok();
 
         unsafe {
-            std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_USER", "Olivier Smith");
-            std::env::set_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", "dev-box.local");
+            std::env::set_var("CODIFIX_WRITER_IDENTITY_USER", "Olivier Smith");
+            std::env::set_var("CODIFIX_WRITER_IDENTITY_HOST", "dev-box.local");
         }
 
         let writer_id = derive_default_writer_id("memory");
 
-        restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_USER", old_user);
-        restore_env_var("MEMORY_LAYER_WRITER_IDENTITY_HOST", old_host);
+        restore_env_var("CODIFIX_WRITER_IDENTITY_USER", old_user);
+        restore_env_var("CODIFIX_WRITER_IDENTITY_HOST", old_host);
 
         assert_eq!(writer_id, "memory-olivier-smith-dev-box-local");
     }
@@ -1217,11 +1211,11 @@ mod tests {
         {
             assert_eq!(
                 watch_service_unit_name("customer portal"),
-                "memory-watch-customer-portal.service"
+                "codifix-watch-customer-portal.service"
             );
             assert_eq!(
                 managed_watch_service_name("session 123"),
-                "com.memory-layer.memory-watch.codex.session-123"
+                "dev.codifix.watch.codex.session-123"
             );
         }
 
@@ -1229,11 +1223,11 @@ mod tests {
         {
             assert_eq!(
                 watch_service_unit_name("customer portal"),
-                "memory-watch-customer-portal.service"
+                "codifix-watch-customer-portal.service"
             );
             assert_eq!(
                 managed_watch_service_name("session 123"),
-                "memory-watch-codex-session-123.service"
+                "codifix-watch-codex-session-123.service"
             );
         }
 
@@ -1261,19 +1255,13 @@ mod tests {
             std::env::set_var("USERPROFILE", r"C:\Users\tester");
         }
 
-        let root = std::path::PathBuf::from(r"C:\Users\tester\AppData\Local\memory-layer");
+        let root = std::path::PathBuf::from(r"C:\Users\tester\AppData\Local\codifix");
         assert_eq!(
             user_home_dir().unwrap(),
             std::path::PathBuf::from(r"C:\Users\tester")
         );
-        assert_eq!(
-            preferred_global_config_path(),
-            root.join("memory-layer.toml")
-        );
-        assert_eq!(
-            preferred_user_env_path().unwrap(),
-            root.join("memory-layer.env")
-        );
+        assert_eq!(preferred_global_config_path(), root.join("codifix.toml"));
+        assert_eq!(preferred_user_env_path().unwrap(), root.join("codifix.env"));
         assert_eq!(preferred_user_state_dir().unwrap(), root);
         assert_eq!(preferred_user_cache_dir().unwrap(), root.join("cache"));
 
@@ -1286,14 +1274,14 @@ mod tests {
     fn windows_task_xml_is_per_user_and_restartable() {
         let xml = render_windows_task_xml(&WindowsTaskSpec {
             name: windows_backend_task_name().to_string(),
-            executable: std::path::PathBuf::from(r"C:\Program Files\Memory Layer\bin\codifix.exe"),
+            executable: std::path::PathBuf::from(r"C:\Program Files\Codifix\bin\codifix.exe"),
             arguments: vec![
                 "--config".to_string(),
-                r"C:\Users\Test User\AppData\Local\memory-layer\memory-layer.toml".to_string(),
+                r"C:\Users\Test User\AppData\Local\codifix\codifix.toml".to_string(),
                 "service".to_string(),
                 "run".to_string(),
             ],
-            description: "Run the Memory Layer backend".to_string(),
+            description: "Run the Codifix backend".to_string(),
             working_directory: std::path::PathBuf::from(r"C:\Users\tester"),
             start_at_logon: true,
             restart_on_failure: true,
@@ -1306,9 +1294,9 @@ mod tests {
         assert!(xml.contains("<RestartOnFailure>"));
         assert!(xml.starts_with(r#"<?xml version="1.0" encoding="UTF-16"?>"#));
         assert_eq!(&super::encode_windows_task_xml(&xml)[..2], &[0xff, 0xfe]);
-        assert!(xml.contains(
-            "&quot;C:\\Users\\Test User\\AppData\\Local\\memory-layer\\memory-layer.toml&quot;"
-        ));
+        assert!(
+            xml.contains("&quot;C:\\Users\\Test User\\AppData\\Local\\codifix\\codifix.toml&quot;")
+        );
         assert_eq!(
             windows_watch_manager_task_name(),
             "MemoryLayer-WatcherManager"
@@ -1332,9 +1320,9 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[test]
     fn packaged_assets_are_found_from_windows_bin_share_layout() {
-        let root = std::env::temp_dir().join(format!("memory-layer-assets-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("codifix-assets-{}", std::process::id()));
         let exe = root.join("bin").join("codifix.exe");
-        let web = root.join("share").join("memory-layer").join("web");
+        let web = root.join("share").join("codifix").join("web");
         std::fs::create_dir_all(&web).unwrap();
         std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
         std::fs::write(&exe, b"test").unwrap();

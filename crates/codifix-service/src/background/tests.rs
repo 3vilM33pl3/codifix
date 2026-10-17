@@ -80,7 +80,7 @@ impl Fixture {
             .await
             .unwrap();
         let mut database_url =
-            reqwest::Url::parse(&std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()).unwrap();
+            reqwest::Url::parse(&std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()).unwrap();
         database_url.set_path(&database);
         let pool = PgPool::connect(database_url.as_str()).await.unwrap();
         codifix_test_support::run_migrations(&pool).await.unwrap();

@@ -37,8 +37,8 @@ const GITHUB_SKILL_TEMPLATE_ARCHIVE_URL: &str =
 const GITHUB_SKILL_TEMPLATE_RAW_BASE: &str =
     "https://raw.githubusercontent.com/3vilM33pl3/memory/main/.agents/skills";
 const GITHUB_SKILL_TEMPLATE_TIMEOUT: Duration = Duration::from_secs(10);
-const GITHUB_ARCHIVE_ENV: &str = "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
-const GITHUB_RAW_BASE_ENV: &str = "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_RAW_BASE";
+const GITHUB_ARCHIVE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
+const GITHUB_RAW_BASE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_RAW_BASE";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -363,7 +363,7 @@ pub(crate) fn simple_yaml_value(lines: &[&str], key: &str) -> Option<String> {
 
 pub(crate) fn discover_skill_template_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
-    if let Some(path) = env::var_os("MEMORY_LAYER_SKILL_TEMPLATE") {
+    if let Some(path) = env::var_os("CODIFIX_SKILL_TEMPLATE") {
         let path = PathBuf::from(path);
         return (path.is_absolute() && path.is_dir()).then_some(path);
     }
@@ -451,7 +451,7 @@ pub(crate) fn upgrade_project_skills_with_template(
     } else {
         let runtime_dir = codifix_config::project_paths_for_repo(repo_root)
             .map(|paths| paths.runtime_dir())
-            .unwrap_or_else(|| repo_root.join(".mem").join("runtime"));
+            .unwrap_or_else(|| repo_root.join(".codifix").join("runtime"));
         Some(
             runtime_dir
                 .join("skill-backups")
@@ -637,7 +637,7 @@ pub(crate) fn format_github_skill_version_summary(report: &GitHubSkillVersionRep
 }
 
 pub(crate) fn download_github_skill_template() -> Result<PathBuf> {
-    if env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").is_some() {
+    if env::var_os("CODIFIX_SKILL_TEMPLATE").is_some() {
         return discover_skill_template_dir()
             .ok_or_else(|| anyhow::anyhow!("configured release skill template is unavailable"));
     }
@@ -935,7 +935,7 @@ poll_interval = "60s"
 idle_threshold = "5m"
 min_changed_files = 2
 require_passing_test = false
-ignored_paths = [".git/", "target/", ".mem/"]
+ignored_paths = [".git/", "target/", ".codifix/"]
 audit_log_path = {audit_log_path}
 state_file_path = {state_file_path}
 "#,
@@ -964,7 +964,7 @@ repo_root = {repo_root}
 
 [capture]
 include_paths = ["README.md", "docs/", "src/", "crates/", "scripts/", "packaging/"]
-ignore_paths = [".git/", "target/", ".mem/", "node_modules/"]
+ignore_paths = [".git/", "target/", ".codifix/", "node_modules/"]
 
 [analysis]
 analyzers = ["rust", "typescript", "python"]

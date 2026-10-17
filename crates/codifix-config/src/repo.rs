@@ -97,11 +97,11 @@ pub fn default_agent_analyzers() -> Vec<String> {
 }
 
 pub fn repo_agent_settings_path(repo_root: &Path) -> PathBuf {
-    repo_root.join(".agents").join("memory-layer.toml")
+    repo_root.join(".agents").join("codifix.toml")
 }
 
 pub fn read_repo_project_slug(repo_root: &Path) -> Option<String> {
-    read_project_slug_from_file(&repo_root.join(".mem").join("project.toml"))
+    read_project_slug_from_file(&repo_root.join(".codifix").join("project.toml"))
         .or_else(|| read_project_slug_from_file(&repo_agent_settings_path(repo_root)))
 }
 

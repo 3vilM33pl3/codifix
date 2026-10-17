@@ -15,7 +15,7 @@ fn config(address: std::net::SocketAddr) -> AppConfig {
 }
 fn owner() -> Value {
     json!({"authenticated":true,"mode":"single_user","read_only":false,
-        "principal":{"id":Uuid::new_v5(&Uuid::NAMESPACE_OID,b"memory-layer-local-owner"),
+        "principal":{"id":codifix_record::LOCAL_OWNER_PRINCIPAL_ID,
             "kind":"internal","display_name":"Synthetic owner","global_role":"admin"}})
 }
 async fn server(listener: tokio::net::TcpListener, replies: Vec<Reply>) -> Vec<String> {

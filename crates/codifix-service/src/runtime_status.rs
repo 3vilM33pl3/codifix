@@ -751,11 +751,11 @@ pub(crate) fn command_is_manager_for_profile(
 pub(crate) fn command_looks_dev_stack(command: &str) -> bool {
     command.contains("target/debug/memory")
         || command.contains("target/release/memory")
-        || command.contains("MEMORY_LAYER_PROFILE=dev")
-        || command.contains("MEMORY_LAYER_PROFILE=\"dev\"")
-        || command.contains("MEMORY_LAYER_PROFILE='dev'")
+        || command.contains("CODIFIX_PROFILE=dev")
+        || command.contains("CODIFIX_PROFILE=\"dev\"")
+        || command.contains("CODIFIX_PROFILE='dev'")
         || command.contains("config.dev.toml")
-        || command.contains("/.mem/runtime/dev/")
+        || command.contains("/.codifix/runtime/dev/")
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]

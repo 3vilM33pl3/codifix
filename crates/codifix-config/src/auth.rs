@@ -320,7 +320,7 @@ pub fn default_auth_session_ttl() -> Duration {
 }
 
 pub fn default_oidc_client_secret_env() -> String {
-    "MEMORY_LAYER_OIDC_CLIENT_SECRET".to_string()
+    "CODIFIX_OIDC_CLIENT_SECRET".to_string()
 }
 
 pub fn default_oidc_scopes() -> Vec<String> {

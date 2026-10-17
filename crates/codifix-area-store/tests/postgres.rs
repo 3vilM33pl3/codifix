@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Set MEMORY_LAYER_TEST_DATABASE_URL to a disposable pgvector database and
-//! MEMORY_LAYER_TEST_REQUIRE_DB=1. Every source and target is a newly generated
+//! Set CODIFIX_TEST_DATABASE_URL to a disposable pgvector database and
+//! CODIFIX_TEST_REQUIRE_DB=1. Every source and target is a newly generated
 //! IsolatedDatabase, never an existing backup or application database. Fixtures
 //! cover all import tables, including reviewed canonical relationship edges.
 mod support;

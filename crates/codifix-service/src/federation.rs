@@ -480,7 +480,7 @@ mod tests {
         };
         // Deserialize explicit data, never load the developer's config/providers.
         let config = serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"synthetic"},
-            "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},
+            "database":{"url":std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()},
             "offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false}})).unwrap();
         let state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
             .await

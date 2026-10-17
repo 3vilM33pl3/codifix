@@ -212,11 +212,11 @@ pub(super) fn command_is_manager_for_profile(command: &str, profile: Profile) ->
 pub(super) fn command_looks_dev_stack(command: &str) -> bool {
     command.contains("target/debug/memory")
         || command.contains("target/release/memory")
-        || command.contains("MEMORY_LAYER_PROFILE=dev")
-        || command.contains("MEMORY_LAYER_PROFILE=\"dev\"")
-        || command.contains("MEMORY_LAYER_PROFILE='dev'")
+        || command.contains("CODIFIX_PROFILE=dev")
+        || command.contains("CODIFIX_PROFILE=\"dev\"")
+        || command.contains("CODIFIX_PROFILE='dev'")
         || command.contains("config.dev.toml")
-        || command.contains("/.mem/runtime/dev/")
+        || command.contains("/.codifix/runtime/dev/")
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -233,7 +233,7 @@ pub(super) fn linux_manager_unit_path() -> Option<PathBuf> {
         config_home
             .join("systemd")
             .join("user")
-            .join("memory-watch-manager.service"),
+            .join("codifix-watch-manager.service"),
     )
 }
 
@@ -297,7 +297,7 @@ pub(super) fn manager_service_enabled(profile: Profile) -> bool {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        systemctl_user_check("is-enabled", "memory-watch-manager.service")
+        systemctl_user_check("is-enabled", "codifix-watch-manager.service")
     }
 }
 
@@ -323,7 +323,7 @@ pub(super) fn manager_service_running(profile: Profile) -> bool {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        systemctl_user_check("is-active", "memory-watch-manager.service")
+        systemctl_user_check("is-active", "codifix-watch-manager.service")
     }
 }
 

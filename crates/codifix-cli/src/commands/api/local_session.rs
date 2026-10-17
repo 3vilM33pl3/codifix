@@ -93,8 +93,7 @@ impl ApiClient {
         ensure!(
             me.authenticated
                 && me.principal.global_role == Some(AuthRole::Admin)
-                && me.principal.id
-                    == Uuid::new_v5(&Uuid::NAMESPACE_OID, b"memory-layer-local-owner"),
+                && me.principal.id == codifix_record::LOCAL_OWNER_PRINCIPAL_ID,
             "Local owner authentication required; no credentials were changed"
         );
         let origin = base.origin().ascii_serialization();

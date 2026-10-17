@@ -824,7 +824,7 @@ async fn clients(
     let mut child = tokio::process::Command::new("node")
         .arg("web/tests/f1-clients-live.mjs")
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
-        .env_remove("MEMORY_LAYER_CLIENT_TOKEN")
+        .env_remove("CODIFIX_CLIENT_TOKEN")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

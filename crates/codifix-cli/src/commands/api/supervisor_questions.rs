@@ -166,7 +166,7 @@ mod tests {
     }
     fn auth(kind: &str, mode: &str) -> String {
         serde_json::json!({"authenticated":true,"mode":mode,"read_only":false,
-            "principal":{"id":Uuid::new_v5(&Uuid::NAMESPACE_OID,b"memory-layer-local-owner"),"kind":kind,"display_name":"synthetic","global_role":"admin"}}).to_string()
+            "principal":{"id":codifix_record::LOCAL_OWNER_PRINCIPAL_ID,"kind":kind,"display_name":"synthetic","global_role":"admin"}}).to_string()
     }
     fn api(address: std::net::SocketAddr) -> ApiClient {
         let config = serde_json::from_value(serde_json::json!({"service":{"bind_addr":address.to_string(),"api_token":"synthetic-owner"},"database":{"url":"postgresql://unused/unused"}})).unwrap();

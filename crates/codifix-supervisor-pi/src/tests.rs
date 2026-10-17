@@ -305,7 +305,7 @@ fn parent_credentials_and_loader_overrides_are_not_inherited() {
         .env("MEMORY_PI_NESTED_ENVIRONMENT_TEST", "1")
         .env("OPENAI_API_KEY", "synthetic-private-key")
         .env(
-            "MEMORY_LAYER__DATABASE__URL",
+            "CODIFIX__DATABASE__URL",
             "postgresql://synthetic:secret@invalid/never",
         )
         .env("PI_CODING_AGENT_DIR", "/not-the-isolated-agent-dir")

@@ -285,7 +285,7 @@ pub(crate) fn enable_watch_service_routed(
             platform::windows_watch_task_name(&manual_watch_identity(project, target.area));
         platform::register_windows_task(&platform::WindowsTaskSpec {
             name: task_name.clone(),
-            description: format!("Memory Layer watcher for {project}"),
+            description: format!("Codifix watcher for {project}"),
             executable: memory_binary_path()?,
             arguments: manual_watch_arguments(repo_root, project, target),
             working_directory: repo_root.to_path_buf(),
@@ -518,7 +518,7 @@ pub(crate) fn watch_service_status_routed(
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-pub(crate) const WATCH_MANAGER_UNIT_NAME: &str = "memory-watch-manager.service";
+pub(crate) const WATCH_MANAGER_UNIT_NAME: &str = "codifix-watch-manager.service";
 const WATCH_MANAGER_SCAN_SECONDS: u64 = 10;
 const WATCH_MANAGER_VERIFY_EVERY_SCANS: u64 = 6;
 
@@ -978,7 +978,7 @@ pub(crate) fn resolve_agent_repo_root(cwd: &str) -> Result<Option<PathBuf>> {
         return Ok(None);
     }
     // When the agent runs inside a git worktree (e.g. Claude Code -w), --show-toplevel
-    // returns the worktree path, which lacks .mem/project.toml. Resolve through to
+    // returns the worktree path, which lacks .codifix/project.toml. Resolve through to
     // the main repo root via --git-common-dir so both agents share the same project slug.
     let common_dir_output = ProcessCommand::new("git")
         .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
@@ -991,7 +991,7 @@ pub(crate) fn resolve_agent_repo_root(cwd: &str) -> Result<Option<PathBuf>> {
             .trim()
             .to_string();
         if let Some(main_root) = PathBuf::from(&common_dir).parent()
-            && main_root.join(".mem").join("project.toml").exists()
+            && main_root.join(".codifix").join("project.toml").exists()
         {
             return Ok(Some(main_root.to_path_buf()));
         }
@@ -1007,8 +1007,8 @@ fn resolve_single_initialized_child_repo(workspace_root: &Path) -> Result<Option
     {
         let path = entry.path();
         if !path.is_dir()
-            || (!path.join(".mem").join("project.toml").is_file()
-                && !path.join(".agents").join("memory-layer.toml").is_file())
+            || (!path.join(".codifix").join("project.toml").is_file()
+                && !path.join(".agents").join("codifix.toml").is_file())
         {
             continue;
         }
@@ -1030,7 +1030,7 @@ fn resolve_single_initialized_child_repo(workspace_root: &Path) -> Result<Option
 }
 
 pub(crate) fn repo_agent_watch_enabled(repo_root: &Path) -> Result<bool> {
-    let path = repo_root.join(".agents").join("memory-layer.toml");
+    let path = repo_root.join(".agents").join("codifix.toml");
     if !path.is_file() {
         return Ok(true);
     }
@@ -1057,7 +1057,7 @@ pub(crate) fn resolve_manager_project_slug(repo_root: &Path) -> String {
 }
 
 pub(crate) fn ensure_agent_watch_repo_bootstrap(repo_root: &Path, project: &str) -> Result<()> {
-    if !repo_root.join(".mem").is_dir() {
+    if !repo_root.join(".codifix").is_dir() {
         initialize_repo(repo_root, project, false, false)?;
     } else {
         repair_repo_bootstrap(repo_root, project)?;
@@ -1070,7 +1070,7 @@ pub(crate) fn ensure_agent_watch_repo_config(repo_root: &Path) -> Result<()> {
     let path = codifix_platform::project_paths(repo_root, &project)
         .map(|paths| paths.config_path())
         .filter(|path| path.is_file())
-        .unwrap_or_else(|| repo_root.join(".mem").join("config.toml"));
+        .unwrap_or_else(|| repo_root.join(".codifix").join("config.toml"));
     let content = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
     let mut value: toml::Value = content
         .parse()
@@ -1162,7 +1162,7 @@ pub(crate) fn managed_watch_service_name(profile: Profile, session_id: &str) -> 
             Profile::Dev => "dev-".to_string(),
         };
         format!(
-            "memory-watch-codex-{profile_prefix}{}.service",
+            "codifix-watch-codex-{profile_prefix}{}.service",
             platform::sanitize_service_fragment(session_id)
         )
     }
@@ -1290,10 +1290,7 @@ pub(crate) fn start_managed_agent_watcher(
         ]);
         platform::register_windows_task(&platform::WindowsTaskSpec {
             name: task_name.clone(),
-            description: format!(
-                "Memory Layer watcher for agent session {}",
-                session.session_id
-            ),
+            description: format!("Codifix watcher for agent session {}", session.session_id),
             executable: memory_binary_path()?,
             arguments,
             working_directory: repo_root.to_path_buf(),
@@ -1321,7 +1318,7 @@ pub(crate) fn start_managed_agent_watcher(
         &format!("WorkingDirectory={}", repo_root.display()),
         "--property",
         "Restart=no",
-        "--setenv=MEMORY_LAYER_WATCH_SERVICE_MANAGED=1",
+        "--setenv=CODIFIX_WATCH_SERVICE_MANAGED=1",
         "--collect",
     ]);
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -1561,7 +1558,7 @@ pub(crate) fn enable_watch_manager_service_routed(
             .with_context(|| format!("create {}", working_directory.display()))?;
         platform::register_windows_task(&platform::WindowsTaskSpec {
             name: task_name.to_string(),
-            description: "Memory Layer watcher manager".to_string(),
+            description: "Codifix watcher manager".to_string(),
             executable: memory_binary_path()?,
             arguments: {
                 let mut arguments = vec![
@@ -1847,7 +1844,7 @@ pub(crate) fn render_watch_manager_unit_routed(
     let memory_binary = memory_binary_path()?;
     let home = env::var("HOME").unwrap_or_else(|_| "/".to_string());
     Ok(format!(
-        "[Unit]\nDescription=Memory Layer Watcher Manager\nAfter=default.target\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={} --config {}{} watcher manager run\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=Codifix Watcher Manager\nAfter=default.target\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={} --config {}{} watcher manager run\nRestart=always\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         shell_escape_str(&home),
         shell_escape_path(&memory_binary),
         shell_escape_path(config_path),
@@ -1871,8 +1868,8 @@ pub(crate) fn render_watch_manager_launch_agent_routed(
     let working_directory =
         macos_app_support_dir().ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
     let log_dir = user_memory_layer_log_dir()?;
-    let stdout_path = log_dir.join("memory-watch-manager.stdout.log");
-    let stderr_path = log_dir.join("memory-watch-manager.stderr.log");
+    let stdout_path = log_dir.join("codifix-watch-manager.stdout.log");
+    let stderr_path = log_dir.join("codifix-watch-manager.stderr.log");
     let mut arguments = vec![
         binary.display().to_string(),
         "--config".to_string(),
@@ -1963,7 +1960,7 @@ pub(crate) fn render_watch_unit(repo_root: &Path, project: &str) -> Result<Strin
         .canonicalize()
         .with_context(|| format!("canonicalize {}", repo_root.display()))?;
     Ok(format!(
-        "[Unit]\nDescription=Memory Layer Watcher ({project})\nAfter=default.target\n\n[Service]\nType=simple\nEnvironmentFile=-{}\nEnvironment=MEMORY_LAYER_WATCH_SERVICE_MANAGED=1\nWorkingDirectory={}\nExecStart={} --config {} watcher run --project {}\nRestart=on-failure\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
+        "[Unit]\nDescription=Codifix Watcher ({project})\nAfter=default.target\n\n[Service]\nType=simple\nEnvironmentFile=-{}\nEnvironment=CODIFIX_WATCH_SERVICE_MANAGED=1\nWorkingDirectory={}\nExecStart={} --config {} watcher run --project {}\nRestart=on-failure\nRestartSec=2\n\n[Install]\nWantedBy=default.target\n",
         shell_escape_path(&env_file),
         working_directory.display(),
         shell_escape_path(&memory_binary),
@@ -2047,7 +2044,7 @@ pub(crate) fn managed_watch_launch_agent_label(profile: Profile, session_id: &st
     match profile {
         Profile::Prod => platform::managed_watch_launch_agent_label(session_id),
         Profile::Dev => format!(
-            "com.memory-layer.memory-watch.codex.dev.{}",
+            "dev.codifix.watch.codex.dev.{}",
             platform::sanitize_service_fragment(session_id)
         ),
     }
@@ -2201,8 +2198,8 @@ pub(crate) fn render_watch_launch_agent(repo_root: &Path, project: &str) -> Resu
         .with_context(|| format!("canonicalize {}", repo_root.display()))?;
     let log_dir = user_memory_layer_log_dir()?;
     let sanitized = sanitize_service_fragment(project);
-    let stdout_path = log_dir.join(format!("memory-watch-{sanitized}.stdout.log"));
-    let stderr_path = log_dir.join(format!("memory-watch-{sanitized}.stderr.log"));
+    let stdout_path = log_dir.join(format!("codifix-watch-{sanitized}.stdout.log"));
+    let stderr_path = log_dir.join(format!("codifix-watch-{sanitized}.stderr.log"));
     let command = launch_agent_shell_command(&[
         binary.display().to_string(),
         "--config".to_string(),
@@ -2212,7 +2209,7 @@ pub(crate) fn render_watch_launch_agent(repo_root: &Path, project: &str) -> Resu
         "--project".to_string(),
         project.to_string(),
     ])?;
-    let command = format!("export MEMORY_LAYER_WATCH_SERVICE_MANAGED=1; {command}");
+    let command = format!("export CODIFIX_WATCH_SERVICE_MANAGED=1; {command}");
     render_launch_agent_plist(
         &watch_launch_agent_label(project),
         &working_directory,
@@ -2242,10 +2239,10 @@ pub(crate) fn render_managed_watch_launch_agent(
         Profile::Dev => "dev-".to_string(),
     };
     let stdout_path = log_dir.join(format!(
-        "memory-watch-codex-{profile_prefix}{sanitized}.stdout.log"
+        "codifix-watch-codex-{profile_prefix}{sanitized}.stdout.log"
     ));
     let stderr_path = log_dir.join(format!(
-        "memory-watch-codex-{profile_prefix}{sanitized}.stderr.log"
+        "codifix-watch-codex-{profile_prefix}{sanitized}.stderr.log"
     ));
     let mut args = vec![binary.display().to_string()];
     // Prefer the resolved project config so the watcher talks to the same
@@ -2277,7 +2274,7 @@ pub(crate) fn render_managed_watch_launch_agent(
         started_at.to_string(),
     ]);
     let command = launch_agent_shell_command(&args)?;
-    let command = format!("export MEMORY_LAYER_WATCH_SERVICE_MANAGED=1; {command}");
+    let command = format!("export CODIFIX_WATCH_SERVICE_MANAGED=1; {command}");
     render_launch_agent_plist(
         &managed_watch_launch_agent_label(profile, target.id),
         &working_directory,

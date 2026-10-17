@@ -371,7 +371,7 @@ impl WorktreeSandboxManager {
     fn sandbox_root(&self, repo_root: &Path) -> PathBuf {
         self.root_dir.clone().unwrap_or_else(|| {
             repo_root
-                .join(".mem")
+                .join(".codifix")
                 .join("runtime")
                 .join("loop-worktrees")
         })
@@ -446,7 +446,7 @@ fn parse_status_line(line: &str) -> Option<RunnerChangedFile> {
 }
 
 fn collect_artifacts(worktree_path: &Path) -> io::Result<Vec<RunnerArtifact>> {
-    let artifact_root = worktree_path.join(".mem").join("loop-artifacts");
+    let artifact_root = worktree_path.join(".codifix").join("loop-artifacts");
     if !artifact_root.exists() {
         return Ok(Vec::new());
     }

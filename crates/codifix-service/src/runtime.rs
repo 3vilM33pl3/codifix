@@ -15,11 +15,12 @@ mod evaluation_tests {
     fn config(read_only: bool) -> AppConfig {
         serde_json::from_value(serde_json::json!({
             "service": {"bind_addr":"127.0.0.1:0", "api_token":"synthetic", "read_only":read_only},
-            "database": {"url": std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap_or_default()},
+            "database": {"url": std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap_or_default()},
             "evaluation": {"semantic_time":"2026-01-01T00:00:00Z"},
             "offline":{"enabled":false}, "cluster":{"enabled":false},
             "reinforcement":{"enabled":true}
-        })).unwrap()
+        }))
+        .unwrap()
     }
 
     #[tokio::test]
@@ -276,7 +277,7 @@ pub async fn run_service(config_path: Option<PathBuf>) -> Result<()> {
         let _effect_recovery = crate::effects::start(state.clone());
         let _federation_tasks = federation::start(
             state.clone(),
-            std::env::var_os("MEMORY_LAYER_FEDERATION_CONFIG").map(PathBuf::from),
+            std::env::var_os("CODIFIX_FEDERATION_CONFIG").map(PathBuf::from),
         )
         .await?;
         let app = routes::build_http_app(state.clone());

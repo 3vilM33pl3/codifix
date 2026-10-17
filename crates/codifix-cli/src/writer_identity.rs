@@ -33,7 +33,7 @@ pub(crate) fn resolve_writer_identity_for_tool(
             name: config.writer.name.clone(),
         });
     }
-    if let Ok(writer_id) = env::var("MEMORY_LAYER_WRITER_ID") {
+    if let Ok(writer_id) = env::var("CODIFIX_WRITER_ID") {
         let trimmed = writer_id.trim();
         if !trimmed.is_empty() {
             return Ok(WriterIdentity {
@@ -42,7 +42,7 @@ pub(crate) fn resolve_writer_identity_for_tool(
             });
         }
     }
-    if let Ok(writer_id) = env::var("MEMORY_LAYER_AGENT_ID") {
+    if let Ok(writer_id) = env::var("CODIFIX_AGENT_ID") {
         let trimmed = writer_id.trim();
         if !trimmed.is_empty() {
             return Ok(WriterIdentity {

@@ -373,7 +373,7 @@ mod tests {
         // This test only uses the state for frozen configuration/policy, never
         // the host's configuration or model providers.
         let config = serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"synthetic"},
-            "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},"offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false}})).unwrap();
+            "database":{"url":std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()},"offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false}})).unwrap();
         let state = crate::runtime::build_state(config, Arc::new(Mutex::new(None)))
             .await
             .unwrap();

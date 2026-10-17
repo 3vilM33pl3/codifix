@@ -45,7 +45,7 @@ async fn provider_intent_precedes_request_and_interrupted_execution_is_not_repla
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let config = serde_json::from_value(serde_json::json!({
         "service":{"bind_addr":"127.0.0.1:0","api_token":"fixture"},
-        "database":{"url":std::env::var("MEMORY_LAYER_TEST_DATABASE_URL").unwrap()},
+        "database":{"url":std::env::var("CODIFIX_TEST_DATABASE_URL").unwrap()},
         "offline":{"enabled":false},"cluster":{"enabled":false,"service_id":host},
         "reinforcement":{"enabled":false},"llm_audit":{"enabled":false},
         "llm":{"provider":"ollama","base_url":url,"model":"fixture"},"mcp":{"enabled":false}

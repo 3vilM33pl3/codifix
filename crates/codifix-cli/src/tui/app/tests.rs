@@ -1027,7 +1027,7 @@ fn dev_manager_status_ignores_installed_service_probe() {
 fn manager_process_detection_is_profile_scoped() {
     let prod = "/home/user/.local/bin/memory --config /home/user/.config/memory-layer/memory-layer.toml watcher manager run";
     let dev = "/home/user/project/target/debug/memory watcher manager run";
-    let explicit_dev = "MEMORY_LAYER_PROFILE=dev /home/user/.local/bin/memory watcher manager run";
+    let explicit_dev = "CODIFIX_PROFILE=dev /home/user/.local/bin/memory watcher manager run";
 
     assert!(super::command_is_manager_for_profile(prod, Profile::Prod));
     assert!(!super::command_is_manager_for_profile(prod, Profile::Dev));
@@ -1629,7 +1629,7 @@ fn llm_audit_status_lines_render_current_state() {
         max_message_chars: 8000,
         max_total_chars: 32000,
         profile: "dev".to_string(),
-        config_path: Some("/repo/.mem/config.dev.toml".to_string()),
+        config_path: Some("/repo/.codifix/config.dev.toml".to_string()),
     });
 
     let rendered = llm_audit_status_lines(&app)
@@ -1647,7 +1647,7 @@ fn llm_audit_status_lines_render_current_state() {
     assert!(rendered.contains("redaction=on"));
     assert!(rendered.contains("profile=dev"));
     assert!(rendered.contains("A disable"));
-    assert!(rendered.contains("/repo/.mem/config.dev.toml"));
+    assert!(rendered.contains("/repo/.codifix/config.dev.toml"));
 }
 
 #[test]

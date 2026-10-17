@@ -63,7 +63,7 @@ pub fn installation_roots() -> Result<(PathBuf, PathBuf)> {
     Ok((
         folder(&FOLDERID_ProgramData)?.join("MemoryLayer"),
         folder(&FOLDERID_ProgramFiles)?
-            .join("Memory Layer")
+            .join("Codifix")
             .join("releases"),
     ))
 }

@@ -369,7 +369,7 @@ impl Owner {
 
 async fn serve(owner: &mut Owner) -> Result<()> {
     ensure!(
-        std::env::var("MEMORY_LAYER_TEST_REQUIRE_DB").as_deref() == Ok("1"),
+        std::env::var("CODIFIX_TEST_REQUIRE_DB").as_deref() == Ok("1"),
         "explicit disposable database required"
     );
     let input = std::io::stdin();

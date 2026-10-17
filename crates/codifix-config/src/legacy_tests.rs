@@ -796,7 +796,7 @@ fn graph_extract_activity_details_roundtrip() {
 #[test]
 fn finds_repo_local_mem_config() {
     let temp_dir = unique_temp_dir("mem-api-config");
-    let mem_dir = temp_dir.join(".mem");
+    let mem_dir = temp_dir.join(".codifix");
     fs::create_dir_all(&mem_dir).unwrap();
     let config_path = mem_dir.join("config.toml");
     fs::write(&config_path, "test = true\n").unwrap();
@@ -816,8 +816,8 @@ fn prefers_xdg_global_config_path_when_present() {
     let _guard = env_lock().lock().unwrap();
     let temp_dir = unique_temp_dir("mem-api-global");
     let config_home = temp_dir.join("config-home");
-    fs::create_dir_all(config_home.join("memory-layer")).unwrap();
-    let global_path = config_home.join("memory-layer").join("memory-layer.toml");
+    fs::create_dir_all(config_home.join("codifix")).unwrap();
+    let global_path = config_home.join("codifix").join("codifix.toml");
     fs::write(&global_path, "test = true\n").unwrap();
 
     unsafe {
@@ -835,7 +835,7 @@ fn prefers_xdg_global_config_path_when_present() {
 #[test]
 fn repo_config_is_found_from_nested_directory() {
     let temp_dir = unique_temp_dir("mem-api-repo");
-    let mem_dir = temp_dir.join(".mem");
+    let mem_dir = temp_dir.join(".codifix");
     fs::create_dir_all(&mem_dir).unwrap();
     let config_path = mem_dir.join("config.toml");
     fs::write(&config_path, "[automation]\nenabled = false\n").unwrap();
@@ -865,14 +865,14 @@ fn project_home_config_wins_over_legacy_repo_config() {
     let old_state_home = env::var("XDG_STATE_HOME").ok();
     #[cfg(not(target_os = "windows"))]
     let old_cache_home = env::var("XDG_CACHE_HOME").ok();
-    fs::create_dir_all(repo_dir.join(".mem")).unwrap();
+    fs::create_dir_all(repo_dir.join(".codifix")).unwrap();
     fs::write(
-        repo_dir.join(".mem").join("project.toml"),
+        repo_dir.join(".codifix").join("project.toml"),
         "slug = \"demo\"\n",
     )
     .unwrap();
     fs::write(
-        repo_dir.join(".mem").join("config.toml"),
+        repo_dir.join(".codifix").join("config.toml"),
         "[automation]\nenabled = false\n",
     )
     .unwrap();
@@ -931,7 +931,7 @@ fn loads_repo_agent_settings_from_agents_directory() {
     let agents_dir = temp_dir.join(".agents");
     fs::create_dir_all(&agents_dir).unwrap();
     fs::write(
-            agents_dir.join("memory-layer.toml"),
+            agents_dir.join("codifix.toml"),
             "[capture]\ninclude_paths = [\"ops/\"]\nignore_paths = [\"tmp/\"]\n\n[analysis]\nanalyzers = [\"rust\"]\n\n[retrieval]\ngraph_enabled = true\n",
         )
         .unwrap();
@@ -953,9 +953,9 @@ fn prefers_macos_application_support_global_config_path_when_present() {
     let app_support = home
         .join("Library")
         .join("Application Support")
-        .join("memory-layer");
+        .join("codifix");
     fs::create_dir_all(&app_support).unwrap();
-    let global_path = app_support.join("memory-layer.toml");
+    let global_path = app_support.join("codifix.toml");
     fs::write(&global_path, "test = true\n").unwrap();
     let original_home = env::var("HOME").ok();
 
@@ -982,26 +982,26 @@ fn shared_env_file_overrides_config_for_explicit_path() {
     let temp_dir = unique_temp_dir("mem-api-shared-env");
     let config_dir = temp_dir.join("config");
     fs::create_dir_all(&config_dir).unwrap();
-    let config_path = config_dir.join("memory-layer.toml");
+    let config_path = config_dir.join("codifix.toml");
     fs::write(
             &config_path,
             "[service]\nbind_addr = \"127.0.0.1:4040\"\napi_token = \"from-config\"\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"postgresql://config\"\n",
         )
         .unwrap();
     fs::write(
-            config_dir.join("memory-layer.env"),
-            "MEMORY_LAYER__DATABASE__URL=postgresql://from-env\nMEMORY_LAYER__SERVICE__API_TOKEN=from-env\nOPENAI_API_KEY=test\n",
+            config_dir.join("codifix.env"),
+            "CODIFIX__DATABASE__URL=postgresql://from-env\nCODIFIX__SERVICE__API_TOKEN=from-env\nOPENAI_API_KEY=test\n",
         )
         .unwrap();
 
     unsafe {
-        env::remove_var("MEMORY_LAYER__DATABASE__URL");
-        env::remove_var("MEMORY_LAYER__SERVICE__API_TOKEN");
+        env::remove_var("CODIFIX__DATABASE__URL");
+        env::remove_var("CODIFIX__SERVICE__API_TOKEN");
     }
     let config = AppConfig::load_with_profile(Some(config_path), Profile::Prod).unwrap();
     unsafe {
-        env::remove_var("MEMORY_LAYER__DATABASE__URL");
-        env::remove_var("MEMORY_LAYER__SERVICE__API_TOKEN");
+        env::remove_var("CODIFIX__DATABASE__URL");
+        env::remove_var("CODIFIX__SERVICE__API_TOKEN");
     }
 
     assert_eq!(config.database.url, "postgresql://from-env");
@@ -1013,7 +1013,7 @@ fn shared_env_file_overrides_config_for_explicit_path() {
 fn mcp_config_defaults_to_read_only_http_mount() {
     let _guard = env_lock().lock().unwrap();
     let temp_dir = unique_temp_dir("mem-api-mcp-config");
-    let config_path = temp_dir.join("memory-layer.toml");
+    let config_path = temp_dir.join("codifix.toml");
     fs::create_dir_all(&temp_dir).unwrap();
     fs::write(
             &config_path,
@@ -1037,28 +1037,25 @@ fn process_env_still_wins_over_env_file_for_explicit_path() {
     let temp_dir = unique_temp_dir("mem-api-env-precedence");
     let config_dir = temp_dir.join("config");
     fs::create_dir_all(&config_dir).unwrap();
-    let config_path = config_dir.join("memory-layer.toml");
+    let config_path = config_dir.join("codifix.toml");
     fs::write(
             &config_path,
             "[service]\nbind_addr = \"127.0.0.1:4040\"\napi_token = \"from-config\"\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"postgresql://config\"\n",
         )
         .unwrap();
     fs::write(
-        config_dir.join("memory-layer.env"),
-        "MEMORY_LAYER__DATABASE__URL=postgresql://from-env-file\n",
+        config_dir.join("codifix.env"),
+        "CODIFIX__DATABASE__URL=postgresql://from-env-file\n",
     )
     .unwrap();
 
     unsafe {
-        env::remove_var("MEMORY_LAYER__DATABASE__URL");
-        env::set_var(
-            "MEMORY_LAYER__DATABASE__URL",
-            "postgresql://from-process-env",
-        );
+        env::remove_var("CODIFIX__DATABASE__URL");
+        env::set_var("CODIFIX__DATABASE__URL", "postgresql://from-process-env");
     }
     let config = AppConfig::load_with_profile(Some(config_path), Profile::Prod).unwrap();
     unsafe {
-        env::remove_var("MEMORY_LAYER__DATABASE__URL");
+        env::remove_var("CODIFIX__DATABASE__URL");
     }
 
     assert_eq!(config.database.url, "postgresql://from-process-env");
@@ -1069,7 +1066,7 @@ fn process_env_still_wins_over_env_file_for_explicit_path() {
 fn credential_env_value_reads_adjacent_env_file() {
     let _guard = env_lock().lock().unwrap();
     let temp_dir = unique_temp_dir("mem-api-credential-env-file");
-    let config_path = temp_dir.join("memory-layer.toml");
+    let config_path = temp_dir.join("codifix.toml");
     fs::create_dir_all(&temp_dir).unwrap();
     fs::write(
             &config_path,
@@ -1077,19 +1074,19 @@ fn credential_env_value_reads_adjacent_env_file() {
         )
         .unwrap();
     fs::write(
-        temp_dir.join("memory-layer.env"),
-        "MEMORY_LAYER_OIDC_CLIENT_SECRET=from-env-file\n",
+        temp_dir.join("codifix.env"),
+        "CODIFIX_OIDC_CLIENT_SECRET=from-env-file\n",
     )
     .unwrap();
 
     unsafe {
-        env::remove_var("MEMORY_LAYER_OIDC_CLIENT_SECRET");
+        env::remove_var("CODIFIX_OIDC_CLIENT_SECRET");
     }
     let config = AppConfig::load_with_profile(Some(config_path), Profile::Prod).unwrap();
 
     assert_eq!(
         config
-            .credential_env_value("MEMORY_LAYER_OIDC_CLIENT_SECRET")
+            .credential_env_value("CODIFIX_OIDC_CLIENT_SECRET")
             .as_deref(),
         Some("from-env-file")
     );
@@ -1100,7 +1097,7 @@ fn credential_env_value_reads_adjacent_env_file() {
 fn credential_env_value_prefers_process_environment() {
     let _guard = env_lock().lock().unwrap();
     let temp_dir = unique_temp_dir("mem-api-credential-process-env");
-    let config_path = temp_dir.join("memory-layer.toml");
+    let config_path = temp_dir.join("codifix.toml");
     fs::create_dir_all(&temp_dir).unwrap();
     fs::write(
             &config_path,
@@ -1108,18 +1105,18 @@ fn credential_env_value_prefers_process_environment() {
         )
         .unwrap();
     fs::write(
-        temp_dir.join("memory-layer.env"),
-        "MEMORY_LAYER_OIDC_CLIENT_SECRET=from-env-file\n",
+        temp_dir.join("codifix.env"),
+        "CODIFIX_OIDC_CLIENT_SECRET=from-env-file\n",
     )
     .unwrap();
 
     unsafe {
-        env::set_var("MEMORY_LAYER_OIDC_CLIENT_SECRET", "from-process-env");
+        env::set_var("CODIFIX_OIDC_CLIENT_SECRET", "from-process-env");
     }
     let config = AppConfig::load_with_profile(Some(config_path), Profile::Prod).unwrap();
-    let value = config.credential_env_value("MEMORY_LAYER_OIDC_CLIENT_SECRET");
+    let value = config.credential_env_value("CODIFIX_OIDC_CLIENT_SECRET");
     unsafe {
-        env::remove_var("MEMORY_LAYER_OIDC_CLIENT_SECRET");
+        env::remove_var("CODIFIX_OIDC_CLIENT_SECRET");
     }
 
     assert_eq!(value.as_deref(), Some("from-process-env"));
@@ -1129,9 +1126,9 @@ fn credential_env_value_prefers_process_environment() {
 #[test]
 fn read_repo_project_slug_uses_project_metadata() {
     let repo_root = unique_temp_dir("mem-api-project-slug");
-    fs::create_dir_all(repo_root.join(".mem")).unwrap();
+    fs::create_dir_all(repo_root.join(".codifix")).unwrap();
     fs::write(
-        repo_root.join(".mem").join("project.toml"),
+        repo_root.join(".codifix").join("project.toml"),
         "slug = \"sctp\"\nrepo_root = \"/tmp/sctp-conformance\"\n",
     )
     .unwrap();
@@ -1147,13 +1144,13 @@ fn legacy_and_new_capture_threshold_keys_can_be_merged() {
     let temp_dir = unique_temp_dir("mem-api-threshold-merge");
     let config_home = temp_dir.join("config-home");
     let repo_dir = temp_dir.join("repo");
-    let global_dir = config_home.join("memory-layer");
-    let mem_dir = repo_dir.join(".mem");
+    let global_dir = config_home.join("codifix");
+    let mem_dir = repo_dir.join(".codifix");
     fs::create_dir_all(&global_dir).unwrap();
     fs::create_dir_all(&mem_dir).unwrap();
 
     fs::write(
-            global_dir.join("memory-layer.toml"),
+            global_dir.join("codifix.toml"),
             "[service]\nbind_addr = \"127.0.0.1:4040\"\napi_token = \"from-config\"\nrequest_timeout = \"30s\"\n\n[database]\nurl = \"postgresql://config\"\n\n[automation]\nidle_threshold = \"5m\"\n",
         )
         .unwrap();
@@ -1195,7 +1192,7 @@ fn legacy_and_new_capture_threshold_keys_can_be_merged() {
 #[test]
 fn dev_profile_overlays_config_dev_toml_on_top_of_base() {
     let temp_dir = unique_temp_dir("mem-api-dev-overlay");
-    let mem_dir = temp_dir.join(".mem");
+    let mem_dir = temp_dir.join(".codifix");
     fs::create_dir_all(&mem_dir).unwrap();
     fs::write(
             mem_dir.join("config.toml"),
@@ -1208,8 +1205,8 @@ fn dev_profile_overlays_config_dev_toml_on_top_of_base() {
     )
     .unwrap();
     fs::write(
-        mem_dir.join("memory-layer.env"),
-        "MEMORY_LAYER_TEST_DEV_CREDENTIAL=from-dev-env-file\n",
+        mem_dir.join("codifix.env"),
+        "CODIFIX_TEST_DEV_CREDENTIAL=from-dev-env-file\n",
     )
     .unwrap();
 
@@ -1225,7 +1222,7 @@ fn dev_profile_overlays_config_dev_toml_on_top_of_base() {
     );
     assert_eq!(
         config
-            .credential_env_value("MEMORY_LAYER_TEST_DEV_CREDENTIAL")
+            .credential_env_value("CODIFIX_TEST_DEV_CREDENTIAL")
             .as_deref(),
         Some("from-dev-env-file")
     );
@@ -1235,7 +1232,7 @@ fn dev_profile_overlays_config_dev_toml_on_top_of_base() {
 #[test]
 fn dev_profile_errors_when_overlay_is_missing() {
     let temp_dir = unique_temp_dir("mem-api-dev-overlay-missing");
-    let mem_dir = temp_dir.join(".mem");
+    let mem_dir = temp_dir.join(".codifix");
     fs::create_dir_all(&mem_dir).unwrap();
     fs::write(
             mem_dir.join("config.toml"),

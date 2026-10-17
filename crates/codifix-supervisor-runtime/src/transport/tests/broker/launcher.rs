@@ -14,10 +14,7 @@ async fn production_launcher_delivers_revokes_accounts_and_cleans_up() {
 }
 
 async fn run(mode: Mode, cancel: bool) {
-    assert_eq!(
-        std::env::var("MEMORY_LAYER_TEST_REQUIRE_DB").as_deref(),
-        Ok("1")
-    );
+    assert_eq!(std::env::var("CODIFIX_TEST_REQUIRE_DB").as_deref(), Ok("1"));
     let pi = PathBuf::from(
         std::env::var_os("MEMORY_PI_PATCHED_ARTIFACT").expect("explicit pinned artifact"),
     );

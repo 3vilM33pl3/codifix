@@ -585,7 +585,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
     let repo_root: &Path = ctx.repo_root.as_path();
     let config_path = ctx.config_path.clone();
     let global_config_path = ctx.global_config_path.clone();
-    let mem_dir = repo_root.join(".mem");
+    let mem_dir = repo_root.join(".codifix");
     let project_path = mem_dir.join("project.toml");
     let legacy_config_path = mem_dir.join("config.toml");
     let root_gitignore_path = repo_root.join(".gitignore");
@@ -670,7 +670,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
         if config_path.exists() || config_fix_applied {
             "User-local project config file is present."
         } else if legacy_config_path.exists() {
-            "User-local project config file is missing; legacy .mem/config.toml fallback is active."
+            "User-local project config file is missing; legacy .codifix/config.toml fallback is active."
         } else {
             "User-local project config file is missing."
         },
@@ -753,7 +753,7 @@ fn repo_bootstrap_checks(report: &mut DoctorReport, ctx: &DoctorCtx) -> Result<(
         Some(root_gitignore_path.display().to_string()),
         if root_gitignore_contains_mem(repo_root)? {
             Some(
-                "Remove `/.mem` from the root .gitignore if you want to commit .mem/project.toml."
+                "Remove `/.codifix` from the root .gitignore if you want to commit .codifix/project.toml."
                     .to_string(),
             )
         } else {
@@ -1088,7 +1088,7 @@ async fn config_value_checks(
         Some(resolve_writer_identity(config, None)?.id),
         if config.writer.id.trim().is_empty() {
             Some(format!(
-                "Optional: set [writer].id in {} or export MEMORY_LAYER_WRITER_ID if you want a custom stable writer label.",
+                "Optional: set [writer].id in {} or export CODIFIX_WRITER_ID if you want a custom stable writer label.",
                 config_path.display()
             ))
         } else {
@@ -1976,7 +1976,7 @@ fn config_skipped_checks(report: &mut DoctorReport) {
 }
 
 pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<()> {
-    let mem_dir = repo_root.join(".mem");
+    let mem_dir = repo_root.join(".codifix");
     let project_paths = codifix_platform::project_paths(repo_root, project)
         .ok_or_else(|| anyhow::anyhow!("could not resolve user project config paths"))?;
     let runtime_dir = project_paths.runtime_dir();
@@ -1985,9 +1985,9 @@ pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<(
     let home_project_path = project_paths.project_path();
     let project_path = mem_dir.join("project.toml");
     let legacy_config_path = mem_dir.join("config.toml");
-    let legacy_env_path = mem_dir.join("memory-layer.env");
+    let legacy_env_path = mem_dir.join("codifix.env");
     let local_gitignore_path = mem_dir.join(".gitignore");
-    let agent_config_path = repo_root.join(".agents").join("memory-layer.toml");
+    let agent_config_path = repo_root.join(".agents").join("codifix.toml");
     let skill_root = repo_root.join(".agents").join("skills");
 
     fs::create_dir_all(&project_paths.config_dir)
@@ -2018,10 +2018,10 @@ pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<(
         )
         .with_context(|| format!("write {}", home_project_path.display()))?;
     }
-    fs::create_dir_all(&mem_dir).context("create .mem")?;
+    fs::create_dir_all(&mem_dir).context("create .codifix")?;
     if !project_path.exists() {
         fs::write(&project_path, render_project_metadata(project, repo_root))
-            .context("write .mem/project.toml")?;
+            .context("write .codifix/project.toml")?;
     }
     ensure_mem_gitignore(&local_gitignore_path, false)?;
     if !agent_config_path.exists() {
@@ -2032,7 +2032,7 @@ pub(crate) fn repair_repo_bootstrap(repo_root: &Path, project: &str) -> Result<(
             &agent_config_path,
             render_agent_project_config(project, repo_root),
         )
-        .context("write .agents/memory-layer.toml")?;
+        .context("write .agents/codifix.toml")?;
     }
     if missing_memory_skill_dirs(&skill_root).next().is_some() {
         let skill_template_dir = discover_skill_template_dir()
@@ -2074,7 +2074,7 @@ pub(crate) fn root_gitignore_contains_mem(repo_root: &Path) -> Result<bool> {
         return Ok(false);
     }
     let content = fs::read_to_string(path)?;
-    Ok(content.lines().any(|line| line.trim() == "/.mem"))
+    Ok(content.lines().any(|line| line.trim() == "/.codifix"))
 }
 
 pub(crate) fn is_placeholder_database_url(value: &str) -> bool {
@@ -2110,7 +2110,7 @@ pub(crate) fn automation_runtime_dir(config: &AppConfig, repo_root: &Path) -> Pa
 pub(crate) fn default_automation_runtime_dir(repo_root: &Path) -> PathBuf {
     codifix_config::project_paths_for_repo(repo_root)
         .map(|paths| paths.runtime_dir())
-        .unwrap_or_else(|| repo_root.join(".mem").join("runtime"))
+        .unwrap_or_else(|| repo_root.join(".codifix").join("runtime"))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -2134,7 +2134,7 @@ pub(crate) fn read_local_service_overrides(repo_root: &Path) -> Option<LocalServ
     let config_path = codifix_config::project_paths_for_repo(repo_root)
         .map(|paths| paths.config_path())
         .filter(|path| path.is_file())
-        .unwrap_or_else(|| repo_root.join(".mem").join("config.toml"));
+        .unwrap_or_else(|| repo_root.join(".codifix").join("config.toml"));
     let content = fs::read_to_string(config_path).ok()?;
     let mut in_service = false;
     let mut overrides = LocalServiceOverrides::default();

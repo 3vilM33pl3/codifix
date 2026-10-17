@@ -90,7 +90,7 @@ See also:
 
 const UPGRADE_AFTER_HELP: &str = "\
 Agent notes:
-  Use after installing a newer Memory Layer package to refresh repo-local Memory skills.
+  Use after installing a newer Codifix package to refresh repo-local Memory skills.
   Backs up replaced skill directories under the user-local project runtime directory before writing.
   Prefer --dry-run --json before applying from automation.
 
@@ -179,7 +179,7 @@ See also:
 
 const SERVICE_RESTART_ALL_AFTER_HELP: &str = "\
 Agent notes:
-  Restarts Memory Layer services that are already active or loaded after a package install or upgrade.
+  Restarts Codifix services that are already active or loaded after a package install or upgrade.
   Does not start intentionally stopped services. Use --dry-run --json before changing service state from automation.
   Use --mark-tui-restart from installers so running TUIs can show a red restart status.
 
@@ -221,8 +221,8 @@ Agent notes:
   Company Mac onboarding uses auth login/logout and projects available with an explicit --company origin.
   Device credentials and pending-request secrets stay in macOS Keychain; company commands bypass local-owner config.
   Browser users sign in through Authentik. CLI, TUI, watcher, and MCP clients use service tokens.
-  Set MEMORY_LAYER_CLIENT_TOKEN to the issued token; it takes precedence over service.api_token.
-  Newly created token secrets are printed once and are never stored in Memory Layer config.
+  Set CODIFIX_CLIENT_TOKEN to the issued token; it takes precedence over service.api_token.
+  Newly created token secrets are printed once and are never stored in Codifix config.
 
 Examples:
   memory auth login --company https://memory.example.com --name Work-Mac --no-browser
@@ -552,7 +552,7 @@ See also:
 const AGENT_START_AFTER_HELP: &str = "\
 Agent notes:
   Run once when an agent starts a task in a branch or worktree.
-  The command reads local Git metadata and writes only the coordination record to Memory Layer.
+  The command reads local Git metadata and writes only the coordination record to Codifix.
 
 Examples:
   memory agent start --project memory
@@ -694,14 +694,14 @@ Examples:
 
 const DEMO_AFTER_HELP: &str = "\
 What it does:
-  Seeds a showcase project with a relatable set of memories about Memory Layer itself,
+  Seeds a showcase project with a relatable set of memories about Codifix itself,
   so query, resume, and the graph show real results on a fresh install. Works keyless
   (no LLM or embedding provider required). Safe to rerun or delete and reseed.
 
 Requires a running service — `docker compose up` or `memory service run` first.
 
 Agent notes:
-  Safe to run for a user who asks to try Memory Layer: it only writes into
+  Safe to run for a user who asks to try Codifix: it only writes into
   the chosen demo project and is idempotent. Do not seed demo data into a
   real project slug.
 
@@ -1313,19 +1313,19 @@ See also:
 )]
 pub(in crate::commands) struct Cli {
     /// Use a specific config file instead of the discovered default.
-    #[arg(long, env = "MEMORY_LAYER_CONFIG")]
+    #[arg(long, env = "CODIFIX_CONFIG")]
     pub(crate) config: Option<PathBuf>,
     /// Select an operator-configured knowledge area.
-    #[arg(long, global = true, env = "MEMORY_LAYER_AREA")]
+    #[arg(long, global = true, env = "CODIFIX_AREA")]
     pub(crate) area: Option<String>,
     /// Operator-owned routing policy; never loaded from a repository.
-    #[arg(long, global = true, env = "MEMORY_LAYER_AREA_ROUTING")]
+    #[arg(long, global = true, env = "CODIFIX_AREA_ROUTING")]
     pub(crate) area_routing: Option<PathBuf>,
     /// Override the writer identity used for write-capable commands.
     #[arg(
         long = "writer-id",
         visible_alias = "agent-id",
-        env = "MEMORY_LAYER_WRITER_ID"
+        env = "CODIFIX_WRITER_ID"
     )]
     pub(crate) writer_id: Option<String>,
     #[command(subcommand)]
@@ -1341,7 +1341,7 @@ pub(in crate::commands) enum Command {
     // --- Core: getting started and daily use ---
     #[command(about = "Run the interactive setup wizard.", after_help = WIZARD_AFTER_HELP)]
     Wizard(WizardArgs),
-    #[command(about = "Bootstrap a repo-local Memory Layer setup.", after_help = INIT_AFTER_HELP)]
+    #[command(about = "Bootstrap a repo-local Codifix setup.", after_help = INIT_AFTER_HELP)]
     Init(InitArgs),
     #[command(about = "Load a demo project so you can try queries immediately.", after_help = DEMO_AFTER_HELP)]
     Demo(DemoArgs),
@@ -1357,7 +1357,7 @@ pub(in crate::commands) enum Command {
     Tui(TuiArgs),
 
     // --- Status and health ---
-    #[command(about = "Show the aggregate Memory Layer diagnostic status.", after_help = STATUS_AFTER_HELP)]
+    #[command(about = "Show the aggregate Codifix diagnostic status.", after_help = STATUS_AFTER_HELP)]
     Status(StatusArgs),
     #[command(about = "List configured application URLs, with Web interfaces first.", after_help = crate::commands::urls::HELP)]
     Urls(crate::commands::urls::UrlsArgs),
@@ -1415,7 +1415,7 @@ pub(in crate::commands) enum Command {
     UpToSpeed(UpToSpeedArgs),
 
     // --- Service and automation ---
-    #[command(about = "Manage the Memory Layer backend service.", after_help = SERVICE_GROUP_AFTER_HELP)]
+    #[command(about = "Manage the Codifix backend service.", after_help = SERVICE_GROUP_AFTER_HELP)]
     Service(ServiceArgs),
     #[command(about = "Inspect identity and administer scoped service access.", after_help = AUTH_GROUP_AFTER_HELP)]
     Auth(AuthArgs),
@@ -1448,7 +1448,7 @@ pub(in crate::commands) enum Command {
     // --- Evaluation and maintenance ---
     #[command(about = "Run automated Memory quality evaluations.", after_help = EVAL_GROUP_AFTER_HELP)]
     Eval(EvalArgs),
-    #[command(about = "Upgrade repo-local Memory Layer skill files.", after_help = UPGRADE_AFTER_HELP)]
+    #[command(about = "Upgrade repo-local Codifix skill files.", after_help = UPGRADE_AFTER_HELP)]
     Upgrade(UpgradeArgs),
 
     // --- Hidden utilities (still fully functional) ---
@@ -1644,7 +1644,7 @@ pub(in crate::commands) struct DevInitArgs {
 
 #[derive(Debug, Args)]
 #[command(
-    about = "Run the interactive setup wizard for global or repo-local Memory Layer configuration.",
+    about = "Run the interactive setup wizard for global or repo-local Codifix configuration.",
     after_help = WIZARD_AFTER_HELP
 )]
 pub(in crate::commands) struct WizardArgs {
@@ -1661,7 +1661,7 @@ pub(in crate::commands) struct WizardArgs {
 
 #[derive(Debug, Args)]
 #[command(
-    about = "Create or refresh the repo-local Memory Layer bootstrap files.",
+    about = "Create or refresh the repo-local Codifix bootstrap files.",
     after_help = INIT_AFTER_HELP
 )]
 pub(in crate::commands) struct InitArgs {
@@ -1678,7 +1678,7 @@ pub(in crate::commands) struct InitArgs {
 
 #[derive(Debug, Args)]
 #[command(
-    about = "Upgrade repo-local Memory Layer skill files from the installed template.",
+    about = "Upgrade repo-local Codifix skill files from the installed template.",
     after_help = UPGRADE_AFTER_HELP
 )]
 pub(in crate::commands) struct UpgradeArgs {
@@ -1695,7 +1695,7 @@ pub(in crate::commands) struct UpgradeArgs {
 
 #[derive(Debug, Args)]
 #[command(
-    about = "Manage the Memory Layer backend service for local or packaged installs.",
+    about = "Manage the Codifix backend service for local or packaged installs.",
     after_help = SERVICE_GROUP_AFTER_HELP
 )]
 pub(in crate::commands) struct ServiceArgs {
@@ -1713,7 +1713,7 @@ pub(in crate::commands) enum ServiceCommand {
     Disable(ServiceLifecycleArgs),
     #[command(about = "Show the current packaged service status.", after_help = SERVICE_STATUS_AFTER_HELP)]
     Status,
-    #[command(about = "Restart active Memory Layer services after an install or upgrade.", after_help = SERVICE_RESTART_ALL_AFTER_HELP)]
+    #[command(about = "Restart active Codifix services after an install or upgrade.", after_help = SERVICE_RESTART_ALL_AFTER_HELP)]
     RestartAll(ServiceRestartAllArgs),
     #[command(about = "Provision or rotate the shared service API token.", after_help = SERVICE_TOKEN_AFTER_HELP)]
     EnsureApiToken(ServiceEnsureApiTokenArgs),
@@ -3952,7 +3952,7 @@ pub(crate) fn write_shared_env_file(path: &Path, key: &str, value: &str) -> Resu
 }
 
 pub(in crate::commands) const DEV_API_TOKEN: &str = "dev-memory-token";
-const SERVICE_API_TOKEN_KEY: &str = "MEMORY_LAYER__SERVICE__API_TOKEN";
+const SERVICE_API_TOKEN_KEY: &str = "CODIFIX__SERVICE__API_TOKEN";
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -4085,7 +4085,7 @@ pub(crate) fn shared_env_path_for_config(config_path: &Path) -> PathBuf {
     config_path
         .parent()
         .unwrap_or_else(|| Path::new("."))
-        .join("memory-layer.env")
+        .join("codifix.env")
 }
 
 pub(crate) fn default_global_config_path() -> PathBuf {

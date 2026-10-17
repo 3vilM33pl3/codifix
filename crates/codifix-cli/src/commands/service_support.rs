@@ -125,7 +125,7 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
             .with_context(|| format!("create {}", working_directory.display()))?;
         platform::register_windows_task(&platform::WindowsTaskSpec {
             name: task_name.to_string(),
-            description: "Memory Layer backend service".to_string(),
+            description: "Codifix backend service".to_string(),
             executable: binary,
             arguments: vec![
                 "--config".to_string(),
@@ -147,8 +147,8 @@ pub(crate) fn start_backend_service_once(config_path: &Path) -> Result<String> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         run_systemctl_system(["daemon-reload"])?;
-        run_systemctl_system(["enable", "--now", "memory-layer.service"])?;
-        Ok("Enabled memory-layer.service".to_string())
+        run_systemctl_system(["enable", "--now", "codifix.service"])?;
+        Ok("Enabled codifix.service".to_string())
     }
 }
 
@@ -184,7 +184,7 @@ pub(crate) fn preview_enable_backend_service(config_path: &Path) -> String {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         format!(
-            "Dry run: would run `systemctl enable --now memory-layer.service` using config {}",
+            "Dry run: would run `systemctl enable --now codifix.service` using config {}",
             config_path.display()
         )
     }
@@ -225,8 +225,8 @@ pub(crate) fn disable_backend_service(config_path: &Path) -> Result<String> {
 
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        run_systemctl_system(["disable", "--now", "memory-layer.service"])?;
-        Ok("Disabled memory-layer.service".to_string())
+        run_systemctl_system(["disable", "--now", "codifix.service"])?;
+        Ok("Disabled codifix.service".to_string())
     }
 }
 
@@ -262,7 +262,7 @@ pub(crate) fn preview_disable_backend_service(config_path: &Path) -> String {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         format!(
-            "Dry run: would run `systemctl disable --now memory-layer.service` using config {}",
+            "Dry run: would run `systemctl disable --now codifix.service` using config {}",
             config_path.display()
         )
     }
@@ -309,10 +309,10 @@ pub(crate) fn backend_service_status(config_path: &Path) -> Result<String> {
     #[cfg(all(unix, not(target_os = "macos")))]
     {
         let is_installed = packaged_service_available();
-        let is_enabled = run_systemctl_system(["is-enabled", "memory-layer.service"]).is_ok();
-        let is_active = run_systemctl_system(["is-active", "memory-layer.service"]).is_ok();
+        let is_enabled = run_systemctl_system(["is-enabled", "codifix.service"]).is_ok();
+        let is_active = run_systemctl_system(["is-active", "codifix.service"]).is_ok();
         Ok(format!(
-            "Backend service:\n- unit: memory-layer.service\n- config: {}\n- installed: {}\n- enabled: {}\n- active: {}\n\nInspect with:\n- systemctl status memory-layer.service",
+            "Backend service:\n- unit: codifix.service\n- config: {}\n- installed: {}\n- enabled: {}\n- active: {}\n\nInspect with:\n- systemctl status codifix.service",
             config_path.display(),
             yes_no(is_installed),
             yes_no(is_enabled),
@@ -323,10 +323,9 @@ pub(crate) fn backend_service_status(config_path: &Path) -> Result<String> {
 
 const TUI_RESTART_MARKER_FILE: &str = "tui-restart-required.json";
 #[cfg(all(unix, not(target_os = "macos")))]
-const LINUX_GLOBAL_TUI_RESTART_MARKER: &str = "/var/lib/memory-layer/tui-restart-required.json";
+const LINUX_GLOBAL_TUI_RESTART_MARKER: &str = "/var/lib/codifix/tui-restart-required.json";
 #[cfg(target_os = "macos")]
-const MACOS_GLOBAL_TUI_RESTART_MARKER: &str =
-    "/usr/local/var/memory-layer/tui-restart-required.json";
+const MACOS_GLOBAL_TUI_RESTART_MARKER: &str = "/usr/local/var/codifix/tui-restart-required.json";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ServiceRestartReport {
@@ -339,7 +338,7 @@ pub(crate) struct ServiceRestartReport {
 impl ServiceRestartReport {
     pub(crate) fn summary(&self) -> String {
         let mut lines = vec![format!(
-            "Memory Layer service restart{}:",
+            "Codifix service restart{}:",
             if self.dry_run { " dry run" } else { "" }
         )];
         for operation in &self.operations {
@@ -471,7 +470,7 @@ pub(crate) fn restart_platform_services(
     dry_run: bool,
     operations: &mut Vec<ServiceRestartOperation>,
 ) -> Result<()> {
-    for unit in ["memory-layer.service", "memory-watch.service"] {
+    for unit in ["codifix.service", "codifix-watch.service"] {
         restart_systemd_system_unit_if_active(unit, dry_run, operations);
     }
     for scope in active_memory_user_unit_scopes() {
@@ -635,7 +634,7 @@ pub(crate) fn active_user_memory_units_for(
                 "--type=service",
                 "--state=active",
                 "--no-legend",
-                "memory-watch*.service",
+                "codifix-watch*.service",
             ]);
         command
     } else {
@@ -646,7 +645,7 @@ pub(crate) fn active_user_memory_units_for(
             "--type=service",
             "--state=active",
             "--no-legend",
-            "memory-watch*.service",
+            "codifix-watch*.service",
         ]);
         command
     };
@@ -665,7 +664,7 @@ pub(crate) fn parse_systemd_unit_names(output: &str) -> Vec<String> {
     output
         .lines()
         .filter_map(|line| line.split_whitespace().next())
-        .filter(|unit| unit.starts_with("memory-watch") && unit.ends_with(".service"))
+        .filter(|unit| unit.starts_with("codifix-watch") && unit.ends_with(".service"))
         .map(ToString::to_string)
         .collect()
 }
@@ -717,9 +716,7 @@ pub(crate) fn active_launch_agent_labels() -> Result<Vec<String>> {
                 let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
                     continue;
                 };
-                if file_name.starts_with("com.memory-layer.memory-watch")
-                    && file_name.ends_with(".plist")
-                {
+                if file_name.starts_with("dev.codifix.watch") && file_name.ends_with(".plist") {
                     labels.push(file_name.trim_end_matches(".plist").to_string());
                 }
             }

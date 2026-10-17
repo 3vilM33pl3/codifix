@@ -333,10 +333,10 @@ pub fn run(file: &Path, expected: &str, output: &Path) -> Result<Receipt> {
         ("USERPROFILE".into(), output.as_os_str().to_owned()),
         ("TEMP".into(), output.as_os_str().to_owned()),
         ("TMP".into(), output.as_os_str().to_owned()),
-        ("MEMORY_LAYER_PROFILE".into(), "prod".into()),
-        ("MEMORY_LAYER_TEST_REQUIRE_DB".into(), "1".into()),
+        ("CODIFIX_PROFILE".into(), "prod".into()),
+        ("CODIFIX_TEST_REQUIRE_DB".into(), "1".into()),
         (
-            "MEMORY_LAYER_TEST_DATABASE_URL".into(),
+            "CODIFIX_TEST_DATABASE_URL".into(),
             descriptor.database_url.clone().into(),
         ),
         (

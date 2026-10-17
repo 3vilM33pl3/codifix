@@ -15,7 +15,7 @@ pub(super) struct UrlsArgs {
     #[arg(long)]
     pub json: bool,
     /// Optional operator participant configuration containing a gateway address.
-    #[arg(long, env = "MEMORY_LAYER_FEDERATION_CONFIG")]
+    #[arg(long, env = "CODIFIX_FEDERATION_CONFIG")]
     pub federation_config: Option<PathBuf>,
 }
 
@@ -200,27 +200,17 @@ fn load(path: &std::path::Path) -> Option<toml::Value> {
 fn endpoint_env(value: &mut toml::Value, path: &std::path::Path, selected: bool) {
     let file = fs::read_to_string(codifix_config::env_path_for_config(path)).unwrap_or_default();
     for (section, key, name, boolean) in [
-        (
-            "service",
-            "bind_addr",
-            "MEMORY_LAYER__SERVICE__BIND_ADDR",
-            false,
-        ),
+        ("service", "bind_addr", "CODIFIX__SERVICE__BIND_ADDR", false),
         (
             "auth",
             "public_base_url",
-            "MEMORY_LAYER__AUTH__PUBLIC_BASE_URL",
+            "CODIFIX__AUTH__PUBLIC_BASE_URL",
             false,
         ),
-        ("auth", "mode", "MEMORY_LAYER__AUTH__MODE", false),
-        ("mcp", "enabled", "MEMORY_LAYER__MCP__ENABLED", true),
-        (
-            "mcp",
-            "http_enabled",
-            "MEMORY_LAYER__MCP__HTTP_ENABLED",
-            true,
-        ),
-        ("mcp", "http_path", "MEMORY_LAYER__MCP__HTTP_PATH", false),
+        ("auth", "mode", "CODIFIX__AUTH__MODE", false),
+        ("mcp", "enabled", "CODIFIX__MCP__ENABLED", true),
+        ("mcp", "http_enabled", "CODIFIX__MCP__HTTP_ENABLED", true),
+        ("mcp", "http_path", "CODIFIX__MCP__HTTP_PATH", false),
     ] {
         let from_file = file
             .lines()

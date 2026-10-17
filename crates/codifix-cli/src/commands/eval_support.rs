@@ -2492,7 +2492,7 @@ status=".memory-eval/${question_id}.status.json"
 cmd="./.memory-eval/memory"
 
 set +e
-"$cmd" query --project "${MEMORY_LAYER_PROJECT:?}" --question "$question" --json > "$out" 2> "$err"
+"$cmd" query --project "${CODIFIX_PROJECT:?}" --question "$question" --json > "$out" 2> "$err"
 code=$?
 set -e
 if [ "$code" -eq 0 ] && [ ! -s "$out" ]; then
@@ -2674,17 +2674,17 @@ pub(crate) fn run_eval_shell_command(
             codifix_eval::EvalCondition::NoMemory => {
                 command_builder
                     .env("MEMORY_EVAL_MEMORY_ENABLED", "0")
-                    .env_remove("MEMORY_LAYER_API_TOKEN")
-                    .env_remove("MEMORY_LAYER_AGENT_ID")
-                    .env_remove("MEMORY_LAYER_PROJECT")
+                    .env_remove("CODIFIX_API_TOKEN")
+                    .env_remove("CODIFIX_AGENT_ID")
+                    .env_remove("CODIFIX_PROJECT")
                     .env_remove("MEMORY_CONFIG")
-                    .env_remove("MEMORY_LAYER_CONFIG")
+                    .env_remove("CODIFIX_CONFIG")
                     .env_remove("MEMORY_BASE_URL");
             }
             _ => {
                 command_builder.env("MEMORY_EVAL_MEMORY_ENABLED", "1");
                 if let Some(project) = project {
-                    command_builder.env("MEMORY_LAYER_PROJECT", project);
+                    command_builder.env("CODIFIX_PROJECT", project);
                 }
                 if let Some(context) = context {
                     command_builder
@@ -2693,13 +2693,13 @@ pub(crate) fn run_eval_shell_command(
                     if let Some(config_path) = &context.memory_config_path {
                         command_builder
                             .env("MEMORY_CONFIG", config_path)
-                            .env("MEMORY_LAYER_CONFIG", config_path);
+                            .env("CODIFIX_CONFIG", config_path);
                         if config_path
                             .parent()
                             .map(|parent| parent.join("config.dev.toml").is_file())
                             .unwrap_or(false)
                         {
-                            command_builder.env("MEMORY_LAYER_PROFILE", "dev");
+                            command_builder.env("CODIFIX_PROFILE", "dev");
                         }
                     }
                 }
@@ -3061,7 +3061,7 @@ pub(crate) fn eval_memory_command() -> String {
 pub(crate) fn eval_memory_config_path(cwd: &Path) -> Option<PathBuf> {
     env::var_os("MEMORY_CONFIG")
         .map(PathBuf::from)
-        .or_else(|| env::var_os("MEMORY_LAYER_CONFIG").map(PathBuf::from))
+        .or_else(|| env::var_os("CODIFIX_CONFIG").map(PathBuf::from))
         .or_else(|| {
             codifix_platform::discover_project_root(cwd)
                 .and_then(|repo_root| codifix_config::project_paths_for_repo(&repo_root))
@@ -3069,7 +3069,7 @@ pub(crate) fn eval_memory_config_path(cwd: &Path) -> Option<PathBuf> {
                 .filter(|path| path.exists())
         })
         .or_else(|| {
-            let candidate = cwd.join(".mem").join("config.toml");
+            let candidate = cwd.join(".codifix").join("config.toml");
             candidate.exists().then_some(candidate)
         })
 }

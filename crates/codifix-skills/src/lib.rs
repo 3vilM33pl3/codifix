@@ -32,7 +32,7 @@ pub const MEMORY_SKILL_NAMES: &[&str] = &[
 const GITHUB_SKILL_TEMPLATE_ARCHIVE_URL: &str =
     "https://github.com/3vilM33pl3/memory/archive/refs/heads/main.zip";
 const GITHUB_SKILL_TEMPLATE_TIMEOUT: Duration = Duration::from_secs(10);
-const GITHUB_ARCHIVE_ENV: &str = "MEMORY_LAYER_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
+const GITHUB_ARCHIVE_ENV: &str = "CODIFIX_GITHUB_SKILL_TEMPLATE_ARCHIVE_URL";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -655,7 +655,7 @@ pub fn discover_skill_template_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     // An operator may pin the exact authenticated release bundle. An invalid
     // explicit selection must not fall back to another installation or main.
-    if let Some(path) = env::var_os("MEMORY_LAYER_SKILL_TEMPLATE") {
+    if let Some(path) = env::var_os("CODIFIX_SKILL_TEMPLATE") {
         let path = PathBuf::from(path);
         return (path.is_absolute() && path.is_dir()).then_some(path);
     }
@@ -743,7 +743,7 @@ pub fn upgrade_project_skills_with_template(
     } else {
         let runtime_dir = codifix_config::project_paths_for_repo(repo_root)
             .map(|paths| paths.runtime_dir())
-            .unwrap_or_else(|| repo_root.join(".mem").join("runtime"));
+            .unwrap_or_else(|| repo_root.join(".codifix").join("runtime"));
         Some(
             runtime_dir
                 .join("skill-backups")
@@ -854,7 +854,7 @@ pub fn read_skill_content(
 }
 
 pub fn download_github_skill_template() -> Result<PathBuf> {
-    if env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").is_some() {
+    if env::var_os("CODIFIX_SKILL_TEMPLATE").is_some() {
         return discover_skill_template_dir()
             .ok_or_else(|| anyhow::anyhow!("configured release skill template is unavailable"));
     }
@@ -1004,7 +1004,7 @@ mod tests {
     fn release_template_override_never_downloads_or_falls_back() {
         const CHILD: &str = "MEMORY_SKILL_PIN_TEST_CHILD";
         if let Ok(mode) = env::var(CHILD) {
-            let expected = PathBuf::from(env::var_os("MEMORY_LAYER_SKILL_TEMPLATE").unwrap());
+            let expected = PathBuf::from(env::var_os("CODIFIX_SKILL_TEMPLATE").unwrap());
             if mode == "valid" {
                 assert_eq!(discover_skill_template_dir(), Some(expected.clone()));
                 assert_eq!(download_github_skill_template().unwrap(), expected);
@@ -1027,7 +1027,7 @@ mod tests {
                     "tests::release_template_override_never_downloads_or_falls_back",
                 ])
                 .env(CHILD, mode)
-                .env("MEMORY_LAYER_SKILL_TEMPLATE", path)
+                .env("CODIFIX_SKILL_TEMPLATE", path)
                 .env(GITHUB_ARCHIVE_ENV, "http://127.0.0.1:9/not-a-template")
                 .status()
                 .unwrap();
