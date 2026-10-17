@@ -23,11 +23,11 @@ use reqwest::Client;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
     model::{
-        AnnotateAble, CallToolRequestParams, CallToolResult, Content, GetPromptRequestParams,
+        CallToolRequestParams, CallToolResult, ContentBlock, GetPromptRequestParams,
         GetPromptResult, ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult,
         ListToolsResult, PaginatedRequestParams, Prompt, PromptArgument, PromptMessage,
-        PromptMessageRole, RawResourceTemplate, ReadResourceRequestParams, ReadResourceResult,
-        ResourceContents, ResourceTemplate, ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+        ReadResourceRequestParams, ReadResourceResult, ResourceContents, ResourceTemplate, Role,
+        ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
     },
     service::RequestContext,
     transport::stdio,
@@ -369,7 +369,7 @@ impl ServerHandler for MemoryMcpServer {
             }
         };
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
-            PromptMessageRole::User,
+            Role::User,
             message,
         )]))
     }
@@ -1622,7 +1622,7 @@ fn api_error(error: anyhow::Error) -> McpError {
 
 fn structured_with_text(text: String, value: Value) -> Result<CallToolResult, McpError> {
     let mut result = CallToolResult::structured(value);
-    result.content = vec![Content::text(text)];
+    result.content = vec![ContentBlock::text(text)];
     Ok(result)
 }
 
@@ -2029,10 +2029,9 @@ fn resource_templates() -> Vec<ResourceTemplate> {
     ]
     .into_iter()
     .map(|(uri, name, description)| {
-        RawResourceTemplate::new(uri, name)
+        ResourceTemplate::new(uri, name)
             .with_description(description)
             .with_mime_type("application/json")
-            .no_annotation()
     })
     .collect()
 }

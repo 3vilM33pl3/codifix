@@ -156,7 +156,7 @@ pub(super) fn bundle(bytes: &[u8]) -> Result<Bundle> {
             bail!("archive skill root has a case alias");
         }
         if file
-            .name()
+            .name()?
             .trim_end_matches('/')
             .split('/')
             .any(|part| part.is_empty() || matches!(part, "." | ".."))
