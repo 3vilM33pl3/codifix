@@ -136,8 +136,8 @@ $pgRoot='C:\MemoryLab\NativePostgres'
 $pgManifestPath=Join-Path $SourceRoot 'scripts/windows/native-postgres.json'
 $pgManifest=Read-PackJson $pgManifestPath
 $pgPreparedPath=Join-Path $pgRoot 'prepared.json';$pgPrepared=Read-PackJson $pgPreparedPath
-if($pgManifest.format -cne 'memory-windows-postgres-proof-v1' -or $pgManifest.postgres_version -cne '17.11' -or
-    $pgManifest.pgvector_version -cne '0.8.7' -or $pgPrepared.format -cne 'memory-windows-postgres-proof-result-v1' -or
+if($pgManifest.format -cne 'codifix-windows-postgres-proof-v1' -or $pgManifest.postgres_version -cne '17.11' -or
+    $pgManifest.pgvector_version -cne '0.8.7' -or $pgPrepared.format -cne 'codifix-windows-postgres-proof-result-v1' -or
     $pgManifest.postgres.sha256 -cne '6eabdf00d2893713b75db4336a23c3fdf505f056e217ec6e2e95d901750cfea3' -or
     $pgManifest.pgvector.sha256 -cne 'cac0b10c360f05b2d521200105ba3697e773d4cd3731f5a915a7e37ebe0bea85' -or
     $pgPrepared.manifest_sha256 -cne (Get-PackHash $pgManifestPath)){throw 'Pinned prepared PostgreSQL/CRT receipt required'}

@@ -249,10 +249,23 @@ class BuildToolsManifestTests(unittest.TestCase):
                          '$env:CODIFIX_PDS_TEST_ROOT = $runtime', 'security.test.mjs']:
             self.assertIn(required, script)
 
+    def test_release_postgres_contract_matches_the_shared_manifest(self):
+        root = Path(__file__).parent
+        manifest = json.loads((root / 'native-postgres.json').read_text())
+        release = (root.parents[1] / 'packaging/windows/start-release-postgres.ps1').read_text()
+        # The hosted native build must get past the dependency guard before it
+        # can exercise PostgreSQL; validate every field in that exact guard.
+        for field in ['format', 'postgres_version', 'pgvector_version']:
+            self.assertIn(f"$manifest.{field} -ne '{manifest[field]}'", release)
+        for artifact in ['postgres', 'pgvector']:
+            self.assertIn(f"$manifest.{artifact}.sha256 -ne '{manifest[artifact]['sha256']}'", release)
+        for consumer in ['guest-native-postgres.ps1', 'guest-runtime-pack.ps1']:
+            self.assertIn("'" + manifest['format'] + "'", (root / consumer).read_text())
+
     def test_native_postgres_inputs_and_lab_boundary(self):
         root = Path(__file__).parent
         manifest = json.loads((root / 'native-postgres.json').read_text())
-        self.assertEqual(manifest['format'], 'memory-windows-postgres-proof-v1')
+        self.assertEqual(manifest['format'], 'codifix-windows-postgres-proof-v1')
         self.assertEqual(manifest['postgres_version'], '17.11')
         self.assertEqual(manifest['pgvector_version'], '0.8.7')
         for kind, host in [('postgres', 'get.enterprisedb.com'), ('pgvector', 'codeload.github.com')]:

@@ -11,7 +11,7 @@ if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB') {
     throw 'Native prerequisite proof is restricted to the disposable Memory VM'
 }
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.format -ne 'memory-windows-postgres-proof-v1' -or
+if ($manifest.format -ne 'codifix-windows-postgres-proof-v1' -or
     $manifest.postgres_version -ne '17.11' -or $manifest.pgvector_version -ne '0.8.7') {
     throw 'Unreviewed native PostgreSQL inputs'
 }
@@ -97,14 +97,14 @@ if ($Action -eq 'Prepare') {
     $support = @(Get-ChildItem -LiteralPath $bin -Filter '*.dll' -File | Sort-Object Name | ForEach-Object {
         @{name=$_.Name;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant();version=$_.VersionInfo.FileVersion}
     })
-    $receipt = [ordered]@{format='memory-windows-postgres-proof-result-v1'; manifest_sha256=(Get-FileHash $ManifestPath).Hash.ToLowerInvariant(); postgres_version=(& (Join-Path $bin 'postgres.exe') --version); postgres_sha256=(Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant(); extensions=@($libraries | ForEach-Object { @{name=$_;sha256=(Get-FileHash (Join-Path $pg "lib\$_")).Hash.ToLowerInvariant()} }); runtime_support=$support; crt_source=$crt; clean_runtime_verified=$false; native_execution_verified=$false}
+    $receipt = [ordered]@{format='codifix-windows-postgres-proof-result-v1'; manifest_sha256=(Get-FileHash $ManifestPath).Hash.ToLowerInvariant(); postgres_version=(& (Join-Path $bin 'postgres.exe') --version); postgres_sha256=(Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant(); extensions=@($libraries | ForEach-Object { @{name=$_;sha256=(Get-FileHash (Join-Path $pg "lib\$_")).Hash.ToLowerInvariant()} }); runtime_support=$support; crt_source=$crt; clean_runtime_verified=$false; native_execution_verified=$false}
     $receipt | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $root 'prepared.json') -Encoding UTF8
     $receipt | ConvertTo-Json -Depth 8
     return
 }
 if (-not (Test-Path (Join-Path $root 'prepared.json'))) { throw 'Prepare native dependencies first' }
 $prepared = Get-Content (Join-Path $root 'prepared.json') -Raw | ConvertFrom-Json
-if ($prepared.format -ne 'memory-windows-postgres-proof-result-v1' -or
+if ($prepared.format -ne 'codifix-windows-postgres-proof-result-v1' -or
     $prepared.manifest_sha256 -ne (Get-FileHash $ManifestPath).Hash.ToLowerInvariant() -or
     $prepared.postgres_sha256 -ne (Get-FileHash (Join-Path $bin 'postgres.exe')).Hash.ToLowerInvariant()) {
     throw 'Prepared native runtime does not match its retained manifest and receipt'

@@ -1,5 +1,5 @@
 {
-  "format": "memory-windows-postgres-proof-v1",
+  "format": "codifix-windows-postgres-proof-v1",
   "postgres_version": "17.11",
   "pgvector_version": "0.8.7",
   "postgres": {"file":"postgresql-17.11-1-windows-x64-binaries.zip","url":"https://get.enterprisedb.com/postgresql/postgresql-17.11-1-windows-x64-binaries.zip","sha256":"6eabdf00d2893713b75db4336a23c3fdf505f056e217ec6e2e95d901750cfea3"},
