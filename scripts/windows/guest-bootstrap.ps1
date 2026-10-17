@@ -7,6 +7,11 @@ if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB') {
 }
 $Lab = 'C:\MemoryLab'
 New-Item -ItemType Directory -Force $Lab | Out-Null
+# Windows drive-root defaults otherwise grant Authenticated Users modification
+# of this ancestor, correctly rejected by the protected-file/process helpers.
+$labSid=(Get-LocalUser -Name 'memorylab').SID.Value
+& "$env:SystemRoot\System32\icacls.exe" $Lab /inheritance:r /grant:r "*${labSid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Lab ancestor ACL failed' }
 Start-Transcript -Path "$Lab\bootstrap.log" -Append
 try {
     $seed = (Get-Volume | Where-Object FileSystemLabel -eq 'MEMSEED').DriveLetter

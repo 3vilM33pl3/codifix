@@ -7,6 +7,18 @@ from urllib.parse import urlsplit
 
 
 class BuildToolsManifestTests(unittest.TestCase):
+    def test_lab_ancestor_is_private_without_recursive_or_host_permission_changes(self):
+        root = Path(__file__).parent
+        for name in ['guest-bootstrap.ps1','guest-protect-lab.ps1']:
+            script = (root / name).read_text()
+            self.assertIn("Get-LocalUser -Name 'memorylab'", script)
+            self.assertIn('/inheritance:r /grant:r', script)
+        repair = (root / 'guest-protect-lab.ps1').read_text()
+        for required in ['ancestor-acl-', 'AreAccessRulesProtected', 'Unexpected lab ancestor principal', 'ReparsePoint']:
+            self.assertIn(required, repair)
+        self.assertNotIn('/T', repair)
+        self.assertNotIn('Get-ChildItem', repair)
+
     def test_native_evaluation_proof_keeps_private_labels_and_paid_campaign_separate(self):
         root = Path(__file__).parent
         script = (root / 'guest-native-eval.ps1').read_text()
