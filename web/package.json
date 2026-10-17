@@ -14,7 +14,7 @@
     "3d-force-graph": "^1.80.0",
     "force-graph": "^1.51.4",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react-dom": "^19.3.0",
     "three": "^0.184.0"
   },
   "devDependencies": {
@@ -23,7 +23,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/pngjs": "^6.0.5",
     "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.0.4",
     "jsdom": "^29.1.1",
     "pngjs": "^7.0.0",
