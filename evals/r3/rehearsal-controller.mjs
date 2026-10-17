@@ -32,7 +32,7 @@ if ((process.platform === 'win32' && !native) || (configuration.execution !== un
       || configuration.dispatch.endpoint !== 'private/dispatch-endpoint.json'))) throw Error('explicit deterministic native controller required');
 if (!manifest.assets.some(asset => asset.path === 'private/runtime.json' && asset.sha256 === configurationSha256)) throw Error('controller configuration changed');
 const journal = native ? await createWindowsHostJournal(configuration.execution) : undefined;
-if (journal && JSON.stringify(await journal.read(path.join(root, 'private'), 'runtime.json')) !== JSON.stringify(configuration)) throw Error('protected controller configuration changed');
+if (journal) await journal.read(path.join(root, 'private'), 'runtime.json', { sha256: configurationSha256 });
 const env = native ? { SystemRoot: process.env.SystemRoot, WINDIR: process.env.SystemRoot,
   PATH: path.dirname(configuration.binaries.node.path), HOME: process.env.HOME, USERPROFILE: process.env.HOME,
   TEMP: process.env.HOME, TMP: process.env.HOME, MEMORY_LAYER_PROFILE: 'prod' }

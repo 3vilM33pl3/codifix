@@ -82,6 +82,20 @@ test('changed helper bytes, aliases and filesystem failures stop before helper i
   }
 });
 
+test('fresh protected reads bind original bytes despite Rust JSON object-key reordering', async () => {
+  const raw = Buffer.from('{"z":{"b":1,"a":2},"a":3}');
+  const f = fixture({ receiptChange: (receipt, operation) => {
+    if (operation === 'read') receipt.value = { a: 3, z: { a: 2, b: 1 } };
+  } });
+  f.files.set(path.win32.join(directory, 'runtime.json').toLowerCase(), raw);
+  const journal = await createWindowsHostJournal(f.execution, f.dependencies);
+  const value = await journal.read(directory, 'runtime.json', { sha256: hash(raw) });
+  assert.deepEqual(value, JSON.parse(raw));
+  assert.notEqual(JSON.stringify(value), raw.toString());
+  await assert.rejects(journal.read(directory, 'runtime.json', { sha256: 'a'.repeat(64) }), /expected digest/);
+  await assert.rejects(journal.read(directory, 'runtime.json', { sha256: 'bad' }), /explicit.*digest/);
+});
+
 test('unknown and mixed profiles, unsafe directories and components never reach native helper', async () => {
   for (const change of [
     f => { f.dependencies.platform = 'linux'; }, f => { f.dependencies.systemRoot = 'C:\\public'; },

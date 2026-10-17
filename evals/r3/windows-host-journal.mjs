@@ -109,6 +109,11 @@ export async function createWindowsHostJournal(execution, { platform = process.p
       await call('create', path.win32.dirname(reviewed), path.win32.basename(reviewed));
     },
     async write(directory, name, value) { await call('write', directory, name, payload(value)); },
-    async read(directory, name) { return (await call('read', directory, name)).value; },
+    async read(directory, name, { sha256 } = {}) {
+      if (sha256 !== undefined && (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256))) throw Error('explicit native journal digest required');
+      const receipt = await call('read', directory, name);
+      if (sha256 !== undefined && receipt.sha256 !== sha256) throw Error('native journal content differs from expected digest');
+      return receipt.value;
+    },
   };
 }
