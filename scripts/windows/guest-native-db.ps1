@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$SourceRoot,
       [Parameter(Mandatory=$true)][guid]$OperationId,
-      [ValidateSet('Area','Service','Supervisor','Fleet')][string]$Scope='Area')
+      [ValidateSet('Area','Service','Supervisor','Fleet','Workspace')][string]$Scope='Area')
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
     $OperationId -eq [guid]::Empty -or $SourceRoot -cnotmatch '^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$') { throw 'Explicit disposable native database source required' }
@@ -20,7 +20,7 @@ $head=(& $git -C $SourceRoot rev-parse HEAD)
 if ($LASTEXITCODE -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Committed source required' }
 $changes=(& $git -C $SourceRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -or $changes) { throw 'Clean database test source required' }
-$label=switch ($Scope) { 'Service' {'native-service-db'} 'Supervisor' {'native-supervisor'} 'Fleet' {'native-pds-fleet'} default {'native-db'} }
+$label=switch ($Scope) { 'Service' {'native-service-db'} 'Supervisor' {'native-supervisor'} 'Fleet' {'native-pds-fleet'} 'Workspace' {'native-workspace-db'} default {'native-db'} }
 $root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\'+$label)
 if (Test-Path -LiteralPath $root) { throw 'Retain existing database test evidence; use a new operation identity' }
 New-Item -ItemType Directory -Path $root | Out-Null
@@ -75,6 +75,7 @@ try {
     }
     $program=$cargo
     $arguments=if ($Scope -eq 'Service') { @('test','--locked','-p','mem-service','--lib','--','--test-threads=1') }
+        elseif ($Scope -eq 'Workspace') { @('test','--workspace','--all-targets','--locked','--','--test-threads=1') }
         elseif ($Scope -eq 'Supervisor') { @('test','--locked','-p','mem-supervisor-runtime','--lib',
             'transport::tests::broker::launcher_windows::native_production_launcher_delivers_revokes_accounts_and_recovers','--','--ignored','--exact','--test-threads=1','--nocapture') }
         elseif ($Scope -eq 'Fleet') {
