@@ -4,7 +4,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$SourceRoot,
     [Parameter(Mandatory=$true)][guid]$OperationId,
-    [ValidateSet('Check','Build')][string]$Action='Check'
+    [ValidateSet('Check','Build','Web')][string]$Action='Check'
 )
 $ErrorActionPreference='Stop'
 if ($env:OS -ne 'Windows_NT' -or $env:COMPUTERNAME -ne 'MEMORY-WINLAB' -or
@@ -24,7 +24,7 @@ $changes=(& $git -C $SourceRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -or $changes) { throw 'Committed clean product source required' }
 $compiler=(& $rustc -vV)
 if ($LASTEXITCODE -or ($compiler -join "`n") -notmatch '(?m)^host: x86_64-pc-windows-msvc\r?$') { throw 'Native MSVC Rust compiler required' }
-$label=if ($Action -eq 'Build') { 'product-build' } else { 'product-check' }
+$label=switch($Action){'Build'{'product-build'} 'Web'{'product-web'} default{'product-check'}}
 $root=Join-Path 'C:\MemoryLab\runs' ($OperationId.ToString()+'\'+$label)
 if (Test-Path -LiteralPath $root) { throw 'Product attempt exists; retain its evidence and use an explicit new operation' }
 New-Item -ItemType Directory -Path $root | Out-Null
@@ -43,6 +43,31 @@ $result=Join-Path $root 'result.json'
 $receipt | ConvertTo-Json | Set-Content -LiteralPath $result -Encoding UTF8
 Push-Location $SourceRoot
 try {
+    if ($Action -eq 'Web') {
+        $node=Join-Path $tools 'node-v24.18.1-win-x64\node.exe'
+        $prepared=Get-Content -LiteralPath 'C:\MemoryLab\NativePds\prepared.json' -Raw | ConvertFrom-Json
+        if($prepared.node_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+            (Get-FileHash -LiteralPath $node).Hash.ToLowerInvariant() -cne $prepared.node_sha256){throw 'Pinned native Node required'}
+        $webLock=Join-Path $SourceRoot 'web\package-lock.json'
+        $webLockHash=(Get-FileHash -LiteralPath $webLock).Hash.ToLowerInvariant()
+        $receipt.web_lock_sha256=$webLockHash; $receipt.node_sha256=$prepared.node_sha256
+        $npm=Join-Path $tools 'node-v24.18.1-win-x64\node_modules\npm\bin\npm-cli.js'
+        foreach($step in @(@('ci','--no-audit','--no-fund'),@('test'),@('run','build'))){
+            $name=$step[0]
+            $process=Start-Process -FilePath $node -ArgumentList (@($npm,'--prefix','web')+$step) -NoNewWindow -PassThru `
+                -RedirectStandardOutput (Join-Path $root ($name+'.stdout.log')) -RedirectStandardError (Join-Path $root ($name+'.stderr.log'))
+            $null=$process.Handle
+            if(-not $process.WaitForExit(1800000)){
+                & "$env:SystemRoot\System32\taskkill.exe" /PID $process.Id /T /F | Out-Null
+                throw 'Owned native Web step exceeded 30 minutes'
+            }
+            $process.WaitForExit(); if($process.ExitCode -ne 0){throw 'Native Web step failed; inspect private logs'}
+        }
+        if((Get-FileHash -LiteralPath $webLock).Hash.ToLowerInvariant() -cne $webLockHash){throw 'Web build changed frozen package lock'}
+        $receipt.web_tests_verified=$true; $receipt.browser_workflow_verified=$false
+        $receipt.state='succeeded'; $receipt.compilation_verified=$true
+        return
+    }
     # Separate bounded evidence files avoid PowerShell 5.1 turning ordinary
     # compiler stderr into a terminating error or dropping it from transcripts.
     $arguments=if ($Action -eq 'Build') {
