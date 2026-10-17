@@ -1,6 +1,6 @@
 # Supervisor persistence
 
-Trusted, in-process PostgreSQL storage for the contracts in `mem-supervisor`.
+Trusted, in-process PostgreSQL storage for the contracts in `codifix-supervisor`.
 No HTTP, provider credentials, worker process, service authorization, human
 approval UI, Pi execution or live migration is implemented by this crate.
 
@@ -254,17 +254,17 @@ from authoritative evidence. No API force-releases unknown usage.
 
 ## Validation
 
-Tests use `mem-test-support::IsolatedDatabase` and only an explicitly configured
-disposable pgvector database. Set `MEMORY_LAYER_TEST_REQUIRE_DB=1` to make missing
+Tests use `codifix-test-support::IsolatedDatabase` and only an explicitly configured
+disposable pgvector database. Set `CODIFIX_TEST_REQUIRE_DB=1` to make missing
 database coverage fail. The harness applies migrations to its configured test
 database and creates/drops isolated synthetic fixture databases; never point it
 at a live or restored source database.
 
 ```sh
 CARGO_TARGET_DIR=/data/tmp/memory-four-area-target \
-  cargo test -p mem-supervisor-store --locked
+  cargo test -p codifix-supervisor-store --locked
 CARGO_TARGET_DIR=/data/tmp/memory-four-area-target \
-  cargo clippy -p mem-supervisor-store --all-targets --locked -- -D warnings
+  cargo clippy -p codifix-supervisor-store --all-targets --locked -- -D warnings
 ```
 
 Integration coverage includes exclusive concurrent claims, hard call/cost caps,

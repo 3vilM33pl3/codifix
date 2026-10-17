@@ -1,7 +1,7 @@
 # Fresh-target area import
 
 `import_partition` is a trusted PostgreSQL library operation, not a deployment
-command. It accepts only an opaque `MaterializedPartition` from `mem-area` after
+command. It accepts only an opaque `MaterializedPartition` from `codifix-area` after
 complete inventory/manifest/payload validation. It never discovers a source or
 target database, migrates schema, reads credentials, writes an archive, starts
 services, enrolls an instance or grants permissions.
@@ -41,7 +41,7 @@ cache capacity to zero, as the operator does. No intermediate commits, disabled
 triggers or omitted verification are used to limit database memory.
 
 Reviewed mixed-source projections are the sole content transformation: their
-safe note/reference and null context fields come from `mem-area`, not importer
+safe note/reference and null context fields come from `codifix-area`, not importer
 heuristics. Immutable provenance receipts retain the original source/version/
 archived-task hashes and exact review-decision binding. PostgreSQL-rendered target
 hashes are recorded separately from the materializer's wire-byte hashes.
@@ -86,7 +86,7 @@ or cross-area endpoints remain blocked; no fictional source owner is assigned.
 
 ## Focused verification
 
-Eleven tests use generated, migrated `mem-test-support::IsolatedDatabase` sources
+Eleven tests use generated, migrated `codifix-test-support::IsolatedDatabase` sources
 and targets with synthetic text only. They exercise exact historical versions
 with reversed UUID order, tombstones, canonical state, source-check history,
 tags, commits, populated reviewed relations across preserved project boundaries
@@ -99,10 +99,10 @@ Replaying after activation or after provenance-receipt corruption is rejected.
 Use only an independently selected disposable PostgreSQL test database:
 
 ```bash
-MEMORY_LAYER_TEST_REQUIRE_DB=1 cargo test -p mem-area-store --locked
+CODIFIX_TEST_REQUIRE_DB=1 cargo test -p codifix-area-store --locked
 ```
 
-The existing test harness requires `MEMORY_LAYER_TEST_DATABASE_URL`; it creates
+The existing test harness requires `CODIFIX_TEST_DATABASE_URL`; it creates
 and drops generated fixture databases and must never target a live or restored
 real-data database. No paid provider, source snapshot or running application is
 needed by these tests.
@@ -150,7 +150,7 @@ For larger verification, run the explicit 100,000-relation variant on a
 resource-limited disposable server (not a production or restored database):
 
 ```bash
-MEMORY_LAYER_TEST_REQUIRE_DB=1 cargo test -p mem-area-store --test memory_growth \
+CODIFIX_TEST_REQUIRE_DB=1 cargo test -p codifix-area-store --test memory_growth \
   --locked full_import_large_relation_memory_probe -- --ignored --nocapture
 ```
 

@@ -1,6 +1,6 @@
 # Release Readiness
 
-Use this checklist before tagging a Memory Layer release. The goal is to ship a
+Use this checklist before tagging a Codifix release. The goal is to ship a
 clean tag from `main`, publish every supported installer, and leave Homebrew in a
 verifiable state.
 
@@ -41,18 +41,18 @@ extensions.
    graph persistence, curation persistence, or service repository queries:
 
    ```bash
-   export MEMORY_LAYER_TEST_DATABASE_URL=postgres://memory:memory@localhost:5432/memory_test
-   export MEMORY_LAYER_TEST_REQUIRE_DB=1
-   cargo test -p mem-test-support -p mem-graph -p mem-curate -p mem-search -p mem-service --locked
+   export CODIFIX_TEST_DATABASE_URL=postgres://memory:memory@localhost:5432/memory_test
+   export CODIFIX_TEST_REQUIRE_DB=1
+   cargo test -p codifix-test-support -p codifix-graph -p codifix-curate -p codifix-search -p codifix-service --locked
    ```
 
 7. Run the eval checks relevant to the release:
 
    ```bash
-   memory eval doctor --suite evals/suites/research-v1 --text
-   memory eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml --text
-   memory eval doctor --suite evals/suites/memory-quality-v1 --text
-   memory eval gate --comparison target/memory-evals/quality-comparison.json --policy evals/gates/memory-quality-v1.toml --text
+   codifix eval doctor --suite evals/suites/research-v1 --text
+   codifix eval gate --comparison target/memory-evals/comparison.json --policy evals/gates/research-v1.toml --text
+   codifix eval doctor --suite evals/suites/memory-quality-v1 --text
+   codifix eval gate --comparison target/memory-evals/quality-comparison.json --policy evals/gates/memory-quality-v1.toml --text
    ```
 
 8. Build the local Debian package smoke:
@@ -79,21 +79,21 @@ extensions.
 2. Wait for `.github/workflows/release.yml` to finish.
 3. Verify the GitHub Release contains:
 
-   - `memory-layer_<version>_amd64.deb`
-   - `memory-layer_<version>_arm64.deb`
-   - `memory-layer-<version>-macos-x86_64.pkg`
-   - `memory-layer-<version>-macos-aarch64.pkg`
-   - `memory-layer-<version>-windows-x86_64.zip`
-   - `memory-layer-<version>-windows-x86_64.msi`
-   - `memory-<version>.tar.gz`
+   - `codifix_<version>_amd64.deb`
+   - `codifix_<version>_arm64.deb`
+   - `codifix-<version>-macos-x86_64.pkg` and `codifix-<version>-macos-x86_64-application-update.pkg`
+   - `codifix-<version>-macos-aarch64.pkg` and `codifix-<version>-macos-aarch64-application-update.pkg`
+   - `codifix-<version>-windows-x86_64-build.<n>.zip`
+   - `codifix-<version>-windows-x86_64-build.<n>.msi` and `codifix-<version>-windows-x86_64-build.<n>-server-tools.msi`
+   - `codifix-<version>.tar.gz`
    - matching `.sha256` files for every artifact
 
 4. Compute or confirm the source archive SHA256 from the published release
-   asset, then update `Formula/memory-layer.rb`.
+   asset, then update `Formula/codifix.rb`.
 5. Validate the formula:
 
    ```bash
-   ruby -c Formula/memory-layer.rb
+   ruby -c Formula/codifix.rb
    ```
 
 6. Commit and push the Homebrew formula refresh.
@@ -103,18 +103,18 @@ extensions.
 Smoke test at least one fresh install and one upgrade path before announcing the
 release:
 
-- Debian amd64: install `memory-layer_<version>_amd64.deb`
-- Debian arm64: install `memory-layer_<version>_arm64.deb` on a 64-bit Raspberry Pi or equivalent ARM Linux host
+- Debian amd64: install `codifix_<version>_amd64.deb`
+- Debian arm64: install `codifix_<version>_arm64.deb` on a 64-bit Raspberry Pi or equivalent ARM Linux host
 - macOS: install Homebrew or the matching `.pkg`
 - Windows: install the x86_64 MSI or unzip the x86_64 ZIP
 
 For each smoke test:
 
 ```bash
-memory --version
-memory doctor
-memory health
-memory status --project <project-slug>
+codifix --version
+codifix doctor
+codifix health
+codifix status --project <project-slug>
 ```
 
 ## Known cautions

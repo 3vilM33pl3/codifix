@@ -1,7 +1,7 @@
 # Demo Video Pipeline
 
 This directory contains a reproducible, privacy-safe pipeline for generating a
-90-120 second Memory Layer demo video.
+90-120 second Codifix demo video.
 
 ## Prerequisites
 

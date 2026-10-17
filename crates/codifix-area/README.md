@@ -1,14 +1,14 @@
 # Area migration planning foundation
 
-`mem-area` is an offline partition planner for the four stable area IDs `trust`,
-`homelab`, `workshop`, and `general`. The `memory-area` binary reads JSON files and
+`codifix-area` is an offline partition planner for the four stable area IDs `trust`,
+`homelab`, `workshop`, and `general`. The `codifix-area` binary reads JSON files and
 writes JSON to stdout. It has no database/configuration/provider client, importer,
 worker activation, credential access, or bundle-export fallback.
 
 ```sh
-memory-area inventory --input /protected/snapshot-inventory.json
-memory-area plan --inventory /protected/snapshot-inventory.json
-memory-area verify --inventory /protected/snapshot-inventory.json --manifest /protected/reviewed-manifest.json
+codifix-area inventory --input /protected/snapshot-inventory.json
+codifix-area plan --inventory /protected/snapshot-inventory.json
+codifix-area verify --inventory /protected/snapshot-inventory.json --manifest /protected/reviewed-manifest.json
 ```
 
 Exit status is `0` for a valid inventory, emitted draft, or valid reviewed plan;
@@ -292,7 +292,7 @@ from 256 through 1024 MiB inclusive for explicitly reviewed larger snapshots.
 `materialize` retains the default. No unbounded API or envelope-limit override
 is exposed, and changing the budget does not change successful output bytes or
 partition hashes. The operator CLI binds the chosen budget into its preparation
-receipt and requires the same value for import (see `mem-area-ops`). Original
+receipt and requires the same value for import (see `codifix-area-ops`). Original
 archive bytes stream without whole-archive buffering. Inventory/verification
 metadata, temporary row parsing, schema/index overhead and caller buffers are
 additional memory; the cap is not a total-process RSS guarantee. Errors are

@@ -40,4 +40,4 @@ recovery must be designed with the durable adapter, not by replacing a ledger wi
 an empty one. A signed release notice is data; only locally established evidence
 may populate `UpgradeContext`, and eligibility is not an installation capability.
 
-Validate with `cargo test -p mem-supervisor --all-targets --locked`.
+Validate with `cargo test -p codifix-supervisor --all-targets --locked`.

@@ -1,7 +1,7 @@
 # Transactional local persistence
 
-`mem-store` owns local event/job SQL primitives, not authorization, providers,
-configuration, HTTP, or federation. `mem-record` holds safe job wire types.
+`codifix-store` owns local event/job SQL primitives, not authorization, providers,
+configuration, HTTP, or federation. `codifix-record` holds safe job wire types.
 
 Timeline callers own the transaction: mutate, enqueue required work, append
 events last, commit, then broadcast. An append error must roll back the whole

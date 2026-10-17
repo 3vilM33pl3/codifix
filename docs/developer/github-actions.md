@@ -1,6 +1,6 @@
 # GitHub Actions
 
-Memory Layer uses GitHub Actions for incremental validation, release publishing, dependency upkeep, and optional Codex-agent workflows.
+Codifix uses GitHub Actions for incremental validation, release publishing, dependency upkeep, and optional Codex-agent workflows.
 
 CI, nightly, and agent workflows run on project-owned self-hosted runners. The
 primary Linux x86_64 runner is `Monolith_Memory`, registered with the labels
@@ -73,7 +73,7 @@ The workflow starts with a path filter and only runs the jobs affected by the ch
 - `Rust Tests`: `cargo test --workspace --all-targets --locked`
 - `Rust Clippy`: `cargo clippy --workspace --all-targets --locked -- -D warnings`
 - `DB Integration`: runs pgvector-backed migration, graph, and curation smoke tests
-- `Offline Eval Smoke`: dry-runs the bundled offline memory evaluation suite
+- `Offline Eval Smoke`: dry-runs the bundled offline codifix evaluation suite
 - `Web Build`: installs and builds the TUI/web frontend
 - `Debian Package Smoke`: builds an amd64 `.deb` package and uploads it when
   packaging files or bundled assets change
@@ -83,23 +83,23 @@ Rust tests, clippy, and the feature matrix cover those changes incrementally;
 Nightly still builds the complete Debian package every day. This avoids an LTO
 relink on every source-only push.
 
-The DB integration job runs when a pull request touches `migrations/**`, `mem-graph`, `mem-curate`, `mem-search`, `mem-service`, `mem-api`, or the shared DB test harness. It starts a `pgvector/pgvector:pg16` service and sets:
+The DB integration job runs when a pull request touches `migrations/**`, `codifix-graph`, `codifix-curate`, `codifix-search`, `codifix-service`, `codifix-api`, or the shared DB test harness. It starts a `pgvector/pgvector:pg16` service and sets:
 
 ```bash
-MEMORY_LAYER_TEST_DATABASE_URL=postgres://memory:memory@localhost:55432/memory_test
-MEMORY_LAYER_TEST_REQUIRE_DB=1
+CODIFIX_TEST_DATABASE_URL=postgres://memory:memory@localhost:55432/memory_test
+CODIFIX_TEST_REQUIRE_DB=1
 ```
 
 Port `55432` avoids colliding with PostgreSQL already running on the host.
 
-Local `cargo test --workspace --all-targets --locked` remains usable without PostgreSQL. DB tests return early when `MEMORY_LAYER_TEST_DATABASE_URL` is absent, unless `MEMORY_LAYER_TEST_REQUIRE_DB=1` is also set.
+Local `cargo test --workspace --all-targets --locked` remains usable without PostgreSQL. DB tests return early when `CODIFIX_TEST_DATABASE_URL` is absent, unless `CODIFIX_TEST_REQUIRE_DB=1` is also set.
 
 To run the same DB smoke tests locally, start any PostgreSQL instance with the `vector` extension available, create a test database, then run:
 
 ```bash
-export MEMORY_LAYER_TEST_DATABASE_URL=postgres://memory:memory@localhost:5432/memory_test
-export MEMORY_LAYER_TEST_REQUIRE_DB=1
-cargo test -p mem-test-support -p mem-graph -p mem-curate --locked
+export CODIFIX_TEST_DATABASE_URL=postgres://memory:memory@localhost:5432/memory_test
+export CODIFIX_TEST_REQUIRE_DB=1
+cargo test -p codifix-test-support -p codifix-graph -p codifix-curate --locked
 ```
 
 ## Release Publishing
@@ -116,7 +116,7 @@ Native package jobs build and checksum the supported installer set:
 - macOS Intel `.pkg`
 - macOS Apple Silicon `.pkg`
 - Windows x86_64 `.zip` and `.msi`
-- `memory-<version>.tar.gz` source archive for Homebrew
+- `codifix-<version>.tar.gz` source archive for Homebrew
 
 Each package job uploads workflow artifacts. A single final publish job downloads
 those artifacts, generates release notes, creates the GitHub Release, and

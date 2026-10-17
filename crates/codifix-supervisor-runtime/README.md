@@ -158,7 +158,7 @@ worker status separately from full autonomous agency. See the
 [operator contract](../../docs/user/cli/supervisor.md#bounded-workshop-proposal-worker).
 
 Deployment limitation: the current launcher requires an explicitly trusted local
-Docker host process. The hardened `memory-layer@.service` intentionally removes
+Docker host process. The hardened `codifix@.service` intentionally removes
 Docker access and inherited provider credentials, and permits loopback egress
 only. **Do not remove these protections or grant the application Docker-group
 membership to make this launcher work.** A separately reviewed, narrowly scoped
@@ -227,7 +227,7 @@ after revocation, completed replay, and session-lock release. The explicit ignor
 test additionally runs the pinned real Pi through the production sandbox and
 broker with a localhost fake provider and non-superuser worker grants. It asserts
 one generation, durable result/usage and an idle restart. It requires explicit
-`MEMORY_PI_PATCHED_ARTIFACT` and `MEMORY_PI_SANDBOX_DRIVER` paths; no real API
+`CODIFIX_PI_PATCHED_ARTIFACT` and `CODIFIX_PI_SANDBOX_DRIVER` paths; no real API
 credential or paid endpoint is used.
 
 `GuardedBrokerJob` uses `execute_guarded_and_persist` with a mandatory

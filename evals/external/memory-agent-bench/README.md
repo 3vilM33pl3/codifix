@@ -1,12 +1,12 @@
 # MemoryAgentBench Integration
 
 This directory contains Memory-owned glue for running a small native
-MemoryAgentBench pilot against Memory Layer.
+MemoryAgentBench pilot against Codifix.
 
 The benchmark itself is not vendored. `scripts/prepare.sh` clones
 `https://github.com/HUST-AI-HYZ/MemoryAgentBench` into
 `target/memory-agent-bench`, checks out the pinned commit
-`569241d877899d5c36d7d3b789de6c2489ea6cba`, copies the Memory Layer adapter,
+`569241d877899d5c36d7d3b789de6c2489ea6cba`, copies the Codifix adapter,
 and applies a small local patch to `agent.py`.
 
 ## Shape

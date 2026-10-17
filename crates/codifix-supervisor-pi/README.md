@@ -128,11 +128,11 @@ generation. Revocation during counting sent no generation; malformed usage
 retained uncertainty with no accepted proposal. All containers were removed.
 No paid calls, real knowledge, live database or credential was used.
 
-Reproduce after building `cargo build -p mem-supervisor-pi --bin memory-pi-sandbox`
-using the shared build target, with `MEMORY_PI_PATCHED_ARTIFACT` and
-`MEMORY_PI_SANDBOX_DRIVER` set to those explicit verified local paths,
-`MEMORY_LAYER_TEST_REQUIRE_DB=1` and a disposable test database. Run the named
-ignored test in `mem-supervisor-runtime`. These environment-selected test paths
+Reproduce after building `cargo build -p codifix-supervisor-pi --bin memory-pi-sandbox`
+using the shared build target, with `CODIFIX_PI_PATCHED_ARTIFACT` and
+`CODIFIX_PI_SANDBOX_DRIVER` set to those explicit verified local paths,
+`CODIFIX_TEST_REQUIRE_DB=1` and a disposable test database. Run the named
+ignored test in `codifix-supervisor-runtime`. These environment-selected test paths
 are not a production installer, sandbox-launch API or activation grant.
 
 ## Focused checks
@@ -140,9 +140,9 @@ are not a production installer, sandbox-launch API or activation grant.
 Run from the workspace root (Python 3 is needed only for fake executables):
 
 ```sh
-CARGO_TARGET_DIR=/data/tmp/memory-four-area-target cargo test -p mem-supervisor-pi --locked --offline
-CARGO_TARGET_DIR=/data/tmp/memory-four-area-target cargo clippy -p mem-supervisor-pi --all-targets --locked --offline -- -D warnings
-cargo fmt -p mem-supervisor-pi --check
+CARGO_TARGET_DIR=/data/tmp/memory-four-area-target cargo test -p codifix-supervisor-pi --locked --offline
+CARGO_TARGET_DIR=/data/tmp/memory-four-area-target cargo clippy -p codifix-supervisor-pi --all-targets --locked --offline -- -D warnings
+cargo fmt -p codifix-supervisor-pi --check
 ```
 
 Tests assert the child's exact environment/arguments/requests, empty context,
@@ -155,7 +155,7 @@ or host isolation certification.
 An explicit ignored `sandboxed_real_credential_free_probe` diagnostic can be run
 only after an operator independently supplies a network-disabled, read-only-root
 container with the pinned binary at `/scratch/pi`, private writable `/scratch`,
-and `MEMORY_PI_SANDBOXED_PROBE=network-none-read-only-root`. The marker is an
+and `CODIFIX_PI_SANDBOXED_PROBE=network-none-read-only-root`. The marker is an
 intent acknowledgement, not sandbox attestation. On 2026-09-17:
 
 - The existing `rust:1.98.1-bookworm` image could not load the host-built driver,
@@ -190,7 +190,7 @@ docker run --rm --pull=never --network=none --read-only \
   --tmpfs=/scratch:rw,exec,nosuid,nodev,size=160m,mode=0700,uid=1000,gid=1000 \
   --mount=type=bind,src=/absolute/path/to/pinned-pi,dst=/scratch/pi,readonly \
   --mount=type=bind,src=/absolute/path/to/probe-test-driver,dst=/probe-tests,readonly \
-  --env=MEMORY_PI_SANDBOXED_PROBE=network-none-read-only-root \
+  --env=CODIFIX_PI_SANDBOXED_PROBE=network-none-read-only-root \
   ubuntu@sha256:cd21a4f68a617580279d4b091cb18e3af9fa8a87500665f0ae5f7f757d17d367 \
   /probe-tests --exact tests::sandboxed_real_credential_free_probe --ignored --nocapture
 ```
@@ -290,7 +290,7 @@ result, an admission proxy or a production provider grant.
 
 The ignored `provider_probe::sandboxed_patched_pi_matches_supervisor_admission`
 test connects the actual separately hashed AMD64 binary's first request to
-`mem-supervisor-runtime::pi_admission::PiAdmission`, a test-only dependency here.
+`codifix-supervisor-runtime::pi_admission::PiAdmission`, a test-only dependency here.
 It supplies the exact structured question/evidence prompt, fixed supervisor
 instructions and `PI_CACHE_RETENTION=none`. The validator rejects all unknown
 fields, context additions and profile changes, including session-affinity keys.
