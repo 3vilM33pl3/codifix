@@ -33,6 +33,27 @@ Receipts retain exact source/tool hashes and private operation paths. This is no
 an official R3 campaign, a Rust grading pass or a hard disk-limit claim; it makes
 no model calls.
 
+`guest-native-eval-bootstrap.ps1` is a separate fixed `PrepareOnly` action for
+consolidated acceptance. Run it from the latest clean copied source in the
+interactive lab account, for example:
+
+```powershell
+& "$SourceRoot\scripts\windows\guest-native-eval-bootstrap.ps1" -Action PrepareOnly `
+    -SourceRoot $SourceRoot -OperationId ([guid]::NewGuid()) `
+    -RustProofOperationId 'a8cf16d2-5913-4ee7-ac68-48bb6b5a2e80'
+```
+
+It rechecks that retained Rust proof and preserves its profile/toolchains,
+builds only the current helper/Memory/three R3 examples with `--locked --offline`
+under the shared product-build mutex, and writes a new private derived profile.
+The helper's outer Job launches only native pack preparation; the database URL
+is a synthetic port-9 placeholder and no database is contacted. New receipts and
+input/output hashes stay below `runs/NEW_OPERATION/native-eval-bootstrap`.
+The full campaign guard remains closed. No existing evidence is overwritten and
+no tool installation, provider call or VM operation is part of this script.
+Portable checks are `python -m unittest scripts/windows/test_native_eval_bootstrap.py`;
+the additional PowerShell parser/helper check requires `pwsh`.
+
 ## Host prerequisite and recovery
 
 On 2026-10-04, loading `kvm_amd` failed with `Operation not supported`.
