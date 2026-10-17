@@ -8,20 +8,54 @@ import { once } from 'node:events';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 await (async () => {
-const [source, root, sid, mode] = process.argv.slice(2);
+const [source, root, sid, mode, profilePath] = process.argv.slice(2);
 const accountOnly = mode === '--account-only';
 if (process.platform !== 'win32' || process.env.COMPUTERNAME !== 'MEMORY-WINLAB'
     || !/^C:\\MemoryLab\\source(?:\\[A-Za-z0-9_.-]+)+$/.test(source ?? '')
     || !/^C:\\MemoryLab\\runs\\[0-9a-f-]{36}\\native-pds-fleet$/.test(root ?? '')
     || !/^S-1-5-21-(?:\d+-){3}\d+$/.test(sid ?? '')
-    || (mode !== undefined && !accountOnly)
+    || (mode !== undefined && mode !== '--fleet' && !accountOnly)
     || (!accountOnly && process.env.MEMORY_LAYER_TEST_REQUIRE_DB !== '1')) throw Error('Explicit disposable native fleet required');
-const runtime = 'C:\\MemoryLab\\NativePds\\runtime';
 const node = 'C:\\MemoryLab\\Tools\\node-v24.18.1-win-x64\\node.exe';
 const binary = 'C:\\MemoryLab\\build\\product-msvc\\x86_64-pc-windows-msvc\\debug\\memory-pds-pipe.exe';
 const digest = async file => createHash('sha256').update(await fs.readFile(file)).digest('hex');
-const prepared = JSON.parse((await fs.readFile('C:\\MemoryLab\\NativePds\\prepared.json', 'utf8')).replace(/^\uFEFF/, ''));
+const json = async file => JSON.parse((await fs.readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
+const baselinePath = 'C:\\MemoryLab\\NativePds\\prepared.json';
+let preparedPath = baselinePath;
+if (profilePath !== undefined) {
+  assert.equal(profilePath, 'C:\\MemoryLab\\inputs\\native-pds-profile.json');
+  const selected = await json(profilePath);
+  assert.deepEqual(Object.keys(selected).sort(), ['format','prepared','sha256']);
+  assert.equal(selected.format, 'memory-native-pds-profile-v1');
+  assert(/^C:\\MemoryLab\\NativePds\\(?:patched-[0-9a-f-]{36}\\)?prepared\.json$/.test(selected.prepared));
+  assert.equal(await digest(selected.prepared), selected.sha256);
+  preparedPath = selected.prepared;
+}
+const runtime = path.join(path.dirname(preparedPath), 'runtime');
+const prepared = await json(preparedPath);
+if (preparedPath === baselinePath) assert.equal(prepared.format, 'memory-windows-pds-proof-result-v1');
+else {
+  assert.equal(prepared.format, 'memory-windows-pds-patched-proof-v1');
+  assert.equal(prepared.original_prepared_sha256, await digest(baselinePath));
+  assert.equal(prepared.path_patch.layout, 'windows-sha256-did-paths-v1');
+  const patchFile = path.join(source, 'packaging/windows-pds/windows-paths.mjs');
+  assert.equal(prepared.path_patch.patch_sha256, await digest(patchFile));
+  const { patchPdsFile, originalFiles } = await import(pathToFileURL(patchFile));
+  const expected = new Map((await json(baselinePath)).files.map(f => [f.path, f.sha256]));
+  for (const name of Object.keys(originalFiles)) {
+    const file = `node_modules/@atproto/pds/dist/${name}`;
+    const bytes = patchPdsFile(name, await fs.readFile(path.join(path.dirname(baselinePath), 'runtime', file)));
+    expected.set(file, createHash('sha256').update(bytes).digest('hex'));
+  }
+  assert.equal(prepared.files.length, expected.size);
+  for (const file of prepared.files) {
+    assert.equal(file.sha256, expected.get(file.path), 'unreviewed PDS portability delta');
+    expected.delete(file.path);
+  }
+  assert.equal(expected.size, 0);
+}
 assert.equal(prepared.native_sqlite_verified, true);
 assert.equal(await digest(node), prepared.node_sha256);
 const actualFiles = new Set();

@@ -25,7 +25,7 @@ function Get-BoundFiles([string]$SelectedStage) {
         'PiBuild' { @('guest-native-pi.ps1','native-pi.json') }
         { $_ -in @('ProductCheck','ProductBuild') } { @('guest-native-product.ps1') }
         { $_ -in @('NativeDb','NativeServiceDb','NativeSupervisor') } { @('guest-native-db.ps1') }
-        'NativeFleet' { @('guest-native-db.ps1','guest-pds-fleet.mjs') }
+        'NativeFleet' { @('guest-native-db.ps1','guest-pds-fleet.mjs','native-pds-profile.json') }
         'NativeEval' { @('guest-native-eval.ps1','guest-evaluation-proof.mjs','evaluation-helper.exe','r3_score.exe') }
         'NativeApi' {
             @('guest-native-api.ps1','native-api.json')

@@ -79,7 +79,7 @@ try {
             'transport::tests::broker::launcher_windows::native_production_launcher_delivers_revokes_accounts_and_recovers','--','--ignored','--exact','--test-threads=1','--nocapture') }
         elseif ($Scope -eq 'Fleet') {
             $program='C:\MemoryLab\Tools\node-v24.18.1-win-x64\node.exe'
-            @('C:\MemoryLab\inputs\guest-pds-fleet.mjs',$SourceRoot,$root,$sid)
+            @('C:\MemoryLab\inputs\guest-pds-fleet.mjs',$SourceRoot,$root,$sid,'--fleet','C:\MemoryLab\inputs\native-pds-profile.json')
         }
         else { @('test','--locked','-p','mem-area-ops','-p','mem-area-store','--all-targets','--','--test-threads=1') }
     $process=Start-Process -FilePath $program -ArgumentList $arguments -NoNewWindow -PassThru `
