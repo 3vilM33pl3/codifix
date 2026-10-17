@@ -1,7 +1,7 @@
 {
   "name": "codifix-docs",
   "private": true,
-  "version": "2.1.0",
+  "version": "3.0.0-rc.1",
   "type": "module",
   "scripts": {
     "dev": "next dev",

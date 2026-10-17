@@ -1,6 +1,6 @@
 ---
 name: codifix-plan-execution
-version: 2.1.0
+version: 3.0.0-rc.1
 description: Save the approved plan and checkpoint when execution starts, and verify all plan checkbox items are complete before claiming the task is finished
 ---
 

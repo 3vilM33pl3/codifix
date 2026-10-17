@@ -1,6 +1,6 @@
 ---
 name: codifix-direct-task-start
-version: 2.1.0
+version: 3.0.0-rc.1
 description: Record a task memory before starting direct no-plan implementation work when the user asks to implement, fix, change, add, update, release, install, or otherwise mutate the repository without first approving a plan
 ---
 

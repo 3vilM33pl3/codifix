@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -26,7 +27,8 @@ def load_json(path: Path) -> dict:
 def main() -> int:
     manifest = load_json(PLUGIN_ROOT / ".codex-plugin" / "plugin.json")
     assert manifest["name"] == "codifix"
-    assert re.fullmatch(r"0\.1\.0(?:\+codex\.[0-9]{14})?", manifest["version"])
+    workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]
+    assert manifest["version"] == workspace["version"]
     assert manifest["skills"] == "./skills/"
     assert manifest["mcpServers"] == "./.mcp.json"
     assert manifest["license"] == "AGPL-3.0-or-later"

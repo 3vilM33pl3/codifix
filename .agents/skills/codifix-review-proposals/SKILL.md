@@ -1,6 +1,6 @@
 ---
 name: codifix-review-proposals
-version: 2.1.0
+version: 3.0.0-rc.1
 description: Review pending Codifix replacement proposals interactively inside the LLM CLI; explain why each memory update was proposed, gather codebase proof when needed, and approve or reject only after explicit confirmation
 ---
 

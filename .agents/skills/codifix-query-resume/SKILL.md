@@ -1,6 +1,6 @@
 ---
 name: codifix-query-resume
-version: 2.1.0
+version: 3.0.0-rc.1
 description: Query curated project memory before answering repo-specific questions, and use resume to get back into flow after interruptions
 ---
 
