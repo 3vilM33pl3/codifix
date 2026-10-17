@@ -256,6 +256,30 @@ restoration has completed; do not alternate old and new clients. This rehearsed
 procedure is preparation only; live application still requires all approved
 cutover gates.
 
+## Mac preserved-runtime binding
+
+The old completed onboarding journal is immutable recovery evidence. Use the
+release-specific [Mac runtime handover operator](../scripts/codifix-cutover/README.md#mac-preserved-runtime-handover-30-only)
+for the already populated, renamed root; retain its four-file operator bundle
+at a durable private path independent of the final checkout rename. Never edit
+old journal pins/stages or replay `onboard.py apply` against this root.
+
+This is a separate gate after the preceding role/database/filesystem and private
+credential/configuration reconciliation. `inspect` and `bind` check the exact
+renamed cluster through a separately reviewed loopback-only maintenance
+PostgreSQL while old jobs/application writers are stopped. Bind publishes only
+cold configs/inert plists and a final receipt; it does not start PostgreSQL or
+services. Stop maintenance PostgreSQL cleanly after binding. Its new guarded
+PostgreSQL launcher can then start the stopped populated cluster without a
+running-database dependency. Area launchers require that exact server ready and
+repeat the SQL identity checks. No sync/watch launcher is provided.
+
+Review the [input/SQL boundary and current evidence](../docs/reviews/codifix-rename/evidence/macos-runtime-rebind.md)
+before activation. Python fixture tests establish refusal/retry boundaries;
+actual Darwin binaries, an independently populated native fixture and the live
+cold-window acceptance gates remain required. Do not infer live readiness from
+a successful bind or register any inert plist automatically.
+
 ## Windows preview
 
 1. Preserve the exact installed user/server-tools MSI, ZIP, named releases,
