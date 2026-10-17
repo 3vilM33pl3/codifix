@@ -488,7 +488,7 @@ fn add_external_skill(
         .as_deref()
         .and_then(|path| read_skill_version(path).ok().flatten());
     let detail = if source_kind == SkillSourceKind::RepoCodifix {
-        Some("Repo-local Memory skill is managed by Codifix repair.".to_string())
+        Some("Repo-local Codifix skill is managed by Codifix repair.".to_string())
     } else {
         Some("Skill is visible here but is not mutated by Codifix repair.".to_string())
     };
@@ -811,7 +811,7 @@ pub fn read_skill_content(
     filter: SkillInventoryFilter,
 ) -> Result<SkillContentResponse> {
     if !CODIFIX_SKILL_NAMES.contains(&skill_name) {
-        anyhow::bail!("unknown Memory skill `{skill_name}`");
+        anyhow::bail!("unknown Codifix skill `{skill_name}`");
     }
     let inventory = project_skill_inventory_filtered(repo_root, false, filter);
     let Some(skill) = inventory

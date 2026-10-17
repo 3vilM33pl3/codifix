@@ -157,7 +157,7 @@ fn h_is_no_longer_previous_tab_alias() {
 }
 
 #[test]
-fn skills_tab_defaults_to_memory_filter() {
+fn skills_tab_defaults_to_codifix_filter() {
     let mut app = new_test_app();
     app.meta.skill_inventory = test_skill_inventory();
     app.clamp_skill_selection();

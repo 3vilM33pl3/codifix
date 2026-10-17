@@ -3485,7 +3485,7 @@ impl App {
         }
         self.skills.operation = Some("repairing skills".to_string());
         self.skills.message = None;
-        self.chrome.status_message = "Repairing repo-local Memory skills...".to_string();
+        self.chrome.status_message = "Repairing repo-local Codifix skills...".to_string();
         self.chrome.ui_status = UiStatus::Busy;
         let repo_root = self.repo_root.clone();
         let tx = self.background_tx.clone();
