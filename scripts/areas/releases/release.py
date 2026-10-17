@@ -63,11 +63,24 @@ def unique_object(pairs):
     return result
 
 
+def version_precedence(value):
+    """Order the supported 2.1.0 candidates before the stable release.
+
+    Validation only: the version stored in a signed manifest is never rewritten.
+    Keep this finite grammar shared by preparation and live upgrade operators.
+    """
+    require(isinstance(value, str), "Expected a supported v2.1.0 version")
+    if value == "2.1.0":
+        return (1, 0)
+    candidate = re.fullmatch(r"2\.1\.0-rc\.([1-9][0-9]{0,5})", value)
+    require(candidate is not None, "Expected 2.1.0 or a supported v2.1.0 release candidate version")
+    return (0, int(candidate.group(1)))
+
+
 def validate(manifest):
     exact_fields(manifest, {"format", "release_version", "source_revision", "platform", "schema", "upgrade", "pi", "artifacts"}, "manifest")
     require(manifest["format"] == FORMAT, "Unsupported manifest format")
-    require(isinstance(manifest["release_version"], str) and
-            re.fullmatch(r"2\.1\.0-rc\.[1-9][0-9]{0,5}", manifest["release_version"]), "Expected a v2.1.0 release candidate version")
+    version_precedence(manifest["release_version"])
     require(isinstance(manifest["source_revision"], str) and REVISION.fullmatch(manifest["source_revision"]), "Invalid full source revision")
     require(manifest["platform"] == "linux", "Only Linux release artifacts are supported")
     schema = manifest["schema"]

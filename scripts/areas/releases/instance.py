@@ -350,8 +350,8 @@ def rehearse(arguments):
     candidate = verify_prepared(arguments.prepared, arguments.trusted_signing_fingerprint,
                                 instance, arguments.schema_current)
     require(candidate["architecture"] == prior["architecture"], "Architecture differs between releases")
-    require(int(candidate["release_version"].rsplit(".", 1)[1]) > int(prior["release_version"].rsplit(".", 1)[1]),
-            "Forward rehearsal requires a newer release candidate, not a downgrade")
+    require(release.version_precedence(candidate["release_version"]) > release.version_precedence(prior["release_version"]),
+            "Forward rehearsal requires a strictly newer release, not an equal version or downgrade")
     require(all(not item["upgrade"]["migrations"] and item["schema_compatibility"] ==
                 {"floor": arguments.schema_current, "head": arguments.schema_current}
                 for item in (prior, candidate)),

@@ -50,6 +50,19 @@ class ManifestTests(unittest.TestCase):
         self.assertFalse(result["installation_authorized"])
         self.assertEqual(result["status"], "unsigned_manifest_created")
 
+    def test_stable_and_candidate_precedence_without_rewriting_signed_bytes(self):
+        self.assertLess(TOOL.version_precedence("2.1.0-rc.9"), TOOL.version_precedence("2.1.0-rc.10"))
+        self.assertLess(TOOL.version_precedence("2.1.0-rc.999999"), TOOL.version_precedence("2.1.0"))
+        for version in ("2.1.0-rc.1", "2.1.0-rc.999999", "2.1.0"):
+            changed = copy.deepcopy(self.manifest)
+            changed["release_version"] = version
+            before = TOOL.canonical(changed)
+            TOOL.validate(changed)
+            self.assertEqual(TOOL.canonical(changed), before)
+        for version in ("2.1.0-rc.0", "2.1.0-rc.01", "2.1.0-rc.1000000", "v2.1.0", "2.1.0+build.1", "2.2.0", None):
+            with self.subTest(version=version), self.assertRaises(TOOL.ReleaseError):
+                TOOL.version_precedence(version)
+
     def test_refuses_existing_output_and_symlink_inputs(self):
         with self.assertRaises(FileExistsError):
             TOOL.create(creator(self.root))

@@ -100,7 +100,7 @@ class UpgradeTests(unittest.TestCase):
         other = "arm64" if FIXTURE.ARCHITECTURE == "amd64" else "amd64"
         (source / "other-binary").write_bytes(b"unused fixture")
         (source / "signing-public-key.asc").write_bytes(FIXTURE.FIXTURE.FIXTURE.SignatureTests.public)
-        TOOL.release.create(FIXTURE.FIXTURE.FIXTURE.creator(source, version="2.1.0-rc.2", schema_floor=60, schema_head=61,
+        TOOL.release.create(FIXTURE.FIXTURE.FIXTURE.creator(source, version=getattr(self, "candidate_version", "2.1.0-rc.2"), schema_floor=60, schema_head=61,
             classification="approval-required", migrations=True,
             artifact=[f"{FIXTURE.ARCHITECTURE}:archive:{source / archive}", f"{other}:binary:{source / 'other-binary'}"]))
         FIXTURE.FIXTURE.FIXTURE.SignatureTests.command(["--local-user", self.signer + "!", "--digest-algo", "SHA256",
@@ -273,6 +273,24 @@ class UpgradeTests(unittest.TestCase):
         result = self.recover("inspect")
         self.assertEqual(result["status"], "recorded_planned")
         self.assertEqual(self.host.calls, calls)
+
+
+@unittest.skipUnless(shutil.which("gpg") and FIXTURE.ARCHITECTURE, "Disposable signature fixture unavailable")
+class StableUpgradeTests(unittest.TestCase):
+    """Exercise an actual signed RC-to-stable operation, not a mocked comparator."""
+    candidate_version = "2.1.0"
+    setUpClass = classmethod(UpgradeTests.setUpClass.__func__)
+    setUp = UpgradeTests.setUp
+    write_config = UpgradeTests.write_config
+    operator = UpgradeTests.operator
+    begin = UpgradeTests.begin
+
+    def test_signed_stable_upgrade_preserves_existing_configuration(self):
+        before = (self.layout.config / "trust/memory-layer.toml").read_bytes()
+        result = self.begin()
+        self.assertEqual(result["status"], "complete")
+        self.assertIn(("health", "trust", "2.1.0"), self.host.calls)
+        self.assertEqual((self.layout.config / "trust/memory-layer.toml").read_bytes(), before)
 
 
 if __name__ == "__main__":

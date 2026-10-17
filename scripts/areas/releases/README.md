@@ -27,7 +27,7 @@ source path enters the signed manifest. Identical inputs produce identical bytes
 | Field | Meaning |
 | --- | --- |
 | `format` | Exactly `memory-release-v1` |
-| `release_version` | Exactly a `2.1.0-rc.N` version, without a leading `v` |
+| `release_version` | `2.1.0` or a supported `2.1.0-rc.N` version, without a leading `v`; N is 1–999999 without leading zeroes |
 | `source_revision` | Full lowercase 40- or 64-digit Git object ID |
 | `platform` | Exactly `linux` |
 | `schema` | Integer `floor` and `head`, defining the supported database interval |

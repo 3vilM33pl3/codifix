@@ -19,7 +19,10 @@ operator checks the observed database head after health succeeds.
 - Prepare both previous and candidate releases using `instance.py prepare`.
   Both require valid signatures from the supplied enrolled signing fingerprint.
   The installed binary/Web bytes must exactly match the previous release. The
-  candidate must be a higher `2.1.0-rc.N` on the same native architecture.
+  candidate must be strictly newer on the same native architecture. Supported
+  `2.1.0-rc.N` versions order numerically; stable `2.1.0` follows every supported
+  candidate. Equal versions and stable-to-candidate downgrades are rejected.
+  Signed versions and existing canonical manifest bytes are never rewritten.
 - The signed candidate schema interval must include the current observed head;
   transitions must declare migrations in the release manifest. Startup must
   reach its signed head. No schema downgrade command exists.

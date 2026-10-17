@@ -297,8 +297,8 @@ class Upgrade:
         require(schema == args.schema_current, "Observed database schema differs from reviewed preparation")
         prior_path, prior = self.copy_prepared(args.previous, args.trusted_signing_fingerprint, schema)
         next_path, candidate = self.copy_prepared(args.prepared, args.trusted_signing_fingerprint, schema)
-        require(int(candidate["release_version"].rsplit(".", 1)[1]) > int(prior["release_version"].rsplit(".", 1)[1]),
-                "Upgrade requires a strictly newer release candidate")
+        require(release.version_precedence(candidate["release_version"]) > release.version_precedence(prior["release_version"]),
+                "Upgrade requires a strictly newer release")
         require(prior["architecture"] == candidate["architecture"], "Architecture changed")
         require(tree_files(self.active) == expected_files(prior), "Installed tree differs from signed previous release")
         digest = console.protected_bytes(self.config_dir / "memory.sha256", 128)

@@ -201,7 +201,8 @@ class SignedPreparationTests(unittest.TestCase):
                                                 "web/index.html": f"<p>{version}</p>".encode()})
         (source / "memory-amd64").write_bytes(b"unselected synthetic artifact")
         (source / "signing-public-key.asc").write_bytes(FIXTURE.SignatureTests.public)
-        args = FIXTURE.creator(source, version=f"2.1.0-rc.{version}", schema_floor=schema, schema_head=schema,
+        release_version = version if isinstance(version, str) else f"2.1.0-rc.{version}"
+        args = FIXTURE.creator(source, version=release_version, schema_floor=schema, schema_head=schema,
                                artifact=[f"amd64:binary:{source}/memory-amd64",
                                          f"arm64:archive:{source}/memory-arm64.tar.gz"], **changes)
         TOOL.release.create(args)
@@ -236,6 +237,15 @@ class SignedPreparationTests(unittest.TestCase):
         self.assertEqual(verified["manifest_sha256"], first["manifest_sha256"])
         with self.assertRaises(TOOL.release.ReleaseError):
             TOOL.verify_prepared(first["preparation_directory"], args.trusted_signing_fingerprint, "general", 60)
+
+    def test_signed_candidate_to_stable_and_equal_or_reverse_rejection(self):
+        prior, stable = self.prepare(999999), self.prepare("2.1.0")
+        result = self.rehearsal(prior, stable)
+        self.assertFalse(result["installation_authorized"])
+        for previous, candidate in ((stable, prior), (stable, stable), (prior, prior)):
+            with self.subTest(previous=previous["release_version"], candidate=candidate["release_version"]):
+                with self.assertRaisesRegex(TOOL.release.ReleaseError, "strictly newer"):
+                    self.rehearsal(previous, candidate)
 
     def test_exact_binary_and_web_roundtrip_switch_rollback_without_execution(self):
         prior, candidate = self.prepare(), self.prepare(2)
