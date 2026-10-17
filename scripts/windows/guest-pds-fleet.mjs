@@ -169,10 +169,10 @@ try {
     return frames.shift();
   };
   assert.equal((await frame()).toString(), 'memory-pds-stdio-v1');
-  const rpc = async (nsid, { body, token, isAdmin = false } = {}) => {
+  const rpc = async (nsid, { body, token, isAdmin = false, method } = {}) => {
     const payload = body === undefined ? Buffer.alloc(0) : Buffer.from(JSON.stringify(body));
     const authorization = isAdmin ? `Basic ${Buffer.from(`admin:${admin}`).toString('base64')}` : token ? `Bearer ${token}` : undefined;
-    const request = Buffer.concat([Buffer.from(`${body === undefined ? 'GET' : 'POST'} /xrpc/${nsid} HTTP/1.1\r\nHost: pds.federation.example.com\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: ${payload.length}\r\n${authorization ? `Authorization: ${authorization}\r\n` : ''}\r\n`), payload]);
+    const request = Buffer.concat([Buffer.from(`${method ?? (body === undefined ? 'GET' : 'POST')} /xrpc/${nsid} HTTP/1.1\r\nHost: pds.federation.example.com\r\nConnection: close\r\n${body === undefined ? '' : 'Content-Type: application/json\r\n'}Content-Length: ${payload.length}\r\n${authorization ? `Authorization: ${authorization}\r\n` : ''}\r\n`), payload]);
     const length = Buffer.alloc(4); length.writeUInt32BE(request.length); child.stdin.write(Buffer.concat([length, request]));
     const response = await frame(), separator = response.indexOf('\r\n\r\n');
     assert(separator > 0);
@@ -190,7 +190,8 @@ try {
   const signingKey = credentials.verificationMethods.atproto;
   assert.notEqual(signingKey, initialKey.did());
   setDocument(signingKey);
-  await rpc('com.atproto.server.activateAccount', { token: account.accessJwt, body: {} });
+  // This procedure has no input schema: POST without a JSON body, not {}.
+  await rpc('com.atproto.server.activateAccount', { token: account.accessJwt, method: 'POST' });
   const exited = once(child, 'exit'); child.stdin.end();
   assert.equal((await exited)[0], 0);
   if (accountOnly) {
