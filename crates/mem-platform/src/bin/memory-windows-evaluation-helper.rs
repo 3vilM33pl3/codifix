@@ -10,6 +10,27 @@ fn main() {
 fn main() {
     use std::path::Path;
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 6
+        && args[0] == "--bootstrap-prepare"
+        && args[2] == "--sha256"
+        && args[4] == "--output"
+    {
+        let outcome = mem_platform::windows_evaluation_helper::bootstrap::run(
+            Path::new(&args[1]),
+            args[3].to_str().unwrap_or_default(),
+            Path::new(&args[5]),
+        );
+        if let Ok(receipt) = outcome
+            && let Ok(json) = serde_json::to_string(&receipt)
+        {
+            println!("{json}");
+            return;
+        }
+        eprintln!(
+            "native bootstrap preparation failed; retain its private output and do not automatically repeat"
+        );
+        std::process::exit(1);
+    }
     if args.len() == 6 && args[0] == "--host-journal" && args[4] == "--caller-pid" {
         use mem_platform::windows_evaluation_helper::{host_journal, verify_outer_job};
         use std::io::Read;

@@ -133,8 +133,8 @@ impl Drop for EvaluationProcess {
     }
 }
 
-struct Pinned {
-    files: Vec<(PathBuf, Input)>,
+pub(crate) struct Pinned {
+    pub(crate) files: Vec<(PathBuf, Input)>,
     directories: Vec<(PathBuf, Directory)>,
 }
 fn no_alternate_streams(path: &std::path::Path) -> Result<()> {
@@ -184,7 +184,7 @@ fn no_alternate_streams(path: &std::path::Path) -> Result<()> {
         }
     }
 }
-fn pin_trees(trees: &[ToolchainTree], scratch: &Directory) -> Result<Pinned> {
+pub(crate) fn pin_trees(trees: &[ToolchainTree], scratch: &Directory) -> Result<Pinned> {
     ensure!(
         (1..=8).contains(&trees.len()),
         "evaluation toolchain count exceeded"

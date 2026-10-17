@@ -2,6 +2,7 @@
 //! Bounded native helper. Does not implement scoring or a campaign backend.
 //! The descriptor and stdin file are operator-approved private inputs. Never put
 //! hidden grader expectations in them or in the reviewed toolchain inventory.
+pub mod bootstrap;
 mod export;
 pub mod host_journal;
 
