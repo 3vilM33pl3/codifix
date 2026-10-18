@@ -1,11 +1,11 @@
 ---
 title: "HTTP API"
-description: "The Codifix v2 REST API: authentication, stability markers, core endpoints, and the OpenAPI specification."
+description: "Codifix REST API authentication, stability markers, core endpoints, and the OpenAPI specification."
 ---
 
 # HTTP API
 
-Everything the CLI, TUI, and web UI do goes through the local HTTP API — and you can call it directly. The full, machine-readable surface is the OpenAPI 3.1 specification:
+The CLI, TUI, and web UI use the service HTTP API for project operations; live updates use WebSocket `/ws`. Local configuration, filesystem and service-management actions also happen outside the API. The machine-readable HTTP contract is the OpenAPI 3.1 specification:
 
 - **From a running service:** `GET /v1/openapi.yaml` (always describes exactly the build it came from)
 - **In the repository:** [`docs/api/openapi.yaml`](https://github.com/3vilM33pl3/codifix/blob/main/docs/api/openapi.yaml)
@@ -35,14 +35,13 @@ roles, token lifecycle, and migration.
 ## API version and stability
 
 The `/v1` prefix is the HTTP API namespace; it is not the Codifix product
-release number. Codifix v2.0.0 retained that namespace but made documented
-breaking changes, including removing obsolete routes and consolidating loop and
-activity operations. Fetch the specification from the running service when
-upgrading a direct integration.
+release number. The current source workspace declares `3.0.0-rc.1`; packaged
+builds with that version may precede later source increments. Fetch the
+specification from the selected service when upgrading a direct integration.
 
 Every operation in the spec carries an `x-stability` marker:
 
-- **`core`** — the supported integration boundary for the current v2 line. Additive fields may appear, and clients must ignore unknown fields.
+- **`core`** — the supported integration boundary documented by that build. Additive fields may appear, and clients must ignore unknown fields.
 - **`internal`** — the service control plane (loops, watchers, agent workspaces, admin, embeddings management). Used by the bundled UIs; may change between minor versions.
 
 For v1-to-v2 route removals and migration steps, read the
@@ -68,7 +67,7 @@ For v1-to-v2 route removals and migration steps, read the
 | `GET /healthz` | Health probe. |
 
 Capture requests still require `writer_id` as an advisory activity label, but
-v2 derives durable authorship and permissions from the authenticated principal.
+the service derives durable authorship and permissions from the authenticated principal.
 Changing the label does not impersonate another principal or grant access.
 
 ## A five-line integration
@@ -87,5 +86,5 @@ Typed Python and TypeScript clients generated from the spec are on the [roadmap]
 ## Related
 
 - [Authentication and access](/docs/reference/authentication) · [Environment variables](/docs/reference/environment-variables) · [Global config](/docs/reference/config-global)
-- [MCP server](/docs/mcp) — the same read surface over the Model Context Protocol.
+- [MCP server](/docs/mcp) — ordinary memory reads plus separately gated control-plane and expertise tools over the Model Context Protocol.
 - [Glossary](/docs/reference/glossary) — the concepts the API speaks in.

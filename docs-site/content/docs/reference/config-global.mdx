@@ -22,11 +22,16 @@ The env file is loaded next to the config file and is the right place for genera
 
 ## What belongs here
 
+An operator-configured area selects its service/data boundary; it is not a
+project slug. Area routing is operator-owned and must not be trusted from a
+repository. Check endpoint, credentials and release together; restarting a
+service does not update a named instance's pinned release.
+
 | Section | Purpose |
 | --- | --- |
-| `[service]` | HTTP bind address, API token, request timeout, optional web root, and `read_only` (student mode: every mutating endpoint returns 403 while queries, briefings, and exports keep working — see the [classroom pack](/docs/classroom)). Live updates share the HTTP listener at `/ws`; v2 has no Cap'n Proto endpoint settings. |
+| `[service]` | HTTP bind address, API token, request timeout, optional web root, and `read_only` (student mode: every mutating endpoint returns 403 while queries, briefings, and exports keep working — see the [classroom pack](/docs/classroom)). Live updates share the HTTP listener at `/ws`; current config has no Cap'n Proto endpoint settings. |
 | `[auth]`, `[auth.oidc]`, `[[auth.group_mappings.rules]]` | Single-user compatibility or Authentik multi-user mode, browser session lifetime, OIDC client, and global/project group roles. |
-| `[mcp]` | Built-in MCP enablement, HTTP path, token requirement, read-only mode. |
+| `[mcp]` | Built-in MCP enablement, HTTP path, token requirement, read-only mode. Ordinary memory reads stay read-only; expertise submission additionally requires non-read-only MCP and explicit consent/service policy. |
 | `[database]` | PostgreSQL URL. The database must already exist and have `vector` enabled. |
 | `[cluster]` | Local-network primary/relay discovery and service identity. |
 | `[writer]` | Optional advisory writer label for activity and diagnostics. The authenticated principal supplies durable authorship. |

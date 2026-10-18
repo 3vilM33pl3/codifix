@@ -96,7 +96,12 @@ Synthesized answers cite the specific memories they draw from, and those citatio
 
 Scoring changes are easy to get wrong, so quality is measured, not assumed. The eval harness runs paired conditions (no-memory baseline versus full memory) over reviewed suites and gates releases on the deltas. The **memory-quality canary** (`evals/suites/memory-quality-v1`) adds adversarial items: seeded stale facts with fresher contradictions, vague rumors, and unanswerable questions, asserting the pipeline refuses or prefers the fresh fact. Its gate enforces absolute floors — including zero tolerated adversarial failures.
 
-Status: the adversarial group **passes** (7/7) and the gate is green. It caught real failures first — deterministic synthesis used to echo superseded facts as supporting context and answered confidently on weak evidence — and the fixes were tuned against its measured per-item signals rather than intuition. That is the canary doing its job.
+The checked-in [2026-07-06 comparison and re-baseline](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/evaluation-runs/2026-07-06-memory-quality-v1-comparison.md)
+records 18/26 overall and 0/7 adversarial items after the fixture provenance fix;
+that historical run failed the gate. This page does not establish current gate
+status. A later passing claim needs matching run artifacts, commit, suite
+checksum and configuration; implemented fixes alone are not a measured result.
+See [Evaluations](/docs/evals) for the evidence boundaries.
 
 **Read more:** [Evaluating Memory](/docs/evals) · [Eval CLI](/docs/reference/cli/integrations-evals)
 

@@ -92,7 +92,16 @@ Tie evaluation claims to artifacts, suite version, commit, model/provider, and c
 
 ## Current benchmark claim
 
-The latest checked-in Memory improvement report is intentionally bounded. It shows strong improvement for hidden memory-only retrieval and grounded-answer tasks, plus token reduction in that suite. It does not claim universal autonomous coding improvement for every future repository or model.
+The [2026-05-03 full memory-improvement-v1 report](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/evaluation-runs/2026-05-03-memory-improvement-v1-full.md)
+records five paired repeats and 155 comparison units: success moved from 0.0%
+to 18.1%, and total tokens from 22,069,461 to 12,970,186. Its valid artifact
+batch is `20260503062007`, run group
+`1a4b75bf-ca1d-4c73-839e-4936c4c51fc0`; earlier same-day batches are excluded.
+The hidden memory-only facts deliberately favored access to the seeded memory.
+These are historical suite results, not a current rc.1 performance guarantee.
+The sequence runs lacked required verified query artifacts, so the report does
+not establish improved long-running autonomous coding continuity. No new paid
+evaluation was run for this documentation refresh.
 
 When publishing a claim, include:
 
@@ -109,7 +118,13 @@ When publishing a claim, include:
 
 Beyond the improvement benchmark, `evals/suites/memory-quality-v1` guards recall quality itself: retrieval items check the right memory surfaces, grounded items check answers state the right facts, and **adversarial-stale** items seed superseded facts, vague rumors, and unanswerable questions, asserting the pipeline refuses or prefers the fresh fact. Its gate (`evals/gates/memory-quality-v1.toml`) enforces absolute floors — at least 90% overall success and zero adversarial failures — independent of baseline deltas.
 
-The adversarial group currently fails (synthesis echoes superseded facts and does not refuse on weak evidence); the gate intentionally stays red on that group until those fixes land. See [Memory quality](/docs/how-it-works/memory-quality) for the full map of quality mechanisms.
+Gate status belongs to a specific run. The checked-in
+[2026-07-06 comparison and re-baseline](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/evaluation-runs/2026-07-06-memory-quality-v1-comparison.md)
+records an offline/dev fixture regression, then a provenance-stable re-baseline
+of 18/26 overall and 0/7 adversarial items; that run failed the gate. Other
+pages may describe later fixes, but a current passing claim needs its matching
+run artifacts, commit, suite checksum and configuration. This refresh did not
+rerun the suite or establish current gate status. See [Memory quality](/docs/how-it-works/memory-quality) for the mechanisms.
 
 ## Common mistakes
 
