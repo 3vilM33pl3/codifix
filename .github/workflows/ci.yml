@@ -447,9 +447,11 @@ jobs:
           node-version: 22
       - run: npm --prefix docs-site ci
       - run: npm --prefix docs-site run check:content
+      - run: npm --prefix docs-site run test:checks
       - run: python3 scripts/check-codex-plugin.py
       - run: python3 -m unittest discover -s scripts/tests -p 'test_codex_plugin_docs.py'
       - run: npm --prefix docs-site run build
+      - run: npm --prefix docs-site run check:built-links
       - run: npm --prefix docs-site run lint:links
       - run: npm --prefix docs-site run check:assets
 

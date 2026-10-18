@@ -92,6 +92,12 @@ Run these from `docs-site/`:
 npm run check:content
 npm run lint:links
 npm run check:assets
+npm run test:checks
 npm run build
+npm run check:built-links
 python3 ../scripts/check-codex-plugin.py
 ```
+
+The rendered-link check runs after a build. It checks actual page/heading IDs,
+including included Markdown, so section links remain valid when a shared guide
+is shortened or reorganized.

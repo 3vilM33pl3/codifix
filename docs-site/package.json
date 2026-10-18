@@ -9,6 +9,8 @@
     "start": "next start",
     "check:content": "node scripts/check-content.mjs",
     "lint:links": "node scripts/check-links.mjs",
+    "check:built-links": "node scripts/check-built-links.mjs",
+    "test:checks": "node --test scripts/check-built-links.test.mjs",
     "check:assets": "node scripts/check-assets.mjs"
   },
   "dependencies": {

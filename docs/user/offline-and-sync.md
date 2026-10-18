@@ -113,4 +113,4 @@ A changed or withdrawn source requires fresh review. No model is invoked.
 `sync-status` includes queued, accepted, proposed, conflict and blocked counts.
 Mutable-state, relation and deletion uploads are not an owner-write protocol.
 Assistant access is a separate consent path: see
-[team setup](https://codifix.dev/docs/team-setup#approve-assistant-access-separately).
+[team setup](https://codifix.dev/docs/team-setup#4-connect-an-assistant-separately).

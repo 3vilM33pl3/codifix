@@ -132,7 +132,7 @@ Live provider RBAC remains unverified by this development work.
 
 ## Device approval in the development build
 
-Follow [device review](https://codifix.dev/docs/team-setup#sign-in-and-review-the-device)
+Follow [device review](https://codifix.dev/docs/team-setup#1-sign-in-and-approve-your-device)
 for exact project, offline-copy and curated-write consent. Company return URLs
 include `company_device=1`. The older `/?device_code=ABCD-1234` local-owner flow
 remains separate; a company error never downgrades into it. A recorded company
@@ -145,7 +145,7 @@ the final combined journey remains unfinished.
 
 ## Journaled workspace preparation in the development build
 
-Use [project preparation](https://codifix.dev/docs/team-setup#prepare-and-apply-a-project)
+Use [project preparation](https://codifix.dev/docs/team-setup#2-select-and-review-a-project)
 for `projects available`, `select`, `prepare`, `apply` and `status`, immutable
 journals and preservation of existing repositories/settings. The native candidate
 requires the approved Keychain device credential; Linux fake-store tests are not
