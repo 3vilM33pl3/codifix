@@ -4,13 +4,20 @@
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import http from 'node:http';
 import net from 'node:net';
 
-const binary = resolve(process.argv[2] ?? 'target/debug/codifix');
+// Cargo's target directory may be configured outside the checkout (including
+// through .cargo/config.toml), so CARGO_TARGET_DIR alone is insufficient.
+const binary = process.argv[2] ? resolve(process.argv[2]) : join(
+  JSON.parse(execFileSync('cargo', ['metadata', '--locked', '--no-deps', '--format-version', '1'], { encoding: 'utf8' })).target_directory,
+  'debug', process.platform === 'win32' ? 'codifix.exe' : 'codifix',
+);
+// Refuse a missing/unusable build before creating containers or other resources.
+accessSync(binary, constants.X_OK);
 const directory = mkdtempSync(join(tmpdir(), 'memory-r1-process-'));
 const container = `memory-r1-process-${randomUUID()}`;
 const image = 'pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f';

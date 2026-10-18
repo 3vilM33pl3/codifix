@@ -278,37 +278,38 @@ jobs:
           cargo build -p codifix-test-support --example r3_snapshot --locked
           cargo build -p codifix-eval --example r3_score --locked
           cargo build -p codifix-eval --example r3_budget --locked
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
           r3_fixture_image=ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
           docker pull "$r3_fixture_image"
           r3_container_image=$(docker image inspect --format '{{.Id}}' "$r3_fixture_image")
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" CODIFIX_R3_REQUIRE_SNAPSHOT=1 \
-            CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SERVICE_ANSWER=1 \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" CODIFIX_R3_REQUIRE_SNAPSHOT=1 \
+            CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SERVICE_ANSWER=1 \
             node --test evals/r3/snapshot.test.mjs
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" \
-            CODIFIX_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_BUDGETED_SERVICE=1 CODIFIX_R3_REQUIRE_MEDIATOR=1 CODIFIX_R3_REQUIRE_EMBEDDINGS=1 CODIFIX_R3_REQUIRE_MODEL_AGENT=1 CODIFIX_R3_REQUIRE_MODEL_ANSWER=1 \
-            CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SERVICE_SESSION=1 \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" \
+            CODIFIX_R3_BUDGET_BIN="$cargo_target_dir/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_BUDGETED_SERVICE=1 CODIFIX_R3_REQUIRE_MEDIATOR=1 CODIFIX_R3_REQUIRE_EMBEDDINGS=1 CODIFIX_R3_REQUIRE_MODEL_AGENT=1 CODIFIX_R3_REQUIRE_MODEL_ANSWER=1 \
+            CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SERVICE_SESSION=1 \
             node --test evals/r3/isolation/service-session.test.mjs evals/r3/isolation/embedding-proxy.test.mjs evals/r3/request-mediator.test.mjs evals/r3/responses-call.test.mjs evals/r3/embeddings-call.test.mjs evals/r3/provider-profile.test.mjs evals/r3/context-reservation.test.mjs evals/r3/synthetic-wire-provider.test.mjs evals/r3/isolation/model-agent.test.mjs evals/r3/isolation/model-answer.test.mjs
           cargo build -p codifix-eval --example r3_retriever --locked
           docker build --network=none -f evals/r3/isolation/Dockerfile.rust -t memory-r3-rust:offline evals/r3/isolation
           r3_rust_image=$(docker image inspect --format '{{.Id}}' memory-r3-rust:offline)
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" \
             CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_RUST_IMAGE="$r3_rust_image" \
-            CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL_TASK=1 \
-            CODIFIX_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_PROVIDER_SESSION=1 CODIFIX_R3_REQUIRE_PROVIDER_OWNER=1 CODIFIX_R3_REQUIRE_APPROVED_SESSION=1 \
+            CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL_TASK=1 \
+            CODIFIX_R3_BUDGET_BIN="$cargo_target_dir/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_PROVIDER_SESSION=1 CODIFIX_R3_REQUIRE_PROVIDER_OWNER=1 CODIFIX_R3_REQUIRE_APPROVED_SESSION=1 \
             node --test evals/r3/isolation/rehearsal-task.test.mjs evals/r3/provider-campaign-session.test.mjs evals/r3/approved-provider.test.mjs
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" \
             CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_RUST_IMAGE="$r3_rust_image" \
-            CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" \
-            CODIFIX_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_PAID_LAUNCHER=1 \
+            CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" \
+            CODIFIX_R3_BUDGET_BIN="$cargo_target_dir/debug/examples/r3_budget" CODIFIX_R3_REQUIRE_PAID_LAUNCHER=1 \
             node --test evals/r3/paid-launcher.test.mjs
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" \
             CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_RUST_IMAGE="$r3_rust_image" \
-            CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL=1 \
+            CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL=1 \
             node --test evals/r3/rehearse.test.mjs
-          CODIFIX_R3_SNAPSHOT_BIN="$PWD/target/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" \
+          CODIFIX_R3_SNAPSHOT_BIN="$cargo_target_dir/debug/examples/r3_snapshot" CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" \
             CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_RUST_IMAGE="$r3_rust_image" \
-            CODIFIX_R3_BUDGET_BIN="$PWD/target/debug/examples/r3_budget" CODIFIX_R3_WIRE=1 \
-            CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL=1 \
+            CODIFIX_R3_BUDGET_BIN="$cargo_target_dir/debug/examples/r3_budget" CODIFIX_R3_WIRE=1 \
+            CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_REHEARSAL=1 \
             node --test evals/r3/rehearse.test.mjs
 
 
@@ -365,27 +366,31 @@ jobs:
             node --test evals/r3/isolation/rust.test.mjs evals/r3/representative.test.mjs evals/r3/held-out.test.mjs
       - name: Verify R3 external baseline adapter
         run: |
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
           cargo build -p codifix-eval --example r3_retriever --locked
-          CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_RETRIEVER=1 \
+          CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_RETRIEVER=1 \
             node --test evals/r3/retriever.test.mjs
       - name: Verify R3 blinded adjudication utility
         run: |
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
           cargo build -p codifix-eval --example r3_score --locked
-          CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SCORE=1 \
+          CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_REQUIRE_SCORE=1 \
             node --test evals/r3/scoring.test.mjs
-          CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" CODIFIX_R3_REQUIRE_REVIEW=1 \
+          CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" CODIFIX_R3_REQUIRE_REVIEW=1 \
             node --test evals/r3/review.test.mjs evals/r3/label-review.test.mjs evals/r3/responses-receipt.test.mjs evals/r3/responses-request.test.mjs evals/r3/provider-transport.test.mjs evals/r3/synthetic-embedding.test.mjs evals/r3/approved-credential.test.mjs evals/r3/campaign-dispatch.test.mjs
       - name: Verify R3 retrieved context and isolated knowledge answering
         run: |
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
           r3_container_image=$(docker image inspect --format '{{.Id}}' ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12)
-          CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$PWD/target/debug/examples/r3_score" \
-            CODIFIX_R3_RETRIEVER_BIN="$PWD/target/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_KNOWLEDGE=1 \
+          CODIFIX_R3_TEST_IMAGE="$r3_container_image" CODIFIX_R3_SCORE_BIN="$cargo_target_dir/debug/examples/r3_score" \
+            CODIFIX_R3_RETRIEVER_BIN="$cargo_target_dir/debug/examples/r3_retriever" CODIFIX_R3_REQUIRE_KNOWLEDGE=1 \
             node --test evals/r3/isolation/knowledge.test.mjs
       - name: Verify R3 campaign dispatch and explicit recovery
         run: |
-          CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" CODIFIX_R3_REQUIRE_REPRESENTATIVE_PACK=1 \
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
+          CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" CODIFIX_R3_REQUIRE_REPRESENTATIVE_PACK=1 \
             node --test evals/r3/representative-pack.test.mjs
-          CODIFIX_R3_CLI_BIN="$PWD/target/debug/codifix" CODIFIX_R3_REQUIRE_RUNNER=1 \
+          CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" CODIFIX_R3_REQUIRE_RUNNER=1 \
             node --test evals/r3/runner.test.mjs
       - run: |
           cp codifix.toml.example "$RUNNER_TEMP/codifix.toml"
