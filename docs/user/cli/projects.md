@@ -1,5 +1,10 @@
 # Project onboarding and synchronization
 
+See [team setup](https://codifix.dev/docs/team-setup) for the shared installation
+and [offline knowledge](https://codifix.dev/docs/offline) for the laptop workflow.
+This reference follows current `main` (`3.0.0-rc.1`); platform acceptance and
+installed-package support remain separate from source availability.
+
 `codifix projects` manages company-authorized laptop projects. Use the full native
 package for synchronization; lean builds report the missing capability explicitly.
 The complete native Mac installation still requires real-Mac acceptance.
@@ -43,5 +48,5 @@ Inspect downloaded history with
 Company enrollment commands use their explicit company origin; local correction
 staging and history use the selected local area/configuration.
 
-See [Mac onboarding](../mac-onboarding.md) for setup, disclosure, recovery and
+See [offline knowledge](https://codifix.dev/docs/offline) for setup, disclosure, recovery and
 current delivery limitations. Git commit, merge and push remain manual Git work.
