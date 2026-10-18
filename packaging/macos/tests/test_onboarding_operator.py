@@ -95,6 +95,15 @@ class OperatorContract(unittest.TestCase):
             patched = patch.object(module, "__file__", str(helper / name))
             patched.start()
             self.addCleanup(patched.stop)
+        # The operator pins its Python runtime too. A developer/CI interpreter
+        # may live under group-writable pyenv ancestors; model the packaged
+        # runtime just like the other synthetic tools, never execute it.
+        self.python = self.tools / "python3"
+        self.python.write_bytes(b"synthetic Python fixture, never executed")
+        self.python.chmod(0o500)
+        python_patch = patch.object(sys, "executable", str(self.python))
+        python_patch.start()
+        self.addCleanup(python_patch.stop)
         self.parent = self.root / "private-data"
         self.parent.mkdir(mode=0o700)
         self.pg = self.tools / "pg"
@@ -239,6 +248,25 @@ class OperatorContract(unittest.TestCase):
         with patch.object(os, "execve") as execute:
             operator.run_job(self.journal, "run-sync", self.metadata["subscription"], self.fake)
             self.assertIn("--watch", execute.call_args.args[1])
+    def test_python_fixture_is_pinned_and_mutable_runtime_ancestors_are_rejected(self):
+        plan = operator.make_plan(self.input)
+        self.assertEqual(plan["python"], str(self.python))
+        self.assertIn({"path": str(self.python), "sha256": files.sha(self.python), "kind": "data"},
+                      plan["pins"])
+        mutable = self.root / "mutable-runtime"
+        mutable.mkdir(mode=0o700)
+        mutable.chmod(0o770)
+        runtime = mutable / "bin"
+        runtime.mkdir(mode=0o700)
+        executable = runtime / "python3"
+        executable.write_bytes(self.python.read_bytes())
+        executable.chmod(0o500)
+        with patch.object(sys, "executable", str(executable)), \
+             self.assertRaisesRegex(files.Refused, "untrusted mutable path ancestor"):
+            operator.make_plan(self.input)
+        self.assertFalse(self.journal.exists())
+        self.assertEqual(self.fake.commands, [])
+
     def test_confirm_and_prerequisites_before_native_effects(self):
         value = self.prepare()
         for digest, confirm in [(value["plan_sha256"], False), ("0" * 64, True)]:
