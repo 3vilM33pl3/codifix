@@ -51,6 +51,7 @@ jobs:
           version="$REQUESTED_VERSION"
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then version="${GITHUB_REF_NAME#v}"; fi
           node scripts/release/contract.mjs "$version"
+          node --test scripts/release/*.test.mjs
           test -f "docs/releases/$version.md"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Verify native dependency manifest bindings before package builds
@@ -480,8 +481,7 @@ jobs:
           gh release create "$tag" "${release_files[@]}" --draft --verify-tag --title "Codifix $tag" --notes-file "docs/releases/$VERSION.md"
           download="$(mktemp -d "$RUNNER_TEMP/codifix-published-assets.XXXXXXXX")"
           gh release download "$tag" --dir "$download"
-          cmp target/release-assets/SHA256SUMS "$download/SHA256SUMS"
-          (cd "$download" && sha256sum -c SHA256SUMS)
+          node scripts/release/verify-download.mjs target/release-assets "$download" "$VERSION"
           if [[ "$VERSION" == *-rc.* ]]; then
             gh release edit "$tag" --draft=false --prerelease=true --latest=false
           else
