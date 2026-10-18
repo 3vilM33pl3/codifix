@@ -1,5 +1,9 @@
 # Integration checkpoint — 17 October 2026
 
+Historical checkpoint. Current publication, runtime and client results are in
+the [live cutover ledger](../live-cutover.md); the pending statements below
+describe this earlier observation, not new work requests.
+
 Candidate source is 3.0.0-rc.1. This is implementation/rehearsal evidence, not a
 published release or a completed fleet cutover. See the separate federation
 snapshot evidence and [CA console checks](../ca-console-checks.md).

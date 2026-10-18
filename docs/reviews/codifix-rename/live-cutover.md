@@ -1,4 +1,4 @@
-# Codifix live cutover — 2026-10-17
+# Codifix live cutover — updated 2026-10-18
 
 This is the current operational checkpoint. The full rename remains in progress;
 older rehearsal notes describe historical states, not the live deployment.
@@ -56,20 +56,56 @@ The separate ca.metatao.net host, SSH and Trust enrolment were untouched.
 Evidence: `approved-root-renewal/result.json` and `smoke.json` in the private
 operational evidence directory below.
 
-## Remaining work
+## Current closeout status
 
-- Publish final release packages after the corrected candidate completes.
-  The Mac runtime, sync and original watchers are restored as described below;
-  its private app build does not establish signed/notarized distribution.
-- Refresh running client sessions. Codifix desktop plugin is installed/enabled;
-  the legacy plugin is disabled with its cache retained. Primary MCP project
-  access and both scoped stdio wrappers passed. Watch manager, Workshop/Homelab
-  watchers and existing embedding bridges/timers are restored. The General latch
-  was confirmed stale and archived; normal scheduling resumed without a manual
-  provider call. After crash recovery, this Codex session exposes the renamed
-  primary and scoped Codifix MCP tools; other existing clients may still need reload.
-- CA stays on its existing installation. Any change there requires Olivier's
-  approval; SSH remains disabled. CA work does not block other participants.
+- **Published:** [v3.0.0-rc.1](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
+  from immutable source `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`.
+  [Release run 39073102523](https://github.com/3vilM33pl3/codifix/actions/runs/39073102523)
+  passed all 11 jobs. Publication reused its verified artifact; no rebuild.
+  All 43 downloaded files match the frozen candidate. GitHub normalized four
+  Debian filenames (`~rc.1` to `.rc.1`); restoring those names in a separate
+  verification directory passed the unchanged `SHA256SUMS`. The release notes
+  include exact download/check commands. The release is prerelease, not latest.
+  The Release workflow is active again.
+- **Client repair complete:** `d71adbe6` corrected active bootstrap/tool names.
+  Nine canonical skills are installed on Monolith; obsolete skills and 13 old
+  PATH entries are archived outside discovery. The Mac source and origin are
+  updated, old wrapper/Claude skills archived, and installed CLI/Workshop/MCP
+  reads pass. Its six application jobs kept their PIDs and successful exit state.
+  Existing sessions may need reopening to refresh their loaded tool inventory.
+- **Documentation:** `917c46ac` updates README, changelog, release notes and
+  installation pages to the published candidate. Content/link/asset checks and
+  the 89-page production build passed. Vercel production deployment
+  `dpl_FFqNR3cEF5KpY8efqx2FEeSTwuSg` is READY at exact source
+  `917c46ac56a030ab0fe39d7b32deb4cd06bb882a`. Live `/docs` and
+  `/docs/install/linux-debian` returned HTTP 200 with the new release links and
+  Debian download mapping. Company Workshop/Homelab health also returned HTTP
+  200/status ok on Codifix 3.0.0-rc.1.
+- **CA pending:** its latest RESULT INBOX still contains only the 17 October
+  inventory. Existing console binding/recovery follow-ups remain pending.
+  CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
+  disabled. No CA changes were made during publication or client repair.
+- **Explicit distribution limits:** stable 3.0.0 is not released. Mac and Windows
+  packages are unsigned; Mac packages are not notarized. Windows remains preview,
+  and Homebrew remains HEAD-only. OS reboot, pixel-level UI and a separate Homelab
+  contribution test are not claimed by this checkpoint.
+
+Publication evidence: `release-promotion-39073102523/parentmetadata.json`,
+`verified-local.json`, `draft-upload-receipt.json`, and the downloaded assets in
+that private directory. The artifact ZIP SHA-256 is
+`9c169980aa65cebb0ee32064cc90784e470455c136471688eebc6008d47906e4`;
+aggregate checksum-file SHA-256 is
+`78fb16f3825ac2956ec2e517d9e66dee6ee03f2f414c008801e1af037535b570`.
+Astra independently reviewed publication provenance and the four-name mapping.
+Future publication verification handles that mapping in `2fdb2ec1`; 12 focused
+release tests pass, and the verifier also passed against these 43 real files.
+
+Client evidence: `client-integration-repair/20261018T084018/receipt.json` on
+Monolith and `client-integration-repair/20261018T084122/` on the Mac. The Mac's
+existing local repository path/project slug remain explicit routing exceptions;
+its original six project memories were read successfully. Go was already absent
+on the Mac, so the Go skill helper itself is not validated there; installed CLI
+and MCP access work. No toolchain installation is claimed.
 
 ## Recovery and temporary remnants
 
@@ -94,7 +130,8 @@ while its remaining Intel Mac build was running, freeing the release concurrency
 slot. Its completed artifacts are retained, including the staged Mac installer.
 These builds do not gate the running Monolith applications.
 
-Corrected unpublished candidate run `39073102523` is running at source
+Historical candidate-progress observations (superseded by publication above):
+run `39073102523` was running at source
 `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71`, including the gateway fix. The crash
 recovery snapshot showed Linux amd64/arm64 and Apple Silicon builds active with
 no failures reported. The later 22:56 UTC snapshot confirms release contract,

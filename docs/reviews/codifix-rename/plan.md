@@ -52,13 +52,13 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 - [ ] Update Linux services/accounts/paths and Web/TUI branding, browser storage, session and CSRF cookies.
 - [x] Rename Swift project, targets, modules, app and Network Access helper; update signing, entitlements and privacy metadata.
-- [ ] Preserve connection metadata and rehearse Keychain transfer/access BEFORE uninstalling the old Mac app.
-- [ ] Update Windows MSI identities, registry/install paths, user/server tools; update Homebrew, DEB and all PKG variants.
-- [ ] Provide a release-specific reinstall procedure; validate fresh installation and transition from populated state.
+- [x] Preserve connection metadata and rehearse Keychain transfer/access BEFORE uninstalling the old Mac app.
+- [x] Update Windows MSI identities, registry/install paths, user/server tools; update Homebrew, DEB and all PKG variants.
+- [x] Provide a release-specific reinstall procedure; validate fresh installation and transition from populated state.
 
 ## D. Agents and project integration
 
-- [ ] Rename plugin/marketplace/MCP tools, prompts and resources; update skills, internal references and generated bootstrap copies.
+- [x] Rename plugin/marketplace/MCP tools, prompts and resources; update skills, internal references and generated bootstrap copies.
 - [x] Update explicit Workshop helper routing without a dev fallback.
 - [ ] Update product-owned sections in consuming repos while preserving user custom configuration.
 - [ ] Migrate markers/path-hash state mappings, wrappers, schedules and saved application paths.
@@ -75,10 +75,10 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## F. Documentation and release
 
-- [ ] Update current docs, examples, diagrams and assets; preserve historical evidence with explicit exceptions.
+- [x] Update current docs, examples, diagrams and assets; preserve historical evidence with explicit exceptions.
 - [x] Update release version validators, manifests, signing and artifact inventory for 3.0.0-rc.1 and 3.0.0.
-- [ ] Cover Linux amd64/arm64, Mac Intel/Apple silicon standard and update packages, Windows ZIP/user MSI/server tools. Windows remains preview.
-- [ ] Prepare website, redirects and installation URLs; freeze a single candidate source SHA.
+- [x] Cover Linux amd64/arm64, Mac Intel/Apple silicon standard and update packages, Windows ZIP/user MSI/server tools. Windows remains preview.
+- [x] Prepare website, redirects and installation URLs; freeze a single candidate source SHA.
 
 ## G. Prior validation evidence (no new rehearsal campaign)
 
@@ -109,6 +109,23 @@ Before new remote federation effects, a matched backup restore is available. Aft
 - [ ] Versions, source/artifact hashes, commits and validation evidence are recorded; inactive services were not activated.
 - [ ] Update Notion status, finish the Workshop plan workflow and remember the implementation. Keep backups until explicit deletion approval.
 
+
+## Current closeout — 18 October 2026
+
+The runtime rename on Monolith and Mac, fresh participating-area federation,
+GitHub/domain cutover and candidate publication are delivered. All 11 candidate
+jobs passed; v3.0.0-rc.1 is published from `66c2d1ec` with all 43 downloaded
+files byte-verified. Active client/bootstrap repairs are complete; current
+installation docs and release links are updated. See [live cutover](live-cutover.md)
+for the evidence, exact Debian transport-name mapping and explicit limitations.
+
+Unchecked whole-fleet/completion items are not fresh rehearsal requests: CA is
+still on the legacy Trust installation, pending the existing console follow-up
+and explicit change approval. Per-host completed evidence is recorded in the
+live ledger; do not imply all consuming repositories/sessions were verified.
+Stable 3.0.0, signed/notarized distribution, pinned Homebrew, OS reboot and visual
+acceptance remain outside the claims of this prerelease. The full-plan completion
+workflow must remain open while the CA scope is unresolved.
 
 ## Current operational boundary
 
