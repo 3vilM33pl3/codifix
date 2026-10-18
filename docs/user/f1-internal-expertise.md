@@ -1,9 +1,12 @@
 # F1: internal expertise exchange
 
-F1 is software for explicit private questions between independently administered
-Codifix instances. Its disposable rehearsal is not an installed service,
-customer release, R3 evaluation or F2 delegation system. Ordinary queries remain
-local. Start with deterministic excerpts; no model account is required.
+Private expertise is an opt-in internal preview for explicit questions between
+independently administered Codifix instances. This guide describes current
+`main` (`3.0.0-rc.1`). Disposable rehearsal evidence does not establish an installed
+service or customer readiness. It does not provide remote work delegation.
+Ordinary queries remain local. Start with deterministic excerpts; no model
+account is required. See [private federation](https://codifix.dev/docs/federation)
+for the related sharing workflows.
 
 ## Installation checklist for a separately approved activation
 

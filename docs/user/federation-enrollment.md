@@ -1,5 +1,10 @@
 # Separate-authority membership enrollment
 
+This operator guide describes current `main` (`3.0.0-rc.1`) and the opt-in private
+federation preview. Begin with [private federation](https://codifix.dev/docs/federation)
+and [team administration](https://codifix.dev/docs/team-setup/administration)
+to separate local permissions from remote space authority.
+
 `codifix-federation-enroll` grants selected instances four private-space capabilities:
 `Pull`, `Publish`, `AskExpertise`, and `AnswerExpertise`. It does not turn a
 participant into the space authority, grant `ManageMembership`, publish arbitrary
