@@ -47,9 +47,10 @@ and ciphertext hashes belong in coordination pages.
 
 ## Remaining acceptance
 
-- [ ] Prepare and verify fresh coordinator enrollment and scoped configuration.
-- [ ] Deliver credentials through a protected channel; Notion carries only
-  public metadata, instructions and sanitized results.
+- [x] Prepare and verify fresh coordinator enrollment and scoped configuration.
+- [x] Stage the sealed credential package through the existing protected delivery
+  workflow; Notion carries public metadata, instructions and sanitized results.
+- [ ] CA-local agent confirms package decryption and credential installation.
 - [ ] CA-local agent activates the approved binding through the existing console.
 - [ ] Verify fresh sync plus a deterministic cited exchange and exact replay.
 - [ ] Reconcile Notion and the project plan, then complete the plan workflow.
@@ -60,3 +61,29 @@ and [RESULT INBOX](https://app.notion.com/p/3e78990715f481cd935ff0a897040e4e).
 Latest engineering CI [39146234764](https://github.com/3vilM33pl3/codifix/actions/runs/39146234764)
 passed every selected job. Conditional checks were skipped; this does not claim
 new coverage from those checks. The published rc.1 artifacts remain unchanged.
+
+## Coordinator completed — 18 October
+
+Astra reviewed the exact gateway change: append Trust's credential and schema
+3/1 compatibility entries, preserving all existing identities and policy. The
+gateway was recreated using its existing pinned image; its old stopped container
+and protected configuration are retained. The authoritative private container
+definition now includes the fresh credential mount for subsequent recreation.
+
+Normal enrollment reached `published_proven` on exact retry with the same record
+IDs and digest. Four membership records occupy sequences 13–16; published tip:
+`6ef4b82082d6bc9c59505fbc06bc9baba362512024b657f25204490683434519`.
+Fresh Trust authentication returned HTTPS200 and the retired credential HTTPS401.
+Workshop, Homelab and General remained healthy at cursor16 with zero failures.
+
+Private evidence is under
+`~/.local/state/codifix-rename-20261017/trust-enrollment-20261018/`:
+`exact-retry.json`, `nonca-healthy.json`, `credential-validation.json`,
+`gateway-activation-result.json` and `persistent-runtime-update.json`.
+
+The [console activation handoff](ca-federation-activation.md) is posted in CURRENT
+ACTION with the encrypted v3 connection package checksum. Its three shell blocks
+were read back exactly and passed syntax validation. The named service's finite
+launcher, DynamicUser credential loading and exact gateway egress are explicitly
+covered. CA activation and the prepared deterministic exchange/replay are still
+pending; coordinator enrollment alone does not close the rename.
