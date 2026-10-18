@@ -8,6 +8,7 @@ use std::{
     collections::BTreeMap,
     fs::{File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
+    ops::{Deref, DerefMut},
     path::Path,
 };
 
@@ -127,10 +128,44 @@ pub(crate) struct SavedRequest<'a> {
     pub result_sha256: Option<&'a str>,
 }
 
+// Release ownership explicitly rather than waiting for the last descriptor to
+// close. On Unix, another thread spawning a child can briefly inherit this open
+// file description across fork/exec, even with close-on-exec set. The guard must
+// also cover resume validation failures, before a RequestBudget exists.
+struct LockedJournal(File);
+
+impl LockedJournal {
+    fn acquire(file: File) -> Result<Self> {
+        file.try_lock()
+            .map_err(|_| anyhow::anyhow!("budget journal is already owned"))?;
+        Ok(Self(file))
+    }
+}
+
+impl Deref for LockedJournal {
+    type Target = File;
+
+    fn deref(&self) -> &File {
+        &self.0
+    }
+}
+
+impl DerefMut for LockedJournal {
+    fn deref_mut(&mut self) -> &mut File {
+        &mut self.0
+    }
+}
+
+impl Drop for LockedJournal {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+
 /// Holds an exclusive OS file lock for its lifetime. A process crash releases
 /// that lock, but never refunds a reservation. Partial journals fail closed.
 pub struct RequestBudget {
-    file: File,
+    file: LockedJournal,
     manifest_sha256: String,
     limits: Limits,
     task_limits: Option<Limits>,
@@ -199,8 +234,7 @@ impl RequestBudget {
         let file = options
             .open(path)
             .context("create private budget journal")?;
-        file.try_lock()
-            .map_err(|_| anyhow::anyhow!("budget journal is already owned"))?;
+        let file = LockedJournal::acquire(file)?;
         let header = Event::Opened {
             version: 1,
             manifest_sha256: manifest_sha256.into(),
@@ -253,15 +287,14 @@ impl RequestBudget {
             std::fs::symlink_metadata(path)?.file_type().is_file(),
             "budget journal must be a regular file"
         );
-        let mut file = OpenOptions::new().read(true).write(true).open(path)?;
-        file.try_lock()
-            .map_err(|_| anyhow::anyhow!("budget journal is already owned"))?;
+        let mut file =
+            LockedJournal::acquire(OpenOptions::new().read(true).write(true).open(path)?)?;
         ensure!(
             file.metadata()?.len() <= MAX_JOURNAL_BYTES,
             "oversized budget journal"
         );
         let mut bytes = Vec::new();
-        (&mut file)
+        (&mut *file)
             .take(MAX_JOURNAL_BYTES + 1)
             .read_to_end(&mut bytes)?;
         ensure!(
@@ -870,6 +903,36 @@ mod tests {
             RequestBudget::resume(&path, &identity(), limits()).expect("resume completed budget");
         assert_eq!(recovered.ledger().tokens, 8);
         assert!(recovered.uncertain_ids().is_empty());
+    }
+
+    #[test]
+    fn journal_owner_releases_lock_with_a_duplicate_alive_on_another_thread() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        let budget = RequestBudget::create(&path, &identity(), limits()).unwrap();
+        // Deterministically reproduce the descriptor lifetime extension caused
+        // by a concurrent fork, without depending on subprocess scheduling.
+        let duplicate = budget.journal_test_reader();
+        let held = std::sync::Barrier::new(2);
+        let released = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                held.wait();
+                released.wait();
+                drop(duplicate);
+            });
+            held.wait();
+            let live_owner_excludes_competitors =
+                RequestBudget::resume(&path, &identity(), limits()).is_err();
+            drop(budget);
+            // Do not panic before releasing the reader thread at its barrier.
+            let reopened = RequestBudget::resume(&path, &identity(), limits());
+            released.wait();
+            assert!(live_owner_excludes_competitors);
+            let reopened = reopened.expect("owner drop releases the journal immediately");
+            assert!(RequestBudget::resume(&path, &identity(), limits()).is_err());
+            assert_eq!(reopened.ledger().requests, 0);
+        });
     }
 
     #[test]
