@@ -92,8 +92,18 @@ operational evidence directory below.
   synthetic Python and still tests rejection of unsafe ancestors. All 149
   synthetic tests passed under the runner's actual PATH. Production path guards
   and host permissions are unchanged. Both fixes are later main-branch work,
-  not changes to the published candidate bytes. Remote CI on the corrected
-  source remains the outstanding validation step.
+  not changes to the published candidate bytes. Follow-up run `39110168686`
+  attempt 2 passed macOS onboarding, format, web build, Windows compilation
+  and Offline CA Release Preparation, but exposed three further failures.
+  `5014af69` aligns company-agent tests with the optional database harness;
+  all four also passed against disposable PostgreSQL with required-DB mode.
+  `a1a01374` resolves Cargo's configured target directory for R1 and all five
+  R3 smoke steps; the real R1 process-recovery smoke passed using the runner's
+  external build directory. `ef8554fc` wraps long footer status text, fixing
+  the actual 672px page overflow in a 390px viewport. The F1 browser workflow
+  passed again with document width 390px and the original assertion intact.
+  Web build and workflow shell/YAML checks passed; Astra found no source
+  blocker. Remote CI on these final corrections remains pending.
   Workflow selectors now use runner label `codifix` (`cc13cfe2`); the existing
   registered runner remains online. The redundant tag-triggered Release run
   `39108940650` is confirmed cancelled.
@@ -119,9 +129,18 @@ release tests pass, and the verifier also passed against these 43 real files.
 Client evidence: `client-integration-repair/20261018T084018/receipt.json` on
 Monolith and `client-integration-repair/20261018T084122/` on the Mac. The Mac's
 existing local repository path/project slug remain explicit routing exceptions;
-its original six project memories were read successfully. Go was already absent
-on the Mac, so the Go skill helper itself is not validated there; installed CLI
-and MCP access work. No toolchain installation is claimed.
+its original six project memories were read successfully. On 18 October,
+Olivier authorized the Go prerequisite installation. Homebrew Go 1.27.2 arm64
+is installed with its official bottle checksum verified. The actual
+`resume-project memory` Go helper passes in the normal login shell through the
+unchanged Workshop route, without CLI override variables, and reads all six
+original active memories. The earlier missing-Go diagnosis was a non-login SSH
+PATH issue: manual Go 1.27.1 already existed and remains preserved. Its old
+symlink is archived; the normal user Go link now selects Homebrew. Protected
+configuration hashes and six running application PIDs are unchanged. Receipt:
+`go-helper-prerequisite-20261018/mac-go-receipt.json` in the private evidence
+directory. Plain non-login SSH shells still require the login shell or an
+absolute Go path. No CA access or changes occurred.
 
 ## Recovery and temporary remnants
 
