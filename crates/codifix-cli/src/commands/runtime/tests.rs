@@ -2793,19 +2793,45 @@ fn ensure_shared_service_api_token_preserves_existing_non_placeholder() {
     let _ = fs::remove_dir_all(dir);
 }
 
+// Token precedence is process-wide configuration. Test it in exact child
+// processes so concurrent API/session tests never observe our synthetic token.
+fn isolated_client_token_case(name: &str, token: Option<&str>) -> bool {
+    let name = format!("commands::runtime::tests::{name}");
+    const CHILD: &str = "CODIFIX_TEST_CLIENT_TOKEN_CASE";
+    if std::env::var(CHILD).as_deref() == Ok(name.as_str()) {
+        return true;
+    }
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+    child
+        .args(["--exact", &name, "--nocapture"])
+        .env(CHILD, &name)
+        .env_remove("CODIFIX_CLIENT_TOKEN");
+    if let Some(token) = token {
+        child.env("CODIFIX_CLIENT_TOKEN", token);
+    }
+    let output = child.output().expect("run isolated client token test");
+    assert!(
+        output.status.success(),
+        "isolated token test failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+        "exact token test did not execute"
+    );
+    false
+}
+
 #[test]
 fn write_headers_sends_token_for_loopback_service() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
-    unsafe {
-        std::env::remove_var("CODIFIX_CLIENT_TOKEN");
+    if !isolated_client_token_case("write_headers_sends_token_for_loopback_service", None) {
+        return;
     }
     let mut config = test_app_config();
     config.service.bind_addr = "127.0.0.1:4040".to_string();
     config.service.api_token = "ml_testtoken".to_string();
 
     let headers = write_headers(&config).unwrap();
-    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
@@ -2818,17 +2844,14 @@ fn write_headers_sends_token_for_loopback_service() {
 
 #[test]
 fn write_headers_sends_token_for_non_loopback_service() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
-    unsafe {
-        std::env::remove_var("CODIFIX_CLIENT_TOKEN");
+    if !isolated_client_token_case("write_headers_sends_token_for_non_loopback_service", None) {
+        return;
     }
     let mut config = test_app_config();
     config.service.bind_addr = "10.22.6.42:4140".to_string();
     config.service.api_token = "ml_testtoken".to_string();
 
     let headers = write_headers(&config).unwrap();
-    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
@@ -2841,14 +2864,14 @@ fn write_headers_sends_token_for_non_loopback_service() {
 
 #[test]
 fn write_headers_prefers_scoped_client_token_environment_variable() {
-    let _guard = ENV_LOCK.lock().unwrap();
-    let previous = std::env::var("CODIFIX_CLIENT_TOKEN").ok();
-    unsafe {
-        std::env::set_var("CODIFIX_CLIENT_TOKEN", "mlt_scoped-client-token");
+    if !isolated_client_token_case(
+        "write_headers_prefers_scoped_client_token_environment_variable",
+        Some("mlt_scoped-client-token"),
+    ) {
+        return;
     }
     let config = test_app_config();
     let headers = write_headers(&config).unwrap();
-    restore_env_var("CODIFIX_CLIENT_TOKEN", previous);
 
     assert_eq!(
         headers
