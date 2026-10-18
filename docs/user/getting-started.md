@@ -2,6 +2,13 @@
 
 This guide is written for someone who just wants Codifix working with as little setup friction as possible.
 
+The current distribution is the [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
+These instructions follow current `main`; source fixes after the candidate are
+not included in its packages. If you are joining an existing installation,
+start with [Team setup](https://codifix.dev/docs/team-setup) instead of creating
+another database. Moving from Memory Layer requires the
+[release-specific update procedure](https://codifix.dev/docs/install/update).
+
 When developing Codifix itself, use the repository's shared memory helper
 for durable project notes: it explicitly selects the Workshop API. The separate
 dev backend/database is for testing. See [project memory routing and dev recovery](../developer/dev-stack.md#project-memory-routing-and-recovery).
@@ -272,7 +279,10 @@ Report which repo-local files were created or preserved, the project slug, backe
 
 ## Fast Install: Debian
 
-1. Download the latest `.deb` package from the GitHub Releases page.
+1. Download the architecture-matched Codifix prerelease and verify its checksum
+   using the [Linux install guide](https://codifix.dev/docs/install/linux-debian).
+   GitHub's `.rc.1` download spelling differs from the original `~rc.1`
+   checksum filename; follow that guide's exact save-as commands.
 2. Install it:
 
 ```bash
@@ -331,18 +341,16 @@ codifix tui
 
 ## Fast Install: macOS
 
-1. Tap this repository and install the formula:
+1. Prefer the architecture-matched unsigned candidate package described in the
+   [macOS install guide](https://codifix.dev/docs/install/macos-homebrew).
+   Homebrew currently supports source `HEAD` only:
 
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
-brew install 3vilM33pl3/codifix/codifix
-```
-
-If you specifically want the latest unreleased `main` branch:
-
-```bash
 brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
+
+This builds current `main`, which can differ from the published candidate.
 
 2. Create the PostgreSQL database and prepare pgvector using the [PostgreSQL Requirement](#postgresql-requirement) section. Do not continue until these commands work:
 
@@ -394,7 +402,11 @@ http://127.0.0.1:4040/
 
 ## Fast Install: Windows
 
-1. Install the x86_64 MSI. It installs per user under `%LOCALAPPDATA%\Programs\Codifix` and adds its `bin` directory to the user `PATH`.
+1. Follow the [Windows preview guide](https://codifix.dev/docs/install/windows)
+   to verify the unsigned x86_64 MSI and install the separate VC++ x64 runtime.
+   It installs per user under `%LOCALAPPDATA%\Programs\Codifix` and adds its
+   `bin` directory to the user `PATH`. It does not bundle a complete native
+   PostgreSQL/PDS/Pi stack.
 2. Start the bundled PostgreSQL Compose template using the [Local Windows PostgreSQL](#local-windows-postgresql) instructions.
 3. Open a new PowerShell window and configure Codifix:
 
@@ -594,7 +606,7 @@ audit activity.
 
 ## Writer ID
 
-Codifix v2 derives durable authorship from the authenticated principal.
+Codifix derives durable authorship from the authenticated principal.
 The writer ID is an advisory runtime label for activity and diagnostics; it
 does not grant access and cannot replace principal identity.
 
@@ -645,6 +657,11 @@ enabled = true
 The wizard exposes this as a shared setup option, and `codifix service enable` can offer to turn it on after a database-connect failure.
 
 ## Daily Use
+
+For a concise workflow including area selection, background jobs and sync,
+use [Daily workflow](https://codifix.dev/docs/daily-workflow). The commands
+below assume a correctly selected local installation; a project slug alone
+does not select a knowledge area.
 
 Open the TUI:
 
@@ -738,6 +755,12 @@ codifix watcher disable --project my-project
 ```
 
 ## Upgrading An Existing Install
+
+These maintenance steps apply to a compatible **existing Codifix** singleton.
+They are not a Memory Layer-to-Codifix migration. For that breaking transition,
+follow the [Update guide](https://codifix.dev/docs/install/update). Named areas
+have independently pinned executables and require the selected-instance
+operator procedure, rather than a blanket service restart.
 
 If you already use Codifix and are upgrading to a newer release:
 
