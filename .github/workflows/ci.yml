@@ -393,9 +393,16 @@ jobs:
           CODIFIX_R3_CLI_BIN="$cargo_target_dir/debug/codifix" CODIFIX_R3_REQUIRE_RUNNER=1 \
             node --test evals/r3/runner.test.mjs
       - run: |
-          cp codifix.toml.example "$RUNNER_TEMP/codifix.toml"
-          cargo run --locked --bin codifix -- \
-            --config "$RUNNER_TEMP/codifix.toml" \
+          offline_root=$(mktemp -d "$RUNNER_TEMP/codifix-offline.XXXXXX")
+          trap 'rm -rf "$offline_root"' EXIT
+          cp codifix.toml.example "$offline_root/codifix.toml"
+          cargo build --locked --bin codifix
+          cargo_target_dir=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
+          # Offline fixtures must not discover the runner's operator area or credentials.
+          /usr/bin/env -i PATH="$PATH" HOME="$offline_root" \
+            XDG_CONFIG_HOME="$offline_root/config" CODIFIX_PROFILE=prod \
+            "$cargo_target_dir/debug/codifix" \
+            --config "$offline_root/codifix.toml" \
             eval run \
             --suite evals/examples/memory-smoke \
             --condition full-memory \
