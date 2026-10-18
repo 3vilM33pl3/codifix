@@ -13,6 +13,11 @@ That makes comparisons reproducible and easy to attach to release notes.
 
 ## Isolated R3 campaigns (in progress)
 
+`campaign plan` and `campaign check-approvals` work without service configuration,
+area routing, database access or credentials. They validate the supplied local
+manifest, assets and approval files. Other evaluation commands keep their
+configuration requirements.
+
 Offline campaign runs retain `dispatch-budget.jsonl`: a durable reservation
 before each driver launch and a settlement only after valid evidence is received.
 An interrupted or invalid dispatch remains unresolved. `ledger.json` reports

@@ -3682,6 +3682,19 @@ pub(super) async fn run() -> Result<()> {
     {
         return super::capture_quality::handle(args).await;
     }
+    // These two campaign checks validate only local files. Do not discover
+    // ambient services, routing or credentials before their existing handlers.
+    if let Command::Eval(EvalArgs {
+        command:
+            EvalCommand::Campaign(EvalCampaignArgs {
+                command:
+                    campaign @ (EvalCampaignCommand::Plan { .. }
+                    | EvalCampaignCommand::CheckApprovals { .. }),
+            }),
+    }) = command
+    {
+        return super::eval_campaign::handle(campaign).await;
+    }
     // Company enrollment never loads local configuration, area routing or the
     // default API client: those may carry unrelated owner/service credentials.
     if crate::commands::auth_enrollment::handle_command(&command).await? {
