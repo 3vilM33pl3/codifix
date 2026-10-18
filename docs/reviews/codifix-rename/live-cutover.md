@@ -138,7 +138,14 @@ operational evidence directory below.
   live-owner exclusion and uncertainty-only recovery. A retained duplicate
   descriptor deterministically reproduced the old failure; the fixed platform
   crate passed 7/7 and 20 parallel repetitions passed 60 journal tests. Astra
-  found no source blocker. Remote CI on this final correction remains pending.
+  found no source blocker. Run `39124658579` confirmed the journal correction:
+  Rust Tests, DB Integration, Rust Format and Windows Compile passed. Feature
+  Matrix and Rust Clippy then rejected three bare `unwrap()` calls in the
+  campaign-local integration test. `5921c3e3` replaces them with descriptive
+  `expect()` messages without changing assertions or suppressing lints. Both
+  exact failing Clippy commands passed locally, the full-feature campaign-local
+  test passed 1/1, and the boundary check passed. Astra found no blocker in this
+  test-only correction; its remote CI confirmation remains pending.
 - **CA pending:** its latest RESULT INBOX still contains only the 17 October
   inventory. Existing console binding/recovery follow-ups remain pending.
   CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
