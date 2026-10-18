@@ -30,7 +30,7 @@ Raw captures never become memory directly. Curation extracts candidate assertion
 
 Lexical overlap misses paraphrases: "deploys ship after checks pass" and "releases publish once verification completes" share almost no words. Once chunk embeddings are built, a semantic pass compares new memories against the project by cosine similarity. Near-duplicates are linked and queued as human-gated merge proposals. Pairs with high embedding similarity but low lexical overlap *and* supersede/negation cues are flagged as likely **contradictions** — an old fact versus a new one — and routed to review as conflicts, never merged automatically.
 
-**Read more:** [`[curation]` config section](/docs/reference/config-global#curation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#memory-proposals)
+**Read more:** [`[curation]` config section](/docs/reference/config-global#curation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#codifix-proposals)
 
 ## At rest
 
@@ -74,7 +74,7 @@ Clusters are found by fusing three signals into one graph and running community 
 
 The mechanism is grounded in memory science — complementary learning systems and schema consolidation, sleep-replay gist extraction, the reflection trees of generative agents, and hierarchical summarization (RAPTOR, GraphRAG). It is off by default and dry-run first, like validation.
 
-**Read more:** [Consolidation and insights](/docs/how-it-works/consolidation) — the full mechanism, triggers, and cited science · [`[consolidation]` config section](/docs/reference/config-global#consolidation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#memory-proposals)
+**Read more:** [Consolidation and insights](/docs/how-it-works/consolidation) — the full mechanism, triggers, and cited science · [`[consolidation]` config section](/docs/reference/config-global#consolidation-section) · [`codifix proposals`](/docs/reference/cli/capture-curation#codifix-proposals)
 
 ## Recall
 

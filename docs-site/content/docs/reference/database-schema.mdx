@@ -7,7 +7,10 @@ description: "Read the storage model at a high level without depending on unstab
 
 Codifix stores durable state in PostgreSQL. This page explains the stable storage concepts and table groups; exact columns and indexes are implementation details owned by the migrations in `migrations/`.
 
-The service runs migrations at startup. PostgreSQL must have `pgvector` installed and the target database must allow `CREATE EXTENSION vector`.
+The service runs append-only migrations at startup. The published Codifix
+candidate embeds migrations through 0085. PostgreSQL must have pgvector
+installed; the schema-owner setup must permit its extension and migrations.
+Do not infer application-version compatibility from an early table definition.
 
 ## Migration source
 
@@ -23,26 +26,41 @@ The service runs migrations at startup. PostgreSQL must have `pgvector` installe
 | `migrations/0013_memory_versions.sql` | Immutable canonical memory versions and tombstones. |
 | `migrations/0015_code_graph.sql` | Graph extraction runs, nodes, edges, symbols, references, evidence. |
 | `migrations/0017_memory_source_provenance.sql` and `0018` | Source verification and symbol provenance. |
+| `0028`–`0032` | Separate live canonical state, canonical relation endpoints, append-only source checks and removal of legacy version-row status columns. |
+| `0033`–`0038`, `0048`–`0052`, `0062`–`0064`, `0070` | Federation storage, reviews, expertise requests/results, addressed exchanges and project-scoped feeds. |
+| `0039`–`0047` | Commit-ordered timeline, durable enrichment jobs, immutable inputs and external-effect journals. |
+| `0053`–`0061`, `0065` | Supervisor policy/accounting/private interactions and reviewed area-import/reconciliation receipts. |
+| `0066`–`0069`, `0071`–`0084` | Company/device onboarding, delegated delivery, agent grants, owner projections, curated contributions and sync health. |
+| `0085` | Codifix federation retirement and recorded local laptop binding transitions. |
 
 ## Table groups
 
 | Group | Tables | What they represent |
 | --- | --- | --- |
 | Project and task intake | `projects`, `sessions`, `tasks`, `raw_captures` | Project identity, agent/task sessions, raw captured task context before curation. |
-| Canonical memory | `memory_entries`, `memory_sources`, `memory_tags`, `memory_relations` | Human-readable memory versions, provenance, labels, and links between memories. |
+| Canonical memory | `memory_entries`, `memory_canonical_state`, `memory_sources`, `memory_tags`, `memory_relations` | Immutable content versions, separate live status/confidence/importance, provenance and canonical relation endpoints. |
 | Search materialization | `memory_chunks`, `memory_chunk_embeddings` | Full-text chunks and provider/model-specific vector spaces for semantic retrieval. |
 | Curation and review | `curation_runs`, `memory_replacement_proposals` | Curation batches and queued replacements that require approve/reject review. |
 | Git evidence | `project_commits` | Imported commit history used as evidence without turning every commit into memory. |
 | Activities | `project_timeline_events` | Query, scan, curate, checkpoint, watcher, graph, embedding, and LLM-audit events. |
 | Bundles | `memory_bundle_imports`, `imported_memory_entries` | Portable codifix import lineage and idempotency. |
 | Code graph | `graph_extraction_runs`, `graph_nodes`, `graph_edges`, `graph_evidence`, `code_symbols`, `code_references` | Parser-backed repository facts used by graph-aware retrieval. |
-| Provenance checks | `memory_source_verifications` | File/source verification status used to de-rank stale memories. |
+| Provenance checks | `memory_source_checks`, `memory_source_verifications` view | Append-only source-check history and its latest-check projection. |
+| Background work | `background_jobs`, `background_job_dependencies`, `background_job_attempts`, `background_job_retry_receipts` | Durable stages, immutable inputs, attempts and idempotent reviewed retry requests. |
+| Supervisor | `supervisor_policies`, `supervisor_actions`, `supervisor_attempts`, `supervisor_budget_days`, `supervisor_questions` | Separate opt-in policy, accounting and project-private interactions. |
+| Company and offline delivery | `onboarding_project_versions`, `onboarding_devices`, `device_replica_records`, `laptop_curated_outbox` | Reviewed project/device bindings, owner-copy records and pending local contributions. These are not interchangeable with local canonical memory. |
 
 ## Memory versioning model
 
 `memory_entries` rows are immutable versions. `canonical_id` groups all versions of the same logical memory, `version_no` orders them, and `is_tombstone` marks a deleted sentinel. Normal query paths use latest non-tombstone versions by default; `codifix history <memory-id>` shows the full chain.
 
 Approving a replacement proposal creates a new version of the target canonical memory. Rejecting a proposal leaves the active version unchanged.
+
+Live status, archive state, confidence and importance are in
+`memory_canonical_state`. Version-row confidence and importance are the asserted
+values at capture. Relation endpoints use canonical IDs so version changes do
+not silently sever a relation. Downloaded owner history stays in its separate
+projection rather than becoming a local canonical write.
 
 ## Embeddings model
 
@@ -63,7 +81,8 @@ Use read-only `psql` queries when debugging. These examples avoid relying on eve
 ```sql
 SELECT slug, name, created_at FROM projects ORDER BY created_at DESC;
 SELECT COUNT(*) FROM raw_captures;
-SELECT memory_type, status, COUNT(*) FROM memory_entries GROUP BY 1, 2 ORDER BY 1, 2;
+SELECT status, COUNT(*) FROM memory_canonical_state GROUP BY status;
+SELECT memory_type, COUNT(*) FROM memory_entries GROUP BY memory_type;
 SELECT status, COUNT(*) FROM memory_replacement_proposals GROUP BY 1;
 SELECT kind, COUNT(*) FROM project_timeline_events GROUP BY 1 ORDER BY 2 DESC;
 ```
