@@ -26,7 +26,17 @@ pub struct Operation {
     pub intent: Intent,
     directory: PathBuf,
     // Kept open and exclusively locked for the entire external operation.
-    _owner: File,
+    _owner: LockedFile,
+}
+
+// Construct only after successful acquisition. Closing one descriptor does not
+// release a Unix lock while an inherited/duplicated descriptor remains open.
+struct LockedFile(File);
+
+impl Drop for LockedFile {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
 }
 
 fn private_file(path: &Path) -> io::Result<File> {
@@ -145,6 +155,7 @@ where
         options.open(lock_path)?
     };
     lock.lock()?;
+    let _lock = LockedFile(lock);
     let mut state = match File::open(path) {
         Ok(file) => {
             let mut bytes = Vec::new();
@@ -233,6 +244,7 @@ impl Operation {
         #[cfg(not(windows))]
         let owner = private_file(&directory.join("owner.lock"))?;
         owner.lock()?;
+        let owner = LockedFile(owner);
         receipt(
             &directory,
             "intent.json",
@@ -307,6 +319,7 @@ pub fn reconcile(root: &Path, limit: usize) -> io::Result<Vec<Intent>> {
             Err(std::fs::TryLockError::WouldBlock) => continue,
             Err(std::fs::TryLockError::Error(error)) => return Err(error),
         }
+        let _owner = LockedFile(owner);
         // Recheck after ownership: the original caller may have just finished.
         if valid_receipt(&directory, "observed.json")?
             || valid_receipt(&directory, "interrupted.json")?
@@ -381,6 +394,11 @@ mod tests {
                 .contains("secret")
         );
         assert!(reconcile(&root, 10).unwrap().is_empty());
+        // A duplicate models an inherited descriptor in another process. Its
+        // lifetime must not extend the operation's ownership after owner drop.
+        #[cfg(unix)]
+        let retained_descriptor = operation._owner.0.try_clone().unwrap();
+        assert!(reconcile(&root, 10).unwrap().is_empty());
         drop(operation);
         assert_eq!(reconcile(&root, 10).unwrap().len(), 1);
         assert!(reconcile(&root, 10).unwrap().is_empty());
@@ -390,6 +408,8 @@ mod tests {
         assert!(done.observed(false).is_err());
         drop(done);
         assert!(reconcile(&root, 10).unwrap().is_empty());
+        #[cfg(unix)]
+        drop(retained_descriptor);
         fs::remove_dir_all(root).unwrap();
     }
 
