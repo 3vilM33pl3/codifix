@@ -12,9 +12,9 @@ impl Drop for Scratch {
 fn only_local_campaign_checks_ignore_service_configuration() {
     let root =
         Scratch(std::env::temp_dir().join(format!("campaign-local-{}", uuid::Uuid::new_v4())));
-    fs::create_dir(&root.0).unwrap();
+    fs::create_dir(&root.0).expect("create isolated campaign directory");
     let manifest = root.0.join("manifest.json");
-    fs::write(&manifest, "!").unwrap();
+    fs::write(&manifest, "!").expect("write invalid campaign manifest");
     let invoke = |name: &str| {
         let mut command = Command::new(env!("CARGO_BIN_EXE_codifix"));
         command
@@ -35,7 +35,7 @@ fn only_local_campaign_checks_ignore_service_configuration() {
                 .arg("--artifact")
                 .arg(root.0.join("missing-artifact.json"));
         }
-        command.output().unwrap()
+        command.output().expect("run campaign validation command")
     };
     for name in ["plan", "check-approvals"] {
         let result = invoke(name);
