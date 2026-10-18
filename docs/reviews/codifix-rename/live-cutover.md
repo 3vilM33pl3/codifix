@@ -107,6 +107,30 @@ operational evidence directory below.
   Workflow selectors now use runner label `codifix` (`cc13cfe2`); the existing
   registered runner remains online. The redundant tag-triggered Release run
   `39108940650` is confirmed cancelled.
+- **Second follow-up batch:** run `39119347339` on `ebc73f36` passed Windows,
+  synthetic macOS, format, web and offline CA preparation. Its DB job passed
+  the Rust workspace tests, CLI build and real R1 process smoke before failing
+  in later R3 fixtures. The three remaining job failures are addressed by:
+  - `b67c7e36`: token-environment tests run in exact subprocesses, removing
+    their race with API tests; seven affected tests passed 20 parallel runs.
+  - `b58f4aa0`: federation fixtures launch the actual `codifix` binary and
+    canonical gate variables, with isolated child HOME/configuration. The full
+    real-PDS run passed C/D recovery/security, Stage E browser/CLI/PTY, F1
+    bidirectional browser/CLI/PTY/MCP, watched-agent and signed-CAR checks.
+    Production authorization and its 30-second retry remain unchanged; only
+    the initial fixture propagation deadline accounts for that retry.
+  - `d7dee064` and `0a30ec30`: local campaign Plan/CheckApprovals dispatch before
+    service configuration loading; other campaign children receive explicit
+    inert loopback configuration. Existing approval/manifest validation remains
+    intact. Empty-HOME integration passed; approved-provider 7/7, review/runner
+    2/2 and representative-task 1/1 passed with no skips or paid calls.
+  - `3eee1324`: the isolation fixture uses configured Cargo output, the current
+    disposable guard and exact Codifix purpose string. Both member boundary
+    probes, both restricted SQL/TLS controls and no-host-port/network checks
+    passed. Only owned disposable fixtures were cleaned up.
+  Astra reviewed the source changes; production auth/routing guards and the CA
+  host are unchanged. These are later source fixes, not rebuilt release assets.
+  The next CI run must validate this batch; no full remote pass is claimed yet.
 - **CA pending:** its latest RESULT INBOX still contains only the 17 October
   inventory. Existing console binding/recovery follow-ups remain pending.
   CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
@@ -141,6 +165,11 @@ configuration hashes and six running application PIDs are unchanged. Receipt:
 `go-helper-prerequisite-20261018/mac-go-receipt.json` in the private evidence
 directory. Plain non-login SSH shells still require the login shell or an
 absolute Go path. No CA access or changes occurred.
+
+Follow-up evidence: `ci-followup-391101-attempt2/` contains completed CI job logs,
+`token-parallel-local.log`, `pds-canonical-gates-local-4.log`,
+`r3-approved-full-local.log`, `r3-review-runner-local.log`,
+`r3-rehearsal-task-local.log`, and `isolation-canonical-local-2.log`.
 
 ## Recovery and temporary remnants
 
