@@ -5,20 +5,19 @@ description: "Review the Codifix Windows x86_64 preview packages and their limit
 
 # Windows
 
-Codifix 3.0.0-rc.1 Windows packages are planned as an x86_64 preview and are
-not published yet. The published v2.1.0 assets install the previous Memory
+The [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) includes unsigned x86_64
+preview packages. The published v2.1.0 assets install the previous Memory
 Layer product, not Codifix. Windows ARM64 is not a release target.
 
 ## Candidate packages
 
-The expected candidate names are:
+The published candidate assets are:
 
 - `codifix-3.0.0-rc.1-windows-x86_64-build.1.msi`
 - `codifix-3.0.0-rc.1-windows-x86_64-build.1.zip`
 - `codifix-3.0.0-rc.1-windows-x86_64-build.1-server-tools.msi`
 
-These filenames are not currently published artifacts. Once the release page
-is available, download from there and verify the matching checksum. The MSI
+Download from the release page and verify its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS). The MSI
 and ZIP provide client/operator tools; the separate machine-level server-tools
 MSI is a scaffold and does not provision dependencies or start services. This
 preview does not provide the complete native PostgreSQL/PDS/Pi stack or full
@@ -31,7 +30,7 @@ before replacing it.
 
 ## MSI
 
-After publication, download and verify the per-user MSI, then run it. The
+Download and verify the per-user MSI, then run it. The
 installer places `codifix.exe`, the bundled web UI, skill templates, README,
 example config, and PowerShell completion under
 `%LOCALAPPDATA%\Programs\Codifix`, then adds its `bin` directory to the user
@@ -51,7 +50,7 @@ stack where supported.
 
 ## Portable ZIP
 
-After publication, extract the ZIP, add its directory to `PATH`, then run:
+Extract the verified ZIP, add its directory to `PATH`, then run:
 
 ```powershell
 codifix --version

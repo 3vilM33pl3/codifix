@@ -5,10 +5,10 @@ description: "Review Codifix macOS package names and Homebrew availability."
 
 # macOS
 
-The Codifix 3.0.0-rc.1 macOS packages are not published yet. The existing
+The [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) provides macOS packages. The existing
 v2.1.0 release is the previous Memory Layer product; its assets are not
 Codifix installers. Homebrew currently provides a HEAD formula only. There is
-no stable Codifix formula or published candidate archive and checksum yet.
+no stable Codifix formula yet.
 
 ## Homebrew
 
@@ -24,7 +24,7 @@ install. Do not use `brew upgrade` as a v2-to-v3 migration path.
 
 ## Native packages
 
-After publication, the expected standard package names are:
+The standard packages are:
 
 - Intel Mac: `codifix-3.0.0-rc.1-macos-x86_64.pkg`
 - Apple Silicon: `codifix-3.0.0-rc.1-macos-aarch64.pkg`
@@ -34,8 +34,9 @@ The matching packages ending in
 `-macos-aarch64-application-update.pkg` are for updating an existing Codifix
 installation. They do not migrate Memory Layer. Standard packages require
 separately configured PostgreSQL/pgvector; application-update packages preserve
-the Codifix runtime they update. The candidate packages are not yet published,
-so these filenames have no available checksums to verify.
+the Codifix runtime they update. Verify downloads against the release
+[SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS). The packages are unsigned and not notarized;
+native package acceptance passed on Intel and Apple Silicon.
 
 Download only from the published Codifix 3.0.0-rc.1 release and verify its
 matching checksum. For an existing Memory Layer installation, first follow the
@@ -44,7 +45,7 @@ matching checksum. For an existing Memory Layer installation, first follow the
 Do not replace an existing bundled runtime with Homebrew as an implicit
 migration.
 
-After installing a published candidate, configure and verify it:
+After installation, configure and verify it:
 
 ```bash
 codifix wizard --global

@@ -1,8 +1,8 @@
 # Codifix
 
-[![CI](https://github.com/3vilM33pl3/codifix/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/3vilM33pl3/codifix/actions/workflows/ci.yml?query=branch%3Amain) [![Nightly](https://github.com/3vilM33pl3/codifix/actions/workflows/nightly.yml/badge.svg?branch=main&event=schedule)](https://github.com/3vilM33pl3/codifix/actions/workflows/nightly.yml?query=branch%3Amain) [![Latest release](https://img.shields.io/github/v/release/3vilM33pl3/codifix?display_name=tag&sort=semver&style=flat)](https://github.com/3vilM33pl3/codifix/releases/latest) [![Release date](https://img.shields.io/github/release-date/3vilM33pl3/codifix?label=release%20date&style=flat)](https://github.com/3vilM33pl3/codifix/releases/latest) [![Downloads](https://img.shields.io/github/downloads/3vilM33pl3/codifix/total?label=downloads&style=flat)](https://github.com/3vilM33pl3/codifix/releases) [![Docs](https://img.shields.io/website?url=https%3A%2F%2Fcodifix.dev%2Fdocs&label=docs&style=flat)](https://codifix.dev/docs)
+[![CI](https://github.com/3vilM33pl3/codifix/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/3vilM33pl3/codifix/actions/workflows/ci.yml?query=branch%3Amain) [![Nightly](https://github.com/3vilM33pl3/codifix/actions/workflows/nightly.yml/badge.svg?branch=main&event=schedule)](https://github.com/3vilM33pl3/codifix/actions/workflows/nightly.yml?query=branch%3Amain) [![Prerelease](https://img.shields.io/badge/prerelease-v3.0.0--rc.1-blue?style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Release date](https://img.shields.io/github/release-date-pre/3vilM33pl3/codifix?label=release%20date&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Downloads](https://img.shields.io/github/downloads/3vilM33pl3/codifix/total?label=downloads&style=flat)](https://github.com/3vilM33pl3/codifix/releases) [![Docs](https://img.shields.io/website?url=https%3A%2F%2Fcodifix.dev%2Fdocs&label=docs&style=flat)](https://codifix.dev/docs)
 
-[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later%20%2F%20commercial-2563eb?style=flat)](#license) [![Rust 2024](https://img.shields.io/badge/Rust-2024-000000?logo=rust&logoColor=white&style=flat)](Cargo.toml) [![Linux](https://img.shields.io/badge/platform-Linux-333333?logo=linux&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/latest) [![macOS](https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/latest) [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/latest) [![Stars](https://img.shields.io/github/stars/3vilM33pl3/codifix?label=stars&style=flat)](https://github.com/3vilM33pl3/codifix) [![Forks](https://img.shields.io/github/forks/3vilM33pl3/codifix?label=forks&style=flat)](https://github.com/3vilM33pl3/codifix/forks) [![Open issues](https://img.shields.io/github/issues/3vilM33pl3/codifix?label=open%20issues&style=flat)](https://github.com/3vilM33pl3/codifix/issues) [![Open PRs](https://img.shields.io/github/issues-pr/3vilM33pl3/codifix?label=open%20PRs&style=flat)](https://github.com/3vilM33pl3/codifix/pulls) [![Last commit](https://img.shields.io/github/last-commit/3vilM33pl3/codifix/main?label=last%20commit&style=flat)](https://github.com/3vilM33pl3/codifix/commits/main) [![Citation](https://img.shields.io/badge/citation-CITATION.cff-2563eb?style=flat)](CITATION.cff)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later%20%2F%20commercial-2563eb?style=flat)](#license) [![Rust 2024](https://img.shields.io/badge/Rust-2024-000000?logo=rust&logoColor=white&style=flat)](Cargo.toml) [![Linux](https://img.shields.io/badge/platform-Linux-333333?logo=linux&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![macOS](https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Stars](https://img.shields.io/github/stars/3vilM33pl3/codifix?label=stars&style=flat)](https://github.com/3vilM33pl3/codifix) [![Forks](https://img.shields.io/github/forks/3vilM33pl3/codifix?label=forks&style=flat)](https://github.com/3vilM33pl3/codifix/forks) [![Open issues](https://img.shields.io/github/issues/3vilM33pl3/codifix?label=open%20issues&style=flat)](https://github.com/3vilM33pl3/codifix/issues) [![Open PRs](https://img.shields.io/github/issues-pr/3vilM33pl3/codifix?label=open%20PRs&style=flat)](https://github.com/3vilM33pl3/codifix/pulls) [![Last commit](https://img.shields.io/github/last-commit/3vilM33pl3/codifix/main?label=last%20commit&style=flat)](https://github.com/3vilM33pl3/codifix/commits/main) [![Citation](https://img.shields.io/badge/citation-CITATION.cff-2563eb?style=flat)](CITATION.cff)
 
 Codifix is a local-first memory system for coding agents and developers.
 It turns project work into durable, searchable knowledge, so the next Codex,
@@ -11,10 +11,11 @@ Claude, or human session can start with evidence instead of guesswork.
 It captures what happened, curates what matters, stores it in PostgreSQL with
 pgvector, and exposes it through a TUI, browser UI, and agent-friendly CLI.
 
-[Website](https://codifix.dev) · [Documentation](https://codifix.dev/docs) · [Latest stable release: v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
+[Website](https://codifix.dev) · [Documentation](https://codifix.dev/docs) · [Codifix v3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
 
-The source candidate is [v3.0.0-rc.1](CHANGELOG.md), in preparation and not yet
-published or installed. Its release and platform acceptance work is pending.
+[v3.0.0-rc.1](docs/releases/3.0.0-rc.1.md) is available as a prerelease.
+All 11 release jobs passed, including Linux and both Mac architectures.
+Mac and Windows packages are unsigned; stable 3.0.0 is not released.
 Windows packages remain a preview of client/operator functionality, not a
 complete native server stack. Use `codifix urls` to inspect the configured
 application URLs.
@@ -50,10 +51,11 @@ demo path.
 
 For a native installation, prerequisites, and verification, start with the
 [Install guide](https://codifix.dev/docs/install) or download the
-[v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0).
-Version 2 is a breaking upgrade from v1; existing users should follow the
-[Update guide](https://codifix.dev/docs/install/update) before
-restarting the service.
+[v3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
+The rename from Memory Layer v2 is a breaking reinstall. Existing users should
+follow the [Update guide](https://codifix.dev/docs/install/update) before
+changing their installation. The historical v2.1.0 packages retain their
+Memory Layer identity.
 The setup wizard configures the machine once and the project you are working
 in:
 

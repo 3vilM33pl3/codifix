@@ -1,39 +1,42 @@
 ---
 title: "Linux / Debian"
-description: "Install the Codifix Debian package when the release candidate is published."
+description: "Install and verify the Codifix Debian release candidate."
 ---
 
 # Linux / Debian
 
-The Codifix 3.0.0-rc.1 Debian packages are not published yet. The current
+The [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) provides Debian packages. The
 published v2.1.0 release installs the previous Memory Layer product and is not
 a Codifix package. The one-line installer intentionally refuses to select that
 legacy release while no Codifix stable release is available.
 
 ## Candidate package names
 
-Once published, the release assets are expected to be:
+GitHub download names use `.rc.1`; the original package/checksum names use
+`~rc.1`. Save the downloads under their original names as shown below:
 
 - x86_64: `codifix_3.0.0~rc.1_amd64.deb`
 - arm64: `codifix_3.0.0~rc.1_arm64.deb`
 
 The arm64 package is for 64-bit Debian-family systems, including Raspberry Pi
-4/5. 32-bit Raspberry Pi OS is not a release target. These filenames do not
-currently identify published artifacts. Wait for the release page and matching
-checksums before installing.
+4/5. 32-bit Raspberry Pi OS is not a release target. Verify downloads against
+the release [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS) before installing.
 
-## Install after publication
+## Install
 
 Install PostgreSQL with pgvector first, or use a reachable PostgreSQL server
 with the `vector` extension enabled. Then download the package for your
-architecture from the published Codifix 3.0.0-rc.1 release, verify its
-published checksum, and install it:
+architecture, verify its checksum, and install it:
 
 ```bash
+curl -fL -o 'codifix_3.0.0~rc.1_amd64.deb' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/codifix_3.0.0.rc.1_amd64.deb'
+curl -fL -o 'codifix_3.0.0~rc.1_amd64.deb.sha256' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/codifix_3.0.0.rc.1_amd64.deb.sha256'
+sha256sum -c 'codifix_3.0.0~rc.1_amd64.deb.sha256'
 sudo dpkg -i codifix_3.0.0~rc.1_amd64.deb
 ```
 
-Use the `_arm64.deb` filename on 64-bit ARM. The candidate is a breaking
+Replace `amd64` with `arm64` in all commands on 64-bit ARM.
+The Debian version inside either package remains `3.0.0~rc.1`. The candidate is a breaking
 product rename. If replacing an existing Memory Layer install, follow the
 [Update guide](/docs/install/update) and the
 [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md)

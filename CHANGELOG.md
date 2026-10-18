@@ -1,10 +1,12 @@
 # Changelog
 
-## 3.0.0-rc.1 - Candidate preparation (unpublished)
+## 3.0.0-rc.1 - 2026-10-18 (prerelease)
 
-This source candidate is being prepared for release. It has not been published
-or installed; package, installation and platform acceptance remain pending.
-This section records the candidate identity, not a completed release.
+Published from source `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71` after all 11
+release jobs passed. Linux amd64/arm64 installation checks, both Mac native
+package checks and Windows preview acceptance passed. See the
+[release notes](docs/releases/3.0.0-rc.1.md) for artifact verification, later
+operator fixes and explicit platform limits. Stable 3.0.0 is not released.
 
 - **Breaking technical rename:** product-owned commands, package identities,
   service names, configuration paths and federation enrolment identities use
@@ -24,9 +26,8 @@ This section records the candidate identity, not a completed release.
   listed in the reinstall procedure. Previously published releases and their
   release records remain unchanged.
 - Windows remains a preview. Build 1 / MSI version `3.0.1` is the allocated
-  candidate identity, not evidence of an accepted package. Native macOS UI,
-  CA deployment, release hashes, installation and cross-platform acceptance
-  are not claimed here.
+  candidate identity. Mac and Windows packages are unsigned; macOS notarization,
+  pixel-level UI acceptance and CA deployment are not claimed.
 
 ## 2.1.0 - 2026-10-17
 

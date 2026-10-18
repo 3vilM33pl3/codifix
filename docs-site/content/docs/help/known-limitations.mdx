@@ -5,8 +5,8 @@ description: "Current Codifix release status, the Memory Layer rename boundary, 
 
 # Known limitations
 
-Codifix 3.0.0-rc.1 is an unpublished release candidate. Its Debian, macOS, and
-Windows packages are not available to install yet. The published v2.1.0 release
+[Codifix 3.0.0-rc.1](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) is a published prerelease. Linux, macOS and
+Windows preview packages are available; stable 3.0.0 is not released. The v2.1.0 release
 is the previous Memory Layer product; no Codifix v2.0 or v2.1 release exists.
 See the [Update guide](/docs/install/update) before moving an existing install.
 
@@ -22,9 +22,9 @@ are intended to be preserved through that reviewed process.
 
 | Platform | Current status |
 |---|---|
-| Debian/Ubuntu | Candidate package names are defined for amd64 and arm64; candidate downloads are not published. |
-| macOS | Candidate Intel and Apple Silicon packages are defined; native Intel validation remains a release gate. Homebrew has a HEAD formula only, with no stable pinned formula yet. |
-| Windows | Candidate x86_64 ZIP/MSI and server-tools MSI are preview artifacts; they are not published. The packages do not provide full Windows parity or a complete native PostgreSQL/PDS/Pi stack. Windows ARM64 is not a release target. |
+| Debian/Ubuntu | Candidate packages and native installation checks passed for amd64 and arm64. |
+| macOS | Intel and Apple Silicon packages passed native acceptance. Packages are unsigned and not notarized. Homebrew has a HEAD formula only. |
+| Windows | Published x86_64 ZIP/MSI and server-tools MSI are unsigned preview artifacts. The packages do not provide full Windows parity or a complete native PostgreSQL/PDS/Pi stack. Windows ARM64 is not a release target. |
 
 The macOS application-update package applies only to an existing Codifix
 installation. It does not migrate Memory Layer. The Windows server-tools MSI
