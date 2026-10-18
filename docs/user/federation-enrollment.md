@@ -1,13 +1,13 @@
 # Separate-authority membership enrollment
 
-`memory-federation-enroll` grants selected instances four private-space capabilities:
-`Pull`, `Publish`, `AskExpertise`, and `AnswerExpertise`. It does not turn Workshop
-or Homelab into the space authority, grant `ManageMembership`, publish arbitrary
+`codifix-federation-enroll` grants selected instances four private-space capabilities:
+`Pull`, `Publish`, `AskExpertise`, and `AnswerExpertise`. It does not turn a
+participant into the space authority, grant `ManageMembership`, publish arbitrary
 records, create credentials, access a database, or invoke a model/Pi agent.
 
 This is one operator step, not a complete deployment tool. Read the
-[runtime prerequisites](federation-runtime.md) and
-[local expertise controls](f1-internal-expertise.md) first.
+[runtime prerequisites](https://codifix.dev/docs/federation/runtime) and
+[local expertise controls](https://codifix.dev/docs/federation/expertise) first.
 
 ## Prerequisites
 
@@ -93,13 +93,13 @@ exact schema-v3 records, selected members, trust keys, review window and canonic
 endpoint, keys, record IDs and reviewed baseline. JSON whitespace is irrelevant.
 
 ```sh
-target/debug/memory-federation-enroll /private/company/enrollment.json
+target/debug/codifix-federation-enroll /private/company/enrollment.json
 ```
 
 Before final review, inspect the authenticated, signed published state:
 
 ```sh
-target/debug/memory-federation-enroll inspect /private/company/enrollment.json
+target/debug/codifix-federation-enroll inspect /private/company/enrollment.json
 ```
 
 Inspection is read-only. Copy `published_through` and `published_tip` into the
@@ -121,7 +121,7 @@ After reviewing every exact record, submit that config with the exact lowercase
 64-character digest printed by its preview:
 
 ```sh
-target/debug/memory-federation-enroll execute /private/company/enrollment.json EXACT_REVIEW_SHA256
+target/debug/codifix-federation-enroll execute /private/company/enrollment.json EXACT_REVIEW_SHA256
 ```
 
 Before its first write, execution verifies nonce-bound signed pages, each audit
@@ -159,10 +159,10 @@ recovery or knowledge correctness.
 ## Finish local authorization separately
 
 Remote membership alone neither exports source knowledge nor enables answering.
-Each Memory instance still needs exact-project local grants, a separately
+Each Codifix instance still needs exact-project local grants, a separately
 configured internal answer identity, reviewed immutable collections, explicit
 requester allowlists and output-destination consent. Follow the
-[F1 internal expertise workflow](f1-internal-expertise.md). Leave Homelab Pi and
+[F1 internal expertise workflow](https://codifix.dev/docs/federation/expertise). Leave Pi and
 paid model execution disabled until those separate controls are approved.
 
 Synthetic operator tests exercise dry preview, strict inputs, digest/expiry
