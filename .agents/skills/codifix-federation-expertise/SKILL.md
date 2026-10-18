@@ -6,24 +6,24 @@ description: Discover approved expertise in other Codifix areas and ask a bounde
 
 # Federated Expertise For Watched Agents
 
-Use this skill for a Codex or Claude task when the current Memory area's
+Use this skill for a Codex or Claude task when the current Codifix area's
 evidence is insufficient and another enrolled area may have relevant, reviewed
 expertise. Ordinary queries remain local. A capability advertisement describes
 what an area can answer; it is not permission to read that area's database.
 
-1. Resolve the repository's configured Memory area and project. If the selected
+1. Resolve the repository's configured Codifix area and project. If the selected
    area is unavailable, stop; never fall back to General or another area.
-2. Use `memory_expertise_discover` on the current area's MCP connection. Select
+2. Use `codifix_expertise_discover` on the current area's MCP connection. Select
    an active, relevant capability from the returned catalog. Do not invent an
    instance, collection or endpoint.
 3. Under the operator-bound standing agent policy, call
-   `memory_expertise_agent_ask` with a fresh request UUID, selected publisher
+   `codifix_expertise_agent_ask` with a fresh request UUID, selected publisher
    and collection, and one concise question. The service chooses the fixed
    onward model destination; the tool call cannot choose or grant it. Send no
    conversation history, files, raw captures, credentials or local search
-   results. Do not use the human-confirmation `memory_expertise_ask` tool to
+   results. Do not use the human-confirmation `codifix_expertise_ask` tool to
    impersonate an approval.
-4. Poll `memory_expertise_agent_result` with the **same** request UUID until a
+4. Poll `codifix_expertise_agent_result` with the **same** request UUID until a
    terminal result or the documented deadline. A queued or published record
    is not an answer. On an ambiguous response, reuse the exact UUID and bytes;
    changing the question creates a new disclosure.

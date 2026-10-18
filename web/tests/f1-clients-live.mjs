@@ -116,17 +116,17 @@ try {
   assert(!(await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'synthetic-f1', version: '1' } })).error);
   mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const tools = (await rpc('tools/list', {})).result.tools;
-  assert.equal(tools.find(t => t.name === 'memory_expertise_ask').annotations.readOnlyHint, false);
+  assert.equal(tools.find(t => t.name === 'codifix_expertise_ask').annotations.readOnlyHint, false);
   async function call(name, args) {
     const response = await rpc('tools/call', { name, arguments: { project: f.left.project, space: f.left.space, ...args } });
     assert(!response.error, 'MCP expertise tool denied'); assert(!response.result.isError);
     return response.result.structuredContent.response;
   }
-  assert.equal((await call('memory_expertise_discover', {})).capabilities[0].owner, f.right.instance);
-  const mcpReview = await call('memory_expertise_prepare', { publisher: f.right.instance, collection: f.right.collection, request_id: randomUUID(), question: 'What is the reviewed incident diagnosis?' });
+  assert.equal((await call('codifix_expertise_discover', {})).capabilities[0].owner, f.right.instance);
+  const mcpReview = await call('codifix_expertise_prepare', { publisher: f.right.instance, collection: f.right.collection, request_id: randomUUID(), question: 'What is the reviewed incident diagnosis?' });
   assert.equal(mcpReview.question.output_destination, 'synthetic_cloud');
-  await call('memory_expertise_ask', { review_json: JSON.stringify(mcpReview), confirmed: true });
-  checkAnswer(await until(() => call('memory_expertise_result', { request_id: mcpReview.question.request_id }), r => r.status === 'answered'), f.right.instance);
+  await call('codifix_expertise_ask', { review_json: JSON.stringify(mcpReview), confirmed: true });
+  checkAnswer(await until(() => call('codifix_expertise_result', { request_id: mcpReview.question.request_id }), r => r.status === 'answered'), f.right.instance);
   console.log('F1 real clients: bidirectional browser cited answers, CLI exact retry, PTY confirmation/result and bound-cloud MCP discovery/prepare/ask/result passed.');
 } finally {
   mcp?.kill(); await browser.close(); await rm(directory, { recursive: true, force: true });

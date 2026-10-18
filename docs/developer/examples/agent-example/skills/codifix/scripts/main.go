@@ -91,7 +91,7 @@ func resolveCommand() ([]string, error) {
 	if _, err := exec.LookPath("codifix"); err == nil {
 		return []string{"codifix"}, nil
 	}
-	return nil, errors.New("Codifix CLI not found. Install `memory`, or set CODIFIX_BIN to an explicit command.")
+	return nil, errors.New("Codifix CLI not found. Install `codifix`, or set CODIFIX_BIN to an explicit command.")
 }
 
 func defaultProject() string {

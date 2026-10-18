@@ -1,4 +1,4 @@
-# Memory Repo Instructions
+# Codifix Repo Instructions
 
 ## Version control
 - Keep commits small and incremental.
@@ -29,14 +29,14 @@ migrated to those user-local paths. The dev service has its own port, socket and
 runtime directory; data isolation requires its own database URL. This checkout
 uses a dedicated dev database. The TUI header shows `[dev]` on the dev profile.
 
-Bootstrap the overlay once, then run each piece via the single `memory`
+Bootstrap the overlay once, then run each piece via the single `codifix`
 binary in a separate shell:
 
 ```bash
-cargo run --bin memory -- dev --no-copy-from-global
+cargo run --bin codifix -- dev --no-copy-from-global
 # Configure a dedicated development database in the dev overlay before startup.
-cargo run --bin memory --features embedded-service -- service run   # dev service
-cargo run --bin memory -- tui           # dev TUI
+cargo run --bin codifix --features embedded-service -- service run   # dev service
+cargo run --bin codifix -- tui           # dev TUI
 ```
 
 Non-interactive flags for `dev`: `--copy-from-global` (copy shared
@@ -46,8 +46,8 @@ existing overlay), `--dry-run` (preview only).
 
 ## Codifix workflows
 
-This project uses Codifix to persist durable project knowledge. The `memory` CLI
-must be on PATH. Durable project knowledge belongs to Workshop's `memory` project;
+This project uses Codifix to persist durable project knowledge. The `codifix` CLI
+must be on PATH. Durable project knowledge belongs to Workshop's `codifix` project;
 the shared Go helper explicitly selects `codifix --area workshop` using
 `.agents/codifix-command.json`. Use that helper for queries, task starts,
 plans and completed work. Direct installed CLI examples below should likewise use
@@ -55,7 +55,7 @@ plans and completed work. Direct installed CLI examples below should likewise us
 
 The dev service/database is for backend tests, not a second durable knowledge
 store. To test a helper against dev, explicitly set
-`CODIFIX_BIN='cargo run --quiet --bin memory --'`. No request failure changes its
+`CODIFIX_BIN='cargo run --quiet --bin codifix --'`. No request failure changes its
 destination. See [routing and recovery](docs/developer/dev-stack.md#project-memory-routing-and-recovery).
 
 ### Shared invariants
@@ -72,8 +72,8 @@ destination. See [routing and recovery](docs/developer/dev-stack.md#project-memo
 Use when: the user asks a project-specific question or returns after an interruption.
 
 ```bash
-codifix query --project memory --question "<question>"
-codifix resume --project memory
+codifix --area workshop query --project codifix --question "<question>"
+codifix --area workshop resume --project codifix
 ```
 
 ### Plan execution
@@ -81,12 +81,12 @@ Use when: a planning session ends and the user approves execution.
 
 Save checkpoint and plan at execution start:
 ```bash
-codifix checkpoint start-execution --project memory --plan-file /tmp/approved-plan.md
+codifix --area workshop checkpoint start-execution --project codifix --plan-file /tmp/approved-plan.md
 ```
 
 Verify all plan items are complete before claiming finished:
 ```bash
-codifix checkpoint finish-execution --project memory
+codifix --area workshop checkpoint finish-execution --project codifix
 ```
 
 ### Remember completed work (mandatory post-task rule)
@@ -97,7 +97,7 @@ final response** unless one of these is true:
 - the user explicitly asked not to store memory
 
 ```bash
-codifix remember --project memory \
+codifix --area workshop remember --project codifix \
   --title "<task title>" \
   --summary "<what changed>" \
   --note "<durable fact 1>" \
@@ -113,7 +113,7 @@ Use when: you answered a request to explain code, a file, a module, an architect
 After answering, store a distilled reusable memory when the explanation is durable and grounded in inspected code or existing memory. Do not store the full chat answer, speculative claims, duplicates, or trivial explanations. Do not use `--file-changed` unless files actually changed.
 
 ```bash
-codifix remember --project memory --type project \
+codifix --area workshop remember --project codifix --type project \
   --title "Explained <file/module/codebase>" \
   --prompt "<user explanation request>" \
   --summary "<short explanation summary>" \

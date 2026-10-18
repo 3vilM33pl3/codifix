@@ -259,11 +259,11 @@ Commands:
   capture-task <payload.json>
   curate-memory [project-slug]
   review-proposals <list|show|approve|reject> --project <slug> [--id <uuid>] [--limit N]
-  start-plan-execution <memory checkpoint start-execution args...>
-  start-task-execution <memory checkpoint start-task args...>
-  finish-plan-execution <memory checkpoint finish-execution args...>
-  remember-task <memory remember args...>
-  remember-current-work <memory remember args...>`)
+  start-plan-execution <codifix checkpoint start-execution args...>
+  start-task-execution <codifix checkpoint start-task args...>
+  finish-plan-execution <codifix checkpoint finish-execution args...>
+  remember-task <codifix remember args...>
+  remember-current-work <codifix remember args...>`)
 }
 
 func printUsage(out io.Writer) {
@@ -321,7 +321,7 @@ func (r *codifixCommandResolver) Resolve() ([]string, error) {
 		return []string{"codifix"}, nil
 	}
 
-	return nil, errors.New("Codifix CLI not found. Install `memory`, or set CODIFIX_BIN to an explicit command.")
+	return nil, errors.New("Codifix CLI not found. Install `codifix`, or set CODIFIX_BIN to an explicit command.")
 }
 
 func (r *codifixCommandResolver) hasSourceRepo() bool {
