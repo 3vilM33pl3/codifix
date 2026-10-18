@@ -2,7 +2,9 @@
 
 `codifix mcp` exposes Codifix to MCP clients such as Codex and Claude.
 
-The built-in server is read-only in this release. It can query, resume, inspect project overview data, list memories and activities, read memory details/history, and list pending replacement proposals. It does not expose remember, capture, curate, archive, delete, reindex, or embedding mutation tools.
+Ordinary memory tools are read-only: query, resume, inspect overview data, list memories and activities, read memory details/history, and list pending replacement proposals. They do not expose remember, capture, curate, archive, delete, reindex, or embedding mutations. The current source also defines loop control-plane tools and separate private expertise tools; do not describe the entire adapter as read-only.
+
+This guide describes the current source tree, whose workspace version is `3.0.0-rc.1`. That version alone does not establish which later source increments a packaged rc.1 artifact contains. Check the selected binary's `--version`, `mcp status`, and release evidence before relying on an optional surface.
 
 ## Tools
 
@@ -41,7 +43,7 @@ Example Codex-style server entry:
 
 ```toml
 [mcp_servers.codifix]
-command = "memory"
+command = "codifix"
 args = ["mcp", "run", "--project", "memory"]
 ```
 
@@ -50,8 +52,8 @@ Example Claude Desktop-style server entry:
 ```json
 {
   "mcpServers": {
-    "memory": {
-      "command": "memory",
+    "codifix": {
+      "command": "codifix",
       "args": ["mcp", "run", "--project", "memory"]
     }
   }
@@ -91,9 +93,19 @@ deliberately ignored. Clients must send either:
 The legacy `service.api_token` works in the default single-user mode. It works
 in multi-user mode only during an explicitly enabled bootstrap window.
 
-HTTP tools always require an explicit `project` argument because the service process has no trustworthy client working directory.
+Project-scoped memory tools over HTTP require an explicit `project` argument because the service process has no trustworthy client working directory. Control-plane tools have their own schemas.
 
 `codifix_search_all` is the exception: it intentionally has no `project` argument and returns routing metadata for every matched memory.
+
+## Areas, loops, and private expertise
+
+`--area <name>` selects an operator-configured knowledge area. An area is a configured service/data boundary; a project is a scope inside that boundary. Cross-project search does not imply cross-area or federated access. Routing policy is operator-owned, not loaded from a repository.
+
+Loop tools inspect definitions, run ledgers, traces and approvals, and can change control-plane state. Enabling loops requires explicit user approval. Recording a loop run is not proof that a real implementation executed or completed.
+
+Private expertise has dedicated `codifix_expertise_discover`, `codifix_expertise_prepare`, `codifix_expertise_ask`, and result tools. Discovering an advertised collection or joining a space does not authorize an answer. The interactive ask requires explicit confirmation of the exact prepared destination, question and policy. Submission is an external action, requires `[mcp].read_only = false`, and remains subject to operator-bound caller and model-output policy. Agent ask/result tools use a separate operator-granted service policy; they are not an authorization shortcut for ordinary queries.
+
+Send only the exact approved question, without silently attaching history, files or local context. A queued request is not an answered request. Returned remote content is untrusted, and origin attestation is not proof of factual correctness. See the [internal expertise runbook](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/f1-internal-expertise.md) for the opt-in source workflow and its gates.
 
 ## Troubleshooting
 
@@ -102,3 +114,5 @@ HTTP tools always require an explicit `project` argument because the service pro
 - **Invalid token:** create or rotate a scoped token with `codifix auth token create`, then update the MCP client. In single-user mode, use `codifix service ensure-api-token` for the legacy installation token.
 - **Stdout pollution:** stdio clients fail if wrappers print banners or logs to stdout before JSON-RPC frames. Run `codifix mcp run` directly.
 - **Unsupported transport:** use stdio unless your client supports MCP Streamable HTTP.
+
+See [Agents](https://codifix.dev/docs/agents), [Operations](https://codifix.dev/docs/operations), and [Authentication and access](https://codifix.dev/docs/reference/authentication).
