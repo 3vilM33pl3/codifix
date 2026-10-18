@@ -86,7 +86,7 @@ in that project's `expertise_callers`, plus separately reviewed collection conse
 for that destination. The `local_human` default does not authorize cloud disclosure.
 
 The gateway configuration is separate. Start only
-`memory-federation-gateway /absolute/path/gateway.json`, with a dedicated,
+`codifix-federation-gateway /absolute/path/gateway.json`, with a dedicated,
 pre-provisioned database and a non-owner restricted SQL login. The binary never
 runs migrations, the local app, MCP, watchers or model providers. See the
 [private topology and grants](../../deploy/federation/README.md).
@@ -318,7 +318,7 @@ uses `SELECT ... FOR UPDATE` on the intent row, which PostgreSQL denies without
 `UPDATE` privilege even though the handler does not change that row. Grant
 only these new tables; no grant on gateway addressed records is implied.
 
-The bundled `memory-federation-expertise` skill teaches watched agents to
+The bundled `codifix-federation-expertise` skill teaches watched agents to
 discover, submit one bounded question and read its cited result. Installing the
 skill does not enable the service, expand collection consent or permit a paid
 model call. Agent answers are deterministic only. The gateway stores private
