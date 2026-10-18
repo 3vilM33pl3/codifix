@@ -15,7 +15,7 @@ concurrency:
 jobs:
   quality:
     name: Nightly Quality Sweep
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -70,7 +70,7 @@ jobs:
 
   debian-package-smoke:
     name: Debian Package Smoke (amd64)
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
