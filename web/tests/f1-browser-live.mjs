@@ -81,7 +81,7 @@ try {
   await expertise.getByText(/Question status: queued/).waitFor();
   assert.equal(await expertise.getByRole('heading', { name: /Untrusted answer/ }).count(), 0);
   assert.equal(errors.length, 0, errors.join('\n'));
-  const screenshotRoot = process.env.MEMORY_FEDERATION_F1_SCREENSHOTS;
+  const screenshotRoot = process.env.CODIFIX_FEDERATION_F1_SCREENSHOTS;
   if (screenshotRoot) { await mkdir(screenshotRoot, { recursive: true }); await page.screenshot({ path: join(screenshotRoot, 'f1-desktop.png'), fullPage: true }); }
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({

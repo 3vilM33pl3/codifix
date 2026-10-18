@@ -4,7 +4,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 let input = ''; for await (const chunk of process.stdin) input += chunk;
@@ -13,9 +13,15 @@ assert.equal(f.synthetic, true);
 for (const side of [f.left, f.right]) assert.equal(new URL(side.url).hostname, '127.0.0.1');
 const directory = await mkdtemp(join(tmpdir(), 'memory-f1-clients-'));
 const browser = await chromium.launch({ headless: true });
-const environment = { ...process.env, CODIFIX_PROFILE: 'prod' };
-delete environment.CODIFIX_CLIENT_TOKEN;
-const binary = resolve('target/debug/memory');
+// Explicit disposable configs must not inherit operator routing or overrides.
+const environment = { ...process.env, HOME: directory,
+  XDG_CONFIG_HOME: join(directory, 'config'), XDG_STATE_HOME: join(directory, 'state'), XDG_CACHE_HOME: join(directory, 'cache'),
+  USERPROFILE: directory, LOCALAPPDATA: join(directory, 'local'), APPDATA: join(directory, 'roaming') };
+for (const key of Object.keys(environment)) if (key.startsWith('CODIFIX_')) delete environment[key];
+environment.CODIFIX_PROFILE = 'prod';
+const binary = f.binary;
+assert.equal(typeof binary, 'string');
+assert(isAbsolute(binary));
 let mcp;
 async function processResult(program, args, data) {
   const child = spawn(program, args, { env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -72,9 +78,9 @@ try {
     const attribution = await panel.getByLabel('Answer citations and attribution').innerText();
     assert(attribution.includes(remote.instance)); assert(attribution.includes('Reviewed synthetic evidence only'));
     assert.equal(errors.length, 0);
-    if (process.env.MEMORY_FEDERATION_F1_SCREENSHOTS) {
-      await mkdir(process.env.MEMORY_FEDERATION_F1_SCREENSHOTS, { recursive: true });
-      await page.screenshot({ path: join(process.env.MEMORY_FEDERATION_F1_SCREENSHOTS, `f1-answer-${side.instance}.png`), fullPage: true });
+    if (process.env.CODIFIX_FEDERATION_F1_SCREENSHOTS) {
+      await mkdir(process.env.CODIFIX_FEDERATION_F1_SCREENSHOTS, { recursive: true });
+      await page.screenshot({ path: join(process.env.CODIFIX_FEDERATION_F1_SCREENSHOTS, `f1-answer-${side.instance}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 390, height: 844 });
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2));

@@ -12,6 +12,18 @@ use std::{
 };
 use tokio::io::AsyncWriteExt;
 
+// The test binary and CLI share the selected Cargo profile/target directory.
+// Never fall back to a stale pre-rename executable in a warm build cache.
+pub(super) fn cli_binary() -> std::path::PathBuf {
+    std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(format!("codifix{}", std::env::consts::EXE_SUFFIX))
+}
+
 pub(super) struct ServiceProcess {
     child: std::process::Child,
     directory: std::path::PathBuf,
@@ -218,17 +230,26 @@ pub(super) async fn app(
         // The integration binary is in <profile>/deps; honor CARGO_TARGET_DIR,
         // release profiles and the native executable suffix rather than a
         // hard-coded source-checkout target/debug path.
-        let executable = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(format!("memory{}", std::env::consts::EXE_SUFFIX));
-        let child = std::process::Command::new(executable)
+        let executable = cli_binary();
+        assert!(
+            executable.is_file(),
+            "build the current Codifix CLI: {}",
+            executable.display()
+        );
+        let mut command = std::process::Command::new(executable);
+        for (key, _) in std::env::vars_os() {
+            if key.to_string_lossy().starts_with("CODIFIX_") {
+                command.env_remove(key);
+            }
+        }
+        let child = command
             .args(["--config", config_path.to_str().unwrap(), "service", "run"])
             .env("CODIFIX_PROFILE", "prod")
             .env("CODIFIX_FEDERATION_CONFIG", runtime_path)
+            .env("HOME", &directory)
+            .env("XDG_CONFIG_HOME", directory.join("config"))
+            .env("XDG_STATE_HOME", directory.join("state"))
+            .env("XDG_CACHE_HOME", directory.join("cache"))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -425,7 +446,7 @@ async fn e_two_instance_http_workflow() {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }));
-        let data = json!({"left":browser_session(&left).await,"right":browser_session(&right).await,"canonical":canonical});
+        let data = json!({"binary":cli_binary(),"left":browser_session(&left).await,"right":browser_session(&right).await,"canonical":canonical});
         let mut child = tokio::process::Command::new("node")
             .arg("web/tests/federation-live.mjs")
             .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))

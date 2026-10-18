@@ -7,9 +7,9 @@ with four separate, independently credentialed databases (gateway, homelab,
 Memory and game). F1 uses real HTTP service applications and automatic origin
 workers in one test process; Stage E additionally starts separate service
 executables. Both publish through the pinned PDS. Set
-`MEMORY_FEDERATION_E_CLIENTS=1` to enable the F1 real-browser, CLI, tmux PTY and
+`CODIFIX_FEDERATION_E_CLIENTS=1` to enable the F1 real-browser, CLI, tmux PTY and
 MCP stdio workflows too. This is an intentional shared full-client gate, not a
-separate optional CI check. Set `MEMORY_FEDERATION_F1_SCREENSHOTS` to retain
+separate optional CI check. Set `CODIFIX_FEDERATION_F1_SCREENSHOTS` to retain
 synthetic browser screenshots.
 
 F1 checks bidirectional cited answers, exact retries, stopped/restarted answering
@@ -31,8 +31,8 @@ Run with the inherited developer token unset, an explicitly disposable database,
 and the client prerequisites below:
 
 ```bash
-/usr/bin/env -u MEMORY_LAYER_CLIENT_TOKEN \
-  MEMORY_LAYER_TEST_REQUIRE_DB=1 MEMORY_FEDERATION_E_CLIENTS=1 \
+/usr/bin/env -u CODIFIX_CLIENT_TOKEN \
+  CODIFIX_TEST_REQUIRE_DB=1 CODIFIX_FEDERATION_E_CLIENTS=1 \
   node tests/federation-pds/run.mjs --runtime
 ```
 
@@ -45,9 +45,9 @@ customer disaster-recovery evidence or authorization to deploy homelab services.
 ## Stage E application and client gate
 
 `--runtime` now also runs the three-database Memory HTTP workflow against the
-same pinned PDS. Set `MEMORY_FEDERATION_E_CLIENTS=1` to additionally launch two
+same pinned PDS. Set `CODIFIX_FEDERATION_E_CLIENTS=1` to additionally launch two
 separate Memory service processes, real browser sessions, CLI commands and a
-private-socket tmux PTY. Prerequisites: a fresh `cargo build -p mem-cli --locked`,
+private-socket tmux PTY. Prerequisites: a fresh `cargo build -p codifix-cli --locked`,
 `npm --prefix web ci`, `npm --prefix web run build`, Playwright Chromium installed
 from `web/`, Python 3 and tmux. The CLI and service fixtures use private temporary
 TOML configuration, not developer/customer profiles. The test issues synthetic
@@ -56,7 +56,7 @@ sessions/tokens; OIDC login itself is not exercised.
 ```bash
 # Supply only an explicitly disposable pgvector database with CREATE DATABASE
 # and CREATE ROLE rights. Never point this gate at a customer/dev Memory database.
-MEMORY_FEDERATION_E_CLIENTS=1 node tests/federation-pds/run.mjs --runtime
+CODIFIX_FEDERATION_E_CLIENTS=1 node tests/federation-pds/run.mjs --runtime
 ```
 
 The application database roles are distinct non-superusers and cannot connect
@@ -68,8 +68,8 @@ is published. All test-owned services, temporary configurations and PTY sockets
 are cleaned up. Databases left by an assertion failure remain only in the caller's
 explicitly disposable PostgreSQL fixture; remove that fixture after diagnosis.
 
-`MEMORY_FEDERATION_E_SCREENSHOTS` optionally retains only synthetic desktop/mobile
-screenshots in a chosen local directory. `MEMORY_FEDERATION_E_AGENT_BROWSER=1`
+`CODIFIX_FEDERATION_E_SCREENSHOTS` optionally retains only synthetic desktop/mobile
+screenshots in a chosen local directory. `CODIFIX_FEDERATION_E_AGENT_BROWSER=1`
 adds an independent agent-browser initial-page check when that tool is available.
 CI runs the real-PDS browser/CLI/PTY gate on relevant Rust, CLI and Web changes.
 
@@ -143,8 +143,8 @@ workflow with three newly created independent databases. It needs an explicitly
 disposable pgvector/PostgreSQL 16 or 17 URL whose test role can create/drop databases:
 
 ```bash
-cargo test -p mem-federation-runtime --test c_workflow --locked --no-run
-MEMORY_LAYER_TEST_DATABASE_URL=postgres://TEST_USER:TEST_PASSWORD@127.0.0.1:TEST_PORT/TEST_DB \
+cargo test -p codifix-federation-runtime --test c_workflow --locked --no-run
+CODIFIX_TEST_DATABASE_URL=postgres://TEST_USER:TEST_PASSWORD@127.0.0.1:TEST_PORT/TEST_DB \
   node tests/federation-pds/run.mjs --runtime
 ```
 

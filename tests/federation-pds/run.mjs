@@ -93,7 +93,7 @@ async function runtimeTest() {
   const fixture = join(runtime, 'pds-fixture.json');
   await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
     repository: state.did, token: state.accessJwt, signing_key: state.signingKey }), { mode: 0o600 });
-  const testEnv = { ...process.env, MEMORY_FEDERATION_PDS_FIXTURE: fixture, CODIFIX_TEST_REQUIRE_DB: '1' };
+  const testEnv = { ...process.env, CODIFIX_FEDERATION_PDS_FIXTURE: fixture, CODIFIX_TEST_REQUIRE_DB: '1' };
   delete testEnv.CODIFIX_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;
   delete testEnv.CODIFIX_FEDERATION_CONFIG;
@@ -115,9 +115,9 @@ async function runtimeTest() {
     const code = await new Promise((resolve, reject) => { app.once('error', reject); app.once('exit', resolve); });
     if (code !== 0) throw new Error('Two-instance Memory application workflow failed');
   } finally { clearTimeout(appTimer); }
-  const expertiseEnv = { ...testEnv, MEMORY_FEDERATION_F1_INSTANCES: '1' };
-  if (testEnv.MEMORY_FEDERATION_E_CLIENTS === '1') expertiseEnv.MEMORY_FEDERATION_F1_CLIENTS = '1';
-  delete expertiseEnv.MEMORY_FEDERATION_E_CLIENTS;
+  const expertiseEnv = { ...testEnv, CODIFIX_FEDERATION_F1_INSTANCES: '1' };
+  if (testEnv.CODIFIX_FEDERATION_E_CLIENTS === '1') expertiseEnv.CODIFIX_FEDERATION_F1_CLIENTS = '1';
+  delete expertiseEnv.CODIFIX_FEDERATION_E_CLIENTS;
   const expertise = spawn('cargo', ['test', '-p', 'codifix-service', 'f1_independent_instances', '--locked', '--', '--test-threads=1', '--nocapture'],
     { cwd: join(directory, '../..'), env: expertiseEnv, stdio: 'inherit' });
   const expertiseTimer = setTimeout(() => expertise.kill('SIGTERM'), 540_000);
@@ -125,8 +125,10 @@ async function runtimeTest() {
     const code = await new Promise((resolve, reject) => { expertise.once('error', reject); expertise.once('exit', resolve); });
     if (code !== 0) throw new Error('F1 expertise separate-database workflow failed');
   } finally { clearTimeout(expertiseTimer); }
+  const agentsEnv = { ...testEnv, CODIFIX_FEDERATION_AGENT_INSTANCES: '1' };
+  delete agentsEnv.CODIFIX_FEDERATION_E_CLIENTS; // watched-agent policies are bound in-process
   const agents = spawn('cargo', ['test', '-p', 'codifix-service', 'watched_agents_four_area_signed_pds_rehearsal', '--locked', '--', '--test-threads=1', '--nocapture'],
-    { cwd: join(directory, '../..'), env: { ...testEnv, MEMORY_FEDERATION_AGENT_INSTANCES: '1' }, stdio: 'inherit' });
+    { cwd: join(directory, '../..'), env: agentsEnv, stdio: 'inherit' });
   const agentsTimer = setTimeout(() => agents.kill('SIGTERM'), 540_000);
   try {
     const code = await new Promise((resolve, reject) => { agents.once('error', reject); agents.once('exit', resolve); });

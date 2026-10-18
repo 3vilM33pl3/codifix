@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Independent databases/credentials and real HTTP, origin workers and mailbox.
-use super::two_instance::{Database, Network, app, pump};
+use super::two_instance::{Database, Network, app, cli_binary, pump};
 use super::*;
 
 async fn caller_policy(f: &mut Fixture) {
@@ -837,7 +837,7 @@ async fn clients(
         .unwrap()
         .write_all(
             &serde_json::to_vec(
-                &json!({"synthetic":true,"left":sides[0],"right":sides[1],"mcp_token":token}),
+                &json!({"synthetic":true,"binary":cli_binary(),"left":sides[0],"right":sides[1],"mcp_token":token}),
             )
             .unwrap(),
         )

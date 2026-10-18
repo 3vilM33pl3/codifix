@@ -4,12 +4,20 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 let input = ''; for await (const chunk of process.stdin) input += chunk;
 const fixture = JSON.parse(input);
+assert.equal(typeof fixture.binary, 'string');
+assert(isAbsolute(fixture.binary));
 const directory = await mkdtemp(join(tmpdir(), 'memory-e-clients-'));
+// Explicit disposable configs must not inherit operator routing or overrides.
+const environment = { ...process.env, HOME: directory,
+  XDG_CONFIG_HOME: join(directory, 'config'), XDG_STATE_HOME: join(directory, 'state'), XDG_CACHE_HOME: join(directory, 'cache'),
+  USERPROFILE: directory, LOCALAPPDATA: join(directory, 'local'), APPDATA: join(directory, 'roaming') };
+for (const key of Object.keys(environment)) if (key.startsWith('CODIFIX_')) delete environment[key];
+environment.CODIFIX_PROFILE = 'prod';
 const browser = await chromium.launch({ headless: true });
 const errors = [];
 async function rpc(side, suffix, body) {
@@ -20,12 +28,13 @@ async function rpc(side, suffix, body) {
   assert.equal(response.ok, true, `Fixture API returned ${response.status} for ${suffix}`);
   return response.json();
 }
-async function until(test) {
-  for (let i = 0; i < 100; i++) { const value = await test(); if (value) return value; await new Promise(r => setTimeout(r, 100)); }
+async function until(test, timeout = 10000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) { const value = await test(); if (value) return value; await new Promise(r => setTimeout(r, 100)); }
   throw new Error('Timed out waiting for accepted/replicated workflow state');
 }
 async function clientProcess(program, args, stdin) {
-  const child = spawn(program, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CODIFIX_PROFILE: 'prod' } });
+  const child = spawn(program, args, { stdio: ['pipe', 'pipe', 'pipe'], env: environment });
   let stdout = '', stderr = ''; child.stdout.on('data', b => stdout += b); child.stderr.on('data', b => stderr += b);
   if (stdin) child.stdin.end(JSON.stringify(stdin)); else child.stdin.end();
   const timer = setTimeout(() => child.kill('SIGTERM'), 45000);
@@ -33,7 +42,7 @@ async function clientProcess(program, args, stdin) {
   clearTimeout(timer); assert.equal(code, 0, `Client failed: ${stderr.slice(-2000)}`); return stdout;
 }
 async function cli(side, ...args) {
-  return JSON.parse(await clientProcess(resolve('target/debug/memory'), ['--config', side.config, 'federation', '--project', side.project, ...args]));
+  return JSON.parse(await clientProcess(fixture.binary, ['--config', side.config, 'federation', '--project', side.project, ...args]));
 }
 async function pageFor(side) {
   const context = await browser.newContext({ viewport: { width: 1360, height: 960 } });
@@ -59,7 +68,7 @@ async function confirm(page) {
 try {
   // Skill-driven dev-server gut check: independent browser navigation, rendered
   // controls, screenshot and overlay check before the authenticated journey.
-  if (process.env.MEMORY_FEDERATION_E_AGENT_BROWSER === '1') {
+  if (process.env.CODIFIX_FEDERATION_E_AGENT_BROWSER === '1') {
     const session = `memory-e-${randomUUID()}`;
     const ab = (...args) => clientProcess('npx', ['--yes', 'agent-browser', '--session', session, ...args]);
     try {
@@ -84,7 +93,8 @@ try {
   await left.getByText('Reviewed incident diagnosis', { exact: true }).waitFor();
   await left.getByRole('button', { name: 'Review publication consent' }).click();
   await confirm(left);
-  await until(async () => (await rpc(fixture.right, '/catalog')).streams.items.some(s => s.shared_version === 1));
+  // Startup occurs before local grants; retain the 30s authorization backoff.
+  await until(async () => (await rpc(fixture.right, '/catalog')).streams.items.some(s => s.shared_version === 1), 45000);
   await right.getByRole('button', { name: 'Refresh local status', exact: true }).click();
   await right.getByRole('button', { name: `Read and cite ${fixture.canonical}`, exact: true }).click();
   await right.getByLabel('Proposed corrected text').fill('Reviewed two-organization correction');
@@ -102,7 +112,7 @@ try {
   assert(!JSON.stringify(context).includes('NEVER_SHARE'));
   await right.getByRole('button', { name: 'Refresh local status', exact: true }).click();
   await right.getByRole('button', { name: `Read and cite ${fixture.canonical}`, exact: true }).click();
-  await right.getByText('Reviewed two-organization correction', { exact: true }).waitFor();
+  await right.locator('p.federation-text').filter({ hasText: /^Reviewed two-organization correction$/ }).waitFor();
   assert.equal(await right.locator('script').filter({ hasText: 'do not execute' }).count(), 0);
   await right.screenshot({ path: join(directory, 'federation-desktop.png'), fullPage: true });
   await right.setViewportSize({ width: 390, height: 844 });
@@ -110,7 +120,7 @@ try {
   await right.screenshot({ path: join(directory, 'federation-mobile.png'), fullPage: true });
   // Real PTY interaction submits another proposal; CLI then inspects/rejects it.
   const terminal = await clientProcess('python3', ['web/tests/federation-terminal.py'], {
-    binary: resolve('target/debug/memory'), config: fixture.right.config, project: fixture.right.project,
+    binary: fixture.binary, config: fixture.right.config, project: fixture.right.project,
     origin: fixture.left.instance, canonical: fixture.canonical,
   });
   assert(terminal.includes('PTY federation context and confirmed correction passed'));
@@ -125,9 +135,9 @@ try {
   console.log('E clients: real browser review/publish/cite/propose/approve, CLI discovery/context/idempotent rejection, PTY proposal, desktop/mobile and escaped imported evidence passed.');
   // Only synthetic screenshots are optionally retained; session/config secrets
   // stay in this private disposable directory and are always removed.
-  if (process.env.MEMORY_FEDERATION_E_SCREENSHOTS) {
+  if (process.env.CODIFIX_FEDERATION_E_SCREENSHOTS) {
     const { copyFile, mkdir } = await import('node:fs/promises');
-    await mkdir(process.env.MEMORY_FEDERATION_E_SCREENSHOTS, { recursive: true });
-    for (const name of ['federation-desktop.png', 'federation-mobile.png']) await copyFile(join(directory, name), join(process.env.MEMORY_FEDERATION_E_SCREENSHOTS, name));
+    await mkdir(process.env.CODIFIX_FEDERATION_E_SCREENSHOTS, { recursive: true });
+    for (const name of ['federation-desktop.png', 'federation-mobile.png']) await copyFile(join(directory, name), join(process.env.CODIFIX_FEDERATION_E_SCREENSHOTS, name));
   }
 } finally { await browser.close(); await rm(directory, { recursive: true, force: true }); }
