@@ -41,7 +41,7 @@ An operator-built package containing the reviewed runtime includes
 With your existing projects folder, start:
 
 ```bash
-codifix-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
+codifix-onboard first-run --company https://knowledge.example.com \
   --runtime /ABS/INSTALLED-RUNTIME/runtime-prerequisites.json \
   --name "My Mac" --workspace-parent "$HOME/Projects" \
   --state "$HOME/Library/Application Support/codifix/onboarding"
@@ -184,15 +184,15 @@ must already be private (0700); the output is create-only (0600), never a device
 credential or a server database connection:
 
 ```bash
-codifix projects subscription --company https://<company-origin> \
-  --area workshop --owner-instance <instance-uuid> \
-  --project <project-uuid> --revision <reviewed-revision> \
-  --output /Users/<you>/.config/codifix/subscription.json
-codifix projects subscription --company https://<company-origin> \
-  --area workshop --owner-instance <instance-uuid> \
-  --project <project-uuid> --revision <reviewed-revision> \
-  --output /Users/<you>/.config/codifix/subscription.json \
-  --bootstrap-sha256 <digest-from-preview> --confirm
+codifix projects subscription --company https://knowledge.example.com \
+  --area workshop --owner-instance 11111111-1111-4111-8111-111111111111 \
+  --project 22222222-2222-4222-8222-222222222222 --revision 1 \
+  --output /Users/example/.config/codifix/subscription.json
+codifix projects subscription --company https://knowledge.example.com \
+  --area workshop --owner-instance 11111111-1111-4111-8111-111111111111 \
+  --project 22222222-2222-4222-8222-222222222222 --revision 1 \
+  --output /Users/example/.config/codifix/subscription.json \
+  --bootstrap-sha256 DIGEST_FROM_PREVIEW --confirm
 ```
 
 An identical confirmed replay retains the local subscription UUID. A different
@@ -280,10 +280,10 @@ remote authorization or successful native Mac acceptance.
 Manual preparation/inspection uses the same implementation:
 
 ```bash
-codifix projects agents prepare --company https://<company-origin> \
+codifix projects agents prepare --company https://knowledge.example.com \
   --caller codex --workspace-journal /ABS/PRIVATE/project-onboarding.json --open-browser
-codifix projects agents status --company https://<company-origin> --agent-id AGENT_UUID
-codifix projects agents configure --company https://<company-origin> \
+codifix projects agents status --company https://knowledge.example.com --agent-id AGENT_UUID
+codifix projects agents configure --company https://knowledge.example.com \
   --agent-id AGENT_UUID --profile /ABS/PRIVATE/installation/profiles/SUBSCRIPTION_UUID.json \
   --workspace-journal /ABS/PRIVATE/project-onboarding.json
 ```
