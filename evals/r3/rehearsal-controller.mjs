@@ -37,6 +37,8 @@ const env = native ? { SystemRoot: process.env.SystemRoot, WINDIR: process.env.S
   PATH: path.dirname(configuration.binaries.node.path), HOME: process.env.HOME, USERPROFILE: process.env.HOME,
   TEMP: process.env.HOME, TMP: process.env.HOME, CODIFIX_PROFILE: 'prod' }
   : { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: process.env.HOME, CODIFIX_PROFILE: 'prod' };
+// Campaign run/review retain the CLI config prerequisite, but never use an ambient service.
+Object.assign(env, { CODIFIX__SERVICE__BIND_ADDR: '127.0.0.1:9', CODIFIX__SERVICE__API_TOKEN: 'unused-local-campaign-parser', CODIFIX__DATABASE__URL: 'postgresql://unused:unused@127.0.0.1:9/unused' });
 let activeCli, stopping = false, dispatcher;
 const interrupted = () => { stopping = true; activeCli?.kill(native ? 'SIGKILL' : 'SIGINT'); void dispatcher?.close(); };
 process.once('SIGINT', interrupted);

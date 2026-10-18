@@ -15,7 +15,8 @@ test('campaign CLI exports blinded packets and applies synthetic ballots without
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-review-'));
   t.after(() => fs.rm(root, { recursive: true }));
   const pack = path.join(root, 'pack');
-  const env = { PATH: process.env.PATH, HOME: root, CODIFIX_PROFILE: 'prod' };
+  const env = { PATH: process.env.PATH, HOME: root, CODIFIX_PROFILE: 'prod',
+      CODIFIX__SERVICE__BIND_ADDR: '127.0.0.1:9', CODIFIX__SERVICE__API_TOKEN: 'unused-local-campaign-parser', CODIFIX__DATABASE__URL: 'postgresql://unused:unused@127.0.0.1:9/unused' };
   const invoke = (program, args) => spawnSync(program, args, { env, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
   const ok = result => { assert.equal(result.status, 0, result.stderr); return result; };
   const write = (file, value) => fs.writeFile(file, JSON.stringify(value));

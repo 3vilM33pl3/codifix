@@ -16,7 +16,8 @@ test('real campaign run and explicit resume preserve dispatch count, results and
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'memory-r3-runner-cli-'));
   t.after(() => fs.rm(root, { recursive: true }));
   const pack = path.join(root, 'pack');
-  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: root, CODIFIX_PROFILE: 'prod' };
+  const env = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: root, CODIFIX_PROFILE: 'prod',
+      CODIFIX__SERVICE__BIND_ADDR: '127.0.0.1:9', CODIFIX__SERVICE__API_TOKEN: 'unused-local-campaign-parser', CODIFIX__DATABASE__URL: 'postgresql://unused:unused@127.0.0.1:9/unused' };
   const invoke = (program, args) => new Promise((resolve, reject) => {
     const child = spawn(program, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';

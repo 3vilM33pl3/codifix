@@ -13,7 +13,8 @@ import { openCampaignDispatch } from './campaign-dispatch.mjs';
 function cli(binary, root, args, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ['eval', 'campaign', ...args], { cwd: root,
-      env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), CODIFIX_PROFILE: 'prod' },
+      env: { PATH: '/usr/bin:/bin', HOME: path.join(root, 'private'), CODIFIX_PROFILE: 'prod',
+      CODIFIX__SERVICE__BIND_ADDR: '127.0.0.1:9', CODIFIX__SERVICE__API_TOKEN: 'unused-local-campaign-parser', CODIFIX__DATABASE__URL: 'postgresql://unused:unused@127.0.0.1:9/unused' },
       stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
     let stdout = '', stderr = '';
