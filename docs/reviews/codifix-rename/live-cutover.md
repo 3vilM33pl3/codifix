@@ -130,7 +130,15 @@ operational evidence directory below.
     passed. Only owned disposable fixtures were cleaned up.
   Astra reviewed the source changes; production auth/routing guards and the CA
   host are unchanged. These are later source fixes, not rebuilt release assets.
-  The next CI run must validate this batch; no full remote pass is claimed yet.
+  Run `39121056109` subsequently passed DB Integration, private PDS/federation,
+  Windows, synthetic macOS, format, web and offline CA preparation. Its only
+  failed selected job was Rust Tests: local journal recovery observed no lost
+  owner immediately after owner drop. `dd323332` explicitly unlocks all three
+  local journal lock scopes, covering normal exit and errors while preserving
+  live-owner exclusion and uncertainty-only recovery. A retained duplicate
+  descriptor deterministically reproduced the old failure; the fixed platform
+  crate passed 7/7 and 20 parallel repetitions passed 60 journal tests. Astra
+  found no source blocker. Remote CI on this final correction remains pending.
 - **CA pending:** its latest RESULT INBOX still contains only the 17 October
   inventory. Existing console binding/recovery follow-ups remain pending.
   CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
@@ -170,6 +178,9 @@ Follow-up evidence: `ci-followup-391101-attempt2/` contains completed CI job log
 `token-parallel-local.log`, `pds-canonical-gates-local-4.log`,
 `r3-approved-full-local.log`, `r3-review-runner-local.log`,
 `r3-rehearsal-task-local.log`, and `isolation-canonical-local-2.log`.
+The deterministic journal reproduction and passing tests are retained in
+`journal-lock-fix/` as `codifix-journal-before.log`,
+`codifix-journal-after.log`, and `codifix-journal-parallel.log`.
 
 ## Recovery and temporary remnants
 
