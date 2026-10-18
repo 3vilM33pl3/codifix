@@ -3,9 +3,17 @@
 CA is console-administered only. SSH is deliberately disabled: do not enable it,
 request SSH certificates or renew a login. Preserve Step CA, OpenBao, issuance,
 trust, credentials, firewall and the existing host security boundary.
-Ask Olivier before any CA installation, service/configuration change, migration,
-retirement or recovery mutation. Read-only follow-ups are coordinated through
-Notion's CURRENT ACTION and RESULT INBOX page bodies.
+On 18 October Olivier authorized preparing the scoped Trust application upgrade
+for execution by the CA-local agent. The current instructions are in
+[the one-session upgrade handoff](ca-upgrade-agent-handoff.md), coordinated
+through Notion's CURRENT ACTION and RESULT INBOX. That scope permits the stated
+application installation, migration and retirement; it does not authorize
+changing Step CA, OpenBao, SSH or other protected host services.
+
+The inventory and read-only requests below record the earlier preparation phase.
+Their pending observations are resolved inside the current upgrade procedure;
+the earlier read-only scope is not a requirement to ask for the same approval
+again. Historical reports do not establish current host state.
 
 ## Received inventory, 17 October 2026
 
