@@ -2,6 +2,13 @@
 
 This guide is written for someone who just wants Codifix working with as little setup friction as possible.
 
+The current distribution is the [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
+These instructions follow current `main`; source fixes after the candidate are
+not included in its packages. If you are joining an existing installation,
+start with [Team setup](https://codifix.dev/docs/team-setup) instead of creating
+another database. Moving from Memory Layer requires the
+[release-specific update procedure](https://codifix.dev/docs/install/update).
+
 When developing Codifix itself, use the repository's shared memory helper
 for durable project notes: it explicitly selects the Workshop API. The separate
 dev backend/database is for testing. See [project memory routing and dev recovery](../developer/dev-stack.md#project-memory-routing-and-recovery).
@@ -165,114 +172,24 @@ codifix health
 
 ## Agent Install Prompt
 
-Give this prompt to an agent when you want it to install Codifix for you:
-
-````
-# Install Codifix
-
-You are installing Codifix for me. Work in the terminal, explain before using sudo, and stop before destructive changes.
-
-## Goal
-
-Install Codifix completely on this machine and configure it for the project I choose.
-
-Repository: https://github.com/3vilM33pl3/codifix
-GitHub Releases: https://github.com/3vilM33pl3/codifix/releases
-
-## Rules
-
-- Detect whether this is Linux/Debian-style or macOS.
-- Do not invent secrets.
-- PostgreSQL is required. Before running `codifix wizard --global`, find an existing database URL or ask me whether to use an existing/hosted PostgreSQL database or create a local one.
-- If creating a local PostgreSQL database, create a dedicated database and user named `codifix` unless I ask for different names.
-- Do not invent the database password; ask me for it or generate one only after confirming that is OK.
-- Make sure the PostgreSQL server has pgvector installed and that the target database has `CREATE EXTENSION IF NOT EXISTS vector;` applied.
-- Verify PostgreSQL with `psql "$DATABASE_URL" -c "SELECT 1;"` and verify pgvector with `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` before configuring Codifix.
-- Ask me for optional LLM or embedding API keys only if I want scan or semantic retrieval.
-- Make sure Go is available on PATH so repo-local Codifix skills can run.
-- Run health checks before saying the install is done.
-
-## Linux / Debian path
-
-1. Download the latest Codifix `.deb` from https://github.com/3vilM33pl3/codifix/releases.
-2. Install the package for the machine architecture:
-   - x86_64: `sudo dpkg -i codifix_<version>_amd64.deb`
-   - arm64 / Raspberry Pi 4/5 with a 64-bit OS: `sudo dpkg -i codifix_<version>_arm64.deb`
-3. Prepare PostgreSQL before configuring Codifix:
-   - If using a hosted/existing database, verify that it accepts connections from this machine and supports pgvector.
-   - If creating a local database, install PostgreSQL and the matching pgvector package for the server major version, for example `postgresql-16-pgvector` when the server is PostgreSQL 16.
-   - Create or receive a database URL such as `postgres://codifix:<password>@127.0.0.1:5432/codifix`.
-   - Run `psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"`.
-   - Run `psql "$DATABASE_URL" -c "SELECT 1;"` and `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"`.
-4. Run `codifix wizard --global` and configure the verified database URL and optional LLM/embedding settings.
-5. Go to my target project directory.
-6. Run `codifix wizard --dry-run`, then `codifix wizard` for repo-local setup.
-7. Start the backend with `sudo systemctl enable --now codifix.service`.
-8. Run `codifix doctor`, `codifix health`, and then open `codifix tui`.
-
-## macOS path
-
-1. Run `brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix`.
-2. Run `brew install 3vilM33pl3/codifix/codifix`.
-3. Prepare PostgreSQL before configuring Codifix:
-   - If using a hosted/existing database, verify that it accepts connections from this machine and supports pgvector.
-   - If creating a local database, use Homebrew PostgreSQL and pgvector, then create a dedicated `codifix` database and user.
-   - Create or receive a database URL such as `postgres://codifix:<password>@127.0.0.1:5432/codifix`.
-   - Run `psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"`.
-   - Run `psql "$DATABASE_URL" -c "SELECT 1;"` and `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"`.
-4. Run `codifix wizard --global` and configure the verified database URL and optional LLM/embedding settings.
-5. Go to my target project directory.
-6. Run `codifix wizard --dry-run`, then `codifix wizard` for repo-local setup.
-7. Start the backend with `codifix service enable`.
-8. Run `codifix doctor`, `codifix health`, and then open `codifix tui`.
-
-## Finish
-
-Report what was installed, where the config files are, whether the service is healthy, and what I should run next.
-````
+Use the [agent setup prompts](https://codifix.dev/docs/install/agent-setup) for
+a standalone installation. They reference the current package guides, checksums
+and prerequisites rather than duplicating platform commands here. For an
+existing organization, follow [Team setup](https://codifix.dev/docs/team-setup).
 
 ## Agent Repo Memory Init Prompt
 
-Give this separate prompt to an agent when Codifix is installed already and you want it to configure a specific project:
-
-````
-# Initialize Repository For Codifix
-
-You are configuring an existing project for Codifix. Work in the terminal, explain before changing files, and stop before destructive changes.
-
-## Goal
-
-Create or refresh repo-local Codifix configuration so agents can write, query, and curate project memory safely.
-
-## Rules
-
-- Work in the target project directory I give you.
-- Do not install the system package; this prompt is only for repo-local Codifix setup.
-- Do not create or reinitialize git history.
-- Do not delete existing `.codifix/`, `.agents/`, or Codifix config files.
-- If `.codifix/project.toml`, legacy `.codifix/config.toml`, `.agents/codifix.toml`, or `.agents/skills/` already exist, inspect them and preserve local customizations.
-- Ask me before overwriting files, rotating credentials, importing history, or running a write operation that was not previewed.
-- Make sure the shared backend is configured and healthy before saying setup is done.
-- Make sure Go is available on `PATH` because repo-local Codifix skills use the Go helper.
-
-## Steps
-
-1. Run `codifix health` and `codifix doctor`.
-2. Run `codifix wizard --dry-run` in the target project to preview setup.
-3. Run `codifix wizard` to create or refresh the user-local project config, `.codifix/project.toml`, and `.agents/` Codifix files.
-4. Run `codifix doctor` again.
-5. If commit history should be available as evidence, run `codifix commits sync --project <project-slug> --dry-run`, then run it for real only if the preview looks correct.
-6. If an initial scan is wanted, run `codifix scan --project <project-slug> --dry-run`, then run it for real only after I approve the preview.
-7. Open `codifix tui` or report the project slug and next commands.
-
-## Finish
-
-Report which repo-local files were created or preserved, the project slug, backend health, and any follow-up actions.
-````
+If Codifix is already installed, use the repository-initialization prompt on the
+same [agent setup page](https://codifix.dev/docs/install/agent-setup#prompt-for-initializing-your-repository).
+Inspect existing `.codifix/` and `.agents/` files, verify the selected area,
+preview with `codifix wizard --dry-run`, and preserve customizations.
 
 ## Fast Install: Debian
 
-1. Download the latest `.deb` package from the GitHub Releases page.
+1. Download the architecture-matched Codifix prerelease and verify its checksum
+   using the [Linux install guide](https://codifix.dev/docs/install/linux-debian).
+   GitHub's `.rc.1` download spelling differs from the original `~rc.1`
+   checksum filename; follow that guide's exact save-as commands.
 2. Install it:
 
 ```bash
@@ -331,18 +248,16 @@ codifix tui
 
 ## Fast Install: macOS
 
-1. Tap this repository and install the formula:
+1. Prefer the architecture-matched unsigned candidate package described in the
+   [macOS install guide](https://codifix.dev/docs/install/macos-homebrew).
+   Homebrew currently supports source `HEAD` only:
 
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
-brew install 3vilM33pl3/codifix/codifix
-```
-
-If you specifically want the latest unreleased `main` branch:
-
-```bash
 brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
+
+This builds current `main`, which can differ from the published candidate.
 
 2. Create the PostgreSQL database and prepare pgvector using the [PostgreSQL Requirement](#postgresql-requirement) section. Do not continue until these commands work:
 
@@ -394,7 +309,11 @@ http://127.0.0.1:4040/
 
 ## Fast Install: Windows
 
-1. Install the x86_64 MSI. It installs per user under `%LOCALAPPDATA%\Programs\Codifix` and adds its `bin` directory to the user `PATH`.
+1. Follow the [Windows preview guide](https://codifix.dev/docs/install/windows)
+   to verify the unsigned x86_64 MSI and install the separate VC++ x64 runtime.
+   It installs per user under `%LOCALAPPDATA%\Programs\Codifix` and adds its
+   `bin` directory to the user `PATH`. It does not bundle a complete native
+   PostgreSQL/PDS/Pi stack.
 2. Start the bundled PostgreSQL Compose template using the [Local Windows PostgreSQL](#local-windows-postgresql) instructions.
 3. Open a new PowerShell window and configure Codifix:
 
@@ -594,7 +513,7 @@ audit activity.
 
 ## Writer ID
 
-Codifix v2 derives durable authorship from the authenticated principal.
+Codifix derives durable authorship from the authenticated principal.
 The writer ID is an advisory runtime label for activity and diagnostics; it
 does not grant access and cannot replace principal identity.
 
@@ -646,54 +565,19 @@ The wizard exposes this as a shared setup option, and `codifix service enable` c
 
 ## Daily Use
 
-Open the TUI:
+Use [Daily workflow](https://codifix.dev/docs/daily-workflow) for capture,
+retrieval, resume, jobs and sync. Start by verifying the destination:
 
 ```bash
-codifix tui
+codifix urls
+codifix status --project my-project --json
+codifix tui --project my-project
 ```
 
-For a visual walkthrough of each tab, use the [TUI Guide](tui/README.md).
-
-Open the web UI:
-
-```text
-http://127.0.0.1:4040/
-```
-
-Check health:
-
-```bash
-codifix service status
-codifix health
-codifix doctor
-```
-
-Save a useful project fact:
-
-```bash
-codifix remember --project my-project --note "Deployment uses a systemd service."
-```
-
-Search project memory:
-
-```bash
-codifix query --project my-project --question "How is deployment handled here?"
-```
-
-Export a shareable codifix bundle:
-
-```bash
-codifix bundle export --project my-project --out my-project.mlbundle.zip
-```
-
-For semantic-search maintenance commands such as `codifix embeddings reindex`, `codifix embeddings reembed`, and `codifix embeddings prune`, see [Embedding Operations](cli/embeddings.md).
-For project memory backup and restore, see [Memory Bundles](cli/bundles.md).
-For watcher health states, restart behavior, and recovery signals in the TUI, see [Watcher Health](cli/watchers.md).
-For the direct write command, see [Remember Command](cli/remember.md).
-For service management and setup diagnostics, see [Service Commands](cli/service.md) and [Doctor Diagnostics](cli/doctor.md).
-For bootstrap behavior, see [Wizard And Bootstrap](cli/wizard.md).
-
-For getting back into flow after an interruption, see [Resume Briefings](cli/resume.md).
+A project slug scopes knowledge inside an installation; it does not select an
+area. See [Areas and projects](https://codifix.dev/docs/areas). For focused
+commands, use [Remember](cli/remember.md), [Query](cli/query.md),
+[Resume](cli/resume.md), [Jobs](cli/jobs.md), or [Bundles](cli/bundles.md).
 
 ## Shell Completion
 
@@ -711,97 +595,43 @@ See [Shell Completion](cli/completion.md) for install paths and shell-specific s
 
 ## Optional Background Watcher
 
-If you want Codifix to capture useful work in the background:
+The manager is the preferred way to attach to configured coding-agent sessions:
 
 ```bash
-codifix watcher enable --project my-project
-```
-
-When the backend service restarts, service-managed watchers will restart too so they reconnect cleanly to the new backend instance.
-
-Check it:
-
-```bash
+codifix watcher manager enable --dry-run
+codifix watcher manager enable
+codifix watcher manager status
 codifix watcher status --project my-project
 ```
 
-In the TUI:
-
-- the `Watchers` tab shows each watcher's health, restart attempts, and last heartbeat
-- the `Project` tab's recent activity section shows watcher-health transitions such as `stale`, `restarting`, `failed`, and recovery back to `healthy`
-- recovery events now show what state the watcher recovered from and, when relevant, how many restart attempts happened before recovery
-
-Disable it later:
-
-```bash
-codifix watcher disable --project my-project
-```
+For area deployments, the manager pins each child's exact area, instance and
+configuration. Legacy per-project `watcher enable` is rejected there. Follow
+[Watchers](https://codifix.dev/docs/watchers) and
+[Area routing](https://codifix.dev/docs/how-it-works/area-routing) for manual
+processes, ownership and recovery.
 
 ## Upgrading An Existing Install
 
-If you already use Codifix and are upgrading to a newer release:
+Follow the [Update guide](https://codifix.dev/docs/install/update) and the
+selected release's procedure. The Memory Layer-to-Codifix rename requires an
+explicit cutover with a matched backup; it is not an in-place package upgrade.
+Named areas have independently pinned executables, so neither package
+installation nor `service restart-all` upgrades those instances.
 
-1. install the new `.deb`
-2. make sure pgvector is installed on the PostgreSQL server for your server version
-3. enable the extension in the specific database named by `database.url`:
-
-```bash
-psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
-psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"
-```
-
-4. restart the backend service:
-
-```bash
-sudo systemctl restart codifix.service
-```
-
-5. verify the setup:
+After the selected upgrade and service procedure, verify health and review
+repo-local skill changes:
 
 ```bash
 codifix doctor
-```
-
-6. rebuild embeddings for existing project memories:
-
-```bash
-codifix embeddings reindex --project my-project
-```
-
-If you later switch the embedding model, Codifix keeps the old embedding space instead of overwriting it. Use:
-
-```bash
-codifix embeddings reembed --project my-project
-```
-
-to materialize vectors for the newly active space, and:
-
-```bash
-codifix embeddings prune --project my-project
-```
-
-only when you want to delete non-active embedding spaces explicitly.
-
-For the command-level explanation of when to use each of those operations, see [Embedding Operations](cli/embeddings.md).
-
-If `codifix doctor` reports that `pgvector` is missing, install the PostgreSQL server package first, enable `vector` in the Codifix database, and rerun the check.
-
-On Debian, upgrades should preserve local edits to:
-
-- `/etc/codifix/codifix.env`
-- `/etc/codifix/codifix.toml`
-
-Those files are treated as package-managed configuration files rather than being overwritten
-with package defaults on every upgrade.
-
-Package upgrades also update the installed Memory skill template. Existing project-local skills in `.agents/skills/` are refreshed explicitly so local customizations are not overwritten silently:
-
-```bash
+codifix health
+codifix status --project my-project
 codifix upgrade --dry-run
-codifix upgrade
 ```
 
-`codifix doctor` reports stale or missing project skills through `workflow.project_skills` and compares them with the current GitHub skill bundle through `workflow.project_skills_github`. `codifix doctor --fix` downloads the current skill bundle from GitHub when possible, repairs repo-local skills, and falls back to the installed template if GitHub is unavailable.
+Refresh skills only after reviewing that preview. Rebuilding or pruning
+embedding spaces is separate maintenance, not a required step for every
+upgrade; see [Embedding operations](cli/embeddings.md). Application migrations
+are append-only; never edit a migration ledger to force compatibility.
 
 ## Using `scan`
 

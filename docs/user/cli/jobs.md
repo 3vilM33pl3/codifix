@@ -1,15 +1,18 @@
 # Background jobs
 
+These commands describe current `main` (`3.0.0-rc.1`). Use the
+[Web UI](https://codifix.dev/docs/web-ui) for the equivalent inspection workflow.
+
 Curation returns after its mutations, timeline events and enrichment intents
 commit together. It does not wait for embedding or consolidation. The service
 recovers pending work from PostgreSQL after restart; polling is authoritative.
 
 ```bash
-codifix jobs --project memory
-codifix jobs --project memory list --status blocked --limit 20
-codifix jobs --project memory inspect JOB_UUID
-codifix jobs --project memory --json inspect JOB_UUID
-codifix jobs --project memory retry JOB_UUID --request-id REQUEST_UUID --yes
+codifix jobs --project example-project
+codifix jobs --project example-project list --status blocked --limit 20
+codifix jobs --project example-project inspect JOB_UUID
+codifix jobs --project example-project --json inspect JOB_UUID
+codifix jobs --project example-project retry JOB_UUID --request-id REQUEST_UUID --yes
 ```
 
 Use the returned `next_after` UUID with `list --after UUID` for another bounded
@@ -34,7 +37,7 @@ authority from a revoked requester to an operator or bypass configuration policy
 
 Pre-cutover enrichment has no reconstructed historical jobs. Database operators
 can explicitly request fresh, version-pinned repair work using the
-[R1 rollout and repair procedure](../../developer/architecture/r1-rollout.md).
+[R1 rollout and repair procedure](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/r1-rollout.md).
 
 Choose a request UUID once. If a reply is lost, repeat the **same** request UUID.
 Provider execution is not exactly once: an uncertain attempt can be billed again.

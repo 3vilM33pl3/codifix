@@ -66,6 +66,15 @@ jobs:
               - "web/**"
             docs_site:
               - "docs-site/**"
+              - "docs/user/**"
+              - "README.md"
+              - "CHANGELOG.md"
+              - "Cargo.toml"
+              - "plugins/codifix/.codex-plugin/plugin.json"
+              - "plugins/codifix/.mcp.json"
+              - "scripts/check-codex-plugin.py"
+              - "scripts/tests/test_codex_plugin_docs.py"
+              - ".github/workflows/ci.yml"
             evals:
               - "Cargo.toml"
               - "Cargo.lock"
@@ -91,6 +100,8 @@ jobs:
               - "plugins/codifix/**"
               - ".agents/plugins/marketplace.json"
               - "scripts/check-codex-plugin.py"
+              - "scripts/tests/test_codex_plugin_docs.py"
+              - "docs/user/cli/mcp.md"
               - "docs/user/codex-desktop-plugin.md"
             formal:
               - "formal/codifix-federation/**"
@@ -435,7 +446,12 @@ jobs:
         with:
           node-version: 22
       - run: npm --prefix docs-site ci
+      - run: npm --prefix docs-site run check:content
+      - run: npm --prefix docs-site run test:checks
+      - run: python3 scripts/check-codex-plugin.py
+      - run: python3 -m unittest discover -s scripts/tests -p 'test_codex_plugin_docs.py'
       - run: npm --prefix docs-site run build
+      - run: npm --prefix docs-site run check:built-links
       - run: npm --prefix docs-site run lint:links
       - run: npm --prefix docs-site run check:assets
 

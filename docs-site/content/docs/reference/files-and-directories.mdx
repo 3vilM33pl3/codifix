@@ -15,6 +15,7 @@ Codifix separates machine config, user-local project runtime state, and repo-own
 | `/etc/codifix/codifix.env` | Debian/system env and service token file. | No |
 | `~/.config/codifix/codifix.toml` | Local Linux global config. | No |
 | `~/.config/codifix/codifix.env` | Local Linux global env file. | No |
+| `~/.config/codifix/area-routing.json` | Operator-owned area/instance routing. Never trust a repository copy. | No |
 | `~/Library/Application Support/codifix/codifix.toml` | macOS global config. | No |
 | `~/.config/codifix/projects/<project-key>/config.toml` | User-local project config. | No |
 | `~/.config/codifix/projects/<project-key>/config.dev.toml` | Dev-profile overlay for a source checkout. | No |
@@ -22,6 +23,12 @@ Codifix separates machine config, user-local project runtime state, and repo-own
 | `~/.cache/codifix/projects/<project-key>/` | Linux project cache/index data. | No |
 
 Platform-specific directories follow XDG on Linux and Application Support on macOS.
+
+Area-specific offline queues, watcher state and audit paths include the area
+name and durable instance UUID. Changing the selected area does not migrate old
+queues. Native sync profiles and device credentials belong in protected
+user-local storage, outside repositories. See [area routing](/docs/how-it-works/area-routing)
+and [offline knowledge](/docs/offline).
 
 ## Repo-owned locations
 

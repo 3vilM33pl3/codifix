@@ -1,158 +1,86 @@
-# Release Compatibility And Known Limitations
+# Release compatibility and known limitations
 
-Codifix v2.1.0 is the current stable release. It adds private federation,
-project/device onboarding, curated project synchronization and durable jobs.
-Windows packages remain a preview of client/operator functionality, not a
-complete native PostgreSQL/PDS/Pi installation. Existing PostgreSQL databases
-migrate in place; back them up before starting the new application.
+These guides describe current `main`. The latest published Codifix package is
+[v3.0.0-rc.1](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1),
+a prerelease. Stable Codifix 3.0.0 has not been released. The earlier
+[v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0) packages
+belong to Memory Layer; there was no Codifix v2 release.
 
-Version 2.1.0 embeds migrations through 0084. Already-applied migrations are
-unchanged. Do not run an older executable against a newer database. Named
-instances require an explicit selected-instance upgrade; downloading or
-installing a package does not replace independently pinned instance releases.
-For a bundled Mac installation, use the architecture-matched
-`application-update.pkg` to preserve its runtime; standard packages require
-separately provisioned dependencies and refuse to replace bundled runtimes.
+## Source and package versions
 
-See the [2.1.0 changelog](../../CHANGELOG.md) and
-[dependency security evidence](../reviews/security-dependencies-20261017.md).
-The unpatched upstream RSA advisory is retained, not suppressed; the inspected
-OIDC path uses public-key verification rather than private-key operations.
+The workspace and plugin can still report `3.0.0-rc.1` after fixes have landed on
+`main`. A matching version string does not prove a binary contains those fixes.
+Use the package's `release-inventory.json` for its exact source commit and
+artifact hashes. For a source build, record `git rev-parse HEAD` as well as
+`codifix --version`. Later changes on `main` are not retroactively part of the
+published candidate.
 
-Read the [v2.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.0.0)
-and [changelog](../../CHANGELOG.md) before updating a v1 production installation.
+The candidate contains project memory, private federation, device/project
+onboarding, synchronized knowledge and durable background jobs. Availability
+still depends on build capabilities, explicit configuration, current grants
+and the selected installation. A passing test or a controlled rehearsal does
+not establish complete deployment or platform acceptance.
 
-## v2.0.1 schema compatibility repair
+## Rename and recovery boundary
 
-Release `v2.0.1` restores migrations 33 through 52 to every release artifact.
-Some `v2.0.0` artifacts only embedded migrations through version 32, so they
-refused to start when pointed at a database that had already applied the newer
-migrations. The `v2.0.1` application code is otherwise the `v2.0.0` release.
+Codifix changes executable, package, service, configuration, plugin and
+federation identities. Installing its package does not adopt Memory Layer's
+state. Follow the [update guide](https://codifix.dev/docs/install/update) and
+the [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md)
+for a reviewed cutover that preserves knowledge and recovery material.
 
-Upgrade the application package to `v2.0.1`; do not downgrade the database,
-delete rows from `_sqlx_migrations`, or edit an applied migration. Existing
-databases at migration 52 are accepted without changing their migration ledger,
-while databases below migration 52 are upgraded normally.
+Preserve a matched backup of the database, configuration, credentials,
+attachments, state and original executables before a cutover. PostgreSQL
+migrations are append-only and run at service startup; they do not perform the
+product rename. The candidate embeds migrations through 0085. Never run an old
+Memory Layer binary against a database after Codifix has accepted writes.
 
-After installing `v2.0.1`, restart the service and verify both the binary and
-database health:
+Named instances keep independently pinned executables. Installing a package or
+running `codifix service restart-all` does not upgrade those instances. Follow
+the selected-instance procedure; do not restart other areas to repair one.
+After new writes, preserve accepted work and recover forward rather than
+blindly choosing an older executable.
 
-```bash
-memory --version
-codifix service restart-all
-codifix doctor
-codifix health
-```
+## Published package limits
 
-## The v2 compatibility boundary
+| Platform | Published candidate and limitations |
+| --- | --- |
+| Debian/Ubuntu | amd64 and arm64 packages passed build/install checks. PostgreSQL with pgvector is a separate prerequisite. GitHub serves Debian filenames with `.rc.1`, while the package version and checksum entries retain `~rc.1`. Follow the exact Linux download instructions. |
+| macOS | Intel and Apple Silicon standard/application-update packages passed package checks. They are unsigned and not notarized; native pixel-level UI acceptance is not claimed. Standard packages need separately provisioned PostgreSQL. Application-update packages preserve an existing Codifix runtime; they do not migrate Memory Layer. Homebrew is HEAD-only. |
+| Windows | Unsigned x86_64 ZIP, per-user MSI and server-tools MSI are preview artifacts. The VC++ x64 runtime is a separate prerequisite. No complete bundled PostgreSQL/PDS/Pi stack or full native parity is claimed. Windows ARM64 and 32-bit systems are not release targets. |
 
-The v2 line preserves these documented boundaries:
+Use the [release asset inventory](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
+and its `SHA256SUMS` and individual `.sha256` files. Checksums establish content
+consistency; they do not provide publisher identity verification. Signing a
+Git commit is different from notarizing or signing an installer.
 
-- the current core CLI workflows and their documented `--json` response shapes
-- append-only database migrations; already-applied migrations are never edited
-- the OpenAPI operations marked `x-stability: core`; control-plane operations
-  marked `internal` may evolve between minor releases
-- read-only MCP query, search, resume, resource, and prompt tools
-- deterministic bundle schema v2 exports and backward-compatible bundle v1 imports
-- packaged operation on Debian amd64/arm64, Homebrew, macOS Intel/Apple Silicon,
-  and Windows x86_64
-- source/dev isolation from the installed service profile
+## Feature boundaries
 
-Advanced surfaces remain deliberately conservative. Loop automations are
-approval-gated, graph quality depends on repository/extractor coverage, and
-evaluation claims require reviewed suites and passing gates.
+| Surface | What to expect |
+| --- | --- |
+| Areas | Operator-configured routing chooses one exact instance; a failed selected service does not fall back into another area. See [Areas and projects](https://codifix.dev/docs/areas). |
+| Private sharing | Reviewed publications and grants determine what is shared. Revocation cannot recall bytes already delivered. See [Federation](https://codifix.dev/docs/federation). |
+| Expertise | Separate, explicitly authorized questions may leave the local instance. Optional model synthesis needs its own configured policy; ordinary queries do not automatically ask another area. |
+| Offline knowledge | Only configured, synchronized subscriptions are available locally. Pending contributions are not accepted owner versions; observed sync time is not current remote authorization. See [Offline and synchronization](https://codifix.dev/docs/offline). |
+| Background jobs | Curation commits before optional enrichment finishes. Inspect failures and confirm retries; uncertain provider attempts can be billed again. See [Jobs](https://codifix.dev/docs/reference/cli/jobs). |
+| Supervisor | Policy, budget and action inspection exist. Optional execution depends on configured adapters and admission; a Pi control probe is not a deployed, isolated production agent. See [Supervisor](https://codifix.dev/docs/reference/cli/supervisor). |
+| Code graph | The browser uses a 3D WebGL renderer where available and a flat 2D canvas fallback otherwise. Graph coverage depends on extraction and the selected repository. |
+| Demo | The interactive website demo uses static sample data and does not establish local service, auth or database health. |
+| Evaluations | Fixture, rehearsal and historical benchmark results are bounded evidence. They do not establish a new paid R3 result, ROI or universal coding improvement. |
 
-## Upgrading from v1
+The [dependency security evidence](https://github.com/3vilM33pl3/codifix/blob/main/docs/reviews/security-dependencies-20261017.md)
+retains the unpatched upstream RSA advisory and the lockfile's yanked-dependency
+warning. The inspected OIDC path verifies public keys rather than performing
+the affected private-key operation; the Rust audit is not described as clean.
 
-Review these breaking changes before restarting the service:
+## Historical Memory Layer releases
 
-- Remove `capnp_unix_socket` and `capnp_tcp_addr`; clients now receive live
-  updates from the `/ws` WebSocket stream.
-- Replace `memory automation flush` with `codifix watcher flush`,
-  `codifix capture task` with `codifix capture`, and `codifix dev init` with
-  `codifix dev`. The duplicate `memory setup` command is gone; use
-  `codifix wizard`.
-- Update direct API integrations against the running service's
-  `GET /v1/openapi.yaml`. v2 removed `/v1/stats`, `/v1/offline/pending`, and the
-  browser auth-token handoff, and consolidated several loop/activity routes.
-- Treat `--writer-id` and `[writer]` as advisory labels. Durable authorship is
-  derived from the authenticated principal.
-- Reissue least-privilege service tokens where appropriate. Role names remain
-  convenient presets, but authorization is enforced as explicit permission
-  sets rather than an ordinal role ladder.
-- Re-export shared bundles when practical. New exports use deterministic,
-  content-addressed schema v2; existing schema v1 bundles still import.
+Keep original release artifacts, manifests, signatures and migration history
+unchanged. The [Memory Layer v2.0.1 schema repair](https://github.com/3vilM33pl3/codifix/releases/tag/v2.0.1)
+restored migrations 33–52 missing from some v2.0.0 artifacts. Repair those
+installations with the matching historical release procedure; never delete
+migration-ledger rows or mix `memory` and `codifix` executables as an upgrade.
 
-## Upgrade guidance
-
-Before upgrading:
-
-```bash
-codifix status --project <project-slug>
-codifix doctor
-pg_dump "$DATABASE_URL" > codifix-before-upgrade.sql
-```
-
-Debian installation does not start/restart services or rotate credentials. After
-reviewing schema compatibility, restart only the selected installation. For the
-legacy system singleton (not a user service or named instance):
-
-```bash
-sudo systemctl restart codifix.service
-codifix doctor
-codifix health
-codifix status --project <project-slug>
-codifix upgrade --dry-run
-```
-
-The v2.0.1 service embeds migrations through version 52 and applies any pending
-migrations when it starts. Do not downgrade the binary against a migrated
-database; restore the pre-upgrade database backup if you must roll back. Run
-`codifix upgrade` only after reviewing the dry run because it can refresh
-repo-local `.agents/` skills and instructions.
-
-For independently pinned named instances, package installation does not change
-their executable. Follow the [named-instance staging contract](../../deploy/areas/README.md)
-and the selected-instance release procedure; never use `restart-all` as an
-implicit package-upgrade step. A database migration can require a coordinated
-writer stop and cannot be undone by blindly selecting an older executable.
-
-## Release artifacts
-
-GitHub Releases publish the supported native installer set:
-
-- Debian x86_64: `codifix_<version>_amd64.deb`
-- Debian arm64: `codifix_<version>_arm64.deb`
-- macOS Intel: `codifix-<version>-macos-x86_64.pkg`
-- macOS Apple Silicon: `codifix-<version>-macos-aarch64.pkg`
-- Windows x86_64: `codifix-<version>-windows-x86_64.msi`
-- Windows x86_64 portable archive: `codifix-<version>-windows-x86_64.zip`
-- Homebrew source archive: `memory-<version>.tar.gz`
-
-For v2.1.0, replace `<version>` with `2.1.0`. Mac application-update installers
-have the additional `-application-update.pkg` suffix. Windows preview filenames
-include `-build.1`; the server-tools MSI is tools-only, not a bundled server.
-Use the release's exact asset inventory and `SHA256SUMS` rather than guessing
-filenames. Every published package has a matching `.sha256` checksum file.
-
-The Debian arm64 package targets 64-bit ARM Linux, including Raspberry Pi 4/5
-systems running a 64-bit Debian-family OS. Windows ARM64 and 32-bit Raspberry Pi
-OS are not release targets yet.
-
-## Current limitations
-
-- Run `codifix doctor` and `codifix health` after every package upgrade.
-- Review `codifix upgrade --dry-run` before refreshing repo-local skills or
-  instructions.
-- Verify the installer architecture before installing: Debian publishes `amd64`
-  and `arm64`, macOS publishes Intel and Apple Silicon packages, and Windows
-  publishes x86_64 packages.
-- The code graph UI depends on browser WebGL support and extractor coverage.
-- The interactive browser demo uses static sample data; it does not prove that
-  your local backend, database, or authentication is healthy.
-- Loop automations remain approval-gated by design, and risky actions must stop
-  for human review.
-
-## Next
-
-Read [Getting Started](getting-started.md), [Doctor Diagnostics](cli/doctor.md), or [Skill Upgrade](cli/upgrade.md).
+For current installation, start with [Install](https://codifix.dev/docs/install),
+[Team setup](https://codifix.dev/docs/team-setup), or
+[Operations](https://codifix.dev/docs/operations).

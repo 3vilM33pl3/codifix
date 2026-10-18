@@ -1,0 +1,6 @@
+{
+  "title": "Team setup",
+  "collapsible": true,
+  "defaultOpen": false,
+  "pages": ["index", "administration"]
+}

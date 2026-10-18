@@ -1,8 +1,12 @@
 # Federation application workflow
 
+For workflow selection and availability boundaries, start with
+[private federation](https://codifix.dev/docs/federation). This page follows
+current `main` (`3.0.0-rc.1`); optional controls need explicit runtime configuration.
+
 This experimental local API connects Web, CLI and the focused TUI to the C/D
 runtime. Enable only in controlled integration environments using the
-[runtime configuration](federation-runtime.md); integration evidence does not
+[runtime configuration](https://codifix.dev/docs/federation/runtime); integration evidence does not
 authorize customer release or substitute for the remaining pilot/security gates.
 Each process currently binds one local project to one explicitly enrolled
 instance/space. Remote identities, credentials, TLS roots and receipt keys remain
@@ -10,7 +14,7 @@ administrator configuration; requests cannot replace them.
 
 Open **More → federation** in Web, `codifix federation --project <slug> ...` in
 the CLI, or `codifix federation --project <slug> tui` for the focused terminal
-workspace. See [commands and confirmation controls](cli/federation.md).
+workspace. See [commands and confirmation controls](https://codifix.dev/docs/reference/cli/federation).
 
 Use the local service's existing authentication: a scoped service token, or a
 browser session with Origin and CSRF for POST. Even single-user retained reads
@@ -20,8 +24,8 @@ All these responses, including failures, use `Cache-Control: no-store`.
 ## API surface
 
 The common prefix is `/v1/projects/{slug}/federation/{space}`. The [OpenAPI
-specification](../api/openapi.yaml) documents bodies and errors; Rust contracts
-are exported by `mem_service::federation::workflow`.
+specification](https://github.com/3vilM33pl3/codifix/blob/main/docs/api/openapi.yaml) documents bodies and errors; Rust contracts
+are exported by `codifix_service::federation::workflow`.
 
 Discovery is `GET /v1/projects/{slug}/federation`; it returns configured IDs and
 the current local actor, never gateway addresses or credentials. Under the common
@@ -192,5 +196,5 @@ The controlled two-instance/client gate exercises these workflows against the
 pinned real PDS. It does not establish production namespace ownership, customer
 SSO, offsite disaster recovery, legal retention approval, external-provider
 forwarding or held-out answer quality. Customer release still depends on the
-remaining [roadmap gates](../reviews/federation-first/README.md). Neither native
+remaining [roadmap gates](https://github.com/3vilM33pl3/codifix/blob/main/docs/reviews/federation-first/README.md). Neither native
 Spaces alpha nor public Bluesky publication is enabled by these controls.

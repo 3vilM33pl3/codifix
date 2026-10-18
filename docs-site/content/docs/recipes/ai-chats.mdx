@@ -25,14 +25,18 @@ Add anything an assistant should durably know: preferences, ongoing projects, de
 {
   "mcpServers": {
     "codifix": {
-      "command": "memory",
+      "command": "codifix",
       "args": ["mcp", "run", "--project", "chats"]
     }
   }
 }
 ```
 
-Codex and other MCP clients take the same stdio command. The server is **read-first by design**: the assistant can query, resume, and inspect memories, but cannot write, delete, or reconfigure anything — your memory stays yours.
+Codex and other MCP clients use the same stdio command; follow the
+[MCP guide](/docs/mcp) for client-specific token forwarding. Ordinary memory
+tools query, resume and inspect. They do not expose canonical-memory writes.
+Loop control and expertise actions are separate optional surfaces with their
+own policy; leave them disabled unless deliberately configured.
 
 ## 3. Use it
 
@@ -44,7 +48,8 @@ The MCP tools return cited memories, and the same honest-refusal contract applie
 
 ## Closing the loop
 
-Since the MCP surface is read-only, write back at the end of a conversation yourself:
+Since ordinary MCP memory tools do not write canonical knowledge, capture the
+reviewed outcome through the CLI:
 
 ```bash
 codifix remember --project chats --type project \

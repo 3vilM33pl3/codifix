@@ -24,7 +24,7 @@ codex plugin add codifix@codifix
 
 Start a new Codex task after installation so it loads the plugin skill and MCP configuration. The MCP server uses the active Codex workspace unless an individual tool call supplies another project.
 
-Use exactly one Codifix MCP connection. Disable any hand-authored `mcp_servers.codifix` configuration before enabling the plugin so `memory_*` tools are not registered twice.
+Use exactly one Codifix MCP connection. Disable any hand-authored `mcp_servers.codifix` configuration before enabling the plugin so `codifix_*` tools are not registered twice.
 
 ## How it fits with project setup
 
@@ -44,7 +44,7 @@ The source profile uses port `4250` and separate runtime state. Do not point a p
 
 ## Versioning and maintainer validation
 
-The plugin currently uses the `0.1.0+codex.<build>` version line and is tested with Codifix `2.0.0`; it has its own compatibility boundary from the binary. A change to the MCP tool surface or the bundled workflow-skill contract needs a compatibility review and a plugin version update.
+The checked-in plugin manifest and workspace both declare `3.0.0-rc.1`. This identifies the current source contract, not proof that every installed rc.1 package contains subsequent source changes or has passed desktop validation. A change to the MCP tool surface or the bundled workflow-skill contract needs a compatibility review and a plugin version update.
 
 Validate the repository-owned contract with:
 

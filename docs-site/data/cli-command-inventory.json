@@ -123,11 +123,41 @@
       "commands": [
         "checkpoint",
         "activities",
-        "up-to-speed",
-        "jobs",
-        "supervisor"
+        "up-to-speed"
       ],
       "description": "Record execution state and prepare the next person or agent to continue."
+    },
+    {
+      "title": "Project onboarding and sync",
+      "href": "/docs/reference/cli/projects",
+      "commands": [
+        "projects"
+      ],
+      "description": "Select approved projects, prepare workspaces and inspect synchronized knowledge."
+    },
+    {
+      "title": "Background jobs",
+      "href": "/docs/reference/cli/jobs",
+      "commands": [
+        "jobs"
+      ],
+      "description": "Inspect durable enrichment and review failed-stage retries."
+    },
+    {
+      "title": "Supervisor",
+      "href": "/docs/reference/cli/supervisor",
+      "commands": [
+        "supervisor"
+      ],
+      "description": "Inspect instance policy, budgets and separate project-private interactions."
+    },
+    {
+      "title": "Private federation",
+      "href": "/docs/reference/cli/federation",
+      "commands": [
+        "federation"
+      ],
+      "description": "Review publications, grants, synchronization and exact expertise questions."
     },
     {
       "title": "Connect people and tools",
@@ -139,9 +169,7 @@
         "agent",
         "loops",
         "mcp",
-        "embeddings",
-        "projects",
-        "federation"
+        "embeddings"
       ],
       "description": "Run the backend, manage access, connect agents, and operate integrations."
     },

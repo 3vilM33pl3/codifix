@@ -52,7 +52,29 @@ Body text.
 
 MDX components are available, but use plain Markdown for normal text. Keep diagrams as fenced `mermaid` blocks and images under `public/images/`.
 
-The detailed TUI, Web UI, and Codex-plugin guides are canonical Markdown in `../docs/user/`. Their matching pages under `content/docs/` only provide frontmatter and a Fumadocs `<include>` wrapper. Update the canonical file; do not duplicate its body in the site.
+Detailed workflow guides are canonical Markdown in `../docs/user/`. Their site
+routes contain only frontmatter and one Fumadocs `<include>` wrapper. This
+includes TUI, Web UI, plugin, daily workflow, areas, team setup/administration,
+Mac onboarding, offline synchronization, federation and the exposed CLI guides.
+The mapping is enforced by `scripts/check-content.mjs`; update it when adding
+a shared route. Never copy the guide body into a wrapper.
+
+Included Markdown uses absolute `https://codifix.dev/docs/...` links so the same
+source works on GitHub and the site. Keep images under `public/images/` and use
+`https://codifix.dev/images/...` in canonical Markdown; the MDX transform resolves
+them locally at build time. Links and images from included content are checked.
+
+The Essentials path stays first. Deep folders use `collapsible: true` and
+`defaultOpen: false`; do not expose operator theory ahead of the daily workflow.
+
+## Version and claim boundaries
+
+Describe current `main` and distinguish it from a published package using its
+release inventory/source commit. Equal version strings do not establish equal
+bytes. Preserve original Memory Layer release notes and historical identifiers.
+Do not turn a synthetic test, rehearsal, unsigned package or opt-in capability
+into a broad production-readiness claim. Use generic identities and sanitized
+examples in public guides.
 
 ## Common edits
 
@@ -70,5 +92,12 @@ Run these from `docs-site/`:
 npm run check:content
 npm run lint:links
 npm run check:assets
+npm run test:checks
 npm run build
+npm run check:built-links
+python3 ../scripts/check-codex-plugin.py
 ```
+
+The rendered-link check runs after a build. It checks actual page/heading IDs,
+including included Markdown, so section links remain valid when a shared guide
+is shortened or reorganized.

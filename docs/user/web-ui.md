@@ -2,6 +2,12 @@
 
 The Web UI is the browser companion to the TUI. It is served by the same local Codifix service and reads the same project data: memory, cited queries, code graph context, activity, watchers, proposals, skills, embeddings, and resume briefings.
 
+This guide follows current `main` (`3.0.0-rc.1`). A visible control does not imply
+its optional runtime is configured. Start with [team setup](https://codifix.dev/docs/team-setup)
+for a shared installation, [areas](https://codifix.dev/docs/areas) for knowledge
+boundaries, and [administration](https://codifix.dev/docs/team-setup/administration)
+for people and access.
+
 Open the installed service at `http://127.0.0.1:4040/`. From a source checkout, start the isolated dev service with:
 
 ```bash
@@ -45,7 +51,8 @@ Automations, Bundles, and Access are not primary tabs. That keeps the everyday b
 
 ## Graph explorer
 
-The Graph tab is a WebGL-only 3D explorer with three independently visible layers:
+The Graph tab uses a 3D WebGL explorer, with a flat 2D canvas fallback when WebGL
+is unavailable. It has three independently visible layers:
 
 - **Code** shows parser-backed code neighborhoods and is visible by default.
 - **Provenance** adds active-memory-to-source links, including available file, symbol, commit, and verification information. It is off by default.
@@ -61,7 +68,10 @@ The initial view is a bounded neighborhood, not an unlimited repository render. 
 
 Hovering a layer control or a visible node/edge highlights that layer and dims the others. Toggling Provenance or Memory relationships changes only the browser view; it does not rewrite graph data or backend filters. Click a code node to inspect it. Shift-click a second code node to show connecting paths in the loaded **Code** layer; clear the selection, use Back/Forward, or refresh to leave that local connection view.
 
-Memory and source selections expose their corresponding type, identifiers, metadata, and relationships. Browsers without WebGL show an unsupported state: there is no 2D fallback for this view.
+Memory and source selections expose their corresponding type, identifiers,
+metadata, and relationships. The fallback is labelled "WebGL is unavailable —
+using the flat 2D renderer." It preserves a way to inspect the graph on browsers
+without WebGL; rendering support does not establish repository extraction coverage.
 
 ## Work safely
 
@@ -73,7 +83,8 @@ For terminal-oriented inspection, use the [TUI](https://codifix.dev/docs/tui). F
 
 ## Synchronized knowledge and private sharing
 
-**More → offline (Synchronized knowledge)** inspects explicitly configured
+See [offline knowledge](https://codifix.dev/docs/offline) for enrollment,
+synchronization and recovery. **More → offline (Synchronized knowledge)** inspects explicitly configured
 read-only laptop subscriptions. Select by subscription UUID; the panel also
 shows company, area, owner instance, project UUID, space and device identity.
 This selection is independent of project slugs in ordinary Query.
@@ -100,7 +111,7 @@ does not enable edits, credential enrollment, installation, or synchronization.
 
 **More → jobs** provides filtered, bounded background-work inspection, dependency
 and attempt history, queue statistics and explicit retry confirmation. See
-[Background jobs](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/jobs.md). Enrichment is separate from curation success.
+[Background jobs](https://codifix.dev/docs/reference/cli/jobs). Enrichment is separate from curation success.
 
 Activity recovery polls bounded sequence-based pages every five seconds, even
 when live notifications are unavailable. The WebSocket reconnects automatically.
@@ -109,12 +120,14 @@ the server explicitly reports history removed by retention. Recovery does not
 reconstruct deleted history, and late responses from a previously selected
 project are discarded.
 
+Start with the [federation guide](https://codifix.dev/docs/federation) to choose
+between publication, expertise questions and offline copies.
 The **More → federation** workspace exposes the configured private space, local
 grants, authority enrollment, reviewed publication, shared citations, correction
 proposals, approval/rejection, subscriptions and sync controls. Mutations display
 their exact request and require confirmation. Drafts are cleared on project
 changes; imported text is escaped and never forwarded to a model from this view.
-See [Federation workflow](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/federation-workflow.md) for consent and offline-copy limits.
+See [Federation workflow](https://codifix.dev/docs/federation/workflow) for consent and offline-copy limits.
 
 On a single-user loopback installation, opening Federation establishes the local
 owner's revocable browser session before discovery, including read-only requests.
@@ -123,7 +136,7 @@ are not replaced automatically after an authorization failure. Multi-user
 installations continue to use their normal OIDC sign-in; current permissions,
 explicit federation grants and CSRF protection still apply.
 
-### Private expertise questions (disposable F1 rehearsal)
+### Private expertise questions (opt-in preview)
 
 The **Watched agent exchanges** panel lists the latest twenty project-scoped
 Codex/Claude questions by request ID, destination, time and observed transport
@@ -147,7 +160,7 @@ question**. Review the exact destination, collection revision, question, identit
 deadline and digest before checking the consent box and sending. Preparation does
 not send a question. No history, files or local search results are attached;
 ordinary queries remain local. The operator must enable the experimental browser
-policy and explicit grants described in [Federation runtime](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/federation-runtime.md).
+policy and explicit grants described in [Federation runtime](https://codifix.dev/docs/federation/runtime).
 
 Only deterministic excerpts and `local_human` output are supported here. Remote
 content is displayed as untrusted text with its citation/attribution data, never
@@ -165,8 +178,8 @@ After an uncertain submission, **Retry exact question** reuses the same reviewed
 bytes and request ID. Closing the review does not cancel delivery. A new question
 is a new request and may repeat work; expired reviews require fresh preparation.
 Read-only mode and missing export permission disable the panel; the server still
-enforces all current permissions. CLI/TUI/MCP
-parity and the complete live rehearsal remain unfinished.
+enforces all current permissions. CLI/TUI/MCP have corresponding explicit
+review workflows; their availability still depends on operator configuration.
 
 ### Expertise collection management
 
@@ -200,8 +213,9 @@ submission as queued, not published. Closing a review does not roll back a
 committed action. Project/identity/permission changes clear local state and abort
 pending requests; review contents are not saved in browser storage. Server-side
 permissions remain authoritative. A real-browser HTTP/SQL rehearsal covers
-collection management and queued questions; CLI/TUI/MCP parity and the complete
-independent-instance answering rehearsal remain open.
+collection management and queued questions. Independent-database synthetic
+rehearsals also exercise answering and client workflows; this evidence does not
+establish activation or customer readiness for an installation.
 
 After inspecting a collection, administrators can enter an **Answering service
 principal UUID**, inspect its stored grant and review a grant or revocation.
@@ -224,11 +238,11 @@ scoped by the project selector. This build explicitly reports execution **not
 integrated** for full autonomous agency, even if a policy is enabled. Inspecting
 this operational feed never starts work or exposes private bodies. The separate
 project-private interaction panel below has its own permissions and explicit
-consent; see [Supervisor inspection](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md).
+consent; see [Supervisor inspection](https://codifix.dev/docs/reference/cli/supervisor).
 
-### Workshop questions and saved proposals
+### Project-private questions and saved proposals
 
-Select the Workshop project and open **More → Supervisor**. Under **Questions
+Select the configured project and open **More → Supervisor**. Under **Questions
 and proposals**, **Load saved proposals** and **Open proposal** display a saved
 question, plain-text response and exact source-version/digest citations. Approve
 or reject first opens confirmation. A recorded review is permanent and does not
@@ -248,7 +262,7 @@ metadata. Choose a request to inspect status; **Refresh question status** is an
 explicit read, not another model call. **Read cited answer** appears when a saved
 result is available. Queued does not mean answered. Pending work has a ten-minute
 deadline (or an earlier standing-grant expiry), at most eight outstanding
-questions per Workshop project and one active answer worker. Existing limits of
+questions per project and one active answer worker. Existing limits of
 20 generations and USD 2.50 per day remain in force; current policy can lower
 them.
 
@@ -279,7 +293,7 @@ An enabled policy, visible controls or queued request does not prove the worker
 is running. These are software/operator requirements, not a claim that paid
 question execution is already deployed. This workflow does not enable the other
 three areas or cross-area communication. See the
-[CLI/TUI and operator instructions](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md#explicit-private-questions).
+[CLI/TUI and operator instructions](https://codifix.dev/docs/reference/cli/supervisor#explicit-private-questions).
 
 
 ## Local administration
@@ -349,7 +363,7 @@ or blocked runs surface their diagnostic summary and blocked reasons.
 
 The Skills tab is the full inventory view for repo-local Codifix skills.
 It defaults to the `codifix` umbrella skill so the main health signal stays
-quiet, but the filter can switch to the full Memory-owned bundle when you need
+quiet, but the filter can switch to the full Codifix-owned bundle when you need
 to inspect focused skills such as query, resume, remember, proposal review, or
 plan execution.
 
@@ -362,7 +376,7 @@ Use `Repair skills` when the repo-local bundle is missing, stale, unversioned, o
 corrupt. The action uses the same repair path as `codifix doctor --fix`: it
 downloads the current GitHub skill bundle when available, falls back to the
 installed template when offline, backs up replaced files, and only mutates
-Memory-owned skill directories.
+Codifix-owned skill directories.
 
 
 ## Runtime Status

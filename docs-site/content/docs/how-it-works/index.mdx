@@ -32,7 +32,11 @@ Codifix is not a chat transcript store. It separates short-lived activity from d
 
 ## Projects
 
-A **project** is the unit of scoping. Each project gets its own memory namespace tied to a repository or working directory. Memories, activity, and configuration are isolated per project, so context from one codebase does not leak into another.
+A **project** groups knowledge inside one instance. An **area** chooses the
+independently operated instance first; a matching project slug elsewhere does
+not identify the same project or grant access. Project-scoped reads enforce
+their permissions; explicit cross-project search can include other authorized
+projects in the selected instance. See [Areas and projects](/docs/areas).
 
 Projects are identified by a slug, for example `memory` or `docs-site`, and configured through `codifix wizard`, `codifix init`, and `.codifix/project.toml`.
 
@@ -71,6 +75,16 @@ Replacement proposals require review before older knowledge is superseded. This 
 Codifix stores canonical memories, raw captures, history, proposals, activity, embeddings, commit evidence, and graph references in PostgreSQL with pgvector. The database is the shared backend for the CLI, TUI, web UI, watchers, and MCP server.
 
 The repo-local `.codifix/` directory scopes a checkout to a project; it is not the database. Global config stores service, database, and provider settings outside the repository.
+
+Curation commits the canonical mutations and durable enrichment intents before
+returning. Embedding and consolidation can finish later; inspect
+[background jobs](/docs/reference/cli/jobs) when enrichment is pending.
+
+Reviewed [federation](/docs/federation) and
+[offline synchronization](/docs/offline) use separate publications or read-only
+owner projections. They do not turn downloaded knowledge into locally owned
+canonical records. Supervisor policy and accounting govern separate opt-in
+bounded interactions; see [Supervisor](/docs/reference/cli/supervisor).
 
 ## Retrieve
 

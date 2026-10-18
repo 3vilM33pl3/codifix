@@ -1,5 +1,11 @@
 # Supervisor inspection
 
+This reference follows current `main` (`3.0.0-rc.1`). Private interaction controls
+are an opt-in preview requiring separately provisioned policy, source consent
+and an operator worker. See [areas](https://codifix.dev/docs/areas) for scope
+and [team administration](https://codifix.dev/docs/team-setup/administration)
+for installation responsibilities. A visible panel is not worker activation.
+
 The operational view includes the disclosure grant's observed expiry when a
 private interaction profile is configured. CLI and TUI use plain-language
 warnings, and the TUI recomputes expiry/staleness while open. This does not renew
@@ -10,12 +16,12 @@ confirmation. `--json` output retains the structured response contract.
 ## Private proposals and human review
 
 When the operator configures `[supervisor.interaction]` with a private, hash-bound
-Workshop work manifest, its saved result is available in the exact project:
+project work manifest, its saved result is available in the exact project:
 
 ```sh
-codifix supervisor proposals --project memory
-codifix supervisor result --project memory --action ACTION_UUID
-codifix supervisor review --project memory --action ACTION_UUID --digest RESULT_SHA256 --request-id NEW_UUID --decision approve
+codifix supervisor proposals --project example-project
+codifix supervisor result --project example-project --action ACTION_UUID
+codifix supervisor review --project example-project --action ACTION_UUID --digest RESULT_SHA256 --request-id NEW_UUID --decision approve
 ```
 
 The review command previews the exact terms. Repeat with `--confirm` only after
@@ -42,8 +48,8 @@ below adds new reviewed requests; neither workflow provides autonomous agency.
 
 ## Explicit private questions
 
-This is an opt-in Workshop-local workflow, not remote expertise discovery or
-four-area communication. Migration `0060`, an explicitly provisioned Workshop
+This is an opt-in project-local workflow, not remote expertise discovery or
+four-area communication. Migration `0060`, an explicitly provisioned project
 identity/policy, the approved exact-source grant, `[supervisor.interaction]`, and
 a separate operator worker are required. Merely building this code or opening
 the panel does not deploy or enable a paid question worker.
@@ -51,7 +57,7 @@ the panel does not deploy or enable a paid question worker.
 Prepare one question, using a fresh non-nil UUID for this new request:
 
 ```sh
-codifix supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID
+codifix supervisor ask --project example-project --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID
 ```
 
 The preparation displays the **exact question**, OpenAI destination,
@@ -60,11 +66,11 @@ It does not invoke a model or enqueue work. Inspect these terms, then copy both
 hashes into the confirmation with the **same question and request UUID**:
 
 ```sh
-codifix supervisor ask --project memory --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID --profile-digest PROFILE_SHA256 --request-digest REQUEST_SHA256 --confirm
-codifix supervisor question --project memory --request-id REQUEST_UUID
-codifix supervisor questions --project memory
+codifix supervisor ask --project example-project --question 'What should we verify before demonstrating federation?' --request-id REQUEST_UUID --profile-digest PROFILE_SHA256 --request-digest REQUEST_SHA256 --confirm
+codifix supervisor question --project example-project --request-id REQUEST_UUID
+codifix supervisor questions --project example-project
 # Optional bounded pagination:
-codifix supervisor questions --project memory --after LAST_REQUEST_UUID
+codifix supervisor questions --project example-project --after LAST_REQUEST_UUID
 ```
 
 Confirmation does not silently prepare replacement terms. A changed profile,
@@ -73,7 +79,7 @@ source, question or request digest fails closed. The question is limited to
 history, files, ordinary-query results and other areas are never attached.
 
 **Queued is not answered.** The queue admits at most eight outstanding questions
-per Workshop project, with a ten-minute deadline, and the operator processes one
+per project, with a ten-minute deadline, and the operator processes one
 question at a time. The standing source grant can expire earlier. The existing
 20-generation / USD 2.50 daily ceilings are unchanged and may be reduced by
 policy. Exhaustion does not authorize increasing limits or selecting another
@@ -119,31 +125,6 @@ unsent preview. After an uncertain submission, Enter retries the same request
 and `r` inspects it; no new UUID is generated. Use `l` for your question list,
 `j`/`k` to select, Enter for status, `r` to refresh, and Enter on an available
 answer to read its citations. Escape returns to private proposals.
-
-### Operator queue execution
-
-The application must not acquire a provider credential or Docker socket. The
-separate trusted operator can process at most one pending question with:
-
-```sh
-memory-workshop-worker run-next /PRIVATE/work.json PROFILE_SHA256 INSTANCE_UUID /PRIVATE/service.toml CONFIG_SHA256
-```
-
-Supply the existing approved normal provider key and explicitly scoped database
-connection through the operator's protected environment, not command arguments;
-never use R3 credentials. The private service configuration must hash-match,
-remain writable-primary/non-evaluation/non-relay, and name the same instance and
-interaction profile. Current source, requester, credential, policy, expiry and
-lease checks run again before disclosure and result storage. No model retries,
-provisioning or policy enablement occur in `run-next`.
-
-For the independent preview only, the fixed-target
-`scripts/run-workshop-question-queue.mjs` operator wrapper provides `once` and
-`serve` modes; `serve` invokes the same guarded `run-next` every two seconds.
-It requires separately staged, hash-pinned artifacts and explicit operator
-activation. It is not a generic deployment installer or an application tool.
-Stop and inspect credential, storage or configuration failures. An enabled
-policy or a successful enqueue is not evidence that this worker is running.
 
 ## Operational metadata
 
@@ -242,89 +223,4 @@ observations remain visible after policy changes and are not proof of present
 availability, backups, network access or healthy models. Successful collection
 does not mean the observed counts indicate a healthy system.
 
-## Bounded Workshop proposal worker
-
-For an application deployment that intentionally cannot access Docker or a
-provider, use the separate **operator-only** `memory-workshop-worker` executable.
-It has no HTTP listener and must never become an MCP tool or application command.
-The trusted operator owns Docker access and the approved normal provider key;
-neither authority is given to the Memory application or Pi. Its fixed transport
-can only contact OpenAI's approved API, with redirects, proxies and retries off.
-This is not an OS-wide egress firewall for the operator account.
-
-```sh
-# Explicit private paths and durable IDs; never put a secret in command arguments.
-memory-workshop-worker observe /PRIVATE/work.json SHA256 INSTANCE_UUID
-memory-workshop-worker run /PRIVATE/work.json SHA256 INSTANCE_UUID
-```
-
-`DATABASE_URL` must explicitly name a loopback `memory_workshop_` database.
-`run` may perform one approved paid generation; it requires the separately
-prepared normal `OPENAI_API_KEY`. Missing credentials still permit metadata
-recovery but never a claim. `observe` journals/reconciles metadata only. Existing
-running or completed actions are not relaunched. A stopped/uncertain run must
-be inspected, not retried under a fresh identity to bypass its reservation.
-SIGINT/SIGTERM blocks new disclosure while allowing bounded billing settlement.
-Output is metadata only; durable history remains visible through the normal
-Supervisor views. The in-application worker status is not a heartbeat for this
-separate process. It does not provision, migrate, enable policy, import a corpus
-or complete the four-area deployment.
-
-This is separate from full autonomous agency and defaults off. An independently
-provisioned Workshop service can opt into **one fixed proposal**, with a dedicated
-exact-project internal identity and frozen source grant. A private JSON work
-file fixes schema version 1, action/source-event/attempt UUIDs, the grant, question
-and sandbox artifacts. It must be owned by the service user, mode 0600, inside a
-0700 directory. Symlinks, unsafe ancestor permissions, duplicate JSON keys,
-unknown fields, changed hashes and other areas are rejected.
-
-```toml
-# Add only after target, source exclusions and artifact verification are complete.
-[supervisor.model_work]
-manifest = "/ABSOLUTE/PRIVATE/work.json"
-sha256 = "REPLACE_WITH_EXACT_MANIFEST_SHA256"
-```
-
-The host process inherits the approved normal `OPENAI_API_KEY`; Pi receives only
-an opaque one-work broker token. Do not point this process at an R3 credential or
-an existing mixed-area database. No credential lookup/fallback is performed by
-the worker. Current implementation requires non-root Linux AMD64, local Docker,
-the pinned local Ubuntu image, hash-verified patched Pi and sandbox driver in
-non-group-writable paths, and a separate private runtime directory. Pi gets no
-network, host workspace, Docker socket, database credential or provider key.
-
-This operator-host launcher is **not yet compatible with the hardened named
-instance service**: that service deliberately denies Docker and external egress
-and strips inherited provider keys. Do not weaken it or add Docker-group access.
-Use the separate operator path above instead of weakening that named service.
-The [Workshop local preview](../workshop-preview.md) demonstrates this separation
-with an independently verified containerized app and target; it does not turn
-this in-service configuration example into a supported named-service activation.
-
-The worker polls every two seconds and claims once with a 180-second lease.
-Shutdown/reload blocks new disclosure and results; an already-started commit can
-complete, and already-sent provider calls must still be accounted. Abrupt death
-retains durable reservations; recovery expires the action to `uncertain`, never
-automatically requeues or regenerates it. Changing the work file requires a new
-hash in configuration; reusing an ID with changed terms fails. New work is a new
-disclosure/billing decision, not a recovery shortcut. The existing USD 2.50 and
-20-generation daily maximum remains enforced independently by the store.
-
-Web, CLI and TUI show `model_work` separately from `execution: not_integrated`
-(full autonomous agency). `completed` means the exact stored proposal's hash and
-usage were verified against child delivery; `stored` means durable output exists
-but this process cannot confirm delivery. Neither means the proposed correction
-is correct or has been applied. No result is executed as an instruction. Status
-and history omit questions, source contents, paths and private proposal bodies.
-
-## Disposable verification
-
-The ignored service test `supervisor_real_browser_cli_rehearsal` creates its own
-synthetic PostgreSQL database, paused policy and read-only service on an allocated
-loopback port. It runs the real CLI, TUI through a PTY, and built Web UI through
-Playwright, verifies their durable identity against storage, then confirms no
-actions were created. It requires built Web assets, a TUI-enabled CLI, Chromium,
-Python 3 with `scripts/tests/supervisor-pty-requirements.txt` installed in a test
-virtual environment on `PATH`, and the explicitly configured disposable test database.
-Set `MEMORY_SUPERVISOR_REHEARSAL_CLI` to that CLI's absolute path before running
-the test with `--ignored --nocapture`. Never point it at an existing deployment.
+For deployment prerequisites and knowledge boundaries, see [areas](https://codifix.dev/docs/areas) and [team administration](https://codifix.dev/docs/team-setup/administration). Operator worker activation remains separately reviewed deployment work.

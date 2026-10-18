@@ -4,23 +4,26 @@
 
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later%20%2F%20commercial-2563eb?style=flat)](#license) [![Rust 2024](https://img.shields.io/badge/Rust-2024-000000?logo=rust&logoColor=white&style=flat)](Cargo.toml) [![Linux](https://img.shields.io/badge/platform-Linux-333333?logo=linux&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![macOS](https://img.shields.io/badge/platform-macOS-333333?logo=apple&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Windows](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white&style=flat)](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) [![Stars](https://img.shields.io/github/stars/3vilM33pl3/codifix?label=stars&style=flat)](https://github.com/3vilM33pl3/codifix) [![Forks](https://img.shields.io/github/forks/3vilM33pl3/codifix?label=forks&style=flat)](https://github.com/3vilM33pl3/codifix/forks) [![Open issues](https://img.shields.io/github/issues/3vilM33pl3/codifix?label=open%20issues&style=flat)](https://github.com/3vilM33pl3/codifix/issues) [![Open PRs](https://img.shields.io/github/issues-pr/3vilM33pl3/codifix?label=open%20PRs&style=flat)](https://github.com/3vilM33pl3/codifix/pulls) [![Last commit](https://img.shields.io/github/last-commit/3vilM33pl3/codifix/main?label=last%20commit&style=flat)](https://github.com/3vilM33pl3/codifix/commits/main) [![Citation](https://img.shields.io/badge/citation-CITATION.cff-2563eb?style=flat)](CITATION.cff)
 
-Codifix is a local-first memory system for coding agents and developers.
-It turns project work into durable, searchable knowledge, so the next Codex,
-Claude, or human session can start with evidence instead of guesswork.
+Codifix gives coding agents and developers durable project knowledge: decisions,
+fixes, evidence and handoffs that the next session can retrieve with citations.
+It captures and curates work, stores it in PostgreSQL with pgvector, and makes it
+available through a browser, TUI, CLI and MCP.
 
-It captures what happened, curates what matters, stores it in PostgreSQL with
-pgvector, and exposes it through a TUI, browser UI, and agent-friendly CLI.
+Use one local project or route work to separately operated **knowledge areas**.
+Configured teams can share reviewed knowledge privately, ask explicit expertise
+questions, and synchronize selected knowledge for offline use. These workflows
+require their own setup and permissions; a local query does not automatically
+search other areas.
 
 [Website](https://codifix.dev) · [Documentation](https://codifix.dev/docs) · [Codifix v3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
 
 [v3.0.0-rc.1](docs/releases/3.0.0-rc.1.md) is available as a prerelease.
-All 11 release jobs passed, including Linux and both Mac architectures.
-Mac and Windows packages are unsigned; stable 3.0.0 is not released.
+This README and the website describe current `main`, which includes fixes newer
+than those package bytes. Use the release inventory for the exact package
+commit. Mac and Windows packages are unsigned; stable 3.0.0 is not released.
 Windows packages remain a preview of client/operator functionality, not a
 complete native server stack. Use `codifix urls` to inspect the configured
 application URLs.
-
-![Codifix memories tab](docs/img/tui/memories-tab.png)
 
 ## Start here
 
@@ -49,7 +52,10 @@ demo path.
 
 ### Use it in a project
 
-For a native installation, prerequisites, and verification, start with the
+If you are joining an existing company installation, follow
+[Team setup](https://codifix.dev/docs/team-setup) and use the approved company
+origin and device enrollment. For a new standalone installation, prerequisites,
+and verification, start with the
 [Install guide](https://codifix.dev/docs/install) or download the
 [v3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
 The rename from Memory Layer v2 is a breaking reinstall. Existing users should
@@ -80,7 +86,14 @@ interruption, and inspect or recover when something looks wrong. The
 [Daily workflow](https://codifix.dev/docs/daily-workflow) gives the
 commands and the [TUI](https://codifix.dev/docs/tui) and
 [Web UI](https://codifix.dev/docs/web-ui) make the stored evidence
-easy to inspect.
+easy to inspect. Before writing, verify the destination using
+[Areas and projects](https://codifix.dev/docs/areas). The
+[Jobs reference](https://codifix.dev/docs/reference/cli/jobs) explains why
+embedding or consolidation can still be pending after curation succeeds.
+
+For configured teams, [private sharing and expertise](https://codifix.dev/docs/federation)
+and [offline synchronization](https://codifix.dev/docs/offline) explain what is
+shared, what remains local, and how to inspect freshness and pending work.
 
 ### Connect agents
 
@@ -88,8 +101,8 @@ easy to inspect.
   supported MCP connection and desktop workflow skill.
 - [Agents](https://codifix.dev/docs/agents) — project setup and
   agent-facing workflows.
-- [MCP](https://codifix.dev/docs/mcp) — read-only project-memory
-  tools over stdio or local Streamable HTTP.
+- [MCP](https://codifix.dev/docs/mcp) — project-memory retrieval and optional
+  explicitly authorized expertise/control tools over stdio or Streamable HTTP.
 
 Use one Codifix MCP connection per client. The Codex plugin guide
 explains how to avoid duplicate tool registration and how to verify the active
@@ -102,24 +115,30 @@ project.
   re-entry briefings.
 - Local TUI and browser UI for memories, activity, review, watchers, and
   runtime health.
+- Knowledge-area routing, reviewed private publications, and explicitly
+  authorized expertise exchange.
+- Selective offline knowledge, company project/device onboarding, and durable
+  background jobs with inspection and confirmed retries.
 - Coding-agent integration through the CLI, repo-local skills, and MCP.
 - Repeatable evaluation with paired ablations, immutable artifacts, gates, and
   cost/latency reporting.
 
 ## Evidence and evaluation
 
-The newest checked-in local reference is the
-[2026-07-06 `memory-quality-v1` re-baseline](docs/developer/evaluation-runs/2026-07-06-memory-quality-v1-comparison.md):
-`0.692` (18/26), with retrieval at 10/10 and grounded answers at 8/9. Its gate
-is still red because the adversarial-stale floor is intentionally unmet; treat
-it as a precise engineering reference, not a general release claim.
+Evaluation records measure different things; they are not a single release
+score. The [15 October capture-quality pilot](docs/developer/evaluation-runs/2026-10-15-jev-capture-quality-pilot.md)
+records a synthetic offline rules baseline and transport/replay tests. It made
+no live Jev calls and establishes no provider quality or cost advantage.
 
-The separately recorded
-[2026-05-03 Docker `memory-improvement-v1` benchmark](docs/developer/evaluation-runs/2026-05-03-memory-improvement-v1-full.md)
-ran five paired repeats against a different suite. It reported full-memory
-aggregate success from 0.0% to 18.1%, perfect retrieval ranking metrics, and a
-41.2% reduction in total tokens. Read it as historical Docker-harness evidence
-rather than a directly comparable successor to the July local run.
+The [6 July memory-quality reference](docs/developer/evaluation-runs/2026-07-06-memory-quality-v1-comparison.md)
+is a historical local run with a red adversarial-stale gate.
+The [3 May Docker benchmark](docs/developer/evaluation-runs/2026-05-03-memory-improvement-v1-full.md)
+is separate historical evidence from a different suite. Neither result proves
+current product-wide coding improvement.
+
+The [R3 campaign status](evals/r3/README.md) records its own frozen inputs,
+isolation requirements and remaining evidence. Fixture tests and CI recovery
+are not a new paid campaign or ROI result.
 
 For methodology and commands, see the
 [evaluation guide](https://codifix.dev/docs/evals) and
@@ -132,7 +151,11 @@ dives:
 
 - [Quickstart](https://codifix.dev/docs/quickstart)
 - [Install](https://codifix.dev/docs/install)
+- [Areas and projects](https://codifix.dev/docs/areas)
+- [Team setup](https://codifix.dev/docs/team-setup)
 - [Daily workflow](https://codifix.dev/docs/daily-workflow)
+- [Federation and expertise](https://codifix.dev/docs/federation)
+- [Offline and synchronization](https://codifix.dev/docs/offline)
 - [Help](https://codifix.dev/docs/help)
 - [Operations](https://codifix.dev/docs/operations)
 - [How it works](https://codifix.dev/docs/how-it-works)

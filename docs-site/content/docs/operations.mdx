@@ -33,7 +33,7 @@ The foreground run command is intentionally blocking. If it exits, the service i
 
 ## Database
 
-Codifix stores everything in PostgreSQL with pgvector. See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup.
+PostgreSQL with pgvector is the authority for durable memories, provenance and service ledgers. Configuration, credentials, local logs, caches, exports and release artifacts also live outside the database. See [PostgreSQL and pgvector](/docs/install/postgresql-pgvector) for setup.
 
 <Mermaid chart="flowchart TB\n    P[Projects] --> M[Canonical memories]\n    M --> E[Evidence and sources]\n    M --> V[Embeddings]\n    M --> A[Activity events]\n    M --> G[Code graph references]" />
 
@@ -59,11 +59,15 @@ Do not commit secrets, API keys, local database URLs, or runtime state.
 
 ## Upgrades
 
-Codifix v2.0.0 is a breaking upgrade from v1. Follow the
-[v2 Update guide](/docs/install/update) for removed config keys, renamed
-commands, API changes, package-specific install steps, migrations, and rollback.
-The sequence below is the shorter runbook for routine updates within a
-compatible release line.
+The current source workspace declares `3.0.0-rc.1`; this does not certify every
+source capability in an installed rc.1 artifact. Follow the
+[Update guide](/docs/install/update) and selected release evidence for package
+installation, migrations and rollback. Historical v1-to-v2 changes are migration
+context, not the current release designation.
+
+Named areas/instances can pin independent releases. Installing a package or
+running `service restart-all` does not upgrade those pinned releases. Use the
+reviewed selected-instance upgrade procedure for the platform and exact target.
 
 Before upgrading, take a baseline and back up the database:
 
@@ -71,10 +75,9 @@ Before upgrading, take a baseline and back up the database:
 pg_dump "$DATABASE_URL" > codifix-before-upgrade.sql
 ```
 
-After upgrading:
+After the selected installation's upgrade procedure has completed, verify it:
 
 ```bash
-codifix service restart-all
 codifix doctor
 codifix health
 codifix status --project <project-slug>
@@ -82,6 +85,21 @@ codifix upgrade --dry-run
 ```
 
 Run `codifix upgrade` inside repositories only after reviewing the dry run, because it can refresh `.agents/` and other repo-local integration files.
+
+## Areas and background work
+
+An operator-configured area selects a service/data boundary; projects scope
+knowledge within it. A durable job records work, attempts and effects; queued,
+running and completed are different states. Federation exchanges approved
+publications or explicitly authorized private expertise across instances; it does
+not make global project search an unrestricted remote query. Supervisor policies
+govern opt-in bounded agent work and accounting separately from jobs and ordinary
+memory queries. Source implementation does not establish deployment readiness.
+
+Use [Areas and projects](/docs/areas) to verify the destination,
+[Jobs](/docs/reference/cli/jobs) for enrichment failures,
+[Offline](/docs/offline) for pending contribution receipts, and
+[Federation](/docs/federation) for publication and expertise recovery.
 
 ## Logs and diagnostics
 

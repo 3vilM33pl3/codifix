@@ -1,18 +1,25 @@
 ---
 title: "Quickstart"
-description: "From nothing to a working Codifix with a demo project in about five minutes."
+description: "Try project memory with a disposable local Docker demo."
 ---
 
 # Quickstart
 
 This is a single reproducible demo: start the bundled stack, load the demo project, and ask one question. It uses Docker only, so you do not need PostgreSQL, pgvector, or any API keys to see it work.
 
+The first run builds the current source, including Rust and the browser UI, so
+allow time for the build. It is separate from the published native candidate.
+The Compose file uses fixed demo credentials and publishes port 4040; use a
+trusted local machine and keep production data out of this disposable demo.
+
 ## 1. Start the stack
 
 From a clone of the repository:
 
 ```bash
-docker compose up
+git clone https://github.com/3vilM33pl3/codifix
+cd codifix
+docker compose up --build
 ```
 
 That starts PostgreSQL with pgvector, the Codifix service, and the web UI. When it settles, the service is listening on `http://localhost:4040`.
@@ -33,7 +40,9 @@ This seeds a project called `demo` with a small, curated set of memories about C
 docker compose exec codifix codifix query --project demo --question "How does reinforcement work?"
 ```
 
-You get a short, cited answer drawn from the demo memories, with a confidence score and an honest signal when the evidence is thin.
+The keyless stack retrieves cited demo memories. Generated prose and semantic
+retrieval depend on configured providers; insufficient evidence is reported
+explicitly.
 
 ## 4. Explore
 
@@ -47,4 +56,6 @@ The terminal UI lets you browse and search every memory, inspect where each came
 
 - [Install](/docs/install) - native install, prerequisites, configuration, and verification.
 - [Daily workflow](/docs/daily-workflow) - capture, query, resume, inspect, and recover.
+- [Areas and projects](/docs/areas) - verify the destination for knowledge.
+- [Team setup](/docs/team-setup) - join an existing company installation.
 - [How it works](/docs/how-it-works) - memories, retrieval, reinforcement, and the code graph.

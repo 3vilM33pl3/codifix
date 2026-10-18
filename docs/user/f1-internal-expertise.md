@@ -1,17 +1,20 @@
 # F1: internal expertise exchange
 
-F1 is software for explicit private questions between independently administered
-Memory instances. Its disposable rehearsal is not an installed homelab service,
-customer release, R3 evaluation or F2 delegation system. Ordinary queries remain
-local. Start with deterministic excerpts; no model account is required.
+Private expertise is an opt-in internal preview for explicit questions between
+independently administered Codifix instances. This guide describes current
+`main` (`3.0.0-rc.1`). Disposable rehearsal evidence does not establish an installed
+service or customer readiness. It does not provide remote work delegation.
+Ordinary queries remain local. Start with deterministic excerpts; no model
+account is required. See [private federation](https://codifix.dev/docs/federation)
+for the related sharing workflows.
 
 ## Installation checklist for a separately approved activation
 
-1. Provision one Codifix instance/database for `homelab` and one for `memory`,
+1. Provision separate Codifix instances/databases for the participating areas,
    plus a dedicated company-space gateway database and private PDS. Use separate
-   runtime credentials. Follow the [gateway topology](../../deploy/federation/README.md),
-   [runtime configuration](federation-runtime.md) and
-   [recovery contract](../developer/architecture/federation-security.md).
+   runtime credentials. Follow the [gateway topology](https://github.com/3vilM33pl3/codifix/blob/main/deploy/federation/README.md),
+   [runtime configuration](https://codifix.dev/docs/federation/runtime) and
+   [recovery contract](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/federation-security.md).
    Apply all append-only migrations with the schema-owner workflow and then
    reviewed gateway grants. Do not run fixture bootstrap utilities against real
    data. Keep PDS credentials, raw repository routes and gateway SQL inaccessible
@@ -20,7 +23,7 @@ local. Start with deterministic excerpts; no model account is required.
    credentials and independently distribute gateway receipt-key trust. Add every
    credential identity to the gateway's `expertise_fleet` as `["UUID", 3]`.
    F1 fails closed without a complete compatible fleet. Existing v2 history
-   remains unchanged; these are unpublished Memory-profile Lexicons, not native
+   remains unchanged; these are unpublished Codifix-profile Lexicons, not native
    Spaces or public Bluesky interoperability.
 3. Explicitly grant remote `Pull`, `Publish`, `AskExpertise` and `AnswerExpertise`
    memberships as needed using the authority's existing federation membership
@@ -63,16 +66,16 @@ local. Start with deterministic excerpts; no model account is required.
    broadening the approved collection.
 
 Configuration examples and exact JSON shapes are in
-[runtime configuration](federation-runtime.md#f1-private-expertise-opt-in).
+[runtime configuration](https://codifix.dev/docs/federation/runtime#f1-private-expertise-opt-in).
 The capability-detail API is
 `GET /v1/projects/{slug}/federation/{space}/capabilities/{publisher}/{record}`;
 listing is bounded and may require following a cursor through an empty filtered
-page. See [OpenAPI](../api/openapi.yaml) and [CLI commands](cli/federation.md).
+page. See [OpenAPI](https://github.com/3vilM33pl3/codifix/blob/main/docs/api/openapi.yaml) and [CLI commands](https://codifix.dev/docs/reference/cli/federation).
 
 ## Daily use and recovery
 
 Web provides collection review, service grants, discovery, question confirmation
-and results under Federation. `codifix federation --project homelab tui` provides
+and results under Federation. `codifix federation --project example-project tui` provides
 the focused terminal equivalent: F5 prepares/reads and F6 confirms only the exact
 prepared mutation. CLI `collections`, `capabilities`, `ask prepare`, `ask submit`
 and `answer` use the same project-scoped API and policy.
@@ -103,27 +106,27 @@ consent, requester provider consent and exact responder model configuration.
 Positive call/token budgets are mandatory. The default enabled ceiling is one
 invocation per question, 800 output tokens and 20 daily calls per responder;
 40,000 tokens are conservatively reserved per call without refunding unknown
-usage. See the [restricted model configuration](federation-runtime.md#optional-f1-synthesis).
+usage. See the [restricted model configuration](https://codifix.dev/docs/federation/runtime#optional-f1-synthesis).
 This documentation authorizes no paid calls.
 
-## Adding the game project
+## Adding another participating instance
 
 Provision its own instance/database and credentials, add its schema-v3 identity
 to the complete gateway fleet, then deliberately enroll the required remote and
 local capabilities. Existing collections still deny it. Review new revisions
-whose requester allowlists explicitly include game, and grant its own answering
+whose requester allowlists explicitly include the new instance, and grant its answering
 identity only its own reviewed collections if reverse exchange is wanted. No
 code change is needed; a restart/configuration rollout and reviewed policy changes
 are required. Do not infer access merely from company-space membership.
 
 ## What the rehearsal establishes
 
-The [executable PDS gate](../../tests/federation-pds/README.md#f1-expertise-gate)
+The [executable PDS gate](https://github.com/3vilM33pl3/codifix/blob/main/tests/federation-pds/README.md#f1-expertise-gate)
 checks two-way answers, real clients, third-instance enrollment, recovery and
 fake-model failures using disposable data. The
-[TLS isolation gate](../../tests/federation-isolation/README.md) tests fixed
+[TLS isolation gate](https://github.com/3vilM33pl3/codifix/blob/main/tests/federation-isolation/README.md) tests fixed
 routes, credentials and cross-space denial. The
-[execution evidence](../reviews/federation-first/f1-execution.md) records exact
+[execution evidence](https://github.com/3vilM33pl3/codifix/blob/main/docs/reviews/federation-first/f1-execution.md) records exact
 coverage and limitations. F1's separate-database service apps run in one test
 process; the accompanying Stage E regression launches separate service processes.
 This is not independent physical-host, disaster-recovery or customer evidence.
@@ -133,5 +136,5 @@ Revocation cannot recall transferred bytes, browser screenshots, backups or
 recipients' copies. Gateway signatures prove attribution/integrity, not factual
 truth. Scoped Lean reducer proofs do not prove deployed authentication, model
 behavior or network liveness. Retention/legal holds, offsite restore, image
-security, real identity provisioning and actual homelab activation need their own
+security, real identity provisioning and activation of an installation need their own
 approved operational exercise.

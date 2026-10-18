@@ -29,6 +29,14 @@ def main() -> int:
     assert manifest["name"] == "codifix"
     workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]
     assert manifest["version"] == workspace["version"]
+    guide = (ROOT / "docs/user/codex-desktop-plugin.md").read_text(encoding="utf-8")
+    documented_version = re.search(
+        r"plugin manifest and workspace both declare `([^`]+)`", guide
+    )
+    assert documented_version, "plugin guide must identify its checked-in manifest version"
+    assert documented_version.group(1) == manifest["version"], (
+        "plugin guide compatibility version must match the checked-in manifest"
+    )
     assert manifest["skills"] == "./skills/"
     assert manifest["mcpServers"] == "./.mcp.json"
     assert manifest["license"] == "AGPL-3.0-or-later"
@@ -41,6 +49,27 @@ def main() -> int:
         "args": ["mcp", "run"],
         "env_vars": ["CODIFIX_CLIENT_TOKEN"],
     }
+
+    mcp_guide = (ROOT / "docs/user/cli/mcp.md").read_text(encoding="utf-8")
+    toml_examples = re.findall(r"```toml\n(.*?)\n```", mcp_guide, re.DOTALL)
+    documented_servers = [
+        tomllib.loads(example).get("mcp_servers", {}).get("codifix")
+        for example in toml_examples
+    ]
+    documented_servers = [entry for entry in documented_servers if entry is not None]
+    assert documented_servers, "MCP guide must include its Codex server configuration"
+    assert all(entry["command"] == server["command"] for entry in documented_servers), (
+        "MCP guide executable must match the plugin configuration"
+    )
+    assert all(entry.get("env_vars") == server["env_vars"] for entry in documented_servers), (
+        "Codex MCP guide must explicitly forward the scoped client token variable"
+    )
+    for example in re.findall(r"```json\n(.*?)\n```", mcp_guide, re.DOTALL):
+        configured = json.loads(example).get("mcpServers", {})
+        if "codifix" in configured:
+            assert configured["codifix"]["command"] == server["command"], (
+                "MCP guide executable must match the plugin configuration"
+            )
 
     skill = PLUGIN_ROOT / "skills" / "codifix-codex" / "SKILL.md"
     contents = skill.read_text(encoding="utf-8")

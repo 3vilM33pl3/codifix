@@ -30,4 +30,5 @@ npm run check:assets
 - Do not commit secrets, local database URLs, or runtime files.
 - Mark client-specific or package-specific uncertainty as an explicit open question with the verification needed.
 - Put static screenshots and diagrams under `public/images/` and reference them with `/images/...`.
-- The TUI, Web UI, and Codex-plugin detail guides are canonical Markdown in `../docs/user/`; their site pages are thin MDX `<include>` wrappers. Edit the canonical guide rather than copying it into the site.
+- Detailed user guides are canonical Markdown in `../docs/user/`; their site pages are thin MDX `<include>` wrappers. The current mapping and editing rules are in [EDITING.md](EDITING.md).
+- Docs CI validates shared-guide and README changes as well as site changes. Run the content, link, asset and plugin-contract checks before the production build.

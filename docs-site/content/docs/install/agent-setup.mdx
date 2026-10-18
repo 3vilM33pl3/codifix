@@ -1,83 +1,44 @@
 ---
 title: "Let your agent set you up"
-description: "Copy-paste prompts that let Claude Code, Codex, or any coding agent install and configure Codifix for you."
+description: "Short prompts for a verified standalone install or a repository refresh."
 ---
 
 # Let your agent set you up
 
-Instead of following the install guides by hand, paste these prompts into Claude Code, Codex CLI, or any coding agent and let it do the work. The first prompt installs and configures Codifix on the machine; the second initializes an existing repository.
-
-Use the following two prompts to install the Codifix application and initialize your repository.
-
-If you use Codex Desktop, the [Codex plugin](/docs/codex-plugin) is the supported way to add the Codifix MCP connection and workflow skill. These prompts remain useful for generic coding agents and repo initialization.
+Use these prompts with a coding agent that can inspect your machine and run
+commands. For an existing company installation, use [Team setup](/docs/team-setup)
+rather than asking an agent to create another service/database.
+Codex Desktop users can add the [Codex plugin](/docs/codex-plugin) after setup.
 
 ## Prompt for installing
-Paste this prompt into Claude Code, Codex CLI, or any coding agent to have it install and configure Codifix for you.
 
 <PromptBox>
 
 ```text title="Install prompt"
-# Install Codifix
+Install Codifix on this machine using the current platform guide at
+https://codifix.dev/docs/install and the exact published release inventory.
 
-You are installing Codifix for me. Work in the terminal, explain before using sudo, and stop before destructive changes.
+First inspect the OS, architecture and existing installation. The current
+Codifix package is 3.0.0-rc.1, a prerelease; do not select the historical
+Memory Layer release through a generic "latest" installer. Verify checksums
+and explain the unsigned-package/platform limits. Homebrew is HEAD-only.
 
-## Goal
+If Memory Layer or an existing named area is present, use the release-specific
+update procedure before changing it. Preserve configuration, credentials,
+state, data and recovery executables. Confirm the exact installation to change.
 
-Install Codifix completely on this machine and configure it for the project I choose.
+For a fresh standalone service, provision or verify PostgreSQL with pgvector
+before running codifix wizard --global. Use protected secret configuration;
+never put credentials in source control. Configure optional paid providers
+only when requested. Make Go available for repo-local workflow skills.
 
-Repository: https://github.com/3vilM33pl3/codifix
-GitHub Releases: https://github.com/3vilM33pl3/codifix/releases
+Preview repository setup with codifix wizard --dry-run, preserve existing
+.codifix and .agents customizations, then apply the reviewed setup. Start only
+the intended service using its platform guide. Verify codifix --version,
+codifix doctor, codifix health, codifix urls and the selected project status.
 
-## Rules
-
-- Detect whether this is Linux/Debian-style or macOS.
-- Do not invent secrets.
-- PostgreSQL is required. Before running `codifix wizard --global`, find an existing database URL or ask me whether to use an existing/hosted PostgreSQL database or create a local one.
-- If creating a local PostgreSQL database, create a dedicated database and user named `codifix` unless I ask for different names.
-- Do not invent the database password; ask me for it or generate one only after confirming that is OK.
-- Make sure the PostgreSQL server has pgvector installed and that the target database has `CREATE EXTENSION IF NOT EXISTS vector;` applied.
-- Verify PostgreSQL with `psql "$DATABASE_URL" -c "SELECT 1;"` and verify pgvector with `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` before configuring Codifix.
-- Ask me for optional LLM or embedding API keys only if I want scan or semantic retrieval.
-- Make sure Go is available on PATH so repo-local Codifix skills can run.
-- Run health checks before saying the install is done.
-
-## Linux / Debian path
-
-1. Download the latest Codifix `.deb` from GitHub Releases.
-2. Install the package for the machine architecture:
-   - x86_64: `sudo dpkg -i codifix_<version>_amd64.deb`
-   - arm64 / Raspberry Pi 4 or 5 with a 64-bit OS: `sudo dpkg -i codifix_<version>_arm64.deb`
-3. Prepare PostgreSQL before configuring Codifix:
-   - If using a hosted/existing database, verify that it accepts connections from this machine and supports pgvector.
-   - If creating a local database, install PostgreSQL and the matching pgvector package for the server major version, for example `postgresql-16-pgvector` when the server is PostgreSQL 16.
-   - Create or receive a database URL such as `postgres://codifix:<password>@127.0.0.1:5432/codifix`.
-   - Run `psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"`.
-   - Verify with `psql "$DATABASE_URL" -c "SELECT 1;"` and `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"`.
-4. Run `codifix wizard --global` and configure the verified database URL and optional LLM/embedding settings.
-5. Go to my target project directory.
-6. Run `codifix wizard --dry-run`, then `codifix wizard` for repo-local setup.
-7. Start the backend with `sudo systemctl enable --now codifix.service`.
-8. Run `codifix doctor`, `codifix health`, and then open `codifix tui`.
-
-## macOS path
-
-1. Run `brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix`.
-2. Run `brew install 3vilM33pl3/codifix/codifix`.
-3. Prepare PostgreSQL before configuring Codifix:
-   - If using a hosted/existing database, verify that it accepts connections from this machine and supports pgvector.
-   - If creating a local database, use Homebrew PostgreSQL and pgvector, then create a dedicated `codifix` database and user.
-   - Create or receive a database URL such as `postgres://codifix:<password>@127.0.0.1:5432/codifix`.
-   - Run `psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"`.
-   - Verify with `psql "$DATABASE_URL" -c "SELECT 1;"` and `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"`.
-4. Run `codifix wizard --global` and configure the verified database URL and optional LLM/embedding settings.
-5. Go to my target project directory.
-6. Run `codifix wizard --dry-run`, then `codifix wizard` for repo-local setup.
-7. Start the backend with `codifix service enable`.
-8. Run `codifix doctor`, `codifix health`, and then open `codifix tui`.
-
-## Finish
-
-Report what was installed, where the config files are, whether the service is healthy, and what I should run next.
+Report the exact version/source, installation and config paths, validation,
+and next action. Stop for any unrequested destructive change.
 ```
 
 </PromptBox>
@@ -87,38 +48,21 @@ Report what was installed, where the config files are, whether the service is he
 <PromptBox>
 
 ```text title="Initialize repo prompt"
-# Initialize Repository For Codifix
+Configure this repository for the existing Codifix installation. Inspect the
+repo marker, .agents files, user-local config and operator-owned area routing.
+Verify the intended area and project before any read or write.
 
-You are configuring an existing project for Codifix. Work in the terminal, explain before changing files, and stop before destructive changes.
+Do not reinstall the package, create a database, reinitialize Git, delete
+existing configuration or overwrite custom instructions. Run codifix health
+and codifix doctor, then codifix wizard --dry-run. Apply only the reviewed
+repo-local setup with codifix wizard, preserving customizations.
 
-## Goal
+Verify codifix status --project <project-slug> --json. Make Go available for
+the shared workflow helper. Do not import commits, scan repositories, enable
+providers or grant external expertise access merely to initialize the repo.
 
-Create or refresh repo-local Codifix configuration so agents can write, query, and curate project memory safely.
-
-## Rules
-
-- Work in the target project directory I give you.
-- Do not install the system package; this prompt is only for repo-local Codifix setup.
-- Do not create or reinitialize git history.
-- Do not delete existing `.codifix/`, `.agents/`, or Codifix config files.
-- If `.codifix/project.toml`, legacy `.codifix/config.toml`, `.agents/codifix.toml`, or `.agents/skills/` already exist, inspect them and preserve local customizations.
-- Ask me before overwriting files, rotating credentials, importing history, or running a write operation that was not previewed.
-- Make sure the shared backend is configured and healthy before saying setup is done.
-- Make sure Go is available on `PATH` because repo-local Codifix skills use the Go helper.
-
-## Steps
-
-1. Run `codifix health` and `codifix doctor`.
-2. Run `codifix wizard --dry-run` in the target project to preview setup.
-3. Run `codifix wizard` to create or refresh the user-local project config, `.codifix/project.toml`, and `.agents/` Codifix files.
-4. Run `codifix doctor` again.
-5. If commit history should be available as evidence, run `codifix commits sync --project <project-slug> --dry-run`, then run it for real only if the preview looks correct.
-6. If an initial scan is wanted, run `codifix scan --project <project-slug> --dry-run`, then run it for real only after I approve the preview.
-7. Open `codifix tui` or report the project slug and next commands.
-
-## Finish
-
-Report which repo-local files were created or preserved, the project slug, backend health, and any follow-up actions.
+Report the selected area/project, changed and preserved files, health checks,
+and any remaining issue. Follow https://codifix.dev/docs/daily-workflow next.
 ```
 
 </PromptBox>

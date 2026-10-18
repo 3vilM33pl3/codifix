@@ -23,7 +23,7 @@ secrets, but Codifix does not call OpenBao at runtime.
 
 ## Permission sets and role presets
 
-Authorization in v2 checks explicit permissions. Role names remain convenient
+Authorization checks explicit permissions. Role names remain convenient
 presets, and applicable grants are combined; the service does not authorize by
 comparing an ordinal `reader < writer < operator < admin` ladder.
 
@@ -38,6 +38,12 @@ A global preset applies to every project. Explicit memberships and Authentik
 group mappings apply to named projects. `/v1/auth/me` exposes the expanded
 permission names so clients do not need to infer capabilities from the role
 label.
+
+Project roles do not themselves authorize cross-instance expertise disclosure.
+That workflow also requires current collection eligibility, exact-question
+consent or an explicit service grant, and operator-bound model-output policy.
+See [MCP](/docs/mcp) for the separate submission boundary. Joining a federation
+space is not permission to read every member's knowledge.
 
 ## Authentik setup
 

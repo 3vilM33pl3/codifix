@@ -12,6 +12,8 @@ Codifix reads values from the process environment, from `codifix.env` files next
 | Variable | Required | Used for |
 | --- | ---: | --- |
 | `CODIFIX_CONFIG` | Optional | Same as `--config <path>` for commands that load app config. |
+| `CODIFIX_AREA` | Optional | Select one operator-configured knowledge area; project names alone do not select an instance. |
+| `CODIFIX_AREA_ROUTING` | Managed area deployments | Absolute path to the operator-owned routing policy. A missing pinned policy is an error. |
 | `CODIFIX_PROFILE` | Optional | Force `dev` or `prod`; normally inferred from binary path. |
 | `CODIFIX_WRITER_ID` | Optional | Same as `--writer-id` / `--agent-id`: an advisory activity label. The authenticated principal remains authoritative. |
 | `CODIFIX__SERVICE__API_TOKEN` | Usually generated | Service API token when supplied through env instead of TOML. |

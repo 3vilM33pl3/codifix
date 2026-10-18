@@ -27,13 +27,18 @@ It keeps two kinds of data:
 
 That split is important because it keeps the system auditable. You can see where a memory came from instead of treating it like a black box.
 
-The architecture is split into five parts:
+The core local memory workflow has five parts:
 
 1. a skill layer for agent workflow
 2. a CLI and TUI for daily use
 3. a backend service for storage and retrieval
 4. PostgreSQL for durable data
 5. an optional watcher manager and watcher processes for background capture
+
+The current source workspace declares `3.0.0-rc.1`; source capabilities must be
+distinguished from the evidence for a particular packaged or deployed build.
+The [code map](code-map.md) tracks newer area, job, federation and supervisor
+components and their explicit limitations.
 
 ## Architecture Diagram
 
@@ -55,7 +60,7 @@ flowchart LR
     end
 
     subgraph ServiceHost["Local Codifix runtime"]
-        Service["codifix-service<br/>HTTP, WebSocket, Cap'n Proto"]
+        Service["codifix-service<br/>HTTP and WebSocket"]
         Search["codifix-search<br/>lexical, semantic, graph, rerank"]
         Curate["codifix-curate<br/>capture, normalize, curate"]
     end
@@ -111,16 +116,16 @@ The repo-local Codifix skill bundle in `.agents/skills/` tells Codex when to:
 The umbrella skill lives in `.agents/skills/codifix/`, and the focused skills live beside it.
 The bundle is the main driver for coding agent interaction with Codifix. In practice, the
 skill workflow decides when the agent should use memory, while the shared Go helper in
-`.agents/skills/codifix/scripts/` is the execution path that actually calls `memory`.
+`.agents/skills/codifix/scripts/` is the execution path that actually calls `codifix`.
 That repo-local helper runs through `go run`, so `go` must be available on `PATH` anywhere the
 skill bundle is expected to execute.
 
 For the detailed runtime model of skill discovery, selection, and template bootstrapping, use
 [How Skills Work](../skills/how-skills-work.md).
 
-### CLI (`memory`)
+### CLI (`codifix`)
 
-`memory` is the main user entrypoint for:
+`codifix` is the main user entrypoint for:
 - repo bootstrap (`init`)
 - query
 - remember
@@ -132,7 +137,7 @@ For the detailed runtime model of skill discovery, selection, and template boots
 
 The CLI currently uses two transports:
 - a localhost HTTP API kept as the compatibility and fallback surface
-- a persistent Cap'n Proto connection for live TUI subscriptions
+- a persistent WebSocket connection for live TUI subscriptions
 
 Initialized repositories keep a tiny project marker under `.codifix/project.toml`, agent-visible behavior under `.agents/`, and operational project config/state/cache under user-local Codifix directories. Shared defaults live in the global config and project-local values can override them when needed.
 
@@ -158,6 +163,11 @@ Loop automation is the service-owned control plane for background and manual age
 
 ### PostgreSQL
 
+PostgreSQL is the authority for durable memories, provenance and service ledgers.
+Local caches, exports and federation projections do not supersede the owning
+instance's canonical records. Credentials, configuration and release artifacts
+also exist outside the database and need their own operational handling.
+
 PostgreSQL stores:
 - projects
 - sessions
@@ -167,6 +177,25 @@ PostgreSQL stores:
 - provenance
 - search chunks
 - curation runs
+
+### Areas, jobs, federation and supervisors
+
+An operator-configured area selects a service/data boundary. A project is a
+knowledge and authorization scope within it, not a separate area. Routing policy
+is operator-owned, never implicitly trusted from repository content.
+
+Durable jobs record scheduling, attempts and effects in PostgreSQL; a queued row
+is not completed work. Federation moves approved origin-owned publications and
+supports separately authorized private expertise; it is not ordinary global
+project search. Eligibility, exact disclosure consent and model-output policy
+remain separate from transport membership.
+
+Supervisor crates define opt-in policies, fenced actions, usage accounting and
+bounded runtime adapters. These are distinct from watchers, generic jobs and
+ordinary query synthesis. The source includes gated/internal increments; consult
+the linked execution evidence before claiming a Pi worker or autonomous agent
+service is deployed. See [the four-area ledger](../../reviews/four-area-network/README.md)
+and [federation security](federation-security.md).
 
 ### Automation (`codifix watcher`)
 
@@ -186,7 +215,7 @@ It does not write directly to database tables. It only orchestrates the existing
 ### Live TUI Flow
 
 1. `codifix tui` loads an initial project snapshot
-2. It opens a persistent Cap'n Proto connection to the backend
+2. It opens a persistent WebSocket connection to the backend
 3. It subscribes to project-level and selected-memory updates
 4. Backend pushes snapshot refreshes after relevant writes
 5. The TUI redraws without requiring manual refresh

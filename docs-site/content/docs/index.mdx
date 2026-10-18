@@ -1,89 +1,79 @@
 ---
 title: "Codifix"
-description: "Local-first memory for coding agents."
+description: "Project knowledge for coding agents, with explicit areas, private sharing and offline access."
 ---
 
 # Codifix
 
-Codifix gives coding agents persistent, project-scoped memory. It captures decisions, context, and rationale from each session, curates them to remove duplicates and noise, and stores the results in a graph and vector database so future sessions can recall what matters and how it connects. Frequently used memories are re-validated against your code, so what agents recall stays accurate as the project moves. It works with Codex, Claude Code, OpenCode and the OpenAI, Voyage and Ollama embedding APIs.
+Codifix helps developers and coding agents carry useful knowledge between
+sessions. Capture a decision or fix, keep its evidence, and retrieve it later
+with citations through the CLI, TUI, browser or MCP.
 
-**Memory Layer is now Codifix.** The [3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
-is available for Linux, macOS and Windows preview. It is a breaking rename;
-stable 3.0.0 has not been released. The published
-[v2.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0)
-is the previous Memory Layer product; there was no Codifix v2.0 or v2.1
-release. Existing installations should read the [update guide](/docs/install/update)
-before planning a cutover.
+Start with one local project. When configured, **knowledge areas** keep separately
+operated knowledge distinct, teams share reviewed material privately, and laptops
+retain selected knowledge for offline use. A project query stays within its
+selected instance; sharing or asking another area is an explicit workflow.
+
+These docs follow current `main`. The published
+[3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
+is available for Linux, macOS and Windows preview; later source fixes are not
+part of those package bytes. Stable Codifix 3.0.0 has not been released.
+Memory Layer v2.1.0 is the previous product. See
+[release compatibility](/docs/help/known-limitations) and
+[Update](/docs/install/update) before changing an existing installation.
 
 ## Try it
 
-Start with the demo stack and see the system working end to end.
-
 <CardGroup cols={3}>
   <Card title="Quickstart" href="/docs/quickstart">
-    Run a single reproducible demo with Docker, seed the demo project, and ask one question.
+    Start a disposable Docker stack, load a demo project, and ask one question.
   </Card>
   <Card title="Install" href="/docs/install">
-    Set up Codifix for a real machine or repository.
+    Choose a native package and configure a standalone installation.
   </Card>
-  <Card title="Daily workflow" href="/docs/daily-workflow">
-    Capture, query, resume, inspect, and recover once the stack is running.
+  <Card title="Team setup" href="/docs/team-setup">
+    Join an existing company installation and review your device and project access.
   </Card>
 </CardGroup>
 
 ## Use it in a project
 
 <CardGroup cols={3}>
-  <Card title="TUI" href="/docs/tui">
-    Browse memory, query results, review proposals, and runtime state from the terminal.
+  <Card title="Areas and projects" href="/docs/areas">
+    Verify which installation owns the knowledge before reading or writing.
   </Card>
-  <Card title="Web UI" href="/docs/web-ui">
-    Inspect the same data in a browser with wider panes and the graph view.
+  <Card title="Daily workflow" href="/docs/daily-workflow">
+    Recall context, capture verified results, and inspect jobs or synchronization.
+  </Card>
+  <Card title="TUI and browser" href="/docs/web-ui">
+    Browse memories, queries, activity and pending work; follow the terminal guide when using the TUI.
   </Card>
   <Card title="Agents" href="/docs/agents">
-    Connect Codex, Claude Code, OpenCode, or your own agent to project memory.
+    Connect Codex, Claude Code, OpenCode or your own agent.
   </Card>
   <Card title="Codex plugin" href="/docs/codex-plugin">
-    Connect Codex Desktop through the supported MCP and workflow-skill package.
-  </Card>
-  <Card title="Recipes" href="/docs/recipes">
-    Copy-ready setups for note vaults, research corpora, games, home automation, and AI chats.
+    Configure the supported desktop MCP connection and workflow skill.
   </Card>
   <Card title="Help" href="/docs/help">
-    Find symptom-led troubleshooting, FAQs, and support routes.
+    Follow the symptom to the right diagnostic and recovery guide.
   </Card>
 </CardGroup>
+
+For copy-ready examples beyond software projects, see [Recipes](/docs/recipes).
+The [TUI guide](/docs/tui) describes keyboard controls and terminal workspaces.
 
 ## Understand it
 
-<CardGroup cols={3}>
-  <Card title="How it works" href="/docs/how-it-works">
-    Learn the mental model behind capture, curation, retrieval, and reinforcement.
-  </Card>
-  <Card title="Watchers" href="/docs/watchers">
-    See how background capture and automation loops stay aligned with the repository.
-  </Card>
-  <Card title="Automations" href="/docs/automations">
-    Review the built-in loop workflows that keep memory hygiene and triage moving.
-  </Card>
-  <Card title="MCP" href="/docs/mcp">
-    Use the protocol surface when an agent prefers tools over direct CLI calls.
-  </Card>
-  <Card title="Operations" href="/docs/operations">
-    Run Codifix safely, upgrade it, back it up, and recover it.
-  </Card>
-  <Card title="Evals" href="/docs/evals">
-    Check how Codifix is tested and scored.
-  </Card>
-  <Card title="Reference" href="/docs/reference">
-    Look up commands, APIs, config, environment variables, and exit codes.
-  </Card>
-  <Card title="Classroom" href="/docs/classroom">
-    Follow the conceptual lessons that explain the memory model.
-  </Card>
-  <Card title="Roadmap" href="/docs/roadmap">
-    See where the project is going next.
-  </Card>
-</CardGroup>
+The **Deep dives** sidebar is optional. Open it when you need the mechanisms or
+operator detail behind an everyday workflow.
+
+| Question | Start here |
+| --- | --- |
+| How do capture, curation and retrieval fit together? | [How it works](/docs/how-it-works) |
+| How do instances share reviewed knowledge or answer private questions? | [Federation and expertise](/docs/federation) |
+| What does an offline copy contain, and when is work accepted? | [Offline and synchronization](/docs/offline) |
+| How do I back up, maintain or recover an installation? | [Operations](/docs/operations) |
+| What are the exact commands, settings and contracts? | [Reference](/docs/reference) |
+| What evidence supports quality claims? | [Evaluations](/docs/evals) |
 
 ![How Codifix turns project work into cited context](/images/codifix-flow.svg)

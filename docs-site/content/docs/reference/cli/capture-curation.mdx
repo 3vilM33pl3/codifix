@@ -49,6 +49,12 @@ codifix curate --project memory --batch-size 10 --dry-run
 
 Use this split when another tool produces structured capture payloads or when curation needs to be retried separately.
 
+Successful curation commits canonical changes and durable background-work
+intents together. It does not wait for optional embedding or consolidation.
+Use `codifix jobs --project <slug>` to inspect pending enrichment; see
+[Background jobs](/docs/reference/cli/jobs) for dependencies, failures and
+explicit retry review.
+
 ## `codifix scan`
 
 Scan asks the repository what durable memories can be inferred from code, docs, and history.
@@ -72,7 +78,7 @@ codifix ingest ./research --project memory
 
 ## `codifix proposals`
 
-Not to be confused with [`codifix review`](/docs/reference/cli/reinforcement#memory-review), which handles corrections proposed by memory validation. `codifix proposals` reviews curation replacement decisions for newly captured memories.
+Not to be confused with [`codifix review`](/docs/reference/cli/reinforcement#codifix-review), which handles corrections proposed by memory validation. `codifix proposals` reviews curation replacement decisions for newly captured memories.
 
 Proposals protect existing canonical memories from automatic replacement.
 

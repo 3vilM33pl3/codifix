@@ -1,8 +1,12 @@
-# Federation runtime: controlled integration environments
+# Federation runtime: opt-in configuration
+
+This guide follows current `main` (`3.0.0-rc.1`), including controls that an older
+installed release may lack. Start with [private federation](https://codifix.dev/docs/federation)
+and review participant compatibility before configuring a deployment.
 
 Stages C/D provide opt-in durable publication and trust enforcement, **not a released
 customer federation product**. The wire namespace is unpublished. Do not enable
-this against customer data before the [E and release gates](../reviews/federation-first/README.md)
+this against customer data before the [E and release gates](https://github.com/3vilM33pl3/codifix/blob/main/docs/reviews/federation-first/README.md)
 pass. Native Spaces alpha is not used.
 
 ## Enable deliberately
@@ -26,7 +30,7 @@ identities and an explicitly configured test deployment):
   "project": "00000000-0000-0000-0000-000000000004",
   "principal": "00000000-0000-0000-0000-000000000005",
   "gateway": "https://gateway.federation.example.com",
-  "token_file": "/run/secrets/memory-gateway-token",
+  "token_file": "/run/secrets/codifix-gateway-token",
   "receipt_keys": [{
     "generation": 1,
     "first_sequence": 1,
@@ -37,17 +41,17 @@ identities and an explicitly configured test deployment):
 
 The project/principal must exist locally. Starting the worker neither grants
 remote capability nor enrolls a memory. The first Stage E [application
-API](federation-workflow.md) now exposes centrally authenticated local grants,
+API](https://codifix.dev/docs/federation/workflow) now exposes centrally authenticated local grants,
 preview/review, retained context and status over this configured runtime.
 Review opts the selected stream into future content/state updates using **only
 the reviewed evidence references**, with explicit standing consent and retry-safe
 submission. A fresh explicit review is needed to change that evidence. The worker
 re-resolves each review owner's local policy before processing their queue;
-it never borrows its configured principal's role. Web/CLI/TUI enrollment, review
-and proposal clients remain E work. Trusted in-process APIs remain available;
+it never borrows its configured principal's role. Web/CLI/TUI expose enrollment,
+review and proposal controls. Trusted in-process APIs remain available;
 do not expose them without the local authentication/policy boundary.
 
-### Multiple projects in one instance (2.1.0-rc.2)
+### Multiple projects in one instance (current main)
 
 The existing top-level `project`, `principal` and `expertise_*` fields remain the
 primary binding. An optional `projects` array adds explicit local project bindings;
@@ -89,7 +93,7 @@ The gateway configuration is separate. Start only
 `codifix-federation-gateway /absolute/path/gateway.json`, with a dedicated,
 pre-provisioned database and a non-owner restricted SQL login. The binary never
 runs migrations, the local app, MCP, watchers or model providers. See the
-[private topology and grants](../../deploy/federation/README.md).
+[private topology and grants](https://github.com/3vilM33pl3/codifix/blob/main/deploy/federation/README.md).
 
 ```json
 {
@@ -100,7 +104,7 @@ runs migrations, the local app, MCP, watchers or model providers. See the
   "pds": "https://pds.federation.example.com",
   "repository": "did:web:space.federation.example.com",
   "signing_key": "<enrolled did:key public signing key>",
-  "token_file": "/run/secrets/memory-pds-token",
+  "token_file": "/run/secrets/codifix-pds-token",
   "audit_key_file": "/run/secrets/gateway-audit-key",
   "receipt_keys": [{
     "generation": 1,
@@ -111,11 +115,11 @@ runs migrations, the local app, MCP, watchers or model providers. See the
   "credentials": [
     {
       "instance": "00000000-0000-0000-0000-000000000002",
-      "token_file": "/run/secrets/memory-authority-token"
+      "token_file": "/run/secrets/codifix-authority-token"
     },
     {
       "instance": "00000000-0000-0000-0000-000000000003",
-      "token_file": "/run/secrets/memory-gateway-token"
+      "token_file": "/run/secrets/codifix-gateway-token"
     }
   ]
 }
@@ -130,7 +134,7 @@ The client supplies `after`, `limit` (1–32) and a random UUID `nonce`.
 PDS credentials must never be distributed to participant instances. The listener
 is HTTP and requires a reviewed private-network/TLS termination arrangement;
 the outbound clients require HTTPS. Prevent all raw PDS/CAR/firehose bypasses.
-The [isolation harness](../../tests/federation-isolation/README.md) exercises those
+The [isolation harness](https://github.com/3vilM33pl3/codifix/blob/main/tests/federation-isolation/README.md) exercises those
 controls; setting this file does not itself install a network or TLS edge.
 
 `signing_key` is now mandatory: replace the placeholder with the repository's
@@ -143,7 +147,7 @@ key replacement. PDS key changes require an explicitly verified upstream migrati
 Gateway receipt keys are independent: append a generation with the exact next
 unpublished sequence, distribute trust to receivers and restart with matching
 audit secret and replacement tokens. Existing readers/writers are fenced. See
-[key rollover and recovery](../developer/architecture/federation-security.md).
+[key rollover and recovery](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/federation-security.md).
 
 Token/database URL files must be private (0600 on Unix), 32–4096 bytes; audit keys
 are exactly 64 hexadecimal characters representing a 32-byte scalar. Never reuse
@@ -169,7 +173,7 @@ grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
 Provision that identity through the explicitly confirmed
-[`codifix auth expertise-answerer` installation command](cli/auth.md#internal-expertise-answerer-installation-operator),
+[`codifix auth expertise-answerer` installation command](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/auth.md#internal-expertise-answerer-installation-operator),
 not fixture SQL, a service token or the local-owner administrator. The command
 creates only local read/export permissions and protected audit. Remote
 membership, local space and collection grants remain separate; no worker or
@@ -193,7 +197,7 @@ replay cannot create reusable access. The gateway commit authorizes release, not
 proof of physical delivery. An already-authorized in-flight transfer cannot be
 recalled, and the two databases do not form one atomic transaction. Existing
 24-hour payload expiry still applies; holds do not extend ordinary read access.
-This does not activate existing homelab services or establish customer readiness.
+This does not activate an existing installation or establish customer readiness.
 Use TLS and leave `disposable_test_mode` false for any later approved internal
 installation. Cleartext fixture mode remains prohibited in release builds.
 
@@ -246,7 +250,7 @@ Reads can wait for that approval, and all responses are no-store.
 
 Web/CLI/TUI/MCP support explicit review and private question/result operations.
 See the experimental
-[OpenAPI contract](../../docs/api/openapi.yaml) for paths and request shapes.
+[OpenAPI contract](https://github.com/3vilM33pl3/codifix/blob/main/docs/api/openapi.yaml) for paths and request shapes.
 
 ### Collection review and withdrawal
 
@@ -419,7 +423,7 @@ Transport ambiguity becomes `uncertain`, not an automatic retry. Another questio
 can incur repeat billing.
 
 Structured responses reference unique one-based indexes into selected reviewed
-citations. Memory reconstructs attribution from those exact citations; invented
+citations. Codifix reconstructs attribution from those exact citations; invented
 indexes and malformed answers produce `failed`. This checks provenance, not
 factual correctness or every real-model prompt-injection behavior. Operational
 journals retain identifiers, fingerprints, reservations and fixed outcome
@@ -460,7 +464,7 @@ page. Backoff and source/PDS retry budgets are durable; exhausted or invalid wor
 needs intervention. This is not a scalable checkpoint implementation or a complete
 disaster-recovery system. Revocation denies later gateway access/publication but
 does not erase offline copies. Administrators and admitted recipients can read
-shared plaintext. Browser parity, actual deployment security review and complete
+shared plaintext. Actual deployment security review and complete
 production backup recovery remain gates; the reducer's Lean proofs do not prove
 these runtime or operational guarantees.
 
@@ -474,7 +478,8 @@ keeps reviewed evidence and origin/author/version attribution as untrusted data.
 provider IDs, every selected record's frozen publication policy, and fresh signed
 gateway policy/Pull access. All provider sets default to deny; offline/revoked
 calls fail before invoking a provider. No commercial provider is enabled by this
-configuration. E still supplies the user journey and concrete tool-free adapter.
+configuration. Shared-context forwarding is distinct from the optional F1
+tool-free synthesis workflow above.
 
 An authority token may POST `{"action":"hold","reason":"<owner decision>"}`,
 `release_hold`, or `request_erasure` to `/v1/retention`. These append operational
@@ -512,10 +517,10 @@ defense; application order still comes from the transactional gateway sequence.
 Membership/revocation checks remain in the gateway domain. Receivers now verify
 independent audit receipts, their chain, key windows and fresh signed pages.
 Retained receipts are re-verified on offline snapshot reads. See the
-[full security contract](../developer/architecture/federation-security.md).
+[full security contract](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/federation-security.md).
 Previously persisted `Published` observations are not retroactively certified;
 do not treat pre-D state as cryptographic evidence or promote it to a customer
 deployment without a reviewed verification/migration procedure.
 
-For synthetic verification, see [the PDS harness](../../tests/federation-pds/README.md)
-and [the transaction contract](../developer/architecture/federation-durability.md).
+For synthetic verification, see [the PDS harness](https://github.com/3vilM33pl3/codifix/blob/main/tests/federation-pds/README.md)
+and [the transaction contract](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/federation-durability.md).

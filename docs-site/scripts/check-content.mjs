@@ -28,6 +28,24 @@ const sharedGuidePairs = [
   ].map((name) => [`content/docs/tui/${name}.mdx`, `docs/user/tui/${name}.md`]),
   ['content/docs/web-ui.mdx', 'docs/user/web-ui.md'],
   ['content/docs/codex-plugin.mdx', 'docs/user/codex-desktop-plugin.md'],
+  ['content/docs/daily-workflow.mdx', 'docs/user/daily-workflow.md'],
+  ['content/docs/areas.mdx', 'docs/user/areas-and-projects.md'],
+  ['content/docs/team-setup/index.mdx', 'docs/user/team-setup.md'],
+  ['content/docs/team-setup/administration.mdx', 'docs/user/company-administration.md'],
+  ['content/docs/mac-onboarding.mdx', 'docs/user/mac-onboarding.md'],
+  ['content/docs/offline.mdx', 'docs/user/offline-and-sync.md'],
+  ['content/docs/how-it-works/area-routing.mdx', 'docs/user/area-routing.md'],
+  ['content/docs/help/known-limitations.mdx', 'docs/user/release-compatibility.md'],
+  ['content/docs/mcp.mdx', 'docs/user/cli/mcp.md'],
+  ['content/docs/federation/index.mdx', 'docs/user/federation.md'],
+  ['content/docs/federation/workflow.mdx', 'docs/user/federation-workflow.md'],
+  ['content/docs/federation/runtime.mdx', 'docs/user/federation-runtime.md'],
+  ['content/docs/federation/enrollment.mdx', 'docs/user/federation-enrollment.md'],
+  ['content/docs/federation/expertise.mdx', 'docs/user/f1-internal-expertise.md'],
+  ...['jobs', 'projects', 'supervisor', 'federation'].map((name) => [
+    `content/docs/reference/cli/${name}.mdx`,
+    `docs/user/cli/${name}.md`,
+  ]),
 ];
 
 for (const [siteRelative, canonicalRelative] of sharedGuidePairs) {
@@ -44,11 +62,16 @@ for (const [siteRelative, canonicalRelative] of sharedGuidePairs) {
     continue;
   }
 
-  const includes = includedSpecifiers(readFileSync(siteFile, 'utf8')).map((specifier) =>
+  const wrapper = readFileSync(siteFile, 'utf8');
+  const includes = includedSpecifiers(wrapper).map((specifier) =>
     path.resolve(path.dirname(siteFile), specifier.split('#', 1)[0]),
   );
   if (!includes.includes(canonicalFile)) {
     errors.push(`${label}: must include canonical source ${canonicalRelative}`);
+  }
+  const body = wrapper.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim();
+  if (!/^<include>[^<]+<\/include>$/.test(body)) {
+    errors.push(`${label}: shared guide must contain only frontmatter and one canonical include`);
   }
 }
 
@@ -78,6 +101,8 @@ if (!workspacePackage) {
   const releaseReferences = isPrerelease ? [
     ['README.md', `[${releaseLabel}]`],
     ['CHANGELOG.md', `## ${releaseVersion} -`],
+    ['docs/user/release-compatibility.md', `[${releaseLabel}]`],
+    ['docs-site/content/docs/index.mdx', `[${releaseVersion} prerelease]`],
   ] : [
     ['README.md', `[${releaseLabel}]`],
     ['CHANGELOG.md', `## ${releaseVersion} -`],
@@ -87,7 +112,7 @@ if (!workspacePackage) {
     ],
     ['docs-site/content/docs/index.mdx', `Codifix ${releaseLabel} is available.`],
     [
-      'docs-site/content/docs/help/known-limitations.mdx',
+      'docs/user/release-compatibility.md',
       `Codifix ${releaseLabel} is the current stable release.`,
     ],
     [
