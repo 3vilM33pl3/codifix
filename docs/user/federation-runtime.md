@@ -173,7 +173,7 @@ grant for the reviewed collection. Global roles, global permissions and group
 identities are rejected. Merely naming a principal does not grant access.
 
 Provision that identity through the explicitly confirmed
-[`codifix auth expertise-answerer` installation command](https://codifix.dev/docs/reference/cli/auth#internal-expertise-answerer-installation-operator),
+[`codifix auth expertise-answerer` installation command](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/auth.md#internal-expertise-answerer-installation-operator),
 not fixture SQL, a service token or the local-owner administrator. The command
 creates only local read/export permissions and protected audit. Remote
 membership, local space and collection grants remain separate; no worker or

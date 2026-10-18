@@ -51,7 +51,8 @@ Automations, Bundles, and Access are not primary tabs. That keeps the everyday b
 
 ## Graph explorer
 
-The Graph tab is a WebGL-only 3D explorer with three independently visible layers:
+The Graph tab uses a 3D WebGL explorer, with a flat 2D canvas fallback when WebGL
+is unavailable. It has three independently visible layers:
 
 - **Code** shows parser-backed code neighborhoods and is visible by default.
 - **Provenance** adds active-memory-to-source links, including available file, symbol, commit, and verification information. It is off by default.
@@ -67,7 +68,10 @@ The initial view is a bounded neighborhood, not an unlimited repository render. 
 
 Hovering a layer control or a visible node/edge highlights that layer and dims the others. Toggling Provenance or Memory relationships changes only the browser view; it does not rewrite graph data or backend filters. Click a code node to inspect it. Shift-click a second code node to show connecting paths in the loaded **Code** layer; clear the selection, use Back/Forward, or refresh to leave that local connection view.
 
-Memory and source selections expose their corresponding type, identifiers, metadata, and relationships. Browsers without WebGL show an unsupported state: there is no 2D fallback for this view.
+Memory and source selections expose their corresponding type, identifiers,
+metadata, and relationships. The fallback is labelled "WebGL is unavailable —
+using the flat 2D renderer." It preserves a way to inspect the graph on browsers
+without WebGL; rendering support does not establish repository extraction coverage.
 
 ## Work safely
 

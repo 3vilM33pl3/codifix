@@ -1,0 +1,6 @@
+{
+  "title": "Federation and expertise",
+  "collapsible": true,
+  "defaultOpen": false,
+  "pages": ["index", "workflow", "runtime", "enrollment", "expertise"]
+}

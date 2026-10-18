@@ -5,9 +5,10 @@ device approvals. Start in **Access** and check which instance owns the change.
 Project administration, company administration, Git access and model disclosure
 are separate authorities.
 
-This guide describes current source on `main`, including development company
-workflows. Do not assume the published `3.0.0-rc.1` package has these later
-controls. The [Mac onboarding guide](https://codifix.dev/docs/mac-onboarding)
+This guide describes current source on `main`, including opt-in company
+workflows. Use the selected package's inventory and the running service's
+capabilities to establish its exact contract. The
+[Mac onboarding guide](https://codifix.dev/docs/mac-onboarding)
 records native candidate limits; deployment and provider RBAC must be validated
 for the installation you operate.
 

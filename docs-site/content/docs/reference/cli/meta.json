@@ -6,6 +6,10 @@
     "service-health",
     "query-briefings",
     "capture-curation",
+    "projects",
+    "jobs",
+    "supervisor",
+    "federation",
     "reinforcement",
     "repository-evidence",
     "integrations-evals"

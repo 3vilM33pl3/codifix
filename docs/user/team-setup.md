@@ -5,8 +5,9 @@ package for your platform. Sign in, select the exact projects you are allowed to
 use, review what will be copied and installed, then approve each stage. Git
 credentials and access to an AI provider remain separate from Codifix access.
 
-This guide describes current source on `main`. It is not a claim that the
-published `3.0.0-rc.1` package contains the newer company/device workflows. Native
+This guide describes current source on `main`. The published `3.0.0-rc.1`
+contains company/project commands, but its standard package is not the combined
+native first-run/runtime bundle described by the operator workflow. Native
 provisioning and production credential storage currently have a macOS candidate;
 Linux fake-store tests do not establish a supported cross-platform installer or
 a production plaintext credential fallback. Use the
@@ -28,7 +29,7 @@ not an eligible offline project.
 
 ## Sign in and review the device
 
-On the supported native candidate, browser-assisted login starts with:
+On a configured native client, browser-assisted login starts with:
 
 ```bash
 codifix auth login --company https://knowledge.example.com --name "My laptop"

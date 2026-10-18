@@ -64,7 +64,7 @@ Git commit is different from notarizing or signing an installer.
 | Offline knowledge | Only configured, synchronized subscriptions are available locally. Pending contributions are not accepted owner versions; observed sync time is not current remote authorization. See [Offline and synchronization](https://codifix.dev/docs/offline). |
 | Background jobs | Curation commits before optional enrichment finishes. Inspect failures and confirm retries; uncertain provider attempts can be billed again. See [Jobs](https://codifix.dev/docs/reference/cli/jobs). |
 | Supervisor | Policy, budget and action inspection exist. Optional execution depends on configured adapters and admission; a Pi control probe is not a deployed, isolated production agent. See [Supervisor](https://codifix.dev/docs/reference/cli/supervisor). |
-| Code graph | The current browser graph requires WebGL; it shows an unsupported state without it. Graph coverage depends on extraction and the selected repository. |
+| Code graph | The browser uses a 3D WebGL renderer where available and a flat 2D canvas fallback otherwise. Graph coverage depends on extraction and the selected repository. |
 | Demo | The interactive website demo uses static sample data and does not establish local service, auth or database health. |
 | Evaluations | Fixture, rehearsal and historical benchmark results are bounded evidence. They do not establish a new paid R3 result, ROI or universal coding improvement. |
 

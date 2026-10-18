@@ -75,10 +75,9 @@ Before upgrading, take a baseline and back up the database:
 pg_dump "$DATABASE_URL" > codifix-before-upgrade.sql
 ```
 
-After upgrading:
+After the selected installation's upgrade procedure has completed, verify it:
 
 ```bash
-codifix service restart-all
 codifix doctor
 codifix health
 codifix status --project <project-slug>
@@ -96,6 +95,11 @@ publications or explicitly authorized private expertise across instances; it doe
 not make global project search an unrestricted remote query. Supervisor policies
 govern opt-in bounded agent work and accounting separately from jobs and ordinary
 memory queries. Source implementation does not establish deployment readiness.
+
+Use [Areas and projects](/docs/areas) to verify the destination,
+[Jobs](/docs/reference/cli/jobs) for enrichment failures,
+[Offline](/docs/offline) for pending contribution receipts, and
+[Federation](/docs/federation) for publication and expertise recovery.
 
 ## Logs and diagnostics
 

@@ -168,7 +168,7 @@ The federation TUI has the same metadata-only view. `unknown` means the
 gateway could not verify current status; it is not a successful answer.
 
 F1 is default-off internal-use software. Follow the
-[installation and operations checklist](../f1-internal-expertise.md) for a
+[installation and operations checklist](https://codifix.dev/docs/federation/expertise) for a
 separately approved activation; the disposable rehearsal changes no deployment.
 
 `collections list [--after UUID] [--limit 1..32]` and
@@ -258,5 +258,5 @@ exiting clears it. For restart-safe retries, retain a private review file and us
 the CLI's explicit request IDs. Builds without the `tui` feature report that the
 focused terminal workspace is unavailable; other federation commands still work.
 
-See [workflow and trust limits](../federation-workflow.md) and
-[runtime configuration](../federation-runtime.md).
+See [workflow and trust limits](https://codifix.dev/docs/federation/workflow) and
+[runtime configuration](https://codifix.dev/docs/federation/runtime).

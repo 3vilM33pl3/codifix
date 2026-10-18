@@ -20,6 +20,8 @@ codifix <command> <subcommand> --help
 | Option | Env var | Purpose |
 |---|---|---|
 | `--config <path>` | `CODIFIX_CONFIG` | Use a specific global config file. |
+| `--area <name>` | `CODIFIX_AREA` | Select an operator-configured knowledge area. |
+| `--area-routing <path>` | `CODIFIX_AREA_ROUTING` | Use an operator-owned area routing policy, outside repositories. |
 | `--writer-id <id>` | `CODIFIX_WRITER_ID` | Override the advisory writer label for captures and activity; authenticated principal identity is authoritative. |
 | `--agent-id <id>` | `CODIFIX_WRITER_ID` | Alias for `--writer-id`; it changes the label, not authorization. |
 
@@ -64,6 +66,11 @@ Agents should follow a repeatable command pattern:
 | Integrations | `mcp status`, watcher status, `loops list`, eval compare | watcher start/stop, loop settings/runs/approvals, MCP HTTP service config, eval run artifacts |
 
 ## Project resolution
+
+Area routing first chooses the installation; the project slug scopes knowledge
+inside it. A project name is not a cross-area identity. Inspect the area and
+instance in status before writing. See [Areas and projects](/docs/areas) and
+[routing precedence](/docs/how-it-works/area-routing).
 
 Commands that operate on memory need a project slug. In normal repo-local use, the CLI can read `.codifix/project.toml`; in automation, pass `--project <slug>` explicitly so the command does not depend on the current working directory.
 

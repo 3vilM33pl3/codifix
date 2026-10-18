@@ -5,11 +5,15 @@ description: "How the CLI, service, UIs, watchers, MCP, config, and database fit
 
 # Runtime topology
 
-Codifix is built around one shared service and database. The CLI, TUI, web UI, watcher manager, and MCP server are adapters around the same project-scoped backend.
+Each Codifix instance has its own service, database and configured authority.
+The CLI, TUI, browser, watchers and MCP adapt to the selected instance. A single
+installation can serve several projects; independently operated knowledge areas
+do not become one unrestricted shared database.
 
 ```mermaid
 flowchart TB
-    CLI[memory CLI] --> API[codifix-service HTTP API]
+    CLI[Codifix CLI] --> ROUTE[Operator-owned area routing]
+    ROUTE --> API[Selected Codifix HTTP API]
     TUI[TUI] --> API
     WEB[Web UI] --> API
     WATCH[Watchers] --> API
@@ -31,11 +35,22 @@ flowchart TB
 | MCP server | Read-first protocol adapter for MCP clients; it reuses the service API. |
 | PostgreSQL | Durable store for projects, memories, captures, activities, history, graph data, and embeddings. |
 
+Curation commits canonical changes and durable enrichment intents together.
+Workers recover pending [jobs](/docs/reference/cli/jobs) from PostgreSQL after
+restart. The offline write outbox and downloaded knowledge projections are
+separate from the owning instance's canonical PostgreSQL state.
+
+Private federation adds a separately configured gateway and publication/receiver
+ledgers. It transports reviewed publications or explicit expertise requests;
+ordinary local query does not automatically contact another area. See
+[Federation and expertise](/docs/federation).
+
 ## Configuration layers
 
 | Layer | Typical contents |
 |---|---|
 | Global config | Database URL, service URL, API token, providers, service preferences. |
+| Area routing | Operator-owned mapping from exact repository/project identities to a service configuration and durable instance UUID. |
 | Project config | Project slug, repo root, project-specific options. |
 | Repo-local `.agents/` | Agent instructions and Codifix skills. |
 | Runtime state | Checkpoints, service status, watcher heartbeats, generated logs. |
@@ -54,7 +69,11 @@ The foreground command should keep running in the terminal and should not daemon
 
 ## MCP as an adapter
 
-The built-in MCP server exposes read-first Memory tools to clients such as Codex and Claude. It does not write directly to the database. Stdio MCP runs as a local process; HTTP MCP is mounted by the service and should stay local and token-protected.
+The built-in MCP server exposes ordinary read-only memory tools alongside
+separately gated loop and expertise actions. Expertise submission sends an
+explicitly authorized question externally; it is not ordinary retrieval.
+Stdio runs as a local process; service-mounted HTTP uses scoped token
+authentication. See [MCP](/docs/mcp) for the transport and disclosure boundaries.
 
 ## Operational rule
 

@@ -11,6 +11,11 @@ Watchers observe agent sessions and project activity so Codifix can capture usef
 
 The recommended path for Codex-linked sessions. The manager detects live sessions, maps them to projects, and starts a watcher automatically.
 
+With knowledge areas configured, the manager resolves each repository against
+the operator-owned routing policy and pins the child's exact area, instance and
+configuration. Invalid or removed routes stop that child; they do not redirect
+captures into General. See [Area routing](/docs/how-it-works/area-routing).
+
 ```bash
 codifix watcher manager enable
 codifix watcher manager status
@@ -25,7 +30,10 @@ codifix watcher run    --project <slug>
 codifix watcher status --project <slug>
 ```
 
-Foreground watchers observe repository changes, debounce bursts, and send activity to the service. Use this path for Claude Code, custom agents, or any setup where the watcher manager doesn't match.
+Foreground watchers observe repository changes, debounce bursts, and send
+activity to the selected service. Use an explicit area when required. Legacy
+per-project `watcher enable` is rejected for area deployments; use the manager
+and the operator's coordinated watcher procedure.
 
 ## Lifecycle
 

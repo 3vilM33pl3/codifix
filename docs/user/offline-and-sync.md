@@ -6,7 +6,8 @@ before relying on a copy. Queued local work is not owner acceptance, and a cache
 grant is not evidence of current remote authority.
 
 This guide describes current source on `main`. The published `3.0.0-rc.1` package
-must not be assumed to include these later workflows. Native provisioning is a
+contains project-sync commands; its standard package does not include the combined
+native runtime bundle. Native provisioning is a
 macOS candidate with remaining acceptance checks; start with
 [team setup](https://codifix.dev/docs/team-setup) and the
 [Mac candidate guide](https://codifix.dev/docs/mac-onboarding). Full/embedded

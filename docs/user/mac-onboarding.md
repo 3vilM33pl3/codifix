@@ -2,8 +2,10 @@
 
 This guide covers the macOS native onboarding candidate in current source on
 `main`. Start with [team setup](https://codifix.dev/docs/team-setup) for the
-platform-neutral access and project journey. The published `3.0.0-rc.1` package
-must not be assumed to include this later candidate or its combined runtime.
+platform-neutral access and project journey. The published `3.0.0-rc.1` standard
+package contains client/operator tooling, not the optional combined runtime
+bundle. The post-candidate Mac binding and boolean-serialization fixes are
+separately documented in its release-specific operator procedure.
 
 The development package includes resumable sign-in, project selection,
 repository preparation and offline synchronization, followed by a separate
@@ -62,11 +64,11 @@ unlocked. Run first-run in Terminal on the Mac's logged-in desktop, not an SSH
 login session. If the Keychain is locked, use `security unlock-keychain` there
 and enter the Mac password locally. There is no plaintext credential fallback.
 
-On macOS, allow Memory's Local Network access when prompted so it can reach your
+On macOS, allow Codifix's Local Network access when prompted so it can reach your
 private company server. Check **System Settings → Privacy & Security → Local
 Network** if a desktop process cannot reach the server although SSH/curl can.
 Those processes can have different privacy permissions; successful curl alone
-does not prove that Memory's background services can connect. Keep TLS validation
+does not prove that Codifix's background services can connect. Keep TLS validation
 enabled and verify actual service synchronization after granting access.
 
 ### Full curated-project synchronization candidate

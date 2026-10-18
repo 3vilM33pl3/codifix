@@ -45,7 +45,15 @@ Example Codex-style server entry:
 [mcp_servers.codifix]
 command = "codifix"
 args = ["mcp", "run", "--project", "memory"]
+env_vars = ["CODIFIX_CLIENT_TOKEN"]
 ```
+
+For multi-user access, provide a scoped `CODIFIX_CLIENT_TOKEN` in Codex's
+environment before starting it. The forwarding entry is necessary because
+Codex filters ordinary child-process variables whose names contain `TOKEN`.
+Keep the value in protected environment/secret configuration, never in this
+checked-in example. Use the [desktop plugin](https://codifix.dev/docs/codex-plugin)
+instead when you want the repository-supported connection package.
 
 Example Claude Desktop-style server entry:
 

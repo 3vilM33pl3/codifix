@@ -11,7 +11,11 @@ codifix tui
 codifix tui --project <project-slug>
 ```
 
-The header identifies the active project and the footer reports TUI, service, watcher, and skill health. A source checkout uses an isolated dev profile; its header is marked `[dev]` so it is not confused with a packaged installation.
+The header identifies the active project and, for routed installations, the area,
+durable instance and executable release. Check it before writing. The footer
+reports TUI, service, watcher, and skill health. A source checkout uses an
+isolated dev profile; its header is marked `[dev]` so it is not confused with a
+packaged installation. See [Areas and projects](https://codifix.dev/docs/areas).
 
 ## Shared navigation
 
@@ -64,13 +68,13 @@ The configured local loopback owner must authenticate. A disabled/unsupported
 server or failed read is reported as unavailable, not an empty healthy cache.
 
 The **Jobs** tab inspects durable background stages and provides confirmed retry
-with stable request IDs. See [Background jobs](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/jobs.md) for keys and policy.
+with stable request IDs. See [Background jobs](https://codifix.dev/docs/reference/cli/jobs) for keys and policy.
 
 The **Supervisor** tab provides instance-wide metadata-only inspection, separate
-from local coding sessions in Agents. See [Supervisor inspection](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/supervisor.md)
+from local coding sessions in Agents. See [Supervisor inspection](https://codifix.dev/docs/reference/cli/supervisor)
 for permissions, cursor controls and explicit inactive-worker limitations.
 
 For private federation, launch `codifix federation --project <slug> tui`. This
 focused workspace supports membership, exact publication review, shared citations,
 proposals, approval/rejection and synchronization through the same authenticated
-local API as Web and CLI. See [Federation commands and keys](https://github.com/3vilM33pl3/codifix/blob/main/docs/user/cli/federation.md).
+local API as Web and CLI. See [Federation commands and keys](https://codifix.dev/docs/reference/cli/federation).

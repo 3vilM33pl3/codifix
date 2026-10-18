@@ -2,7 +2,9 @@
 
 This section is for people installing, configuring, and using Codifix in real projects.
 
-If you are new, start with the TUI. It shows the main product surface: cited memory search, graph-aware retrieval diagnostics, live agent state, activity history, watcher health, embedding coverage, and curated project memory.
+For a standalone install, start with Getting Started; for an existing organization,
+start with Team setup. Then verify the area/project and follow Daily workflow.
+The TUI and Web UI let you inspect the same cited memory and pending work.
 
 ![Codifix query answer](../img/tui/query-tab.png)
 
@@ -15,6 +17,11 @@ If you are new, start with the TUI. It shows the main product surface: cited mem
 - [Related Docs](#related-docs)
 
 ## Start Here
+
+- **Choose the destination:** [Areas and projects](areas-and-projects.md), [Daily workflow](daily-workflow.md)
+- **Join a team:** [Team setup](team-setup.md), [Company administration](company-administration.md), [Mac onboarding details](mac-onboarding.md)
+- **Share and synchronize:** [Private federation](federation.md), [Sharing workflow](federation-workflow.md), [Offline knowledge](offline-and-sync.md)
+- **Inspect pending work:** [Background jobs](cli/jobs.md), [Supervisor](cli/supervisor.md), [Project synchronization](cli/projects.md)
 
 - **Install and configure:** [Getting Started](getting-started.md), [Wizard And Bootstrap](cli/wizard.md), [Init Bootstrap](cli/init.md), [Demo](cli/demo.md), [Tour](cli/tour.md), [Skill Upgrade](cli/upgrade.md)
 - **Use the visual UIs:** [TUI Guide](tui/README.md), [Web UI](web-ui.md), [TUI Command](cli/tui.md), [Memories Tab](tui/memories.md), [Query Tab](tui/query.md), [Errors Tab](tui/errors.md)
