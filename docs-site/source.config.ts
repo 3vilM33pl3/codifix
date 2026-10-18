@@ -1,14 +1,18 @@
 import { remarkMdxMermaid } from 'fumadocs-core/mdx-plugins';
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 
-type ImageNode = { type: string; url?: string; children?: ImageNode[] };
+type ReferenceNode = { type: string; url?: string; children?: ReferenceNode[] };
 
-// Included Markdown keeps absolute image URLs for GitHub readers. Resolve our
-// own images from the candidate source so builds never depend on live DNS.
-function remarkLocalImages() {
-  return (tree: ImageNode) => {
-    const visit = (node: ImageNode) => {
-      if (node.type === 'image' && node.url?.startsWith('https://codifix.dev/images/')) {
+// Canonical Markdown uses absolute URLs for GitHub. Resolve our own references
+// locally so previews stay on the preview and images need no production DNS.
+function remarkLocalReferences() {
+  return (tree: ReferenceNode) => {
+    const visit = (node: ReferenceNode) => {
+      if (
+        (node.type === 'image' || node.type === 'link') &&
+        node.url &&
+        /^https:\/\/codifix\.dev\/(?:docs(?:[/?#]|$)|images\/|demo(?:[/?#]|$))/.test(node.url)
+      ) {
         node.url = node.url.slice('https://codifix.dev'.length);
       }
       node.children?.forEach(visit);
@@ -23,6 +27,6 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: (defaults) => [remarkLocalImages, ...defaults, remarkMdxMermaid],
+    remarkPlugins: (defaults) => [remarkLocalReferences, ...defaults, remarkMdxMermaid],
   },
 });
