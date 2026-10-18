@@ -81,6 +81,22 @@ operational evidence directory below.
   `/docs/install/linux-debian` returned HTTP 200 with the new release links and
   Debian download mapping. Company Workshop/Homelab health also returned HTTP
   200/status ok on Codifix 3.0.0-rc.1.
+- **Follow-up CI repairs:** main run `39109203814` exposed two independent
+  issues after candidate publication. `4fcc0838` explicitly releases the
+  campaign budget journal lock when its owner exits, including failed resume
+  validation. A parallel child can briefly retain a descriptor after the owner
+  closes it; the live-owner exclusion remains enforced. Twelve focused tests
+  and 20 parallel repetitions (240 executions) passed; Astra reviewed the fix.
+  `ba97b17d` fixes synthetic macOS fixtures that hashed the self-hosted runner's
+  Python beneath group-writable pyenv ancestors. The fixture now pins private
+  synthetic Python and still tests rejection of unsafe ancestors. All 149
+  synthetic tests passed under the runner's actual PATH. Production path guards
+  and host permissions are unchanged. Both fixes are later main-branch work,
+  not changes to the published candidate bytes. Remote CI on the corrected
+  source remains the outstanding validation step.
+  Workflow selectors now use runner label `codifix` (`cc13cfe2`); the existing
+  registered runner remains online. The redundant tag-triggered Release run
+  `39108940650` is confirmed cancelled.
 - **CA pending:** its latest RESULT INBOX still contains only the 17 October
   inventory. Existing console binding/recovery follow-ups remain pending.
   CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
