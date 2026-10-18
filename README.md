@@ -58,10 +58,9 @@ origin and device enrollment. For a new standalone installation, prerequisites,
 and verification, start with the
 [Install guide](https://codifix.dev/docs/install) or download the
 [v3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
-The rename from Memory Layer v2 is a breaking reinstall. Existing users should
-follow the [Update guide](https://codifix.dev/docs/install/update) before
-changing their installation. The historical v2.1.0 packages retain their
-Memory Layer identity.
+Upgrading an existing installation? Read the
+[Update guide](https://codifix.dev/docs/install/update) first: the v3 transition
+requires a breaking reinstall, not an in-place upgrade.
 The setup wizard configures the machine once and the project you are working
 in:
 
