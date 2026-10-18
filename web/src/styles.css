@@ -689,6 +689,7 @@ pre {
 }
 
 .statusbar {
+  overflow-wrap: anywhere;
   margin-top: 0.45rem;
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--line);

@@ -84,7 +84,19 @@ try {
   const screenshotRoot = process.env.MEMORY_FEDERATION_F1_SCREENSHOTS;
   if (screenshotRoot) { await mkdir(screenshotRoot, { recursive: true }); await page.screenshot({ path: join(screenshotRoot, 'f1-desktop.png'), fullPage: true }); }
   await page.setViewportSize({ width: 390, height: 844 });
-  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2));
+  const mobileLayout = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    scrollX: window.scrollX,
+    root: { client: document.documentElement.clientWidth, rect: document.documentElement.getBoundingClientRect().width },
+    body: { client: document.body.clientWidth, scroll: document.body.scrollWidth, rect: document.body.getBoundingClientRect().width },
+    width: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll('body *')]
+      .filter(element => element.scrollWidth > element.clientWidth + 2 || element.getBoundingClientRect().right + window.scrollX > window.innerWidth + 2)
+      .map(element => ({ tag: element.tagName, className: element.className, width: element.getBoundingClientRect().width, client: element.clientWidth, scroll: element.scrollWidth }))
+      .slice(0, 20),
+  }));
+  assert(mobileLayout.width <= mobileLayout.viewport + 2, JSON.stringify(mobileLayout));
+  console.log(`F1 mobile width: ${mobileLayout.width}px within ${mobileLayout.viewport}px viewport.`);
   if (screenshotRoot) await page.screenshot({ path: join(screenshotRoot, 'f1-mobile.png'), fullPage: true });
   console.log('F1 live browser: collection review/activation/withdrawal, service grant/inspection/revocation, signed discovery and confirmed queued question/status passed; desktop/mobile checks passed. No completed-answer/two-origin/PDS claim.');
 } finally { await browser.close(); }
