@@ -36,7 +36,7 @@ async function tcp(host,port) {
   assert.equal(discovered.status,200);
   const reply=JSON.parse(discovered.data);
   assert.equal(reply.claims.nonce,expertise.nonce);
-  assert.equal(reply.claims.purpose,'memory-expertise-discover-v1');
+  assert.equal(reply.claims.purpose,'codifix-expertise-discover-v1');
   assert.equal((await request(config.gateway,'/v1/expertise','wrong-token',ca,expertise)).status,401);
   assert.equal((await request(config.otherGateway,'/v1/expertise',token,ca,expertise)).status,401);
   await assert.rejects(()=>request(config.gateway,path,token,null));

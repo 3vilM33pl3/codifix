@@ -43,10 +43,11 @@ function ip(service) {return Object.values(inspect(service).NetworkSettings.Netw
 let started=false,built=false,proxyBuilt=false;
 try {
   await long('cargo',['build','-p','codifix-federation-runtime','--bin','codifix-federation-gateway','--example','isolation-admin','--locked']);
+  const cargoTarget = JSON.parse(run('cargo', ['metadata', '--locked', '--no-deps', '--format-version', '1'])).target_directory;
   // A fixture image from our built binary and its exact dynamic libraries avoids
   // host mounts and dependence on a base image's glibc version. Not a release image.
   const staging=join(root,'image/rootfs');await mkdir(join(staging,'usr/local/bin'),{recursive:true});
-  const binary=join(repo,'target/debug/codifix-federation-gateway');
+  const binary=join(cargoTarget,'debug/codifix-federation-gateway');
   await copyFile(binary,join(staging,'usr/local/bin/codifix-federation-gateway'));
   const libs=[...run('ldd',[binary]).matchAll(/\/[\w/+.,:@-]+/g)].map(m=>m[0]);
   for(const lib of new Set(libs)) {await mkdir(dirname(join(staging,lib)),{recursive:true});await copyFile(lib,join(staging,lib));}
@@ -85,7 +86,7 @@ try {
       try {run('docker',[...compose,'exec','-T',`gateway_db_${id}`,'pg_isready','-U','fixture_admin','-d','memory_isolation']);break;} catch {if(attempt>60) throw new Error('DB readiness');await new Promise(r=>setTimeout(r,250));}
     }
     await save(join(dir,'admin-url'),`postgres://fixture_admin:${m.adminPassword}@${ip(`gateway_db_${id}`)}:5432/memory_isolation`);
-    const publicKeys=JSON.parse(run(join(repo,'target/debug/examples/isolation-admin'),[dir],{env:{...process.env,MEMORY_FEDERATION_ISOLATION_DISPOSABLE:'1'}}));
+    const publicKeys=JSON.parse(run(join(cargoTarget,'debug/examples/isolation-admin'),[dir],{env:{...process.env,CODIFIX_FEDERATION_ISOLATION_DISPOSABLE:'1'}}));
     await save(join(dir,'gateway/database-url'),`postgres://gateway_runtime:${m.gatewayPassword}@gateway_db_${id}:5432/memory_isolation`);
     await save(join(dir,'gateway/gateway.json'),{space:m.space,authority:m.authority,listen:'0.0.0.0:8081',database_url_file:'/config/database-url',pds:`https://pds-tls-${id}.federation.example.com:8443`,pds_ca_file:'/config/ca.pem',repository:`did:web:space-${id}.federation.example.com`,signing_key:publicKeys.pds_signing_key,
       token_file:'/config/pds-token',audit_key_file:'/config/audit-key',receipt_keys:publicKeys.receipt_keys,policy:{external_models:[]},expertise_fleet:[[m.member,3],[m.authority,3]],credentials:[{instance:m.member,token_file:'/config/member-token'},{instance:m.authority,token_file:'/config/root-token'}]});
@@ -101,7 +102,7 @@ try {
     denied.push({host:ip(`instance_db_${other}`),port:5432});
     await save(join(root,id,'member/probe.json'),{id,space:metadata[id].space,gateway:`gateway-${id}.federation.example.com`,otherGateway:`gateway-${other}.federation.example.com`,denied,localDatabase:ip(`instance_db_${id}`)});
     run('docker',[...compose,'run','--rm','--no-deps','--use-aliases',`member_${id}`],{stdio:'inherit'});
-    console.log(run(join(repo,'target/debug/examples/isolation-admin'),[join(root,id),'verify'],{env:{...process.env,MEMORY_FEDERATION_ISOLATION_DISPOSABLE:'1'}}));
+    console.log(run(join(cargoTarget,'debug/examples/isolation-admin'),[join(root,id),'verify'],{env:{...process.env,CODIFIX_FEDERATION_ISOLATION_DISPOSABLE:'1'}}));
   }
   for(const service of Object.keys(doc.services).filter(s=>!s.startsWith('member_'))) {
     const live=inspect(service);
