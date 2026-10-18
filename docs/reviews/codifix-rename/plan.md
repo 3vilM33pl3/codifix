@@ -119,10 +119,14 @@ files byte-verified. Active client/bootstrap repairs are complete; current
 installation docs and release links are updated. See [live cutover](live-cutover.md)
 for the evidence, exact Debian transport-name mapping and explicit limitations.
 
-Unchecked whole-fleet/completion items are not fresh rehearsal requests: CA is
-still on the legacy Trust installation, pending the existing console follow-up
-and explicit change approval. Per-host completed evidence is recorded in the
-live ledger; do not imply all consuming repositories/sessions were verified.
+Unchecked whole-fleet/completion items are not fresh rehearsal requests. The CA
+Trust upgrade completed on 18 October: Codifix 3.0.0-rc.1/schema85, preserved
+knowledge/history/state, verified local reads/writes and restart acceptance.
+Olivier subsequently approved fresh same-scope Trust federation enrollment and
+scoped application activation. That final connection and cited exchange/replay
+remain pending; see [Trust closeout](trust-federation-closeout.md). Per-host
+completed evidence is recorded in the live ledger; do not imply all consuming
+repositories/sessions were verified.
 Stable 3.0.0, signed/notarized distribution, pinned Homebrew, OS reboot and visual
 acceptance remain outside the claims of this prerelease. The full-plan completion
 workflow must remain open while the CA scope is unresolved.
@@ -130,11 +134,11 @@ workflow must remain open while the CA scope is unresolved.
 ## Current operational boundary
 
 CA is console-administered only; SSH remains disabled and no certificate renewal
-is required. Ask Olivier before any CA change. The
-[read-only console inventory](ca-console-checks.md) has been received and its
-report checksum verified; process/database binding, recovery coverage and restore
-validation remain pending. Coordinate remaining observations through Notion's
-CURRENT ACTION and RESULT INBOX. Current source checks and
+is required. The local Trust application upgrade and its required narrow HBA
+name-field reload were approved and completed. Fresh same-scope federation
+activation is now explicitly approved; unrelated CA changes still require
+approval. Coordinate through Notion's CURRENT ACTION and RESULT INBOX without
+repeating the completed cutover. Current source checks and
 private rehearsal evidence are in [integration status](evidence/integration-status.md)
 and [federation preservation](evidence/federation-slice.md). Source-level checked
 items do not establish native installation, final recovery or live cutover.

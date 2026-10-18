@@ -32,9 +32,18 @@ CA-local commits: `5007b81`, `760e072`, `e33f660`.
 
 Preserve the retired space at cursor 23. Use fresh enrollment and credentials;
 do not resume old queues, republish imported knowledge or widen permissions.
-Resolve the unset health `area_instance_id` against the retained logical
-publisher before starting the federation worker. The process health instance ID
-and immutable import target are not substitutes for the publisher identity.
+Astra verified the pinned rc.1 source: null health `area_instance_id` is expected
+when `[area]` is absent and does not block federation. Leave absent `[area]`
+unchanged. If configured, its instance must equal the federation worker's
+publisher. The process health instance ID and immutable import target are not
+substitutes for the publisher identity. Validate the existing collection tuple
+under the fresh space; retained legacy-space rows alone do not activate it.
+
+The coordinator's fresh space is `e9ba9b50-a888-467a-a894-6dc392402dd5`, with
+authority `c863e242-647d-4f6a-b28f-ccc1612000ce`. The existing CA OpenPGP delivery
+workflow can carry ciphertext over its private LAN drop without enabling SSH
+or changing OpenBao. Credentials must remain private; only public key metadata
+and ciphertext hashes belong in coordination pages.
 
 ## Remaining acceptance
 

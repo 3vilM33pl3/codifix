@@ -146,10 +146,18 @@ operational evidence directory below.
   exact failing Clippy commands passed locally, the full-feature campaign-local
   test passed 1/1, and the boundary check passed. Astra found no blocker in this
   test-only correction; its remote CI confirmation remains pending.
-- **CA pending:** its latest RESULT INBOX still contains only the 17 October
-  inventory. Existing console binding/recovery follow-ups remain pending.
-  CA/Trust cutover needs Olivier's approval of its concrete scope; SSH remains
-  disabled. No CA changes were made during publication or client repair.
+- **CA local upgrade complete:** the 18 October 17:59 UTC RESULT INBOX confirms
+  Codifix 3.0.0-rc.1/schema85, preserved knowledge/history/state, verified restore,
+  healthy local reads/writes and restart acceptance. Step CA/OpenBao were
+  unchanged and SSH remains disabled. Olivier approved the final same-scope
+  Trust federation enrollment and application activation; preparation is in
+  progress. See [Trust closeout](trust-federation-closeout.md).
+- **Latest CI:** engineering run `39146234764` on `c2aab5b8` completed
+  successfully, including Rust Tests, Clippy, DB Integration and Debian Package
+  Smoke. Conditional jobs were skipped, including Offline Eval Smoke; its
+  correction retains exact local validation rather than a new remote pass.
+  Docs-only run `39148506767` succeeded with validation jobs skipped after change
+  detection. No failed or pending jobs remained at the 18 October status check.
 - **Explicit distribution limits:** stable 3.0.0 is not released. Mac and Windows
   packages are unsigned; Mac packages are not notarized. Windows remains preview,
   and Homebrew remains HEAD-only. OS reboot, pixel-level UI and a separate Homelab
