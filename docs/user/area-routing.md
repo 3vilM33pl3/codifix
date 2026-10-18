@@ -1,6 +1,11 @@
 # Knowledge area routing
 
-Memory can route local CLI, TUI and watcher traffic to independently operated
+For the everyday choice of an area and project, start with
+[Areas and projects](https://codifix.dev/docs/areas). This page covers the
+operator-owned routing policy in current source on `main`; it does not imply
+that the published `3.0.0-rc.1` package includes later routing changes.
+
+Codifix can route local CLI, TUI and watcher traffic to independently operated
 areas. Install an operator-owned JSON file at
 `~/.config/codifix/area-routing.json` (or the equivalent XDG location), or
 select it with `--area-routing /absolute/path.json` /
@@ -13,7 +18,7 @@ root and must not be group/world writable. Use mode `0600` or `0644`.
   "default_area": "general",
   "areas": {
     "workshop": {
-      "instance_id": "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85",
+      "instance_id": "22222222-2222-4222-8222-222222222222",
       "config": "/etc/codifix/instances/workshop/client.toml"
     },
     "general": {
@@ -21,18 +26,18 @@ root and must not be group/world writable. Use mode `0600` or `0644`.
       "config": "/etc/codifix/instances/general/client.toml"
     },
     "trust": {
-      "instance_id": "cc1bff80-d0e4-4687-9e62-9b8a5fe4bb16",
+      "instance_id": "33333333-3333-4333-8333-333333333333",
       "config": null
     }
   },
   "routes": [
-    {"area": "workshop", "repository": "/srv/repos/memory"},
-    {"area": "workshop", "project": "memory"}
+    {"area": "workshop", "repository": "/srv/repos/example-app"},
+    {"area": "workshop", "project": "example-app"}
   ]
 }
 ```
 
-Replace the example General identity with its enrolled identity. Add Homelab
+Replace every example identity with its enrolled identity. Add Homelab
 and its exact repositories in the same format. Each locally usable area has a
 distinct absolute config path and distinct instance identity. A remote-only
 area has `config: null`; choosing it for local queries or writes produces an
@@ -43,7 +48,7 @@ Every selected application configuration includes its matching identity:
 ```toml
 [area]
 name = "workshop"
-instance_id = "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85"
+instance_id = "22222222-2222-4222-8222-222222222222"
 ```
 
 Keep the ordinary service, database and authorization settings in that area's
@@ -67,9 +72,9 @@ selected config/service never redirects into General. Explicit `--config`
 must agree with the selected route for knowledge commands.
 
 ```bash
-codifix --area workshop query --project memory --question "What changed?"
-codifix --area homelab tui --project homelab
-codifix --area workshop status --project memory --json
+codifix --area workshop query --project example-app --question "What changed?"
+codifix --area homelab tui --project example-infra
+codifix --area workshop status --project example-app --json
 ```
 
 Status JSON includes `area.name` and `area.instance_id`. The TUI header shows the
