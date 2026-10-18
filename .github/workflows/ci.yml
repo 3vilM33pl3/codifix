@@ -15,7 +15,7 @@ concurrency:
 jobs:
   changes:
     name: Detect Changes
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
@@ -118,7 +118,7 @@ jobs:
 
   federation-pds:
     name: Private PDS Prerequisites and Durable Federation
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.federation_pds == 'true'
     timeout-minutes: 35
@@ -166,7 +166,7 @@ jobs:
 
   plugin-contract:
     name: Codex Plugin Contract
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.plugin == 'true'
     steps:
@@ -175,7 +175,7 @@ jobs:
 
   formal-proof:
     name: Federation Formal Proofs
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.formal == 'true'
     steps:
@@ -193,7 +193,7 @@ jobs:
 
   rust-fmt:
     name: Rust Format
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.evals == 'true' || needs.changes.outputs.package == 'true'
     steps:
@@ -205,7 +205,7 @@ jobs:
 
   rust-test:
     name: Rust Tests
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.evals == 'true' || needs.changes.outputs.package == 'true'
     steps:
@@ -218,7 +218,7 @@ jobs:
 
   rust-clippy:
     name: Rust Clippy
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: [changes, rust-test]
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.evals == 'true' || needs.changes.outputs.package == 'true'
     steps:
@@ -240,7 +240,7 @@ jobs:
 
   db-integration:
     name: DB Integration
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.db == 'true' || needs.changes.outputs.evals == 'true'
     services:
@@ -314,7 +314,7 @@ jobs:
 
   feature-matrix:
     name: Feature Matrix
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: [changes, rust-test]
     if: needs.changes.outputs.rust == 'true'
     steps:
@@ -332,7 +332,7 @@ jobs:
 
   offline-eval:
     name: Offline Eval Smoke
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: [changes, rust-test]
     if: needs.changes.outputs.evals == 'true'
     steps:
@@ -401,7 +401,7 @@ jobs:
 
   web-build:
     name: Web Build
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.package == 'true'
     steps:
@@ -414,7 +414,7 @@ jobs:
 
   docs-site:
     name: Docs Site
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.docs_site == 'true'
     steps:
@@ -429,7 +429,7 @@ jobs:
 
   ca-release-preparation:
     name: Offline CA Release Preparation Tests
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.package == 'true'
     steps:
@@ -453,7 +453,7 @@ jobs:
 
   macos-onboarding-contract:
     name: macOS Onboarding Contract (Synthetic Linux Tests)
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: changes
     if: needs.changes.outputs.package == 'true'
     steps:
@@ -468,7 +468,7 @@ jobs:
 
   package-smoke:
     name: Debian Package Smoke (amd64)
-    runs-on: [self-hosted, memory, Linux, X64]
+    runs-on: [self-hosted, codifix, Linux, X64]
     needs: [changes, rust-test, web-build]
     if: needs.changes.outputs.package == 'true'
     steps:
