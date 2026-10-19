@@ -45,14 +45,14 @@ workflow can carry ciphertext over its private LAN drop without enabling SSH
 or changing OpenBao. Credentials must remain private; only public key metadata
 and ciphertext hashes belong in coordination pages.
 
-## Remaining acceptance
+## Acceptance
 
 - [x] Prepare and verify fresh coordinator enrollment and scoped configuration.
 - [x] Stage the sealed credential package through the existing protected delivery
   workflow; Notion carries public metadata, instructions and sanitized results.
 - [x] CA-local agent confirms package decryption and credential installation.
 - [x] CA-local agent activates the approved binding through the existing console.
-- [ ] Verify fresh sync plus a deterministic cited exchange and exact replay.
+- [x] Verify fresh sync plus a deterministic cited exchange and exact replay.
 - [ ] Reconcile Notion and the project plan, then complete the plan workflow.
 
 Coordination: [CURRENT ACTION](https://app.notion.com/p/3e78990715f48170a918f3f2c70277c9)
@@ -85,8 +85,8 @@ The [console activation handoff](ca-federation-activation.md) is posted in CURRE
 ACTION with the encrypted v3 connection package checksum. Its three shell blocks
 were read back exactly and passed syntax validation. The named service's finite
 launcher, DynamicUser credential loading and exact gateway egress are explicitly
-covered. CA activation is complete; the final deterministic exchange/replay is
-still pending and the rename remains open.
+covered. CA activation and the final deterministic exchange/replay are complete;
+the evidence below supersedes the earlier authentication preflight.
 
 ## CA activation verified — report captured 18 October, 20:55 UTC
 
@@ -105,17 +105,39 @@ confirms unchanged Step CA/OpenBao/PostgreSQL processes and healthy protected
 endpoints. Trust's own operator cannot browse capabilities because its retained
 local grant excludes AskExpertise; this is expected and was not broadened.
 
-## Final exchange preflight — 19 October
+## Final exchange and exact replay — 19 October, 12:04 UTC
 
-No question has been prepared or submitted. The prepared test wrapper used the
-old Workshop single-user human-session bootstrap. Workshop and Homelab now use
-multi-user authentication; that bootstrap correctly refuses both. Neither has
-an active authorized human browser session. Workshop's internal owner has the
-existing fresh-space grants, while the distinct Authentik human principal does
-not. General is not an allowed requester for the retained Trust collection.
+Normal Authentik sign-in at `https://workshop.metatao.net/` authenticated Olivier
+as `39d830fc-d2ae-4e37-b8c4-f1a0675510b5`. This is distinct from the retained
+internal owner. Olivier explicitly approved the additional project-local grant:
+**Pull and AskExpertise only**, on Workshop's `codifix` project in the fresh space.
+The supported browser grant UI applied it; read-only state verification confirmed
+exact scope. Authentication mode, Trust's policy and assistant/model destinations
+were unchanged. The earlier authentication-blocked preflight is historical.
 
-The remaining work is a supported human-session/grant reconciliation on the
-requester, followed by the same deterministic question and exact submission/read
-replay. Do not forge a session, switch authentication mode, add assistant callers
-or broaden Trust's collection to make the test pass. Private metadata-only
-evidence: `final-exchange-preflight.json` beside the coordinator evidence.
+The previously approved question was sent in deterministic mode for `local_human`
+output. Request `6c52e9fa-40bc-430c-a120-5865590a421d` was answered with one original
+citation: canonical `14e013ad-4b0d-4aca-a07b-9e1640220a6f`, source version1,
+collection revision1 and the unchanged content digest above. The answer is marked
+untrusted; evidence is sufficient. No provider execution was started.
+
+The browser's **Retry exact question** reused the same request, then a fresh
+answer read returned identical answer text, binding and citations. Gateway
+records still contain exactly one queued, claimed and answered execution;
+the two fresh reads each received their own successful delivery approval.
+Displayed answer: 322 UTF-8 bytes, SHA-256
+`6c19a279bf94c224accab1d137ad4ae8df41c034baf0fe0480cb5c9c1743fa2c`.
+Question SHA-256:
+`6d4aebfe5e801169d553830320f2dd4746a321692eb8f1140902fc3426429f53`.
+These are text hashes, not protocol envelope digests.
+
+Workshop, Homelab and General are healthy at fresh cursor17 with zero sync
+failures, null sync errors and zero pending/blocked outbox work. The gateway is
+running without restart or exit error. No coordinator access to the CA occurred;
+SSH remains disabled. Astra reviewed the sanitized proof without a blocker.
+
+Sanitized durable evidence: [final exchange](evidence/final-trust-exchange.json).
+Private detailed receipts retain `final-exchange-browser-proof.json`,
+`browser-exchange-citation-proof.json`, `final-post-replay-health.json` and
+`coordinator-status.json` beside the prior coordinator evidence. No question or
+answer bodies are included in the durable evidence or Notion closeout report.

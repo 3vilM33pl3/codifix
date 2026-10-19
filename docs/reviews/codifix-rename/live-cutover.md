@@ -1,7 +1,8 @@
-# Codifix live cutover — updated 2026-10-18
+# Codifix live cutover — updated 2026-10-19
 
-This is the current operational checkpoint. The full rename remains in progress;
-older rehearsal notes describe historical states, not the live deployment.
+Codifix 3.0.0-rc.1 rename and scoped participating-host cutover are complete.
+Older rehearsal notes describe historical states, not the live deployment.
+Final exchange evidence is recorded in [Trust closeout](trust-federation-closeout.md).
 
 ## Delivered
 
@@ -145,13 +146,18 @@ operational evidence directory below.
   `expect()` messages without changing assertions or suppressing lints. Both
   exact failing Clippy commands passed locally, the full-feature campaign-local
   test passed 1/1, and the boundary check passed. Astra found no blocker in this
-  test-only correction; its remote CI confirmation remains pending.
+  test-only correction; the later successful run below supersedes this checkpoint.
 - **CA local upgrade complete:** the 18 October 17:59 UTC RESULT INBOX confirms
   Codifix 3.0.0-rc.1/schema85, preserved knowledge/history/state, verified restore,
   healthy local reads/writes and restart acceptance. Step CA/OpenBao were
   unchanged and SSH remains disabled. Olivier approved the final same-scope
-  Trust federation enrollment and application activation; preparation is in
-  progress. See [Trust closeout](trust-federation-closeout.md).
+  Trust federation enrollment and application activation, now complete. The
+  CA report at 20:55 UTC confirms cursor17 and the retained collection. On
+  19 October Workshop received the deterministic cited answer, and exact replay
+  returned identical answer/binding/citations with one gateway execution.
+  Olivier approved the additional Authentik human Pull/AskExpertise project grant.
+  All three non-CA areas remain healthy at cursor17 with empty queues. See
+  [Trust closeout](trust-federation-closeout.md).
 - **Latest CI:** engineering run `39146234764` on `c2aab5b8` completed
   successfully, including Rust Tests, Clippy, DB Integration and Debian Package
   Smoke. Conditional jobs were skipped, including Offline Eval Smoke; its

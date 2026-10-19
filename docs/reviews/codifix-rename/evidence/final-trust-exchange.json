@@ -1,0 +1,172 @@
+{
+  "browser": {
+    "checked_at": "2026-10-19T12:04:30.827Z",
+    "status": "EXCHANGE_AND_EXACT_REPLAY_PASSED",
+    "request_id": "6c52e9fa-40bc-430c-a120-5865590a421d",
+    "binding": {
+      "capability": {
+        "id": "8a65d2ac-1b3f-408d-8151-a4c25dd9b1b8",
+        "publisher": "cc1bff80-d0e4-4687-9e62-9b8a5fe4bb16"
+      },
+      "collection_digest": {
+        "algorithm": "sha256",
+        "hex": "ef2e41c4444724d31d9f0993db5e2d8ce4934bb0912ff31c35241d8f7e9268e6"
+      },
+      "created_at": "2026-10-19T12:03:37.870422482Z",
+      "expires_at": "2026-10-19T12:05:37.870422482Z",
+      "mode": "deterministic",
+      "model_destination": null,
+      "output_destination": "local_human",
+      "principal": "39d830fc-d2ae-4e37-b8c4-f1a0675510b5",
+      "request_id": "6c52e9fa-40bc-430c-a120-5865590a421d",
+      "requester": "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85",
+      "revision": 1,
+      "space": "e9ba9b50-a888-467a-a894-6dc392402dd5"
+    },
+    "answer_sha256": "6c19a279bf94c224accab1d137ad4ae8df41c034baf0fe0480cb5c9c1743fa2c",
+    "answer_utf8_bytes": 322,
+    "same_answer": true,
+    "same_binding_and_citations": true,
+    "citations": [
+      {
+        "author": "unknown:local-author",
+        "authored_at": "2026-03-19T16:34:48.729408Z",
+        "canonical": "14e013ad-4b0d-4aca-a07b-9e1640220a6f",
+        "collection": "8a65d2ac-1b3f-408d-8151-a4c25dd9b1b8",
+        "content_digest": {
+          "algorithm": "sha256",
+          "hex": "a5780f572e73e0f5ce8146af655512a3a5eaab7bc2dda5f2ec274257614abc0c"
+        },
+        "evidence": [],
+        "responder": "cc1bff80-d0e4-4687-9e62-9b8a5fe4bb16",
+        "revision": 1,
+        "source": {
+          "record_id": "14e013ad-4b0d-4aca-a07b-9e1640220a6f",
+          "version": 1
+        }
+      }
+    ],
+    "question_sha256": "6d4aebfe5e801169d553830320f2dd4746a321692eb8f1140902fc3426429f53",
+    "fresh_answer_read_after_replay": true
+  },
+  "post_replay": {
+    "checked_at": "2026-10-19T12:04:54.958373+00:00",
+    "request_id": "6c52e9fa-40bc-430c-a120-5865590a421d",
+    "areas": {
+      "workshop": {
+        "health": {
+          "status": "ok",
+          "database": "up",
+          "version": "3.0.0-rc.1",
+          "area_instance_id": "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85"
+        },
+        "replicas": [
+          {
+            "cursor": 17,
+            "sync_failures": 0,
+            "sync_error": null
+          }
+        ],
+        "source_outbox": [
+          {
+            "pending": 0,
+            "blocked": 0
+          }
+        ]
+      },
+      "homelab": {
+        "health": {
+          "status": "ok",
+          "database": "up",
+          "version": "3.0.0-rc.1",
+          "area_instance_id": "1573e46e-ee3a-4ed9-b5ac-4b2fbf8da196"
+        },
+        "replicas": [
+          {
+            "cursor": 17,
+            "sync_failures": 0,
+            "sync_error": null
+          }
+        ],
+        "source_outbox": [
+          {
+            "pending": 0,
+            "blocked": 0
+          }
+        ]
+      },
+      "general": {
+        "health": {
+          "status": "ok",
+          "database": "up",
+          "version": "3.0.0-rc.1",
+          "area_instance_id": "ab756e53-1f26-466e-9eee-02bcf9aa89a7"
+        },
+        "replicas": [
+          {
+            "cursor": 17,
+            "sync_failures": 0,
+            "sync_error": null
+          }
+        ],
+        "source_outbox": [
+          {
+            "pending": 0,
+            "blocked": 0
+          }
+        ]
+      }
+    },
+    "gateway_attempts": [
+      {
+        "action": "answered",
+        "count": 1
+      },
+      {
+        "action": "claimed",
+        "count": 1
+      },
+      {
+        "action": "delivery_claimed",
+        "count": 2
+      },
+      {
+        "action": "delivery_released",
+        "count": 2
+      },
+      {
+        "action": "delivery_requested",
+        "count": 2
+      },
+      {
+        "action": "queued",
+        "count": 1
+      }
+    ],
+    "workshop_human_grant": [
+      {
+        "principal": "39d830fc-d2ae-4e37-b8c4-f1a0675510b5",
+        "project": "fb83249e-c78c-43eb-a4ba-928513a9023a",
+        "instance": "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85",
+        "space": "e9ba9b50-a888-467a-a894-6dc392402dd5",
+        "capabilities": [
+          "pull",
+          "ask_expertise"
+        ],
+        "enabled": true
+      }
+    ],
+    "gateway_container": {
+      "Running": true,
+      "Restarting": false,
+      "Dead": false,
+      "ExitCode": 0
+    },
+    "same_id_no_duplicate_execution": true,
+    "paid_provider_started_attempts": 0,
+    "ca_access_performed": false
+  },
+  "ca_report_source": "https://app.notion.com/p/3e78990715f481cd935ff0a897040e4e",
+  "ca_report_captured_at": "2026-10-18T20:55:31Z",
+  "review": "Astra reviewed sanitized exchange proof; no concrete blocker."
+}

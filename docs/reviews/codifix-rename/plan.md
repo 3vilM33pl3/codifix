@@ -36,10 +36,10 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 ## A. Baseline and recovery
 
 - [x] Record clean source/release baseline and Workshop approved-plan checkpoint before implementation.
-- [ ] Inventory actual live installations, services, watchers, databases, offline stores, credentials, agent configs, consuming project markers and participating peers. Treat Monolith/Mac/CA docs only as leads.
-- [ ] Record exact old/new state paths and storage keys; verify domain and GitHub target availability.
-- [ ] Freeze naming map and explicit exceptions.
-- [ ] Prepare a matched recovery bundle for every changed stateful participant: databases, configuration, attachments, keys, old binaries/packages. Keep secrets out of Git, Notion and logs.
+- [x] Inventory the changed Monolith, Mac, gateway and CA installations, identities, state, credentials and participating peers; retain per-host evidence in the live ledger.
+- [x] Record exact old/new state paths and storage keys; verify domain and GitHub target availability.
+- [x] Freeze naming map and explicit exceptions.
+- [x] Retain recoverable database/configuration/state and old runtime copies for the changed participants; verify the recorded populated restores. Keep secrets out of Git and Notion. This does not claim a simultaneous whole-estate backup.
 
 ## B. Core workspace
 
@@ -50,7 +50,7 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## C. Applications, services and installation
 
-- [ ] Update Linux services/accounts/paths and Web/TUI branding, browser storage, session and CSRF cookies.
+- [x] Update Linux services/accounts/paths and Web/TUI branding, browser storage, session and CSRF cookies.
 - [x] Rename Swift project, targets, modules, app and Network Access helper; update signing, entitlements and privacy metadata.
 - [x] Preserve connection metadata and rehearse Keychain transfer/access BEFORE uninstalling the old Mac app.
 - [x] Update Windows MSI identities, registry/install paths, user/server tools; update Homebrew, DEB and all PKG variants.
@@ -60,18 +60,18 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 - [x] Rename plugin/marketplace/MCP tools, prompts and resources; update skills, internal references and generated bootstrap copies.
 - [x] Update explicit Workshop helper routing without a dev fallback.
-- [ ] Update product-owned sections in consuming repos while preserving user custom configuration.
-- [ ] Migrate markers/path-hash state mappings, wrappers, schedules and saved application paths.
-- [ ] Validate real MCP clients and fresh sessions, including Workshop/dev separation.
+- [x] Update the inventoried Monolith/Mac product-owned integrations and installed skills while preserving custom configuration; record uninspected consuming repos as outside this acceptance.
+- [x] Migrate this checkout marker/path-hash mapping and inventoried wrappers, schedules and app paths; retain the documented Mac project-path and loaded-session exceptions.
+- [x] Validate installed CLI/MCP reads, scoped wrappers, the Workshop helper and separate dev route; do not claim every consuming repository or loaded client session.
 
 ## E. Federation reset and preservation
 
 - [x] Change namespaces, signed-purpose strings and record-key derivation together; regenerate synthetic fixtures from test keys and hashes.
-- [ ] Archive original signed records, receipts, keys and configuration unchanged.
+- [x] Archive original signed records, receipts, keys and configuration unchanged.
 - [x] Implement one release-specific reset against exact reviewed schema/rows/tables; reject schema drift and unknown dependencies. No wildcard deletion or TRUNCATE CASCADE.
-- [ ] Preserve canonical/received knowledge, identifiers, provenance, attachments, embeddings and area identities; retire old queues/enrolments/subscriptions so they cannot restart.
-- [ ] Re-enrol only previously participating peers; retain inactive status and explicitly restore approved subscriptions/permissions.
-- [ ] Validate original-origin citations, attachments, deduplication and fresh publication; do not automatically republish imported knowledge.
+- [x] Preserve recorded canonical/received data, identifiers, provenance and retained storage through per-host cutovers; retire old federation work. Reuse populated-state fingerprints without claiming new attachment/vector functional probes.
+- [x] Re-enrol the previously participating peers, restore approved subscriptions and retain inactive work; apply only the separately approved human Pull/AskExpertise grant on Workshop codifix.
+- [x] Verify fresh collection publication, original citation identity/version/content digest and same-request replay without duplicate execution; do not republish imported knowledge. Retained attachment data is covered by preservation evidence, not a new serving probe.
 
 ## F. Documentation and release
 
@@ -82,62 +82,67 @@ Semantic memory fields, tables such as memory_entries, /v1/memory, std::mem and 
 
 ## G. Prior validation evidence (no new rehearsal campaign)
 
-- [ ] Restore an isolated production snapshot and rehearse the complete cutover.
-- [ ] Compare IDs, versions, content digests, relationships, provenance, attachments and embeddings; exercise retrieval, history and imported-source resolution.
-- [ ] Validate permissions, credentials, cookies/CSRF, native clients, MCP, markers, watchers and Workshop routing.
-- [ ] Exercise synthetic federation publication, proof, deduplication and revocation with fake providers; confirm old services/queues stay disabled.
-- [ ] Rehearse matched-bundle restoration, run consolidated checks and resolve independent Astra blockers.
+- [x] Reuse completed isolated populated restores and per-host cutover checks; the 17 October direct-cutover instruction supersedes a new whole-estate rehearsal.
+- [x] Reuse recorded table/schema fingerprints and functional retrieval/history/origin checks; record the absent dedicated attachment/vector probes as limits.
+- [x] Reuse focused permission, credential, cookie/CSRF, native client, MCP, marker, watcher and Workshop routing acceptance recorded in the ledger.
+- [x] Exercise synthetic federation publication, proof, deduplication and revocation with fake providers; confirm old services/queues stay disabled.
+- [x] Reuse recorded restoration and consolidated checks, resolve independent Astra blockers and retain recovery copies; no new coordinated restoration campaign.
 
-## H. Single-window live cutover
+## H. Per-host direct cutover
 
-- [ ] Stop watchers, capture, supervisors, federation and queued/inflight work; stop other writers and take final consistent recovery bundle.
-- [ ] Install prepared artifacts and apply rehearsed paths/configuration/scoped database transforms.
-- [ ] Start database/apps with background, paid-provider and federation execution OFF.
+- [x] Quiesce each changed participant as recorded in its cutover procedure and retain its recovery set; do not claim a simultaneous estate-wide outage or snapshot.
+- [x] Install prepared artifacts and apply reviewed paths/configuration and scoped database transforms on the changed participants.
+- [x] Use the reviewed cold-start/disabled-work boundaries during each cutover; enable only the explicitly approved runtime and federation scopes.
 - [x] Bring Workshop up first, update the helper route and validate data/auth/clients.
-- [ ] Establish fresh federation enrolments and explicit sharing; selectively resume previously active services after queue inspection.
+- [x] Establish fresh federation enrolments and explicit sharing; selectively resume previously active services after queue inspection.
 - [x] Rename GitHub repository and switch website/DNS under the revised direct-cutover direction.
 - [x] Move checkout after source workers finish; update main-project markers and storage hash mappings. Keep a temporary old-path link for already-running sessions.
-- [ ] Run final smoke tests from the new checkout and installed packages.
+- [x] Run focused new-checkout/helper and installed-package health/client checks, plus the final Workshop-to-Trust exchange/replay.
 
 Before new remote federation effects, a matched backup restore is available. After remote effects, a local restore cannot undo publications: stop federation and recover forward or coordinate restoration across affected peers.
 
 ## Completion evidence
 
-- [ ] Active branded references use Codifix and remaining legacy references are explicitly allowlisted.
-- [ ] Fresh installs and populated cutover pass; preserved data is functional; CLI/Web/TUI/Mac/agents connect.
-- [ ] Workshop/dev remain explicit; fresh federation works and retired queues stay retired.
-- [ ] Versions, source/artifact hashes, commits and validation evidence are recorded; inactive services were not activated.
-- [ ] Update Notion status, finish the Workshop plan workflow and remember the implementation. Keep backups until explicit deletion approval.
+- [x] Inventoried active branded surfaces use Codifix; documented legacy paths, historical evidence and semantic memory names remain explicit exceptions.
+- [x] Recorded fresh-install and populated-cutover checks pass; verified CLI/Web/TUI/Mac/MCP paths and preserved-data reads work within the ledger scope.
+- [x] Workshop/dev remain explicit; fresh federation works and retired queues stay retired.
+- [x] Versions, source/artifact hashes, commits and scoped acceptance evidence are recorded; no previously inactive work was activated without explicit approval.
+- [ ] Record final Notion readback, complete the Workshop plan workflow and remember the implementation; retain backups until explicit deletion approval.
 
 
-## Current closeout — 18 October 2026
+## Current closeout — 19 October 2026
 
-The runtime rename on Monolith and Mac, fresh participating-area federation,
-GitHub/domain cutover and candidate publication are delivered. All 11 candidate
-jobs passed; v3.0.0-rc.1 is published from `66c2d1ec` with all 43 downloaded
-files byte-verified. Active client/bootstrap repairs are complete; current
-installation docs and release links are updated. See [live cutover](live-cutover.md)
-for the evidence, exact Debian transport-name mapping and explicit limitations.
+Codifix 3.0.0-rc.1 rename and scoped participating-host cutover are complete.
+This reconciles the original checklist with Olivier's 17 October instruction to
+finish the single-user direct cutover using completed checks. Superseded broad
+rehearsal and universal-client wording is narrowed explicitly above; it is not
+represented as executed. [Live cutover](live-cutover.md) records per-host evidence.
 
-Unchecked whole-fleet/completion items are not fresh rehearsal requests. The CA
-Trust upgrade completed on 18 October: Codifix 3.0.0-rc.1/schema85, preserved
-knowledge/history/state, verified local reads/writes and restart acceptance.
-Olivier subsequently approved fresh same-scope Trust federation enrollment and
-scoped application activation. That final connection and cited exchange/replay
-remain pending; see [Trust closeout](trust-federation-closeout.md). Per-host
-completed evidence is recorded in the live ledger; do not imply all consuming
-repositories/sessions were verified.
-Stable 3.0.0, signed/notarized distribution, pinned Homebrew, OS reboot and visual
-acceptance remain outside the claims of this prerelease. The full-plan completion
-workflow must remain open while the CA scope is unresolved.
+Monolith, Mac, gateway and CA Trust are upgraded. The domain/GitHub cutover,
+client/bootstrap repair, legacy executable removal and rc.1 publication are
+delivered. All 11 candidate jobs passed; published source `66c2d1ec` and all 43
+downloaded files remain immutable and byte-verified. Later CI fixes are on main.
+
+The CA-local report confirms fresh Trust activation and collection revision1.
+On 19 October the normal Workshop Authentik session completed the deterministic
+local-human exchange and exact replay. The original citation identity, version
+and content digest match; answer/binding/citations are identical, with exactly
+one gateway execution and no provider starts. The separately approved human
+project grant contains only Pull and AskExpertise. All three non-CA areas are
+healthy at cursor17 with empty source queues. See [Trust closeout](trust-federation-closeout.md).
+
+Stable 3.0.0, signed/notarized distribution, pinned Homebrew, exhaustive consuming
+repo/session audits, new attachment/vector functional probes, OS reboot, pixel
+UI acceptance and a separate Homelab contribution test are outside the claims
+of this prerelease. Existing recovery copies remain retained.
 
 ## Current operational boundary
 
 CA is console-administered only; SSH remains disabled and no certificate renewal
 is required. The local Trust application upgrade and its required narrow HBA
 name-field reload were approved and completed. Fresh same-scope federation
-activation is now explicitly approved; unrelated CA changes still require
-approval. Coordinate through Notion's CURRENT ACTION and RESULT INBOX without
+activation was explicitly approved and completed; unrelated CA changes still
+require approval. Coordinate through Notion's CURRENT ACTION and RESULT INBOX without
 repeating the completed cutover. Current source checks and
 private rehearsal evidence are in [integration status](evidence/integration-status.md)
 and [federation preservation](evidence/federation-slice.md). Source-level checked
