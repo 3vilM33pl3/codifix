@@ -53,7 +53,7 @@ and ciphertext hashes belong in coordination pages.
 - [x] CA-local agent confirms package decryption and credential installation.
 - [x] CA-local agent activates the approved binding through the existing console.
 - [x] Verify fresh sync plus a deterministic cited exchange and exact replay.
-- [ ] Reconcile Notion and the project plan, then complete the plan workflow.
+- [x] Reconcile Notion and the project plan, then complete the plan workflow.
 
 Coordination: [CURRENT ACTION](https://app.notion.com/p/3e78990715f48170a918f3f2c70277c9)
 and [RESULT INBOX](https://app.notion.com/p/3e78990715f481cd935ff0a897040e4e).
@@ -141,3 +141,11 @@ Private detailed receipts retain `final-exchange-browser-proof.json`,
 `browser-exchange-citation-proof.json`, `final-post-replay-health.json` and
 `coordinator-status.json` beside the prior coordinator evidence. No question or
 answer bodies are included in the durable evidence or Notion closeout report.
+
+## Plan completion
+
+The Workshop `finish-plan-execution` helper verified the reconciled checklist,
+recorded implementation `ce5ed522-ee1d-47b4-b67f-84c51c903acc` and archived plan
+`ea789868-711d-4ba0-bf32-ac8633bc8059` on 19 October. Notion CURRENT ACTION,
+RESULT INBOX and the rename plan were updated and read back. The scoped rename
+is closed; recovery copies are retained.

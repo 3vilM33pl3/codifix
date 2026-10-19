@@ -107,7 +107,7 @@ Before new remote federation effects, a matched backup restore is available. Aft
 - [x] Recorded fresh-install and populated-cutover checks pass; verified CLI/Web/TUI/Mac/MCP paths and preserved-data reads work within the ledger scope.
 - [x] Workshop/dev remain explicit; fresh federation works and retired queues stay retired.
 - [x] Versions, source/artifact hashes, commits and scoped acceptance evidence are recorded; no previously inactive work was activated without explicit approval.
-- [ ] Record final Notion readback, complete the Workshop plan workflow and remember the implementation; retain backups until explicit deletion approval.
+- [x] Publish and read back final Notion results and the scoped completion checklist; retain backups until explicit deletion approval.
 
 
 ## Current closeout — 19 October 2026
