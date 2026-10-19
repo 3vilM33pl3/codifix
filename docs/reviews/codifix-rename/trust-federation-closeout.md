@@ -50,8 +50,8 @@ and ciphertext hashes belong in coordination pages.
 - [x] Prepare and verify fresh coordinator enrollment and scoped configuration.
 - [x] Stage the sealed credential package through the existing protected delivery
   workflow; Notion carries public metadata, instructions and sanitized results.
-- [ ] CA-local agent confirms package decryption and credential installation.
-- [ ] CA-local agent activates the approved binding through the existing console.
+- [x] CA-local agent confirms package decryption and credential installation.
+- [x] CA-local agent activates the approved binding through the existing console.
 - [ ] Verify fresh sync plus a deterministic cited exchange and exact replay.
 - [ ] Reconcile Notion and the project plan, then complete the plan workflow.
 
@@ -85,5 +85,37 @@ The [console activation handoff](ca-federation-activation.md) is posted in CURRE
 ACTION with the encrypted v3 connection package checksum. Its three shell blocks
 were read back exactly and passed syntax validation. The named service's finite
 launcher, DynamicUser credential loading and exact gateway egress are explicitly
-covered. CA activation and the prepared deterministic exchange/replay are still
-pending; coordinator enrollment alone does not close the rename.
+covered. CA activation is complete; the final deterministic exchange/replay is
+still pending and the rename remains open.
+
+## CA activation verified — report captured 18 October, 20:55 UTC
+
+RESULT INBOX reports `CA_READY_FOR_EXCHANGE`, fresh cursor17, zero sync failures,
+zero queued/blocked intents and the same collection/revision1. The fresh-space
+collection digest is
+`ef2e41c4444724d31d9f0993db5e2d8ce4934bb0912ff31c35241d8f7e9268e6`.
+Original canonical `14e013ad-4b0d-4aca-a07b-9e1640220a6f`, version1, retains
+content digest `a5780f572e73e0f5ce8146af655512a3a5eaab7bc2dda5f2ec274257614abc0c`.
+The allowed requesters remain Workshop and Homelab; destination is local-human
+only, with no model destinations or assistant callers. Trust's answerer retains
+its project Reader/export permissions and AnswerExpertise collection grant.
+
+SSH remains masked/inactive, no new public listener exists, and the CA report
+confirms unchanged Step CA/OpenBao/PostgreSQL processes and healthy protected
+endpoints. Trust's own operator cannot browse capabilities because its retained
+local grant excludes AskExpertise; this is expected and was not broadened.
+
+## Final exchange preflight — 19 October
+
+No question has been prepared or submitted. The prepared test wrapper used the
+old Workshop single-user human-session bootstrap. Workshop and Homelab now use
+multi-user authentication; that bootstrap correctly refuses both. Neither has
+an active authorized human browser session. Workshop's internal owner has the
+existing fresh-space grants, while the distinct Authentik human principal does
+not. General is not an allowed requester for the retained Trust collection.
+
+The remaining work is a supported human-session/grant reconciliation on the
+requester, followed by the same deterministic question and exact submission/read
+replay. Do not forge a session, switch authentication mode, add assistant callers
+or broaden Trust's collection to make the test pass. Private metadata-only
+evidence: `final-exchange-preflight.json` beside the coordinator evidence.
