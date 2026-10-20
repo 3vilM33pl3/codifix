@@ -1,6 +1,6 @@
 ---
 name: codifix-project-init
-version: 3.0.0-rc.1
+version: 3.0.0
 description: Initialise or refresh Codifix in a project directory after Codifix is already installed; use for repo-local setup with .mem, .agents/codifix.toml, and repo-local memory skills, previewing writes before applying them
 ---
 

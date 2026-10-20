@@ -1,6 +1,6 @@
 ---
 name: codifix
-version: 3.0.0-rc.1
+version: 3.0.0
 description: Umbrella entrypoint for Codifix workflows; use for broad memory-related turns, shared invariants, and docs/admin work, while focused query/resume, plan-execution, and remember skills handle the narrow workflows
 ---
 

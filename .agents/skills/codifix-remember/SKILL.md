@@ -1,6 +1,6 @@
 ---
 name: codifix-remember
-version: 3.0.0-rc.1
+version: 3.0.0
 description: Remember meaningful completed work by capturing task context and curating it into durable project memory with provenance
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "codifix",
-  "version": "3.0.0-rc.1",
+  "version": "3.0.0",
   "description": "Evidence-backed project memory for Codex.",
   "author": {
     "name": "Codifix",

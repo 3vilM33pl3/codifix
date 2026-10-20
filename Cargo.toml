@@ -40,7 +40,7 @@ resolver = "2"
 atrium-common = { path = "vendor/atrium-common" }
 
 [workspace.package]
-version = "3.0.0-rc.1"
+version = "3.0.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["Olivier Van Acker"]
