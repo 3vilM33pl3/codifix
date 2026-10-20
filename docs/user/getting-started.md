@@ -2,7 +2,7 @@
 
 This guide is written for someone who just wants Codifix working with as little setup friction as possible.
 
-The current distribution is the [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1).
+The current distribution is the [Codifix v3.0.0 stable release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0).
 These instructions follow current `main`; source fixes after the candidate are
 not included in its packages. If you are joining an existing installation,
 start with [Team setup](https://codifix.dev/docs/team-setup) instead of creating
@@ -186,10 +186,10 @@ preview with `codifix wizard --dry-run`, and preserve customizations.
 
 ## Fast Install: Debian
 
-1. Download the architecture-matched Codifix prerelease and verify its checksum
+1. Download the architecture-matched Codifix release and verify its checksum
    using the [Linux install guide](https://codifix.dev/docs/install/linux-debian).
-   GitHub's `.rc.1` download spelling differs from the original `~rc.1`
-   checksum filename; follow that guide's exact save-as commands.
+   Debian release filenames use the stable `3.0.0` version; follow the guide's
+   exact package name and checksum instructions.
 2. Install it:
 
 ```bash
@@ -248,7 +248,7 @@ codifix tui
 
 ## Fast Install: macOS
 
-1. Prefer the architecture-matched unsigned candidate package described in the
+1. Prefer the architecture-matched unsigned release package described in the
    [macOS install guide](https://codifix.dev/docs/install/macos-homebrew).
    Homebrew currently supports source `HEAD` only:
 
@@ -257,7 +257,7 @@ brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
 brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
 
-This builds current `main`, which can differ from the published candidate.
+This builds current `main`, which can differ from the published release.
 
 2. Create the PostgreSQL database and prepare pgvector using the [PostgreSQL Requirement](#postgresql-requirement) section. Do not continue until these commands work:
 

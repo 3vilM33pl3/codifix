@@ -1,6 +1,6 @@
 # Background jobs
 
-These commands describe current `main` (`3.0.0-rc.1`). Use the
+These commands describe current `main` (`3.0.0`). Use the
 [Web UI](https://codifix.dev/docs/web-ui) for the equivalent inspection workflow.
 
 Curation returns after its mutations, timeline events and enrichment intents

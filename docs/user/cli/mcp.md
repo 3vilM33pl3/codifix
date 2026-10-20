@@ -4,7 +4,7 @@
 
 Ordinary memory tools are read-only: query, resume, inspect overview data, list memories and activities, read memory details/history, and list pending replacement proposals. They do not expose remember, capture, curate, archive, delete, reindex, or embedding mutations. The current source also defines loop control-plane tools and separate private expertise tools; do not describe the entire adapter as read-only.
 
-This guide describes the current source tree, whose workspace version is `3.0.0-rc.1`. That version alone does not establish which later source increments a packaged rc.1 artifact contains. Check the selected binary's `--version`, `mcp status`, and release evidence before relying on an optional surface.
+This guide describes the current source tree, whose workspace version is `3.0.0`. That version alone does not establish which later source increments a packaged release contains. Check the selected binary's `--version`, `mcp status`, and release evidence before relying on an optional surface.
 
 ## Tools
 

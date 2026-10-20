@@ -35,7 +35,7 @@ The core local memory workflow has five parts:
 4. PostgreSQL for durable data
 5. an optional watcher manager and watcher processes for background capture
 
-The current source workspace declares `3.0.0-rc.1`; source capabilities must be
+The current source workspace declares `3.0.0`; source capabilities must be
 distinguished from the evidence for a particular packaged or deployed build.
 The [code map](code-map.md) tracks newer area, job, federation and supervisor
 components and their explicit limitations.

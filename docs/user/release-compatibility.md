@@ -1,21 +1,19 @@
 # Release compatibility and known limitations
 
-These guides describe current `main`. The latest published Codifix package is
-[v3.0.0-rc.1](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1),
-a prerelease. Stable Codifix 3.0.0 has not been released. The earlier
+These guides describe current `main`. Codifix v3.0.0 is the current stable release. See the
+[v3.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0). The earlier
 [v2.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v2.1.0) packages
 belong to Memory Layer; there was no Codifix v2 release.
 
 ## Source and package versions
 
-The workspace and plugin can still report `3.0.0-rc.1` after fixes have landed on
-`main`. A matching version string does not prove a binary contains those fixes.
-Use the package's `release-inventory.json` for its exact source commit and
-artifact hashes. For a source build, record `git rev-parse HEAD` as well as
+The workspace and plugin report `3.0.0`. Use the package's
+`release-inventory.json` and checksums to match each artifact to its exact source
+commit; a version string alone does not identify package contents. For a source build, record `git rev-parse HEAD` as well as
 `codifix --version`. Later changes on `main` are not retroactively part of the
-published candidate.
+published release.
 
-The candidate contains project memory, private federation, device/project
+The release contains project memory, private federation, device/project
 onboarding, synchronized knowledge and durable background jobs. Availability
 still depends on build capabilities, explicit configuration, current grants
 and the selected installation. A passing test or a controlled rehearsal does
@@ -32,7 +30,8 @@ for a reviewed cutover that preserves knowledge and recovery material.
 Preserve a matched backup of the database, configuration, credentials,
 attachments, state and original executables before a cutover. PostgreSQL
 migrations are append-only and run at service startup; they do not perform the
-product rename. The candidate embeds migrations through 0085. Never run an old
+product rename. The release embeds migrations through 0085 and adds no migrations beyond
+0085. Never run an old
 Memory Layer binary against a database after Codifix has accepted writes.
 
 Named instances keep independently pinned executables. Installing a package or
@@ -43,13 +42,13 @@ blindly choosing an older executable.
 
 ## Published package limits
 
-| Platform | Published candidate and limitations |
+| Platform | Published release and limitations |
 | --- | --- |
-| Debian/Ubuntu | amd64 and arm64 packages passed build/install checks. PostgreSQL with pgvector is a separate prerequisite. GitHub serves Debian filenames with `.rc.1`, while the package version and checksum entries retain `~rc.1`. Follow the exact Linux download instructions. |
-| macOS | Intel and Apple Silicon standard/application-update packages passed package checks. They are unsigned and not notarized; native pixel-level UI acceptance is not claimed. Standard packages need separately provisioned PostgreSQL. Application-update packages preserve an existing Codifix runtime; they do not migrate Memory Layer. Homebrew is HEAD-only. |
-| Windows | Unsigned x86_64 ZIP, per-user MSI and server-tools MSI are preview artifacts. The VC++ x64 runtime is a separate prerequisite. No complete bundled PostgreSQL/PDS/Pi stack or full native parity is claimed. Windows ARM64 and 32-bit systems are not release targets. |
+| Debian/Ubuntu | amd64 and arm64 Debian packages are published. PostgreSQL with pgvector is a separate prerequisite. Debian packages are named `codifix_3.0.0_ARCH.deb`. Follow the exact Linux download instructions. |
+| macOS | Intel and Apple Silicon standard/application-update packages are published. They are unsigned and not notarized; native pixel-level UI acceptance is not claimed. Standard packages need separately provisioned PostgreSQL. Application-update packages preserve an existing Codifix runtime; they do not migrate Memory Layer. Homebrew is HEAD-only. |
+| Windows | Unsigned x86_64 ZIP, per-user MSI and server-tools MSI are preview artifacts; the MSI is build 2 with MSI version 3.0.2. The VC++ x64 runtime is a separate prerequisite. No complete bundled PostgreSQL/PDS/Pi stack or full native parity is claimed. Windows ARM64 and 32-bit systems are not release targets. |
 
-Use the [release asset inventory](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1)
+Use the [release asset inventory](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0)
 and its `SHA256SUMS` and individual `.sha256` files. Checksums establish content
 consistency; they do not provide publisher identity verification. Signing a
 Git commit is different from notarizing or signing an installer.

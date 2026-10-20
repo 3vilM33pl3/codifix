@@ -3,7 +3,7 @@
 Most sessions need the same sequence: verify the destination, recall context,
 capture useful work, then inspect anything still pending. These examples follow
 current source. See [release compatibility](https://codifix.dev/docs/help/known-limitations)
-for the published candidate and platform boundaries.
+for the published release and platform boundaries.
 
 ## 1. Check where you are working
 

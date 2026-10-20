@@ -1,6 +1,6 @@
 # Federation runtime: opt-in configuration
 
-This guide follows current `main` (`3.0.0-rc.1`), including controls that an older
+This guide follows current `main` (`3.0.0`), including controls that an older
 installed release may lack. Start with [private federation](https://codifix.dev/docs/federation)
 and review participant compatibility before configuring a deployment.
 

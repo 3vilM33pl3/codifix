@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.0 - 2026-10-20
+
+Codifix 3.0.0 is the stable release. See [release notes](docs/releases/3.0.0.md)
+for platform package names, verification guidance and support boundaries.
+
+- Complete the technical rename from Memory Layer to Codifix, with explicit
+  reinstall and recovery guidance. The release includes migrations through 0085.
+- Include the post-RC1 fixes for Mac handoff boolean handling and fresh-device
+  binding, agent bootstrap and MCP naming, journal lock release, and CI fixture
+  reliability.
+- Publish Linux amd64 and arm64 packages, macOS Intel and Apple Silicon standard
+  and application-update packages, and Windows x86_64 preview packages. macOS
+  packages are unsigned and not notarized; Windows packages remain unsigned and
+  Windows remains a preview.
+
 ## 3.0.0-rc.1 - 2026-10-18 (prerelease)
 
 Published from source `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71` after all 11

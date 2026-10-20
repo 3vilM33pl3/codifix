@@ -5,7 +5,7 @@ approves which projects your device can use; you review the repository, tools,
 knowledge copy and assistant access before applying the setup. For your own
 standalone service instead, start with [Install](https://codifix.dev/docs/install).
 
-These instructions follow current `main`. The published `3.0.0-rc.1` includes
+These instructions follow current `main`. The published `3.0.0` includes
 company/project commands; its standard package does not include the optional
 combined native first-run/runtime bundle. Native guided provisioning is currently
 a macOS candidate. Check the [Mac guide](https://codifix.dev/docs/mac-onboarding)

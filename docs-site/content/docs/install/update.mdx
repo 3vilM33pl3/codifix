@@ -6,15 +6,14 @@ description: "Understand the breaking Memory Layer v2 to Codifix v3 reinstall an
 # Update
 
 The published v2.1.0 release is the previous Memory Layer product. It does not
-install Codifix, and there was no published Codifix v2.0 or v2.1 release. The
-[Codifix 3.0.0-rc.1 candidate](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) is available as a prerelease. Its technical rename changes
+install Codifix, and there was no published Codifix v2.0 or v2.1 release. Codifix v3.0.0 is the current stable release. ([v3.0.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0)). Its technical rename changes
 package, executable, service, and configuration identities, so installing a
 Codifix package over Memory Layer is not an in-place upgrade.
 
 Before changing an existing installation, read the
 [Codifix 3.0 release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
 It describes the preservation and explicit cutover boundaries. Review the
-release notes and verify downloads using the published [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS).
+release notes and verify downloads using the published [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS).
 
 ## Before a v2-to-v3 cutover
 
@@ -32,19 +31,17 @@ that procedure for exact state reconciliation, service shutdown, package
 retirement, and new installation; do not infer a general database rename from
 matching names.
 
-## Candidate package names
+## v3.0.0 package names
 
-These 3.0.0-rc.1 assets are available on the release page linked above.
+These 3.0.0 assets are available on the release page linked above.
 
-| Platform | Candidate assets |
+| Platform | Release assets |
 |---|---|
-| Debian/Ubuntu | `codifix_3.0.0~rc.1_amd64.deb` or `codifix_3.0.0~rc.1_arm64.deb` |
-| macOS | `codifix-3.0.0-rc.1-macos-{x86_64,aarch64}.pkg` and corresponding `-application-update.pkg` files |
-| Windows x86_64 | `codifix-3.0.0-rc.1-windows-x86_64-build.1.{zip,msi}` and `-server-tools.msi` |
+| Debian/Ubuntu | `codifix_3.0.0_amd64.deb` or `codifix_3.0.0_arm64.deb` |
+| macOS | `codifix-3.0.0-macos-{x86_64,aarch64}.pkg` and corresponding `-application-update.pkg` files |
+| Windows x86_64 | `codifix-3.0.0-windows-x86_64-build.2.{zip,msi}` and `-server-tools.msi` |
 
-GitHub changes `~rc.1` to `.rc.1` in Debian download filenames. Follow the
-[Linux download commands](/docs/install/linux-debian) to save the original
-names before checksum verification; the package bytes are unchanged.
+Debian packages use stable versioned filenames. Verify them using the release checksum files.
 
 Use a standard macOS package for a fresh Codifix installation. The
 application-update package is only for an existing Codifix installation; it

@@ -1,6 +1,6 @@
 # Supervisor inspection
 
-This reference follows current `main` (`3.0.0-rc.1`). Private interaction controls
+This reference follows current `main` (`3.0.0`). Private interaction controls
 are an opt-in preview requiring separately provisioned policy, source consent
 and an operator worker. See [areas](https://codifix.dev/docs/areas) for scope
 and [team administration](https://codifix.dev/docs/team-setup/administration)

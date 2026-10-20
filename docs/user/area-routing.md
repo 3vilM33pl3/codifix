@@ -3,7 +3,7 @@
 For the everyday choice of an area and project, start with
 [Areas and projects](https://codifix.dev/docs/areas). This page covers the
 operator-owned routing policy in current source on `main`; it does not imply
-that the published `3.0.0-rc.1` package includes later routing changes.
+that the published `3.0.0` package includes later routing changes.
 
 Codifix can route local CLI, TUI and watcher traffic to independently operated
 areas. Install an operator-owned JSON file at

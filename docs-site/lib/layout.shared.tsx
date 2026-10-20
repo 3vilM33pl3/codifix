@@ -59,9 +59,9 @@ const socialLinks = [
     icon: <GitHubIcon />,
   },
   {
-    label: 'Codifix v3.0.0-rc.1 prerelease',
-    text: 'v3.0.0-rc.1',
-    href: 'https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1',
+    label: 'Codifix v3.0.0',
+    text: 'v3.0.0',
+    href: 'https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0',
     icon: <ReleaseIcon />,
   },
   {

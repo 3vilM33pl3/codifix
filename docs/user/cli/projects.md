@@ -2,7 +2,7 @@
 
 See [team setup](https://codifix.dev/docs/team-setup) for the shared installation
 and [offline knowledge](https://codifix.dev/docs/offline) for the laptop workflow.
-This reference follows current `main` (`3.0.0-rc.1`); platform acceptance and
+This reference follows current `main` (`3.0.0`); platform acceptance and
 installed-package support remain separate from source availability.
 
 `codifix projects` manages company-authorized laptop projects. Use the full native

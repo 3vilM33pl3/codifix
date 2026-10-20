@@ -44,7 +44,7 @@ The source profile uses port `4250` and separate runtime state. Do not point a p
 
 ## Versioning and maintainer validation
 
-The checked-in plugin manifest and workspace both declare `3.0.0-rc.1`. This identifies the current source contract, not proof that every installed rc.1 package contains subsequent source changes or has passed desktop validation. A change to the MCP tool surface or the bundled workflow-skill contract needs a compatibility review and a plugin version update.
+The checked-in plugin manifest and workspace both declare `3.0.0`. This identifies the current source contract, not proof that every installed package contains subsequent source changes or has passed desktop validation. A change to the MCP tool surface or the bundled workflow-skill contract needs a compatibility review and a plugin version update.
 
 Validate the repository-owned contract with:
 

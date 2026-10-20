@@ -2,7 +2,7 @@
 
 This guide covers the macOS native onboarding candidate in current source on
 `main`. Start with [team setup](https://codifix.dev/docs/team-setup) for the
-platform-neutral access and project journey. The published `3.0.0-rc.1` standard
+platform-neutral access and project journey. The published `3.0.0` standard
 package contains client/operator tooling, not the optional combined runtime
 bundle. The post-candidate Mac binding and boolean-serialization fixes are
 separately documented in its release-specific operator procedure.

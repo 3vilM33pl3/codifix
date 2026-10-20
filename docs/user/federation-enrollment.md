@@ -1,6 +1,6 @@
 # Separate-authority membership enrollment
 
-This operator guide describes current `main` (`3.0.0-rc.1`) and the opt-in private
+This operator guide describes current `main` (`3.0.0`) and the opt-in private
 federation preview. Begin with [private federation](https://codifix.dev/docs/federation)
 and [team administration](https://codifix.dev/docs/team-setup/administration)
 to separate local permissions from remote space authority.

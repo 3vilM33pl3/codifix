@@ -2,7 +2,7 @@
 
 For workflow selection and availability boundaries, start with
 [private federation](https://codifix.dev/docs/federation). This page follows
-current `main` (`3.0.0-rc.1`); optional controls need explicit runtime configuration.
+current `main` (`3.0.0`); optional controls need explicit runtime configuration.
 
 This experimental local API connects Web, CLI and the focused TUI to the C/D
 runtime. Enable only in controlled integration environments using the

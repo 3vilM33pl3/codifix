@@ -5,10 +5,9 @@ description: "Review Codifix macOS package names and Homebrew availability."
 
 # macOS
 
-The [Codifix 3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) provides macOS packages. The existing
+The [Codifix v3.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) provides macOS packages. The existing
 v2.1.0 release is the previous Memory Layer product; its assets are not
-Codifix installers. Homebrew currently provides a HEAD formula only. There is
-no stable Codifix formula yet.
+Codifix installers. Homebrew currently provides a HEAD formula only. The stable formula will be pinned after the release source asset is published.
 
 ## Homebrew
 
@@ -19,15 +18,14 @@ brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
 brew install --HEAD 3vilM33pl3/codifix/codifix
 ```
 
-This builds the current source; it is not a packaged 3.0.0-rc.1 release
-install. Do not use `brew upgrade` as a v2-to-v3 migration path.
+This builds the current source; it is a source build, not a packaged release install. Do not use `brew upgrade` as a v2-to-v3 migration path.
 
 ## Native packages
 
 The standard packages are:
 
-- Intel Mac: `codifix-3.0.0-rc.1-macos-x86_64.pkg`
-- Apple Silicon: `codifix-3.0.0-rc.1-macos-aarch64.pkg`
+- Intel Mac: `codifix-3.0.0-macos-x86_64.pkg`
+- Apple Silicon: `codifix-3.0.0-macos-aarch64.pkg`
 
 The matching packages ending in
 `-macos-x86_64-application-update.pkg` or
@@ -35,10 +33,10 @@ The matching packages ending in
 installation. They do not migrate Memory Layer. Standard packages require
 separately configured PostgreSQL/pgvector; application-update packages preserve
 the Codifix runtime they update. Verify downloads against the release
-[SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS). The packages are unsigned and not notarized;
+[SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS). The packages are unsigned and not notarized;
 native package acceptance passed on Intel and Apple Silicon.
 
-Download only from the published Codifix 3.0.0-rc.1 release and verify its
+Download only from the Codifix 3.0.0 release and verify its
 matching checksum. For an existing Memory Layer installation, first follow the
 [Update guide](/docs/install/update) and the
 [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).

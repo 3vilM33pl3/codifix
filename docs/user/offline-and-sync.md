@@ -5,7 +5,7 @@ knowledge without contacting the company. Check freshness and source versions
 before relying on a copy. Queued local work is not owner acceptance, and a cached
 grant is not evidence of current remote authority.
 
-This guide describes current source on `main`. The published `3.0.0-rc.1` package
+This guide describes current source on `main`. The published `3.0.0` package
 contains project-sync commands; its standard package does not include the combined
 native runtime bundle. Native provisioning is a
 macOS candidate with remaining acceptance checks; start with

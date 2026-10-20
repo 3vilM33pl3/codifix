@@ -2,7 +2,7 @@
 
 The Web UI is the browser companion to the TUI. It is served by the same local Codifix service and reads the same project data: memory, cited queries, code graph context, activity, watchers, proposals, skills, embeddings, and resume briefings.
 
-This guide follows current `main` (`3.0.0-rc.1`). A visible control does not imply
+This guide follows current `main` (`3.0.0`). A visible control does not imply
 its optional runtime is configured. Start with [team setup](https://codifix.dev/docs/team-setup)
 for a shared installation, [areas](https://codifix.dev/docs/areas) for knowledge
 boundaries, and [administration](https://codifix.dev/docs/team-setup/administration)

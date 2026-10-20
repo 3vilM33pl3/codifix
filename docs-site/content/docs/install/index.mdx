@@ -1,6 +1,6 @@
 ---
 title: "Install"
-description: "Install the Codifix release candidate, configure PostgreSQL with pgvector, and initialise your first project."
+description: "Install Codifix 3.0.0, configure PostgreSQL with pgvector, and initialise your first project."
 ---
 
 # Install
@@ -9,31 +9,25 @@ Joining an existing organization? Start with [Team setup](/docs/team-setup) and
 your administrator's approved company origin. The standalone installation below
 creates and configures your own service/database; it is a different journey.
 
-The [3.0.0-rc.1 prerelease](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) is available. Do not
-use the one-line installer for this candidate: until a Codifix stable release
-is available, it deliberately refuses to select the older Memory Layer
-release. The existing v2.1.0 release is still published under the Memory Layer
-product and package identity; it is not a Codifix installer or an upgrade path.
+Codifix v3.0.0 is the current stable release. ([v3.0.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0)). The existing v2.1.0 release remains under the Memory Layer product identity; it is not a Codifix installer or upgrade path.
 
-The Codifix candidate introduces a breaking product rename. Installing it over
+The Codifix release introduces a breaking product rename. Installing it over
 an existing Memory Layer setup does not transfer its state. If you are moving
 an existing installation, read the [Update guide](/docs/install/update) and
 the [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
 
-## Candidate package names
+## Stable package names
 
-Download these packages from the [release page](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0-rc.1) and verify
-them against its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0-rc.1/SHA256SUMS).
+Download these packages from the [release page](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) and verify
+them against its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS).
 
-| Platform | Candidate asset names |
+| Platform | Release asset names |
 |---|---|
-| Debian/Ubuntu | `codifix_3.0.0~rc.1_amd64.deb`, `codifix_3.0.0~rc.1_arm64.deb` |
-| macOS | `codifix-3.0.0-rc.1-macos-x86_64.pkg`, `codifix-3.0.0-rc.1-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
-| Windows x86_64 | `codifix-3.0.0-rc.1-windows-x86_64-build.1.zip`, `.msi`, and `-server-tools.msi` |
+| Debian/Ubuntu | `codifix_3.0.0_amd64.deb`, `codifix_3.0.0_arm64.deb` |
+| macOS | `codifix-3.0.0-macos-x86_64.pkg`, `codifix-3.0.0-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
+| Windows x86_64 | `codifix-3.0.0-windows-x86_64-build.2.zip`, `.msi`, and `-server-tools.msi` |
 
-GitHub changes `~rc.1` to `.rc.1` in Debian download filenames. Follow the
-[Linux download commands](/docs/install/linux-debian) to save the original
-names before checksum verification; the package bytes are unchanged.
+Debian filenames use `codifix_3.0.0_ARCH.deb`. Verify packages against the release checksums.
 
 Follow the instructions for your platform:
 
@@ -60,7 +54,7 @@ semantic retrieval, but the core service works without them.
 |---|---|---|
 | PostgreSQL | Durable storage for projects, captures, memories, activity, and history. | `psql "$DATABASE_URL" -c "SELECT 1;"` |
 | pgvector | Vector storage for semantic retrieval. | `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` |
-| Codifix 3.0.0-rc.1 candidate | Renamed CLI and service tooling; prerelease packages available. | After installation: `codifix --version` |
+| Codifix 3.0.0 | Stable packages available; Windows remains a preview. | After installation: `codifix --version` |
 
 ## Configure after installation
 

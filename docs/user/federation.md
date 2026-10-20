@@ -6,7 +6,7 @@ publication or an explicitly confirmed expertise question; joining a space does
 not export project knowledge automatically.
 
 These guides describe the current `main` implementation. The repository version
-is `3.0.0-rc.1`; that version label and disposable integration evidence do not
+is `3.0.0`; that version label and disposable integration evidence do not
 establish customer readiness or activation on an installed service. Federation
 and expertise remain operator-configured, opt-in capabilities. Check the version
 and configuration of every participant before enabling a workflow.
