@@ -250,14 +250,14 @@ codifix tui
 
 1. Prefer the architecture-matched unsigned release package described in the
    [macOS install guide](https://codifix.dev/docs/install/macos-homebrew).
-   Homebrew currently supports source `HEAD` only:
+   Homebrew builds the checksum-pinned v3.0.0 release source:
 
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
-brew install --HEAD 3vilM33pl3/codifix/codifix
+brew install 3vilM33pl3/codifix/codifix
 ```
 
-This builds current `main`, which can differ from the published release.
+This compiles the stable release locally. Use `--HEAD` only to opt into unreleased changes.
 
 2. Create the PostgreSQL database and prepare pgvector using the [PostgreSQL Requirement](#postgresql-requirement) section. Do not continue until these commands work:
 

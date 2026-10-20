@@ -50,7 +50,7 @@ Darwin)
     head_line "Installing Codifix via Homebrew"
     command -v brew >/dev/null 2>&1 || fail "Homebrew is required on macOS: https://brew.sh"
     brew tap 3vilM33pl3/codifix "https://github.com/$REPO" >/dev/null
-    brew install --HEAD 3vilM33pl3/codifix/codifix
+    brew install 3vilM33pl3/codifix/codifix
     check_postgres
     next_steps
     ;;

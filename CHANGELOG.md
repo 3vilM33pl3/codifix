@@ -14,6 +14,8 @@ for platform package names, verification guidance and support boundaries.
   and application-update packages, and Windows x86_64 preview packages. macOS
   packages are unsigned and not notarized; Windows packages remain unsigned and
   Windows remains a preview.
+- Pin Homebrew to the published v3.0.0 source archive and checksum; the macOS
+  install script now selects the stable formula by default.
 
 ## 3.0.0-rc.1 - 2026-10-18 (prerelease)
 
@@ -21,7 +23,7 @@ Published from source `66c2d1ecc4ca9b0c052e1d854f71a0703f998b71` after all 11
 release jobs passed. Linux amd64/arm64 installation checks, both Mac native
 package checks and Windows preview acceptance passed. See the
 [release notes](docs/releases/3.0.0-rc.1.md) for artifact verification, later
-operator fixes and explicit platform limits. Stable 3.0.0 is not released.
+operator fixes and explicit platform limits. Stable 3.0.0 had not yet been released at that point.
 
 - **Breaking technical rename:** product-owned commands, package identities,
   service names, configuration paths and federation enrolment identities use

@@ -45,7 +45,7 @@ blindly choosing an older executable.
 | Platform | Published release and limitations |
 | --- | --- |
 | Debian/Ubuntu | amd64 and arm64 Debian packages are published. PostgreSQL with pgvector is a separate prerequisite. Debian packages are named `codifix_3.0.0_ARCH.deb`. Follow the exact Linux download instructions. |
-| macOS | Intel and Apple Silicon standard/application-update packages are published. They are unsigned and not notarized; native pixel-level UI acceptance is not claimed. Standard packages need separately provisioned PostgreSQL. Application-update packages preserve an existing Codifix runtime; they do not migrate Memory Layer. Homebrew is HEAD-only. |
+| macOS | Intel and Apple Silicon standard/application-update packages are published. They are unsigned and not notarized; native pixel-level UI acceptance is not claimed. Standard packages need separately provisioned PostgreSQL. Application-update packages preserve an existing Codifix runtime; they do not migrate Memory Layer. Homebrew builds the checksum-pinned v3.0.0 release source. |
 | Windows | Unsigned x86_64 ZIP, per-user MSI and server-tools MSI are preview artifacts; the MSI is build 2 with MSI version 3.0.2. The VC++ x64 runtime is a separate prerequisite. No complete bundled PostgreSQL/PDS/Pi stack or full native parity is claimed. Windows ARM64 and 32-bit systems are not release targets. |
 
 Use the [release asset inventory](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0)

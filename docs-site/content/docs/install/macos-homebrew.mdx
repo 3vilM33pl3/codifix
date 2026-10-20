@@ -7,18 +7,18 @@ description: "Review Codifix macOS package names and Homebrew availability."
 
 The [Codifix v3.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) provides macOS packages. The existing
 v2.1.0 release is the previous Memory Layer product; its assets are not
-Codifix installers. Homebrew currently provides a HEAD formula only. The stable formula will be pinned after the release source asset is published.
+Codifix installers. Homebrew provides a stable formula pinned to the v3.0.0 source archive and checksum.
 
 ## Homebrew
 
-The formula can be used for development from the current source checkout:
+Install the stable release from source:
 
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix
-brew install --HEAD 3vilM33pl3/codifix/codifix
+brew install 3vilM33pl3/codifix/codifix
 ```
 
-This builds the current source; it is a source build, not a packaged release install. Do not use `brew upgrade` as a v2-to-v3 migration path.
+This compiles the checksum-pinned stable source locally. Use `--HEAD` only to opt into unreleased changes. Do not use `brew upgrade` as a v2-to-v3 migration path.
 
 ## Native packages
 
