@@ -14,7 +14,7 @@
     "check:assets": "node scripts/check-assets.mjs"
   },
   "dependencies": {
-    "@types/mdx": "^2.0.13",
+    "@types/mdx": "^2.0.14",
     "fumadocs-core": "^16.9.0",
     "fumadocs-mdx": "^15.0.7",
     "fumadocs-ui": "^16.9.0",
