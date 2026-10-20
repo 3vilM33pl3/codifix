@@ -97,7 +97,9 @@ jobs:
             ~/.cargo/git
             target
           key: release-quality-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          restore-keys: release-quality-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-
+          restore-keys: |
+            release-quality-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-
+            release-quality-${{ runner.os }}-
       - name: Required-database Rust validation
         run: |
           cargo fmt --check
@@ -196,7 +198,10 @@ jobs:
             ${{ runner.temp }}/codifix-linux-build/codifix-target
             ${{ runner.temp }}/codifix-linux-build/npm-cache
           key: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-${{ github.sha }}
-          restore-keys: release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-
+          # Reuse the rc.1 dependency cache from the unchanged Bookworm builder.
+          restore-keys: |
+            release-bookworm-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'web/package-lock.json', 'packaging/ca-bookworm/Dockerfile') }}-
+            release-bookworm-${{ matrix.arch }}-b7467f1d532e6899a3f06c8663496331793e17dcaa6c7c1b497cde7abdd16485-
       - name: Build ABI-constrained packages from frozen source
         env:
           ARCH: ${{ matrix.arch }}
@@ -285,7 +290,9 @@ jobs:
             ~/.cargo/git
             target/${{ matrix.target }}
           key: release-macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          restore-keys: release-macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}-
+          restore-keys: |
+            release-macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock') }}-
+            release-macos-${{ matrix.arch }}-
       - name: Build matching standard and runtime-preserving packages
         env:
           ARCH: ${{ matrix.arch }}
@@ -358,12 +365,9 @@ jobs:
             ~/.cargo/git
             target/x86_64-pc-windows-msvc
           key: release-windows-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          # The workspace rename changes Cargo.lock without changing dependency
-          # versions. Reuse the last 2.1.0 dependency cache; Cargo still validates
-          # fingerprints and every package is rebuilt/checked from this source.
           restore-keys: |
             release-windows-${{ hashFiles('Cargo.lock') }}-
-            release-windows-9cdd6f09ce6eebdad4cf71c3a669985225229e6c90754c82f593c16fe7f263e3-
+            release-windows-
       - name: Install WiX
         shell: pwsh
         run: |

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { releaseIdentity } from './identity.mjs';
 
@@ -14,7 +14,12 @@ for (const dir of ['web', 'docs-site']) {
   assert.equal(lock.version, version, `${dir} lock`);
   assert.equal(lock.packages[''].version, version, `${dir} root lock`);
 }
+assert.equal(JSON.parse(readFileSync('plugins/codifix/.codex-plugin/plugin.json')).version, version, 'Codifix plugin');
 for (const skill of readdirSync('.agents/skills', { withFileTypes: true }).filter(e => e.isDirectory())) {
+  const agentFile = `.agents/skills/${skill.name}/agents/openai.yaml`;
+  if (existsSync(agentFile)) {
+    assert.match(readFileSync(agentFile, 'utf8'), new RegExp(`^version: ${version.replaceAll('.', '\\.')}\\s*$`, 'm'), agentFile);
+  }
   const file = `.agents/skills/${skill.name}/SKILL.md`;
   assert.match(readFileSync(file, 'utf8'), new RegExp(`^version: ${version.replaceAll('.', '\\.')}\\s*$`, 'm'), file);
 }
