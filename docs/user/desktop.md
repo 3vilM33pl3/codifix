@@ -152,8 +152,10 @@ Clippy, the host native-keyring write/read/delete test, all three TLS regression
 cases and the frontend/DEB build passed. The installed native WebKit window shows
 one Sign in button with Workshop preset. The live browser reaches Authentik's
 username login directly, including when a stale Codifix browser cookie exists.
-Completion with the user's credentials is still pending; automated callback tests
-are not evidence that the real account has signed in.
+The user completed the real browser login as `olivier`; the app returned to
+Connected with a verified `human_oidc` identity. Restarting the installed binary
+restored the same saved session without another browser login. The test driver
+was then closed and the installed app relaunched normally.
 
 Workshop was upgraded to schema 86 with the existing application role granted
 CRUD only on the new auth_desktop_codes table. The service remains verify-only;
