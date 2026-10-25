@@ -46,6 +46,7 @@ beforeEach(() => {
   localStorage.clear();
   api.mockImplementation(async (path) => fixture(path));
   vi.mocked(service.connect).mockResolvedValue(auth);
+  vi.mocked(service.openService).mockResolvedValue(undefined);
 });
 describe("desktop workflows", () => {
   it("restores the exact endpoint/project and keeps credentials out of storage", async () => {
@@ -58,9 +59,7 @@ describe("desktop workflows", () => {
     mount(<App />);
     await screen.findByRole("heading", { name: "Pick up where you left off" });
     expect(service.connect).toHaveBeenCalledWith("http://127.0.0.1:4250", null);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Memories" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Memories" }));
     await screen.findByText(detail.canonical_text);
     fireEvent.change(screen.getByRole("textbox", { name: "Search memories" }), {
       target: { value: "nothing matches" },
@@ -78,6 +77,13 @@ describe("desktop workflows", () => {
     vi.mocked(service.connect).mockRejectedValue("Service returned HTTP 401");
     mount(<App />);
     expect(await screen.findByRole("alert")).toHaveTextContent("401");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sign in through browser" }),
+    );
+    expect(service.openService).toHaveBeenCalledWith(
+      "login",
+      "http://127.0.0.1:4250",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
     expect(screen.getByRole("button", { name: "Not connected" })).toBeVisible();
   });

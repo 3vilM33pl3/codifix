@@ -587,7 +587,7 @@ export function App() {
                 Disconnect
               </Button>
             )}
-            {auth?.mode === "multi_user" && (
+            {(auth?.mode === "multi_user" || !!connectionError) && (
               <Button
                 type="button"
                 onClick={() =>
@@ -600,7 +600,7 @@ export function App() {
               </Button>
             )}
           </div>
-          {auth?.mode === "multi_user" && (
+          {(auth?.mode === "multi_user" || !!connectionError) && (
             <p className="caption">
               Browser sign-in manages your browser session only. Enter a service
               token above to authenticate this desktop session.
