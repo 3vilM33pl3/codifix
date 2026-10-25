@@ -30,7 +30,7 @@ Credentials and polling proofs are generated in Rust and saved **before** sendin
 
 For local writable single-user services, expand **Local service or service token** and use **Connect locally or with token**; this establishes the existing loopback owner session. Explicitly pasted tokens stay only in native process memory and must be re-entered after restart. The local development endpoint defaults to `http://127.0.0.1:4250`; it is not a substitute for your area's public browser sign-in origin.
 
-Preferences contain appearance/notification settings and the last successfully connected endpoint/name. Recent projects contain endpoint, slug and an optional folder path. Credentials never enter localStorage. Project and connection switches clear cached query data. No service auth or CORS configuration changes are required.
+Preferences contain appearance/notification settings and the last successfully connected endpoint/name. Recent projects contain endpoint, slug and an optional folder path. Credentials never enter localStorage. Project and connection switches clear cached query data. No service auth or CORS configuration changes are required. HTTPS uses the operating system certificate trust store (including already installed private company CAs); certificate and hostname validation remain mandatory. TLS, network and timeout failures are reported separately from service HTTP responses.
 
 ## Workflows
 
@@ -66,6 +66,7 @@ Electron would standardise the rendering engine but ship a bundled Chromium runt
 npm test
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --locked
+python3 tests/native_tls.py
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 npm run desktop:build
 ```
@@ -77,3 +78,8 @@ Validation: twelve renderer workflow tests, seven native boundary/protocol tests
 ## Figma Code Connect
 
 `code-connect/*.figma.ts` contains parserless mappings for Button, Navigation and Badge in `src/ui.tsx`. Figma returned an Organization/Enterprise-plan requirement when saving mappings, so no published Code Connect association is claimed. The local templates retain the exact component/property mappings for later publication.
+
+The Linux TLS regression uses the production Rust client against a local HTTPS
+fixture in separate processes. A temporary CA bundle must succeed, an unrelated
+CA must fail, and a mismatched hostname must fail. It does not modify system trust
+or contact production services. The additional host-keyring test remains opt-in.

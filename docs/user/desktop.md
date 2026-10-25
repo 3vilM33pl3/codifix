@@ -77,3 +77,25 @@ process remained running and owned the single-instance D-Bus name. Package and
 installed executable checksums match the preserved release artifacts; the 0.1.0
 installation is retained for rollback. This checks installation and process
 lifecycle, not completion of the user's browser approval.
+
+## Private certificate authorities (0.1.2)
+
+Desktop HTTPS now uses the operating system trust store. The earlier bundled
+public-root list rejected Workshop's already trusted Robot Motel CA with
+`InvalidCertificate(UnknownIssuer)`, before any device request reached the server.
+Certificate and hostname checks remain enabled. Connection failures now distinguish
+TLS, network and timeout errors and no longer imply that onboarding is disabled.
+
+Verification: the old transport reproduced the certificate failure; the updated
+transport reached Workshop's unauthenticated endpoint and received HTTP 401.
+A local TLS regression using the production client passed trusted-CA success,
+untrusted-CA rejection and hostname-mismatch rejection, without changing system
+trust. Seven native unit tests and Clippy passed; the frontend and DEB built.
+
+After installing 0.1.2, a native WebKit WebDriver click on **Sign in through
+browser** reached Workshop's real enrollment endpoint and opened the default
+Chrome browser at the matching device approval page. The app displayed the same
+user code and waited for browser approval without a connection error. The test
+driver and its listening ports were stopped while the desktop remained open.
+Human sign-in and selection of project grants remain the user's steps; they
+were not completed automatically or claimed as tested.
