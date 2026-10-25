@@ -2,6 +2,9 @@
 name = "codifix-desktop"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["Olivier Van Acker"]
+description = "A streamlined desktop client for Codifix project knowledge"
 [workspace]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

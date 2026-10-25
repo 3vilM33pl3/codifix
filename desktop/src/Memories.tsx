@@ -1,26 +1,263 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
-import { useProjectData } from './data';
-import { request, time, type MemoryEntryResponse, type MemoryHistoryResponse, type ProjectMemoriesResponse } from './service';
-import { Badge, Empty, Intro, QueryState, Technical } from './ui';
-export function Memories({scope, project, initialId}: {scope: string; project: string; initialId?: string}) {
-  const [search, setSearch] = useState('');
-  const [kind, setKind] = useState('');
+import { Button } from "./ui";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { useMemories } from "./memories-data";
+import {
+  request,
+  time,
+  type MemoryEntryResponse,
+  type MemoryHistoryResponse,
+} from "./service";
+import { Badge, Empty, Intro, QueryState, Technical } from "./ui";
+export function Memories({
+  scope,
+  project,
+  initialId,
+}: {
+  scope: string;
+  project: string;
+  initialId?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [kind, setKind] = useState("");
   const [archived, setArchived] = useState(false);
   const [filters, setFilters] = useState(false);
   const [graph, setGraph] = useState(false);
-  const [selected, select] = useState(initialId ?? '');
-  const list = useProjectData<ProjectMemoriesResponse>(scope, project, 'memories');
-  const items = (list.data?.items ?? []).filter(m => !m.is_tombstone && (archived || m.status === 'active') && (!kind || m.memory_type === kind) && `${m.summary} ${m.preview} ${m.tags.join(' ')}`.toLowerCase().includes(search.toLowerCase()));
-  const selectedId = items.some(m => m.id === selected) ? selected : items[0]?.id;
-  const detail = useQuery({queryKey: [scope, project, 'memory', selectedId], queryFn: () => request<MemoryEntryResponse>(`/v1/memory/${selectedId}`), enabled: !!selectedId, retry: false});
+  const [selected, select] = useState(initialId ?? "");
+  const list = useMemories(scope, project);
+  const items = (list.data?.items ?? []).filter(
+    (m) =>
+      !m.is_tombstone &&
+      (archived || m.status === "active") &&
+      (!kind || m.memory_type === kind) &&
+      `${m.summary} ${m.preview} ${m.tags.join(" ")}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+  );
+  const selectedId = selected || items[0]?.id;
+  const detail = useQuery({
+    queryKey: [scope, project, "memory", selectedId],
+    queryFn: () => request<MemoryEntryResponse>(`/v1/memory/${selectedId}`),
+    enabled: !!selectedId,
+    retry: false,
+  });
   const [historyOpen, showHistory] = useState(false);
-  const history = useQuery({queryKey:[scope,project,'history',selectedId],queryFn:()=>request<MemoryHistoryResponse>(`/v1/memory/${selectedId}/history`),enabled:!!selectedId && historyOpen,retry:false});
+  const history = useQuery({
+    queryKey: [scope, project, "history", selectedId],
+    queryFn: () =>
+      request<MemoryHistoryResponse>(`/v1/memory/${selectedId}/history`),
+    enabled: !!selectedId && historyOpen,
+    retry: false,
+  });
   const memory = detail.data?.project === project ? detail.data : undefined;
-  return <><Intro title={graph ? 'Related knowledge' : 'Memories'} subtitle={graph ? 'An optional relationship view, within Memories.' : 'Find what the project knows, and where it came from.'}/>
-    <div className="search-row"><label className="search-field"><Search size={18}/><input aria-label="Search memories" placeholder="Search project knowledge…" value={search} onChange={e => setSearch(e.target.value)}/></label><button aria-expanded={filters} onClick={()=>setFilters(!filters)}>Filters{kind || archived ? ' · active' : ''}</button><button className="ghost" aria-pressed={graph} onClick={()=>setGraph(!graph)}>{graph ? 'Back to list' : 'List / Graph'}</button></div>
-    {filters && <div className="filter-row"><label>Type <select value={kind} onChange={e=>setKind(e.target.value)}><option value="">All types</option>{[...new Set(list.data?.items.map(m=>m.memory_type))].sort().map(type=><option key={type}>{type}</option>)}</select></label><label className="check"><input type="checkbox" checked={archived} onChange={e=>setArchived(e.target.checked)}/>Include archived memories</label><span className="muted">Search matches titles, excerpts and tags in this project.</span></div>}
-    <QueryState query={list}>{items.length ? <div className="split"><section className="card result-list"><p className="caption">{items.length} results · This project</p>{items.map(m=><button key={m.id} className={`result ${m.id === selectedId ? 'selected' : ''}`} aria-pressed={m.id === selectedId} onClick={()=>{select(m.id);showHistory(false);}}><strong>{m.summary}</strong><span className="caption">{m.memory_type.replaceAll('_',' ')} · {time(m.updated_at)}</span></button>)}</section><section className="card detail"><QueryState query={detail}>{memory ? <><div className="row"><Badge>{memory.memory_type.replaceAll('_',' ')}</Badge><span className="caption">{time(memory.updated_at)}</span></div><h2>{memory.summary}</h2>{graph ? <><p className="muted">Related memories are grouped by their relationship to this knowledge.</p>{memory.related_memories.length ? memory.related_memories.map(relation=><button className="relationship" key={relation.memory_id} onClick={()=>{select(relation.memory_id);setSearch('');setKind('');setArchived(true);}}><span className="eyebrow">{relation.relation_type.replaceAll('_',' ')}</span><strong>{relation.summary}</strong></button>) : <Empty title="No related memories recorded"/>}</> : <><div className="prose">{memory.canonical_text}</div><hr/><span className="eyebrow">SOURCE</span>{memory.sources.length ? memory.sources.map(source=><article className="source" key={source.id}><strong>{source.file_path ?? source.source_kind.replaceAll('_',' ')}</strong>{source.excerpt && <p className="prose muted">{source.excerpt}</p>}<span className="caption">{source.git_commit ? `Commit ${source.git_commit}` : source.task_id ? `Task ${source.task_id}` : 'Source reference retained'}{source.provenance ? ' · provenance available in details' : ''}</span></article>) : <p className="muted">No source details were supplied by the service.</p>}<p className="caption">Tags · {memory.tags.join(' · ') || 'None'}</p><details onToggle={e=>showHistory(e.currentTarget.open)}><summary>Replacement history</summary>{historyOpen && <QueryState query={history}>{history.data?.versions.map(v=><article key={v.id}><strong>Version {v.version_no} · {v.status}</strong><p className="prose">{v.canonical_text}</p></article>)}</QueryState>}</details><Technical label="Ranking & technical details" value={{id:memory.id,canonical_id:memory.canonical_id,version:memory.version_no,confidence:memory.confidence,importance:memory.importance,status:memory.status,sources:memory.sources}}/></>}</> : detail.data ? <p role="alert">This memory belongs to another project. Select a memory in the current project.</p> : null}</QueryState></section></div> : <Empty title={search || kind ? 'No memories match these filters' : 'No memories yet'}>Try another search or capture knowledge from your agent.</Empty>}</QueryState>
-  </>;
+  return (
+    <>
+      <Intro
+        title={graph ? "Related knowledge" : "Memories"}
+        subtitle={
+          graph
+            ? "An optional relationship view, within Memories."
+            : "Find what the project knows, and where it came from."
+        }
+      />
+      <div className="search-row">
+        <label className="search-field">
+          <Search size={18} />
+          <input
+            aria-label="Search memories"
+            placeholder="Search project knowledge…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              select("");
+            }}
+          />
+        </label>
+        <Button aria-expanded={filters} onClick={() => setFilters(!filters)}>
+          Filters{kind || archived ? " · active" : ""}
+        </Button>
+        <Button
+          className="ghost"
+          aria-pressed={graph}
+          onClick={() => setGraph(!graph)}
+        >
+          {graph ? "Back to list" : "List / Graph"}
+        </Button>
+      </div>
+      {filters && (
+        <div className="filter-row">
+          <label>
+            Type{" "}
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="">All types</option>
+              {[...new Set(list.data?.items.map((m) => m.memory_type))]
+                .sort()
+                .map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
+            </select>
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(e) => setArchived(e.target.checked)}
+            />
+            Include archived memories
+          </label>
+          <span className="muted">
+            Search matches titles, excerpts and tags in this project.
+          </span>
+        </div>
+      )}
+      <QueryState query={list}>
+        {items.length || selected ? (
+          <div className="split">
+            <section className="card result-list">
+              <p className="caption">{items.length} results · This project</p>
+              {items.map((m) => (
+                <Button
+                  key={m.id}
+                  className={`result ${m.id === selectedId ? "selected" : ""}`}
+                  aria-pressed={m.id === selectedId}
+                  onClick={() => {
+                    select(m.id);
+                    showHistory(false);
+                  }}
+                >
+                  <strong>{m.summary}</strong>
+                  <span className="caption">
+                    {m.memory_type.replaceAll("_", " ")} · {time(m.updated_at)}
+                  </span>
+                </Button>
+              ))}
+            </section>
+            <section className="card detail">
+              <QueryState query={detail}>
+                {memory ? (
+                  <>
+                    <div className="row">
+                      <Badge>{memory.memory_type.replaceAll("_", " ")}</Badge>
+                      <span className="caption">{time(memory.updated_at)}</span>
+                    </div>
+                    <h2>{memory.summary}</h2>
+                    {graph ? (
+                      <>
+                        <p className="muted">
+                          Related memories are grouped by their relationship to
+                          this knowledge.
+                        </p>
+                        {memory.related_memories.length ? (
+                          memory.related_memories.map((relation) => (
+                            <Button
+                              className="relationship"
+                              key={relation.memory_id}
+                              onClick={() => {
+                                select(relation.memory_id);
+                                setSearch("");
+                                setKind("");
+                                setArchived(true);
+                              }}
+                            >
+                              <span className="eyebrow">
+                                {relation.relation_type.replaceAll("_", " ")}
+                              </span>
+                              <strong>{relation.summary}</strong>
+                            </Button>
+                          ))
+                        ) : (
+                          <Empty title="No related memories recorded" />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="prose">{memory.canonical_text}</div>
+                        <hr />
+                        <span className="eyebrow">SOURCE</span>
+                        {memory.sources.length ? (
+                          memory.sources.map((source) => (
+                            <article className="source" key={source.id}>
+                              <strong>
+                                {source.file_path ??
+                                  source.source_kind.replaceAll("_", " ")}
+                              </strong>
+                              {source.excerpt && (
+                                <p className="prose muted">{source.excerpt}</p>
+                              )}
+                              <span className="caption">
+                                {source.git_commit
+                                  ? `Commit ${source.git_commit}`
+                                  : source.task_id
+                                    ? `Task ${source.task_id}`
+                                    : "Source reference retained"}
+                                {source.provenance
+                                  ? " · provenance available in details"
+                                  : ""}
+                              </span>
+                            </article>
+                          ))
+                        ) : (
+                          <p className="muted">
+                            No source details were supplied by the service.
+                          </p>
+                        )}
+                        <p className="caption">
+                          Tags · {memory.tags.join(" · ") || "None"}
+                        </p>
+                        <details
+                          onToggle={(e) => showHistory(e.currentTarget.open)}
+                        >
+                          <summary>Replacement history</summary>
+                          {historyOpen && (
+                            <QueryState query={history}>
+                              {history.data?.versions.map((v) => (
+                                <article key={v.id}>
+                                  <strong>
+                                    Version {v.version_no} · {v.status}
+                                  </strong>
+                                  <p className="prose">{v.canonical_text}</p>
+                                </article>
+                              ))}
+                            </QueryState>
+                          )}
+                        </details>
+                        <Technical
+                          label="Ranking & technical details"
+                          value={{
+                            id: memory.id,
+                            canonical_id: memory.canonical_id,
+                            version: memory.version_no,
+                            confidence: memory.confidence,
+                            importance: memory.importance,
+                            status: memory.status,
+                            sources: memory.sources,
+                          }}
+                        />
+                      </>
+                    )}
+                  </>
+                ) : detail.data ? (
+                  <p role="alert">
+                    This memory belongs to another project. Select a memory in
+                    the current project.
+                  </p>
+                ) : null}
+              </QueryState>
+            </section>
+          </div>
+        ) : (
+          <Empty
+            title={
+              search || kind
+                ? "No memories match these filters"
+                : "No memories yet"
+            }
+          >
+            Try another search or capture knowledge from your agent.
+          </Empty>
+        )}
+      </QueryState>
+    </>
+  );
 }

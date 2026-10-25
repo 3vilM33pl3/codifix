@@ -295,22 +295,40 @@ async fn choose_project(app: tauri::AppHandle) -> Result<Option<ProjectChoice>, 
     }))
 }
 #[tauri::command]
-fn open_service(section: String, state: State<'_, Transport>) -> Result<(), String> {
-    let c = state.0.lock().map_err(|_| "Connection unavailable")?;
-    let s = c.session.as_ref().ok_or("Connect to a service first")?;
+fn open_service(
+    section: String,
+    endpoint: Option<String>,
+    state: State<'_, Transport>,
+) -> Result<(), String> {
+    // Login can be opened even after a 401, without pretending that browser
+    // cookies authenticate the native transport. No arbitrary path is accepted.
+    let origin = if let Some(value) = endpoint {
+        if section != "login" {
+            return Err("An explicit endpoint is only allowed for login".into());
+        }
+        crate::endpoint(&value)?
+    } else {
+        let c = state.0.lock().map_err(|_| "Connection unavailable")?;
+        c.session
+            .as_ref()
+            .ok_or("Connect to a service first")?
+            .endpoint
+            .clone()
+    };
     let path = match section.as_str() {
         "home" | "help" => "/",
         "login" => "/v1/auth/login?return_to=%2F",
         _ => return Err("Unknown service section".into()),
     };
     open::that(
-        s.endpoint
+        origin
             .join(path)
             .map_err(|_| "Invalid service URL")?
             .as_str(),
     )
     .map_err(|_| "Cannot open browser".into())
 }
+
 fn main() {
     tauri::Builder::default()
         .manage(Transport::default())
