@@ -267,7 +267,7 @@ pub(crate) async fn start_browser_login(
         "request_id": e.request_id, "device_id": e.device_id,
         "name": "Codifix Desktop", "platform": std::env::consts::OS,
         "credential_sha256": hash(&e.credential), "poll_sha256": hash(&e.poll_secret)
-    }))).await.map_err(|error| format!("{error} Browser sign-in needs a service with device onboarding enabled. The request is saved; retry or cancel it."))?;
+    }))).await.map_err(|error| format!("{error} The sign-in request is saved; retry it after resolving the connection error, or cancel it."))?;
     let started: Started =
         serde_json::from_value(value).map_err(|_| "Invalid browser sign-in receipt")?;
     let (info, remaining) = validate_start(started, &e)?;

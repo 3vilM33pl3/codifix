@@ -28,6 +28,7 @@ jobs:
       - run: npm run build
         working-directory: desktop
       - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked
+      - run: python3 desktop/tests/native_tls.py
       - run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check
       - run: npm run desktop:build
         working-directory: desktop

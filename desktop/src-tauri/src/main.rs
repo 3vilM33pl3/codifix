@@ -105,6 +105,29 @@ fn allowed(path: &str, method: &str) -> bool {
         _ => false,
     }
 }
+// Classify transport failures without exposing URLs, credentials or response bodies.
+fn connection_error(error: reqwest::Error) -> String {
+    use std::error::Error;
+    if error.is_timeout() {
+        return "The service request timed out. Check your network or VPN. Its outcome may be unconfirmed.".into();
+    }
+    let mut cause = error.source();
+    while let Some(source) = cause {
+        let message = source.to_string().to_ascii_lowercase();
+        if message.contains("certificate") || message.contains("unknownissuer") {
+            return "The service TLS certificate could not be verified. Check that its issuing CA is trusted by your operating system and the service address matches the certificate. No secure connection was established.".into();
+        }
+        cause = source.source();
+    }
+    if error.is_timeout() {
+        "The service request timed out. Check your network or VPN. Its outcome may be unconfirmed."
+            .into()
+    } else if error.is_connect() {
+        "Could not connect to the service. Check the address, network and VPN, then retry.".into()
+    } else {
+        "The service request failed before a response was confirmed. Check the connection and retry the saved request.".into()
+    }
+}
 impl Session {
     fn new(endpoint: Url, token: Option<String>) -> Result<Self, String> {
         let jar = Arc::new(Jar::default());
@@ -153,10 +176,7 @@ impl Session {
         if let Some(body) = body {
             request = request.json(&body);
         }
-        let mut response = request
-            .send()
-            .await
-            .map_err(|_| "Service connection failed; outcome may be unconfirmed")?;
+        let mut response = request.send().await.map_err(connection_error)?;
         let status = response.status();
         let mut bytes = Vec::new();
         while let Some(chunk) = response
@@ -380,6 +400,29 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "run through tests/native_tls.py with an isolated local TLS fixture"]
+    fn tls_system_roots_probe() {
+        let url =
+            endpoint(&std::env::var("CODIFIX_TLS_TEST_ORIGIN").expect("fixture origin")).unwrap();
+        assert!(is_local(&url) && url.scheme() == "https");
+        tauri::async_runtime::block_on(async {
+            let result = Session::new(url, None)
+                .unwrap()
+                .request("/v1/auth/me", Method::GET, None)
+                .await;
+            if std::env::var("CODIFIX_TLS_EXPECT_TRUSTED").unwrap() == "1" {
+                assert_eq!(result.unwrap(), serde_json::json!({"fixture":true}));
+            } else {
+                let error = result.unwrap_err();
+                assert!(
+                    error.contains("TLS certificate could not be verified"),
+                    "{error}"
+                );
+                assert!(!error.contains("https://"));
+            }
+        });
+    }
     #[test]
     fn endpoints() {
         for s in [
