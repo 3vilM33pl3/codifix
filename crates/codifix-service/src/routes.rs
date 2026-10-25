@@ -328,7 +328,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route("/ws", get(websocket))
         .route("/v1/auth/session/bootstrap", post(session_bootstrap))
         .route("/v1/auth/desktop/login", get(crate::auth::desktop_login))
-        .route("/v1/auth/desktop/exchange", post(crate::auth::desktop_exchange))
+        .route("/v1/auth/desktop/exchange", post(crate::auth::desktop_exchange).layer(axum::extract::DefaultBodyLimit::max(2048)))
         .route("/v1/auth/desktop/logout", post(crate::auth::desktop_logout))
         .route("/v1/auth/login", get(auth_login))
         .route("/v1/auth/callback", get(auth_callback))

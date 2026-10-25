@@ -69,7 +69,10 @@ fn validate_redirect(value: &str) -> Result<reqwest::Url, ApiError> {
     let url = reqwest::Url::parse(value).map_err(|_| bad())?;
     // Require the exact serialized authority and path; URL normalization must
     // not admit alternate numeric hosts, encoded paths or dot segments.
-    let port = url.port().filter(|p| *p > 0).ok_or_else(bad)?;
+    let port = url
+        .port_or_known_default()
+        .filter(|p| *p > 0)
+        .ok_or_else(bad)?;
     if value != format!("http://127.0.0.1:{port}/callback") {
         return Err(bad());
     }
@@ -317,6 +320,34 @@ mod tests {
                 StatusCode::UNAUTHORIZED
             );
         }
+        // Protected audit failure rolls back both code consumption and session.
+        sqlx::raw_sql("CREATE FUNCTION reject_native_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event_type='desktop.session.create' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_native_audit BEFORE INSERT ON auth_audit_events FOR EACH ROW EXECUTE FUNCTION reject_native_audit()")
+            .execute(&db.pool).await.unwrap();
+        assert_eq!(
+            client
+                .post(&exchange)
+                .json(&request)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        let remaining: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM auth_desktop_codes WHERE principal_id=$1")
+                .bind(human)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(remaining, 1);
+        let sessions: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM auth_web_sessions WHERE principal_id=$1")
+                .bind(human)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(sessions, 0);
+        sqlx::raw_sql("DROP TRIGGER reject_native_audit ON auth_audit_events; DROP FUNCTION reject_native_audit()").execute(&db.pool).await.unwrap();
         let response = client.post(&exchange).json(&request).send().await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert!(!response.headers().contains_key(header::SET_COOKIE));
@@ -454,6 +485,74 @@ mod tests {
             client
                 .get(&me)
                 .header("cookie", format!("codifix_session={browser}"))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+        // Only one concurrent exchange may consume a code.
+        let mut tx = db.pool.begin().await.unwrap();
+        let next_code = issue_desktop_code_tx(&mut tx, human, &context())
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        let mut next = request.clone();
+        next["code"] = json!(next_code);
+        let (left, right) = tokio::join!(
+            client.post(&exchange).json(&next).send(),
+            client.post(&exchange).json(&next).send()
+        );
+        let mut statuses = vec![
+            left.unwrap().status().as_u16(),
+            right.unwrap().status().as_u16(),
+        ];
+        statuses.sort();
+        assert_eq!(statuses, vec![200, 401]);
+        let mut tx = db.pool.begin().await.unwrap();
+        let expired = issue_desktop_code_tx(&mut tx, human, &context())
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        sqlx::query(
+            "UPDATE auth_desktop_codes SET expires_at=now()-interval '1 second' WHERE code_hash=$1",
+        )
+        .bind(hash_secret(&expired))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        let mut next = request.clone();
+        next["code"] = json!(expired);
+        assert_eq!(
+            client
+                .post(&exchange)
+                .json(&next)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        sqlx::query("UPDATE auth_principals SET disabled_at=now() WHERE id=$1")
+            .bind(human)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            client
+                .get(&me)
+                .header("cookie", format!("codifix_session={browser}"))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::UNAUTHORIZED
+        );
+        assert_eq!(
+            client
+                .post(&logout)
+                .bearer_auth(&session.token)
+                .json(&json!({}))
                 .send()
                 .await
                 .unwrap()
