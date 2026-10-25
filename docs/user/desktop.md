@@ -78,6 +78,25 @@ Live browser authentication and protected project access still require the user'
 identity-provider sign-in and project approval; automated checks do not claim
 that approval occurred.
 
+### Browser identity check repair (25 October 2026)
+
+The Workshop service hotfix at `79dcf24f` removes an incorrect memory-read
+permission requirement from identity inspection and logout. Previously, a valid
+OIDC account with no project grants received HTTP 403 from `/v1/auth/me`; the
+approval page mislabeled that response as a missing login and disabled review.
+Identity failures now distinguish signed-out, denied and connection states.
+
+Verification: 92 backend authentication tests passed against a disposable
+PostgreSQL database, including zero-grant identity/empty review, unauthorized
+read/approval rejection, logout CSRF and invalid/expired/revoked/disabled sessions.
+All 296 web tests and the web/release builds passed. The optimized service and
+web assets were installed only on Workshop, with previous assets retained;
+health reported `ok` and database `up`. Configuration, grants and schema were
+unchanged. In the real Chrome approval page, the current account became visible
+and clicking **Review device request** returned the expected expired-request
+message. Signing into the intended account and approving a fresh device request
+remain human actions; no project access was granted by this repair.
+
 The 0.1.1 DEB was installed per-user on the current host and launched with no
 startup log errors. A second launch exited successfully while the original
 process remained running and owned the single-instance D-Bus name. Package and
