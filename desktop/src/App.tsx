@@ -23,7 +23,7 @@ import {
   openBrowserLogin,
   cancelBrowserLogin,
   forgetBrowserLogin,
-  time,
+  revokeLegacyBrowserLogin,
   type BrowserLoginProgress,
   projectPath,
   request,
@@ -34,8 +34,8 @@ type Recent = { project: string; endpoint: string; path: string | null };
 const defaultPrefs: Preferences = {
   theme: "system",
   notifications: false,
-  endpoint: "http://127.0.0.1:4250",
-  connectionName: "Local service",
+  endpoint: import.meta.env.VITE_CODIFIX_SERVICE_URL || "http://127.0.0.1:4250",
+  connectionName: import.meta.env.VITE_CODIFIX_SERVICE_NAME || "Local service",
 };
 function readPrefs(): Preferences {
   try {
@@ -306,7 +306,7 @@ export function App() {
           );
           if (version === generation.current) setConnectBusy(false);
         } else {
-          timer = setTimeout(poll, 3000);
+          timer = setTimeout(poll, 500);
         }
       } catch (e) {
         if (!stopped && version === generation.current) {
@@ -315,7 +315,7 @@ export function App() {
         }
       }
     };
-    timer = setTimeout(poll, 3000);
+    timer = setTimeout(poll, 500);
     return () => {
       stopped = true;
       clearTimeout(timer);
@@ -348,7 +348,9 @@ export function App() {
       await acceptConnection(identity, address, label, version, restore);
     } catch (e) {
       if (version === generation.current) {
-        setConnectionError(errorText(e));
+        setConnectionError(
+          errorText(e).includes("HTTP 401.") ? "" : errorText(e),
+        );
         setModal("connection");
       }
     } finally {
@@ -642,8 +644,8 @@ export function App() {
       </div>
       <Modal
         open={modal === "connection"}
-        title="Connect to Codifix"
-        description="Choose the service that holds your project knowledge."
+        title="Sign in to Codifix"
+        description="Continue in your browser, then return here automatically."
         onClose={() => !connectBusy && setModal(null)}
       >
         <form
@@ -653,28 +655,9 @@ export function App() {
             void connectToService(endpoint, token, connectionName, true);
           }}
         >
-          <label>
-            Connection name
-            <input
-              value={connectionName}
-              onChange={(e) => setConnectionName(e.target.value)}
-              placeholder="Workshop"
-              disabled={connectBusy}
-            />
-          </label>
-          <label>
-            Service URL
-            <input
-              type="url"
-              required
-              value={endpoint}
-              onChange={(e) => {
-                setEndpoint(e.target.value);
-                setForgetConfirmed(false);
-              }}
-              disabled={connectBusy}
-            />
-          </label>
+          <p className="caption">
+            {connectionName || "Codifix service"} · {endpoint}
+          </p>
           {connectionError && (
             <p className="notice danger" role="alert">
               {connectionError}
@@ -688,45 +671,29 @@ export function App() {
           {browserLogin ? (
             <section className="card" aria-label="Browser sign-in">
               <h3>
-                {polling ? "Waiting for browser approval…" : "Sign-in paused"}
+                {polling
+                  ? "Finish signing in in your browser"
+                  : "Sign-in interrupted"}
               </h3>
-              <p>
-                Sign in and approve <strong>Codifix Desktop</strong> in your
-                browser. Match this code and fingerprint, then select the
-                projects you want to access.
-              </p>
-              <p>
-                User code: <strong>{browserLogin.user_code}</strong>
-              </p>
-              <p className="caption break">
-                Credential SHA-256: {browserLogin.credential_sha256}
-              </p>
-              <p className="caption break">Device: {browserLogin.device_id}</p>
-              <p className="caption">Expires {time(browserLogin.expires_at)}</p>
-              <p className="caption break">
-                Approval address: {browserLogin.verification_uri}
-              </p>
+              <p>Codifix will open automatically when you’re signed in.</p>
               <div className="actions">
-                <Button
-                  type="button"
-                  onClick={() =>
-                    void openBrowserLogin(browserLogin.request_id).catch((e) =>
-                      setConnectionError(errorText(e)),
-                    )
-                  }
-                >
-                  Open browser again
-                </Button>
-                {!polling && (
+                {polling ? (
                   <Button
                     type="button"
-                    onClick={() => {
-                      setConnectionError("");
-                      setConnectionInfo("");
-                      setPolling(true);
-                    }}
+                    onClick={() =>
+                      void openBrowserLogin(browserLogin.request_id).catch(
+                        (e) => setConnectionError(errorText(e)),
+                      )
+                    }
                   >
-                    Check approval again
+                    Open browser again
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => void beginBrowserLogin()}
+                  >
+                    Try again
                   </Button>
                 )}
                 <Button type="button" onClick={() => void signOutBrowser()}>
@@ -735,102 +702,139 @@ export function App() {
               </div>
             </section>
           ) : (
-            <>
-              <Button
-                className="primary"
-                type="button"
+            <Button
+              className="primary"
+              type="button"
+              disabled={connectBusy}
+              onClick={() => void beginBrowserLogin()}
+            >
+              {connectBusy ? "Connecting…" : "Sign in"}
+            </Button>
+          )}
+          <details>
+            <summary>Connection settings</summary>
+            <label>
+              Connection name
+              <input
+                value={connectionName}
+                onChange={(e) => setConnectionName(e.target.value)}
+                placeholder="Workshop"
                 disabled={connectBusy}
-                onClick={() => void beginBrowserLogin()}
-              >
-                {connectBusy ? "Connecting…" : "Sign in through browser"}
-              </Button>
+              />
+            </label>
+            <label>
+              Service URL
+              <input
+                type="url"
+                required
+                value={endpoint}
+                onChange={(e) => {
+                  setEndpoint(e.target.value);
+                  setForgetConfirmed(false);
+                }}
+                disabled={connectBusy}
+              />
+            </label>
+            <details>
+              <summary>Local service or service token</summary>
+              <label>
+                Service token <span className="caption">(if required)</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  disabled={connectBusy}
+                />
+              </label>
               <p className="caption">
-                Use your service’s public HTTPS address. Browser sign-in
-                connects this desktop and saves its credential in your operating
-                system keyring. Your password stays in the browser.
+                Pasted tokens stay in memory for this session.
               </p>
-              <details>
-                <summary>Local service or service token</summary>
-                <label>
-                  Service token <span className="caption">(if required)</span>
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    disabled={connectBusy}
-                  />
-                </label>
-                <p className="caption">
-                  Pasted tokens stay in memory for this session. Local
-                  single-user services use a native session.
-                </p>
-                <Button type="submit" disabled={connectBusy}>
-                  Connect locally or with token
-                </Button>
-              </details>
-              <div className="actions">
-                {auth && (
-                  <Button
-                    type="button"
-                    disabled={connectBusy}
-                    onClick={() =>
-                      void (async () => {
-                        generation.current++;
-                        await disconnect();
-                        await client.cancelQueries();
-                        client.clear();
-                        setAuth(null);
-                        setProject("");
-                        setConnectionError("");
-                        setConnectionInfo("");
-                        setModal(null);
-                      })().catch((e) => setConnectionError(errorText(e)))
-                    }
-                  >
-                    Disconnect
-                  </Button>
-                )}
+              <Button type="submit" disabled={connectBusy}>
+                Connect locally or with token
+              </Button>
+            </details>
+            <div className="actions">
+              {auth && (
                 <Button
                   type="button"
                   disabled={connectBusy}
-                  onClick={() => void signOutBrowser()}
+                  onClick={() =>
+                    void (async () => {
+                      generation.current++;
+                      await disconnect();
+                      await client.cancelQueries();
+                      client.clear();
+                      setAuth(null);
+                      setProject("");
+                      setConnectionError("");
+                      setConnectionInfo("");
+                      setModal(null);
+                    })().catch((e) => setConnectionError(errorText(e)))
+                  }
                 >
-                  Sign out browser access
+                  Disconnect
                 </Button>
-              </div>
-              {connectionError && (
-                <details>
-                  <summary>Recover an unavailable sign-in</summary>
-                  <p className="caption">
-                    If the service cannot confirm cancellation, you can remove
-                    the saved sign-in here. This does not revoke server access.
-                    Resolve any outstanding device approval in your browser or
-                    with your administrator.
-                  </p>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={forgetConfirmed}
-                      onChange={(e) => setForgetConfirmed(e.target.checked)}
-                    />
-                    I understand that remote access may remain active.
-                  </label>
-                  <Button
-                    type="button"
-                    disabled={connectBusy || !forgetConfirmed}
-                    onClick={() => void signOutBrowser(true)}
-                  >
-                    Forget saved sign-in locally
-                  </Button>
-                </details>
               )}
+              <Button
+                type="button"
+                disabled={connectBusy}
+                onClick={() => void signOutBrowser()}
+              >
+                Sign out
+              </Button>
+            </div>
+            <p className="caption">
+              Sign out removes this app’s saved session. Disconnect keeps it for
+              next time.
+            </p>
+            <details>
+              <summary>Older device sign-ins</summary>
               <p className="caption">
-                Sign out revokes this desktop’s browser-approved access and
-                removes its saved credential. Disconnect keeps it available for
-                next time.
+                Remove access saved by the previous device-approval flow.
               </p>
-            </>
+              <Button
+                type="button"
+                disabled={connectBusy}
+                onClick={() => {
+                  setConnectBusy(true);
+                  setConnectionError("");
+                  setConnectionInfo("");
+                  void revokeLegacyBrowserLogin(endpoint.trim())
+                    .then(() =>
+                      setConnectionInfo("Older device access removed."),
+                    )
+                    .catch((e) => setConnectionError(errorText(e)))
+                    .finally(() => setConnectBusy(false));
+                }}
+              >
+                Remove older device access
+              </Button>
+            </details>
+          </details>
+          {connectionError && !browserLogin && (
+            <details>
+              <summary>Recover an unavailable sign-in</summary>
+              <p className="caption">
+                If sign-out cannot reach the service, you can remove the saved
+                session locally. This does not revoke server access.
+              </p>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={forgetConfirmed}
+                  onChange={(e) => setForgetConfirmed(e.target.checked)}
+                />
+                I understand that remote access may remain active.
+              </label>
+              <Button
+                type="button"
+                disabled={connectBusy || !forgetConfirmed}
+                onClick={() => void signOutBrowser(true)}
+              >
+                Forget saved sign-in locally
+              </Button>
+            </details>
           )}
         </form>
       </Modal>

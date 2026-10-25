@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod browser_auth;
+mod legacy_browser_auth;
 use reqwest::{
     cookie::{CookieStore, Jar},
     Client, Method,
@@ -216,9 +217,11 @@ async fn connect_service(
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
         c.session = None;
+        c.pending = None;
         c.generation
     };
     let _operation = browser.0.lock().await;
+    browser.check_cleanup(&endpoint)?;
     let saved = if token.is_none() && endpoint.scheme() == "https" {
         browser_auth::restore(&endpoint).await?
     } else {
@@ -254,6 +257,7 @@ fn disconnect_service(state: State<'_, Transport>) -> Result<(), String> {
     let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
     c.generation += 1;
     c.session = None;
+    c.pending = None;
     Ok(())
 }
 #[tauri::command]
@@ -392,7 +396,8 @@ fn main() {
             browser_auth::poll_browser_login,
             browser_auth::cancel_browser_login,
             browser_auth::open_browser_login,
-            browser_auth::forget_browser_login
+            browser_auth::forget_browser_login,
+            browser_auth::revoke_legacy_browser_login
         ])
         .run(tauri::generate_context!())
         .expect("Unable to start Codifix Desktop");

@@ -82,10 +82,6 @@ export function canWrite(
 export type BrowserLoginProgress = {
   status: "pending" | "approved";
   request_id: string;
-  device_id: string;
-  credential_sha256: string;
-  user_code: string;
-  verification_uri: string;
   expires_at: string;
   auth: AuthMeResponse | null;
 };
@@ -100,3 +96,6 @@ export const cancelBrowserLogin = (endpoint: string) =>
 
 export const forgetBrowserLogin = (endpoint: string) =>
   invoke<void>("forget_browser_login", { endpoint, confirmed: true });
+
+export const revokeLegacyBrowserLogin = (endpoint: string) =>
+  invoke<void>("revoke_legacy_browser_login", { endpoint });
