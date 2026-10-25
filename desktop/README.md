@@ -7,7 +7,7 @@ Linux-first implementation of the [approved Figma design](https://www.figma.com/
 Use Node 22+ and Rust stable. On Debian/Ubuntu install Tauri's build prerequisites:
 
 ```sh
-sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libssl-dev librsvg2-dev patchelf
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev libdbus-1-dev libssl-dev librsvg2-dev patchelf
 npm ci
 npm run desktop:dev
 ```
@@ -18,13 +18,19 @@ The desktop crate has its own Cargo workspace/lockfile. It does not add GTK requ
 
 ## Connect
 
-1. Connect to your existing service origin, e.g. `http://127.0.0.1:4250`. Change this to the endpoint for the intended knowledge area and give the connection a meaningful name.
-2. Local writable single-user services establish a local-owner cookie session through the existing loopback bootstrap API. Protected services accept an explicitly supplied service token. HTTPS is required for non-loopback endpoints.
-3. Choose an existing project slug, or open its local folder. The folder chooser reads `.codifix/project.toml` to discover the slug; it does not initialise projects or infer names from folder names.
+1. Enter the public **HTTPS origin** of your Codifix service and a connection name. Click **Sign in through browser**.
+2. Sign in to Codifix in your default browser. Compare the user code and credential fingerprint with the desktop, select the projects and reader/writer roles you want, and approve **Codifix Desktop**. The app connects automatically after validating the approval and the resulting identity.
+3. Choose an existing project slug, or open its local folder. The folder chooser reads `.codifix/project.toml`; it does not initialise projects or infer names from folder names.
 
-Credentials and session cookies live only in native process memory. Tokens are never written to preferences. After restart, protected endpoints need the token again. Preferences contain only appearance/notification settings and the last endpoint/name; recent projects contain endpoint, slug and an optional folder path. Project and connection switches clear cached query data.
+Browser sign-in uses the service's existing device enrollment API. It requires a writable primary multi-user service with a configured HTTPS browser origin, explicit area identity and reviewed project manifests. Use its public origin, not an internal proxy address or the development endpoint. Device access is bounded by the human's current permissions and approved reader/writer roles; administrative operations still belong in the browser.
 
-Browser login opens the service's existing sign-in page. Its session does **not** transfer into the desktop process: desktop multi-user authentication currently uses a service token. The app does not change the service's authentication or CORS configuration.
+Credentials and polling proofs are generated in Rust and saved **before** sending the request to the OS credential store: Linux Secret Service (e.g. GNOME Keyring), macOS Keychain or Windows Credential Manager. Only Linux has been exercised. Unlock the desktop keyring if prompted; there is no plaintext fallback. No password or browser cookie transfers to the renderer. Reopening the app restores the saved credential for the exact origin and verifies it with the service. Pending requests can be resumed without generating another credential.
+
+**Cancel sign-in** cancels the saved request, or revokes the device if approval already happened. **Sign out browser access** revokes access before deleting the keyring record. An uncertain response retains the record for retry. If an unreachable service never created the request, the recovery section offers explicitly confirmed **Forget saved sign-in locally**; this does not claim remote revocation. **Disconnect** clears the current session but keeps browser access saved for next time. Closing the window also retains saved browser access. A second launch focuses the existing app, preventing competing enrollment processes.
+
+For local writable single-user services, expand **Local service or service token** and use **Connect locally or with token**; this establishes the existing loopback owner session. Explicitly pasted tokens stay only in native process memory and must be re-entered after restart. The local development endpoint defaults to `http://127.0.0.1:4250`; it is not a substitute for your area's public browser sign-in origin.
+
+Preferences contain appearance/notification settings and the last successfully connected endpoint/name. Recent projects contain endpoint, slug and an optional folder path. Credentials never enter localStorage. Project and connection switches clear cached query data. No service auth or CORS configuration changes are required.
 
 ## Workflows
 
@@ -48,6 +54,8 @@ Connection errors are distinct from empty results. Previously loaded data is lab
 | Radix Dialog | Focus trapping, Escape dismissal and accessible dialog semantics. Automated tests supplement rather than replace Orca testing. |
 | TanStack Query | Scoped loading, caching, refresh and stale/error states. No persistent knowledge cache or second memory database. |
 | Lucide | Small SVG interface icons with labels; decorative icons do not replace text. |
+| [keyring](https://docs.rs/keyring/3.6.3/keyring/) | Uses the OS credential store rather than inventing password storage. Linux needs an available, unlocked Secret Service; failures are explicit. |
+| [Tauri single-instance](https://v2.tauri.app/plugin/single-instance/) | Prevents concurrent app processes from racing over saved enrollment. A second launch focuses the existing window. |
 | Tauri dialog / notification / window-state | Native folder selection, optional desktop feedback and window restoration. Renderer capabilities stay narrow. |
 
 Electron would standardise the rendering engine but ship a bundled Chromium runtime. GTK/libadwaita would give Linux-native widgets but require substantially separate UI implementations on other OSes. The selected approach shares the interface and service bridge, with OS-specific packaging and integration tests.
@@ -64,7 +72,7 @@ npm run desktop:build
 
 `npm run dev` also serves `/review.html`, an explicitly illustrative fixture for comparing the design without accessing real project data. Its IPC mock and sample records are **not included** in the packaged `index.html` entry. Fixture actions that require native integrations report that they are unavailable.
 
-Initial validation: eight renderer workflow tests (connection failure, restoration, keyboard palette, complete paging, linked detail, review receipts/permission gates, retry identity), three Rust boundary tests, TypeScript/production frontend build and Linux DEB build. See `docs/user/desktop.md` for acceptance limitations.
+Validation: twelve renderer workflow tests, seven native boundary/protocol tests, a separately run disposable host-keyring roundtrip, TypeScript/production frontend build and Linux DEB build. Browser tests cover approval handoff, late approval after cancellation, saved access reuse and explicitly confirmed local recovery. Native tests check origin/request binding, typed approval grants, identity mismatch, credential isolation and cancel/approval reconciliation. See `docs/user/desktop.md` for acceptance limitations.
 
 ## Figma Code Connect
 

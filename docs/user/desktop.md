@@ -11,8 +11,9 @@ have a Codifix marker or an existing service slug.
 
 Review and job retry controls use the service's current permissions. Approvals
 and rejections refresh the queue only after a matching receipt. An interrupted
-response is reported as uncertain. Native credentials are discarded on exit;
-browser login does not authenticate the bundled renderer.
+response is reported as uncertain. Browser sign-in connects the desktop through a device approval. Its credential
+is saved in your OS keyring and checked again when the app reopens; passwords
+stay in your browser. Pasted service tokens remain in memory only.
 
 ## Current acceptance limits
 
@@ -45,5 +46,27 @@ explicit browser review fixture.
 
 The configured local endpoint returned HTTP 401 without credentials. Live
 protected-project reads and writes have therefore not been claimed as verified;
-enter an appropriate service token in the connection dialog to exercise them.
+use your area’s public HTTPS address and **Sign in through browser** in the
+connection dialog to exercise them.
 No production memory was approved, rejected or retried during testing.
+
+## Browser sign-in (0.1.1)
+
+In **Manage connection**, enter your public Codifix HTTPS service origin and
+choose **Sign in through browser**. Compare the code and fingerprint, select
+projects in the browser and approve Codifix Desktop. The app completes the
+connection automatically. A configured device-onboarding service and an unlocked
+desktop keyring are required. Use the advanced local/token option for a local
+single-user service; browser access does not authenticate the separate dev service.
+
+**Sign out browser access** revokes this desktop credential and removes it from
+the keyring. **Disconnect** keeps it for the next connection. If cancellation
+cannot be confirmed, retry it. The explicitly confirmed local-forget recovery
+option removes only the saved credential and does not revoke remote access.
+
+The 0.1.1 change passes twelve renderer tests and seven native tests, including
+late approval cancellation and exact device/principal binding. A disposable
+credential was written, read and removed from this host's Linux Secret Service.
+Live browser authentication and protected project access still require the user's
+identity-provider sign-in and project approval; automated checks do not claim
+that approval occurred.

@@ -281,7 +281,7 @@ export function Settings({
           )}
           {section === "About & diagnostics" && (
             <>
-              <h3>Codifix Desktop · 0.1.0</h3>
+              <h3>Codifix Desktop · 0.1.1</h3>
               <p className="muted">Shared Tauri 2 desktop · Linux first</p>
               <p>
                 React and TypeScript provide the shared interface. Rust handles
@@ -299,8 +299,8 @@ export function Settings({
                 }}
               />
               <p className="caption">
-                Authentication tokens are held in memory only. Reconnect after
-                restarting when your service requires a token.
+                Browser-approved credentials are saved in your operating system
+                keyring. Pasted service tokens are held in memory only.
               </p>
             </>
           )}
