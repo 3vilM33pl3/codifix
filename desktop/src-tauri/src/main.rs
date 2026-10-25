@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod browser_auth;
 use reqwest::{
     cookie::{CookieStore, Jar},
     Client, Method,
@@ -9,7 +10,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use url::Url;
 const MAX_RESPONSE: usize = 8 * 1024 * 1024;
@@ -24,6 +25,7 @@ struct Session {
 struct Connection {
     generation: u64,
     session: Option<Session>,
+    pending: Option<browser_auth::Pending>,
 }
 #[derive(Default)]
 struct Transport(Mutex<Connection>);
@@ -104,6 +106,23 @@ fn allowed(path: &str, method: &str) -> bool {
     }
 }
 impl Session {
+    fn new(endpoint: Url, token: Option<String>) -> Result<Self, String> {
+        let jar = Arc::new(Jar::default());
+        let client = Client::builder()
+            .cookie_provider(jar.clone())
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(15))
+            .connect_timeout(Duration::from_secs(5))
+            .build()
+            .map_err(|_| "Cannot create service client")?;
+        Ok(Self {
+            endpoint,
+            client,
+            jar,
+            token,
+        })
+    }
+
     async fn request(
         &self,
         path: &str,
@@ -164,6 +183,7 @@ async fn connect_service(
     endpoint: String,
     token: Option<String>,
     state: State<'_, Transport>,
+    browser: State<'_, browser_auth::BrowserAuth>,
 ) -> Result<Value, String> {
     let endpoint = crate::endpoint(&endpoint)?;
     if token
@@ -178,20 +198,16 @@ async fn connect_service(
         c.session = None;
         c.generation
     };
-    let jar = Arc::new(Jar::default());
-    let client = Client::builder()
-        .cookie_provider(jar.clone())
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(30))
-        .connect_timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|_| "Cannot create service client")?;
-    let session = Session {
-        endpoint,
-        client,
-        jar,
-        token,
+    let _operation = browser.0.lock().await;
+    let saved = if token.is_none() && endpoint.scheme() == "https" {
+        browser_auth::restore(&endpoint).await?
+    } else {
+        None
     };
+    let session = Session::new(
+        endpoint,
+        token.or_else(|| saved.as_ref().map(|s| s.credential.clone())),
+    )?;
     let auth = session.request("/v1/auth/me", Method::GET, None).await?;
     if session.token.is_none()
         && auth["mode"] == "single_user"
@@ -203,6 +219,9 @@ async fn connect_service(
             .await?;
     }
     let auth = session.request("/v1/auth/me", Method::GET, None).await?;
+    if let Some(saved) = &saved {
+        browser_auth::validate_auth(&auth, saved)?;
+    }
     let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
     if c.generation != generation {
         return Err("Connection changed; discard this response".into());
@@ -331,7 +350,15 @@ fn open_service(
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .manage(Transport::default())
+        .manage(browser_auth::BrowserAuth::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
@@ -340,7 +367,12 @@ fn main() {
             disconnect_service,
             api_request,
             choose_project,
-            open_service
+            open_service,
+            browser_auth::start_browser_login,
+            browser_auth::poll_browser_login,
+            browser_auth::cancel_browser_login,
+            browser_auth::open_browser_login,
+            browser_auth::forget_browser_login
         ])
         .run(tauri::generate_context!())
         .expect("Unable to start Codifix Desktop");

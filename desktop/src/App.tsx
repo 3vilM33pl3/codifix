@@ -18,7 +18,13 @@ import {
   connect,
   disconnect,
   errorText,
-  openService,
+  startBrowserLogin,
+  pollBrowserLogin,
+  openBrowserLogin,
+  cancelBrowserLogin,
+  forgetBrowserLogin,
+  time,
+  type BrowserLoginProgress,
   projectPath,
   request,
   type AuthMeResponse,
@@ -80,10 +86,16 @@ export function App() {
     "connection" | "project" | "palette" | "help" | null
   >(null);
   const [connectionError, setConnectionError] = useState("");
+  const [connectionInfo, setConnectionInfo] = useState("");
   const [connectBusy, setConnectBusy] = useState(false);
   const [endpoint, setEndpoint] = useState(prefs.endpoint);
   const [connectionName, setConnectionName] = useState(prefs.connectionName);
   const [token, setToken] = useState("");
+  const [browserLogin, setBrowserLogin] = useState<BrowserLoginProgress | null>(
+    null,
+  );
+  const [polling, setPolling] = useState(false);
+  const [forgetConfirmed, setForgetConfirmed] = useState(false);
   const [slug, setSlug] = useState("");
   const [folder, setFolder] = useState<string | null>(null);
   const [projectError, setProjectError] = useState("");
@@ -169,6 +181,146 @@ export function App() {
     setRecents(next);
     localStorage.setItem("codifix.desktop.projects", JSON.stringify(next));
   }
+  async function acceptConnection(
+    identity: AuthMeResponse,
+    address: string,
+    label: string,
+    version: number,
+    restore = true,
+  ) {
+    if (version !== generation.current) return;
+    const normalized = address.trim().replace(/\/$/, "");
+    savePrefs({
+      ...prefs,
+      endpoint: normalized,
+      connectionName: label.trim() || "Codifix service",
+    });
+    setEndpoint(normalized);
+    setAuth(identity);
+    setScope(`${normalized}:${version}`);
+    if (identity.mode === "multi_user" && !identity.authenticated) {
+      setConnectionError(
+        "This service requires authentication. Sign in through your browser to connect this desktop session.",
+      );
+      setModal("connection");
+      return;
+    }
+    setModal(null);
+    const last = restore
+      ? readRecents().find((r) => r.endpoint === normalized)
+      : null;
+    if (last) {
+      try {
+        await setActiveProject(last.project, last.path, normalized, version);
+      } catch (e) {
+        if (version === generation.current) setProjectError(errorText(e));
+      }
+    }
+  }
+  async function beginBrowserLogin() {
+    const version = ++generation.current;
+    setConnectBusy(true);
+    setConnectionError("");
+    setConnectionInfo("");
+    setBrowserLogin(null);
+    setPolling(false);
+    setAuth(null);
+    setProject("");
+    setRepoRoot(null);
+    setToken("");
+    await client.cancelQueries();
+    client.clear();
+    try {
+      const progress = await startBrowserLogin(endpoint.trim());
+      if (version !== generation.current) return;
+      if (progress.status === "approved" && progress.auth) {
+        await acceptConnection(
+          progress.auth,
+          endpoint,
+          connectionName,
+          version,
+        );
+        setConnectBusy(false);
+      } else {
+        setBrowserLogin(progress);
+        setPolling(true);
+        try {
+          await openBrowserLogin(progress.request_id);
+        } catch (e) {
+          if (version === generation.current) setConnectionError(errorText(e));
+        }
+      }
+    } catch (e) {
+      if (version === generation.current) {
+        setConnectionError(errorText(e));
+        setConnectBusy(false);
+      }
+    }
+  }
+  async function signOutBrowser(forget = false) {
+    const version = ++generation.current;
+    setPolling(false);
+    setBrowserLogin(null);
+    setConnectBusy(true);
+    setAuth(null);
+    setProject("");
+    setRepoRoot(null);
+    setConnectionError("");
+    setConnectionInfo("");
+    await client.cancelQueries();
+    client.clear();
+    try {
+      if (forget) {
+        await forgetBrowserLogin(endpoint.trim());
+        setForgetConfirmed(false);
+        setConnectionInfo(
+          "Saved sign-in removed from this device. Remote revocation was not confirmed.",
+        );
+      } else {
+        await cancelBrowserLogin(endpoint.trim());
+        setConnectionInfo("Browser access signed out on this device.");
+      }
+    } catch (e) {
+      if (version === generation.current) setConnectionError(errorText(e));
+    } finally {
+      if (version === generation.current) setConnectBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (!browserLogin || !polling) return;
+    const version = generation.current;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const progress = await pollBrowserLogin(browserLogin.request_id);
+        if (stopped || version !== generation.current) return;
+        if (progress.status === "approved" && progress.auth) {
+          setPolling(false);
+          setBrowserLogin(null);
+          await acceptConnection(
+            progress.auth,
+            endpoint,
+            connectionName,
+            version,
+          );
+          if (version === generation.current) setConnectBusy(false);
+        } else {
+          timer = setTimeout(poll, 3000);
+        }
+      } catch (e) {
+        if (!stopped && version === generation.current) {
+          setConnectionError(errorText(e));
+          setPolling(false);
+        }
+      }
+    };
+    timer = setTimeout(poll, 3000);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [browserLogin, polling]);
   async function connectToService(
     address: string,
     credential: string | null,
@@ -176,8 +328,11 @@ export function App() {
     restore = false,
   ) {
     const version = ++generation.current;
+    setBrowserLogin(null);
+    setPolling(false);
     setConnectBusy(true);
     setConnectionError("");
+    setConnectionInfo("");
     setAuth(null);
     setProject("");
     setRepoRoot(null);
@@ -190,33 +345,7 @@ export function App() {
         credential?.trim() || null,
       );
       if (version !== generation.current) return;
-      const normalized = address.trim().replace(/\/$/, "");
-      savePrefs({
-        ...prefs,
-        endpoint: normalized,
-        connectionName: label.trim() || "Codifix service",
-      });
-      setEndpoint(normalized);
-      setAuth(identity);
-      setScope(`${normalized}:${version}`);
-      if (identity.mode === "multi_user" && !identity.authenticated) {
-        setConnectionError(
-          "This service requires authentication. Supply a service token to connect this desktop session.",
-        );
-        setModal("connection");
-        return;
-      }
-      setModal(null);
-      const last = restore
-        ? readRecents().find((r) => r.endpoint === normalized)
-        : null;
-      if (last) {
-        try {
-          await setActiveProject(last.project, last.path, normalized, version);
-        } catch (e) {
-          if (version === generation.current) setProjectError(errorText(e));
-        }
-      }
+      await acceptConnection(identity, address, label, version, restore);
     } catch (e) {
       if (version === generation.current) {
         setConnectionError(errorText(e));
@@ -539,72 +668,169 @@ export function App() {
               type="url"
               required
               value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
+              onChange={(e) => {
+                setEndpoint(e.target.value);
+                setForgetConfirmed(false);
+              }}
               disabled={connectBusy}
             />
           </label>
-          <label>
-            Service token <span className="caption">(if required)</span>
-            <input
-              type="password"
-              autoComplete="off"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              disabled={connectBusy}
-            />
-          </label>
-          <p className="caption">
-            Tokens stay in memory for this session and are never saved to disk.
-            Local single-user services use a native session. Remote services
-            require HTTPS.
-          </p>
           {connectionError && (
             <p className="notice danger" role="alert">
               {connectionError}
             </p>
           )}
-          <div className="actions">
-            <Button className="primary" disabled={connectBusy} type="submit">
-              {connectBusy ? "Connecting…" : "Connect"}
-            </Button>
-            {auth && (
+          {connectionInfo && (
+            <p className="notice" role="status">
+              {connectionInfo}
+            </p>
+          )}
+          {browserLogin ? (
+            <section className="card" aria-label="Browser sign-in">
+              <h3>
+                {polling ? "Waiting for browser approval…" : "Sign-in paused"}
+              </h3>
+              <p>
+                Sign in and approve <strong>Codifix Desktop</strong> in your
+                browser. Match this code and fingerprint, then select the
+                projects you want to access.
+              </p>
+              <p>
+                User code: <strong>{browserLogin.user_code}</strong>
+              </p>
+              <p className="caption break">
+                Credential SHA-256: {browserLogin.credential_sha256}
+              </p>
+              <p className="caption break">Device: {browserLogin.device_id}</p>
+              <p className="caption">Expires {time(browserLogin.expires_at)}</p>
+              <p className="caption break">
+                Approval address: {browserLogin.verification_uri}
+              </p>
+              <div className="actions">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void openBrowserLogin(browserLogin.request_id).catch((e) =>
+                      setConnectionError(errorText(e)),
+                    )
+                  }
+                >
+                  Open browser again
+                </Button>
+                {!polling && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setConnectionError("");
+                      setConnectionInfo("");
+                      setPolling(true);
+                    }}
+                  >
+                    Check approval again
+                  </Button>
+                )}
+                <Button type="button" onClick={() => void signOutBrowser()}>
+                  Cancel sign-in
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <>
               <Button
+                className="primary"
                 type="button"
                 disabled={connectBusy}
-                onClick={() =>
-                  void (async () => {
-                    generation.current++;
-                    await disconnect();
-                    await client.cancelQueries();
-                    client.clear();
-                    setAuth(null);
-                    setProject("");
-                    setConnectionError("");
-                    setModal(null);
-                  })().catch((e) => setConnectionError(errorText(e)))
-                }
+                onClick={() => void beginBrowserLogin()}
               >
-                Disconnect
+                {connectBusy ? "Connecting…" : "Sign in through browser"}
               </Button>
-            )}
-            {(auth?.mode === "multi_user" || !!connectionError) && (
-              <Button
-                type="button"
-                onClick={() =>
-                  void openService("login", endpoint).catch((e) =>
-                    setConnectionError(errorText(e)),
-                  )
-                }
-              >
-                Sign in through browser
-              </Button>
-            )}
-          </div>
-          {(auth?.mode === "multi_user" || !!connectionError) && (
-            <p className="caption">
-              Browser sign-in manages your browser session only. Enter a service
-              token above to authenticate this desktop session.
-            </p>
+              <p className="caption">
+                Use your service’s public HTTPS address. Browser sign-in
+                connects this desktop and saves its credential in your operating
+                system keyring. Your password stays in the browser.
+              </p>
+              <details>
+                <summary>Local service or service token</summary>
+                <label>
+                  Service token <span className="caption">(if required)</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    disabled={connectBusy}
+                  />
+                </label>
+                <p className="caption">
+                  Pasted tokens stay in memory for this session. Local
+                  single-user services use a native session.
+                </p>
+                <Button type="submit" disabled={connectBusy}>
+                  Connect locally or with token
+                </Button>
+              </details>
+              <div className="actions">
+                {auth && (
+                  <Button
+                    type="button"
+                    disabled={connectBusy}
+                    onClick={() =>
+                      void (async () => {
+                        generation.current++;
+                        await disconnect();
+                        await client.cancelQueries();
+                        client.clear();
+                        setAuth(null);
+                        setProject("");
+                        setConnectionError("");
+                        setConnectionInfo("");
+                        setModal(null);
+                      })().catch((e) => setConnectionError(errorText(e)))
+                    }
+                  >
+                    Disconnect
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  disabled={connectBusy}
+                  onClick={() => void signOutBrowser()}
+                >
+                  Sign out browser access
+                </Button>
+              </div>
+              {connectionError && (
+                <details>
+                  <summary>Recover an unavailable sign-in</summary>
+                  <p className="caption">
+                    If the service cannot confirm cancellation, you can remove
+                    the saved sign-in here. This does not revoke server access.
+                    Resolve any outstanding device approval in your browser or
+                    with your administrator.
+                  </p>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={forgetConfirmed}
+                      onChange={(e) => setForgetConfirmed(e.target.checked)}
+                    />
+                    I understand that remote access may remain active.
+                  </label>
+                  <Button
+                    type="button"
+                    disabled={connectBusy || !forgetConfirmed}
+                    onClick={() => void signOutBrowser(true)}
+                  >
+                    Forget saved sign-in locally
+                  </Button>
+                </details>
+              )}
+              <p className="caption">
+                Sign out revokes this desktop’s browser-approved access and
+                removes its saved credential. Disconnect keeps it available for
+                next time.
+              </p>
+            </>
           )}
         </form>
       </Modal>

@@ -1,6 +1,6 @@
 [package]
 name = "codifix-desktop"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Olivier Van Acker"]
@@ -20,3 +20,10 @@ url = "2"
 tokio = { version = "1", features = ["sync"] }
 toml = "0.8"
 open = "5"
+
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust", "apple-native", "windows-native"] }
+tauri-plugin-single-instance = "2"
+codifix-record = { path = "../../crates/codifix-record" }

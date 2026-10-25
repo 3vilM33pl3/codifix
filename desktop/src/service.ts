@@ -78,3 +78,25 @@ export function canWrite(
     (permission === "memory_curate" && access?.role === "writer")
   );
 }
+
+export type BrowserLoginProgress = {
+  status: "pending" | "approved";
+  request_id: string;
+  device_id: string;
+  credential_sha256: string;
+  user_code: string;
+  verification_uri: string;
+  expires_at: string;
+  auth: AuthMeResponse | null;
+};
+export const startBrowserLogin = (endpoint: string) =>
+  invoke<BrowserLoginProgress>("start_browser_login", { endpoint });
+export const pollBrowserLogin = (requestId: string) =>
+  invoke<BrowserLoginProgress>("poll_browser_login", { requestId });
+export const openBrowserLogin = (requestId: string) =>
+  invoke<void>("open_browser_login", { requestId });
+export const cancelBrowserLogin = (endpoint: string) =>
+  invoke<void>("cancel_browser_login", { endpoint });
+
+export const forgetBrowserLogin = (endpoint: string) =>
+  invoke<void>("forget_browser_login", { endpoint, confirmed: true });

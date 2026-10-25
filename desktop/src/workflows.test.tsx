@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -29,6 +30,11 @@ vi.mock("./service", async (importOriginal) => ({
   request: vi.fn(),
   chooseProject: vi.fn(),
   openService: vi.fn(),
+  startBrowserLogin: vi.fn(),
+  pollBrowserLogin: vi.fn(),
+  openBrowserLogin: vi.fn(),
+  cancelBrowserLogin: vi.fn(),
+  forgetBrowserLogin: vi.fn(),
 }));
 const api = vi.mocked(service.request);
 function mount(node: ReactNode) {
@@ -48,6 +54,16 @@ beforeEach(() => {
   vi.mocked(service.connect).mockResolvedValue(auth);
   vi.mocked(service.openService).mockResolvedValue(undefined);
 });
+const browserProgress: service.BrowserLoginProgress = {
+  status: "pending",
+  request_id: "11111111-1111-4111-8111-111111111111",
+  device_id: "22222222-2222-4222-8222-222222222222",
+  credential_sha256: "a".repeat(64),
+  user_code: "ABCD-1234",
+  verification_uri: "https://company.example/?device_code=ABCD-1234",
+  expires_at: "2099-01-01T00:00:00Z",
+  auth: null,
+};
 describe("desktop workflows", () => {
   it("restores the exact endpoint/project and keeps credentials out of storage", async () => {
     localStorage.setItem(
@@ -77,15 +93,125 @@ describe("desktop workflows", () => {
     vi.mocked(service.connect).mockRejectedValue("Service returned HTTP 401");
     mount(<App />);
     expect(await screen.findByRole("alert")).toHaveTextContent("401");
+    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+    expect(screen.getByRole("button", { name: "Not connected" })).toBeVisible();
+  });
+  it("completes browser approval and keeps only public connection preferences", async () => {
+    vi.mocked(service.connect).mockRejectedValue("Service returned HTTP 401");
+    vi.mocked(service.startBrowserLogin).mockResolvedValue(browserProgress);
+    vi.mocked(service.openBrowserLogin).mockResolvedValue(undefined);
+    vi.mocked(service.pollBrowserLogin).mockResolvedValue({
+      ...browserProgress,
+      status: "approved",
+      auth,
+    });
+    mount(<App />);
+    await screen.findByRole("alert");
+    fireEvent.change(screen.getByRole("textbox", { name: "Service URL" }), {
+      target: { value: "https://company.example" },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Sign in through browser" }),
     );
-    expect(service.openService).toHaveBeenCalledWith(
-      "login",
-      "http://127.0.0.1:4250",
+    expect(await screen.findByText("ABCD-1234")).toBeVisible();
+    expect(service.startBrowserLogin).toHaveBeenCalledWith(
+      "https://company.example",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
-    expect(screen.getByRole("button", { name: "Not connected" })).toBeVisible();
+    expect(service.openBrowserLogin).toHaveBeenCalledWith(
+      browserProgress.request_id,
+    );
+    expect(screen.getByRole("textbox", { name: "Service URL" })).toBeDisabled();
+    await waitFor(
+      () => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      { timeout: 4500 },
+    );
+    expect(screen.getByRole("button", { name: "Connected" })).toBeVisible();
+    const saved = localStorage.getItem("codifix.desktop.preferences");
+    expect(saved).toContain("https://company.example");
+    expect(saved).not.toMatch(/credential|token|fingerprint|request_id/);
+  });
+  it("discards late approval after the user cancels sign-in", async () => {
+    vi.mocked(service.connect).mockRejectedValue("401");
+    vi.mocked(service.startBrowserLogin).mockResolvedValue(browserProgress);
+    vi.mocked(service.openBrowserLogin).mockResolvedValue(undefined);
+    vi.mocked(service.cancelBrowserLogin).mockResolvedValue(undefined);
+    let resolve!: (p: service.BrowserLoginProgress) => void;
+    vi.mocked(service.pollBrowserLogin).mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    mount(<App />);
+    await screen.findByRole("alert");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sign in through browser" }),
+    );
+    await screen.findByText("ABCD-1234");
+    await waitFor(() => expect(service.pollBrowserLogin).toHaveBeenCalled(), {
+      timeout: 4500,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel sign-in" }));
+    await waitFor(() => expect(service.cancelBrowserLogin).toHaveBeenCalled());
+    await act(async () =>
+      resolve({ ...browserProgress, status: "approved", auth }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Connected" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Sign in through browser" }),
+    ).toBeEnabled();
+  });
+  it("offers explicitly confirmed local recovery after an unconfirmed cancellation", async () => {
+    vi.mocked(service.connect).mockRejectedValue("401");
+    vi.mocked(service.cancelBrowserLogin).mockRejectedValue(
+      "Sign-out is unconfirmed",
+    );
+    vi.mocked(service.forgetBrowserLogin).mockResolvedValue(undefined);
+    mount(<App />);
+    await screen.findByRole("alert");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sign out browser access" }),
+    );
+    await screen.findByText("Sign-out is unconfirmed");
+    fireEvent.click(screen.getByText("Recover an unavailable sign-in"));
+    const forget = screen.getByRole("button", {
+      name: "Forget saved sign-in locally",
+    });
+    expect(forget).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "I understand that remote access may remain active.",
+      }),
+    );
+    fireEvent.click(forget);
+    await waitFor(() =>
+      expect(service.forgetBrowserLogin).toHaveBeenCalledWith(
+        "http://127.0.0.1:4250",
+      ),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Remote revocation was not confirmed",
+    );
+  });
+  it("reuses saved browser access without opening another approval", async () => {
+    vi.mocked(service.connect).mockRejectedValue("401");
+    vi.mocked(service.startBrowserLogin).mockResolvedValue({
+      ...browserProgress,
+      status: "approved",
+      auth,
+    });
+    mount(<App />);
+    await screen.findByRole("alert");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sign in through browser" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(service.openBrowserLogin).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Connected" })).toBeVisible();
   });
   it("command palette opens from Ctrl K and handles keyboard selection", async () => {
     mount(<App />);
