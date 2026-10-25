@@ -59,6 +59,13 @@ connection automatically. A configured device-onboarding service and an unlocked
 desktop keyring are required. Use the advanced local/token option for a local
 single-user service; browser access does not authenticate the separate dev service.
 
+In the browser, choose **Sign in to review this device** before **Review device
+request**. The review button is unavailable until the browser identity is checked.
+An authenticated account without project grants can review the device but will see
+no available projects; an administrator must review its existing membership and
+project onboarding policy. A denied identity check is a service error, not proof
+that you are signed out. Expired device requests must be restarted in the desktop.
+
 **Sign out browser access** revokes this desktop credential and removes it from
 the keyring. **Disconnect** keeps it for the next connection. If cancellation
 cannot be confirmed, retry it. The explicitly confirmed local-forget recovery

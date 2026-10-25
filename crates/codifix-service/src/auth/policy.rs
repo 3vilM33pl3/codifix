@@ -23,6 +23,9 @@ const MAX_AUTH_INSPECTION_BODY: usize = 64 * 1024 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectScope {
     Public,
+    /// Inspect or end the caller's own resolved identity, independent of grants.
+    /// Preserves anonymous single-user introspection; credential resolution still runs.
+    CurrentIdentity,
     /// Valid credential only; the route narrows identity kind (e.g. device logout).
     Authenticated,
     /// Human OIDC browser session, with ordinary mutation Origin/CSRF checks.
@@ -904,7 +907,7 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::GET,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
-                    scope: ProjectScope::Unscoped,
+                    scope: ProjectScope::CurrentIdentity,
                     semantic_read: false,
                 },
             )],
@@ -915,7 +918,7 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::POST,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
-                    scope: ProjectScope::Unscoped,
+                    scope: ProjectScope::CurrentIdentity,
                     semantic_read: false,
                 },
             )],
@@ -2268,6 +2271,7 @@ fn is_authorized(
 ) -> bool {
     match policy.scope {
         ProjectScope::Public => true,
+        ProjectScope::CurrentIdentity => true,
         ProjectScope::Authenticated => {
             principal.credential_source != CredentialSource::AnonymousSingleUser
         }
@@ -2390,6 +2394,7 @@ async fn resolve_request_project(
 ) -> Result<Option<String>, ApiError> {
     match scope {
         ProjectScope::Public
+        | ProjectScope::CurrentIdentity
         | ProjectScope::Authenticated
         | ProjectScope::HumanSession
         | ProjectScope::Unscoped

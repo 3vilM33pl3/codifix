@@ -1531,6 +1531,7 @@ paths:
     get:
       operationId: get_v1_auth_me
       summary: "Return the authenticated principal and effective project access."
+      description: "Identity inspection requires no project grant. Multi-user requests still require a valid credential; single-user installations retain local anonymous identity inspection before bootstrap."
       tags: ["Authentication"]
       x-stability: core
       responses:
@@ -1544,6 +1545,7 @@ paths:
     post:
       operationId: post_v1_auth_logout
       summary: "Revoke the current browser session and expire its cookies."
+      description: "A valid session may sign out even after its project grants are removed. Browser Origin and CSRF checks still apply."
       tags: ["Authentication"]
       x-stability: core
       responses:

@@ -39,6 +39,14 @@ and inserts an authenticated principal extension for handlers. Mutating
 handlers receive the legacy internal API token only after authorization so old
 repository guards remain an internal defense rather than the authority.
 
+`/v1/auth/me` and `/v1/auth/logout` use the caller's resolved identity without
+requiring memory or project permissions. An authenticated human with no grants
+can inspect their identity and sign out. Invalid, expired, revoked or disabled
+credentials still fail resolution, and browser logout retains Origin/CSRF checks.
+Anonymous single-user identity inspection remains available before local bootstrap.
+Device review separately requires a human browser session and offers only projects
+allowed by current permissions; identifying a user does not grant access.
+
 In multi-user mode, capture writer identity, workspace writer identity, loop
 setting attribution, and proposal reviewers are stamped from the server-side
 principal. Client-supplied attribution cannot override them.
