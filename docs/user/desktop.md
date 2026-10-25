@@ -70,3 +70,10 @@ credential was written, read and removed from this host's Linux Secret Service.
 Live browser authentication and protected project access still require the user's
 identity-provider sign-in and project approval; automated checks do not claim
 that approval occurred.
+
+The 0.1.1 DEB was installed per-user on the current host and launched with no
+startup log errors. A second launch exited successfully while the original
+process remained running and owned the single-instance D-Bus name. Package and
+installed executable checksums match the preserved release artifacts; the 0.1.0
+installation is retained for rollback. This checks installation and process
+lifecycle, not completion of the user's browser approval.
