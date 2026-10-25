@@ -95,6 +95,22 @@ pub struct AuthMeResponse {
     pub principal: AuthPrincipalResponse,
 }
 
+/// One-time native login code exchanged by the PKCE client, never a browser.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthDesktopExchangeRequest {
+    pub code: String,
+    pub code_verifier: String,
+    pub redirect_uri: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthDesktopExchangeResponse {
+    pub token: String,
+    pub principal_id: Uuid,
+    pub expires_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthServiceTokenCreateRequest {
     pub name: String,

@@ -880,6 +880,39 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/auth/desktop/login",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/auth/desktop/exchange",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/auth/desktop/logout",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
             "/v1/auth/login",
             &[(
                 Method::GET,
@@ -2176,6 +2209,14 @@ pub(crate) async fn authorization_guard(
         && request.uri().path() == "/v1/onboarding/device/logout"
     {
         super::device::logout_proof(&state, request.headers()).await
+    } else {
+        resolved
+    };
+    let resolved = if resolved.is_err()
+        && request.method() == Method::POST
+        && request.uri().path() == "/v1/auth/desktop/logout"
+    {
+        super::desktop_logout_proof(&state, request.headers()).await
     } else {
         resolved
     };
