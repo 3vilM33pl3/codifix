@@ -127,24 +127,35 @@ describe("desktop workflows", () => {
     expect(saved).not.toMatch(/credential|token|fingerprint|request_id/);
   });
   it("shows a quiet sign-in screen for an expired session", async () => {
-    vi.mocked(service.connect).mockRejectedValue("Service returned HTTP 401. Refresh before retrying a write.");
+    vi.mocked(service.connect).mockRejectedValue(
+      "Service returned HTTP 401. Refresh before retrying a write.",
+    );
     mount(<App />);
     await screen.findByRole("dialog");
-    expect(screen.getByRole("button", {name: "Sign in"})).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.queryByText(/fingerprint|User code|Review device request/)).not.toBeInTheDocument();
-    expect(screen.getByText("Connection settings").parentElement).not.toHaveAttribute("open");
+    expect(
+      screen.queryByText(/fingerprint|User code|Review device request/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Connection settings").parentElement,
+    ).not.toHaveAttribute("open");
   });
   it("allows a new attempt after browser cancellation", async () => {
     vi.mocked(service.connect).mockRejectedValue("401");
     vi.mocked(service.startBrowserLogin).mockResolvedValue(browserProgress);
     vi.mocked(service.openBrowserLogin).mockResolvedValue(undefined);
-    vi.mocked(service.pollBrowserLogin).mockRejectedValue("Sign-in was cancelled in your browser. Try again.");
-    mount(<App />); await screen.findByRole("alert");
-    fireEvent.click(screen.getByRole("button", {name:"Sign in"}));
+    vi.mocked(service.pollBrowserLogin).mockRejectedValue(
+      "Sign-in was cancelled in your browser. Try again.",
+    );
+    mount(<App />);
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await screen.findByText("Sign-in interrupted");
-    fireEvent.click(screen.getByRole("button", {name:"Try again"}));
-    await waitFor(() => expect(service.startBrowserLogin).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() =>
+      expect(service.startBrowserLogin).toHaveBeenCalledTimes(2),
+    );
   });
   it("discards late approval after the user cancels sign-in", async () => {
     vi.mocked(service.connect).mockRejectedValue("401");

@@ -18,19 +18,18 @@ The desktop crate has its own Cargo workspace/lockfile. It does not add GTK requ
 
 ## Connect
 
-1. Enter the public **HTTPS origin** of your Codifix service and a connection name. Click **Sign in through browser**.
-2. Sign in to Codifix in your default browser. Compare the user code and credential fingerprint with the desktop, select the projects and reader/writer roles you want, and approve **Codifix Desktop**. The app connects automatically after validating the approval and the resulting identity.
-3. Choose an existing project slug, or open its local folder. The folder chooser reads `.codifix/project.toml`; it does not initialise projects or infer names from folder names.
+1. Click **Sign in**, log in through your default browser, and return to the app automatically. There is no device code or project approval step.
+2. Choose an existing project slug or its local folder if no recent project is available. Sign-in uses your human account's existing permissions; it does not grant access to new projects.
 
-Browser sign-in uses the service's existing device enrollment API. It requires a writable primary multi-user service with a configured HTTPS browser origin, explicit area identity and reviewed project manifests. Use its public origin, not an internal proxy address or the development endpoint. Device access is bounded by the human's current permissions and approved reader/writer roles; administrative operations still belong in the browser.
+**Connection settings** contains the service's public HTTPS origin and advanced local/token connection. Distribution builds can preset a service using `VITE_CODIFIX_SERVICE_URL` and `VITE_CODIFIX_SERVICE_NAME` at build time. Saved user preferences take precedence. Without a preset, development defaults to `http://127.0.0.1:4250`; use the advanced local connection for a single-user service.
 
-Credentials and polling proofs are generated in Rust and saved **before** sending the request to the OS credential store: Linux Secret Service (e.g. GNOME Keyring), macOS Keychain or Windows Credential Manager. Only Linux has been exercised. Unlock the desktop keyring if prompted; there is no plaintext fallback. No password or browser cookie transfers to the renderer. Reopening the app restores the saved credential for the exact origin and verifies it with the service. Pending requests can be resumed without generating another credential.
+The service needs schema 86 and the native human login endpoints, with its existing OIDC provider configured. No additional identity-provider client or callback registration is required. Browser login uses a fresh OIDC login and PKCE-protected, one-time code exchange through an ephemeral IPv4 loopback listener. The listener is bound before opening the browser and closes on cancellation or after ten minutes. The app verifies the returned human identity before saving its session in the OS keyring and focusing its window.
 
-**Cancel sign-in** cancels the saved request, or revokes the device if approval already happened. **Sign out browser access** revokes access before deleting the keyring record. An uncertain response retains the record for retry. If an unreachable service never created the request, the recovery section offers explicitly confirmed **Forget saved sign-in locally**; this does not claim remote revocation. **Disconnect** clears the current session but keeps browser access saved for next time. Closing the window also retains saved browser access. A second launch focuses the existing app, preventing competing enrollment processes.
+Passwords, PKCE verifiers, callback codes, and native credentials never enter the renderer or localStorage. Only Linux has been exercised. The keyring must be available and unlocked; there is no plaintext fallback. Restart restores the origin-bound saved session and validates it with the service. Expired or revoked sessions return to sign-in.
 
-For local writable single-user services, expand **Local service or service token** and use **Connect locally or with token**; this establishes the existing loopback owner session. Explicitly pasted tokens stay only in native process memory and must be re-entered after restart. The local development endpoint defaults to `http://127.0.0.1:4250`; it is not a substitute for your area's public browser sign-in origin.
+**Cancel sign-in** stops a pending login. **Sign out** revokes this app's session before removing it; **Disconnect** retains it for next time. If revocation cannot be confirmed, retry sign-out. If both revocation and keyring persistence fail, keep the app open so its in-memory cleanup credential remains available. Explicitly confirmed local-forget recovery removes local state without claiming remote revocation. Older managed-device credentials stay separate and can be revoked under **Connection settings → Older device sign-ins**.
 
-Preferences contain appearance/notification settings and the last successfully connected endpoint/name. Recent projects contain endpoint, slug and an optional folder path. Credentials never enter localStorage. Project and connection switches clear cached query data. No service auth or CORS configuration changes are required. HTTPS uses the operating system certificate trust store (including already installed private company CAs); certificate and hostname validation remain mandatory. TLS, network and timeout failures are reported separately from service HTTP responses.
+Pasted service tokens stay in native process memory only. Preferences store appearance, notifications and endpoint/name; recent projects store endpoint, slug and optional folder path. Connection changes clear cached query data. HTTPS uses the OS trust store, including already installed company CAs, with certificate and hostname validation enabled. A second app launch focuses the existing window.
 
 ## Workflows
 
@@ -55,7 +54,7 @@ Connection errors are distinct from empty results. Previously loaded data is lab
 | TanStack Query | Scoped loading, caching, refresh and stale/error states. No persistent knowledge cache or second memory database. |
 | Lucide | Small SVG interface icons with labels; decorative icons do not replace text. |
 | [keyring](https://docs.rs/keyring/3.6.3/keyring/) | Uses the OS credential store rather than inventing password storage. Linux needs an available, unlocked Secret Service; failures are explicit. |
-| [Tauri single-instance](https://v2.tauri.app/plugin/single-instance/) | Prevents concurrent app processes from racing over saved enrollment. A second launch focuses the existing window. |
+| [Tauri single-instance](https://v2.tauri.app/plugin/single-instance/) | Prevents concurrent app processes from racing over saved sessions. A second launch focuses the existing window. |
 | Tauri dialog / notification / window-state | Native folder selection, optional desktop feedback and window restoration. Renderer capabilities stay narrow. |
 
 Electron would standardise the rendering engine but ship a bundled Chromium runtime. GTK/libadwaita would give Linux-native widgets but require substantially separate UI implementations on other OSes. The selected approach shares the interface and service bridge, with OS-specific packaging and integration tests.
@@ -73,7 +72,7 @@ npm run desktop:build
 
 `npm run dev` also serves `/review.html`, an explicitly illustrative fixture for comparing the design without accessing real project data. Its IPC mock and sample records are **not included** in the packaged `index.html` entry. Fixture actions that require native integrations report that they are unavailable.
 
-Validation: twelve renderer workflow tests, seven native boundary/protocol tests, a separately run disposable host-keyring roundtrip, TypeScript/production frontend build and Linux DEB build. Browser tests cover approval handoff, late approval after cancellation, saved access reuse and explicitly confirmed local recovery. Native tests check origin/request binding, typed approval grants, identity mismatch, credential isolation and cancel/approval reconciliation. See `docs/user/desktop.md` for acceptance limitations.
+Validation for 0.1.3: fourteen renderer workflow tests and ten native tests cover browser handoff, automatic connection, cancellation, retry, saved-session reuse, PKCE, callback host/state/path validation, provider denial, listener cleanup and recovery state. Service tests exercise real PostgreSQL session issuance, replay, expiry, permissions, cookie separation and transactional audit failures. These checks do not substitute for a user's real identity-provider login. See `docs/user/desktop.md` for installed-build evidence and acceptance limits.
 
 ## Figma Code Connect
 
@@ -82,4 +81,4 @@ Validation: twelve renderer workflow tests, seven native boundary/protocol tests
 The Linux TLS regression uses the production Rust client against a local HTTPS
 fixture in separate processes. A temporary CA bundle must succeed, an unrelated
 CA must fail, and a mismatched hostname must fail. It does not modify system trust
-or contact production services. The additional host-keyring test remains opt-in.
+or contact production services.

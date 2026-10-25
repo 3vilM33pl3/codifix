@@ -608,6 +608,25 @@ pub(crate) async fn revoke_legacy_browser_login(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    #[ignore = "uses a disposable entry in the current desktop keyring"]
+    async fn host_native_keyring_roundtrip() {
+        let origin = format!("https://test-{}.invalid", Uuid::new_v4());
+        let saved = Enrollment {
+            origin: origin.clone(),
+            credential: format!("mld_{}", random_secret()),
+            principal_id: Uuid::new_v4(),
+            expires_at: Utc::now() + chrono::Duration::minutes(1),
+            pending_logout: false,
+        };
+        assert!(store(&origin, Store::Read).await.unwrap().is_none());
+        store(&origin, Store::Write(saved.clone())).await.unwrap();
+        let read = store(&origin, Store::Read).await.unwrap().unwrap();
+        store(&origin, Store::Delete).await.unwrap();
+        assert_eq!(read.credential, saved.credential);
+        assert_eq!(read.principal_id, saved.principal_id);
+        assert!(store(&origin, Store::Read).await.unwrap().is_none());
+    }
     #[test]
     fn pkce_uses_s256_and_never_exports_verifier() {
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";

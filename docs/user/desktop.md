@@ -11,9 +11,21 @@ have a Codifix marker or an existing service slug.
 
 Review and job retry controls use the service's current permissions. Approvals
 and rejections refresh the queue only after a matching receipt. An interrupted
-response is reported as uncertain. Browser sign-in connects the desktop through a device approval. Its credential
+response is reported as uncertain. Browser sign-in returns you automatically to the app with your existing account permissions. Its session
 is saved in your OS keyring and checked again when the app reopens; passwords
 stay in your browser. Pasted service tokens remain in memory only.
+
+## Sign in (0.1.3)
+
+Click **Sign in**, log in in your default browser, and return to Codifix automatically.
+There are no device codes, fingerprint comparisons or project approval screens.
+Your account keeps its existing permissions. If needed, choose a project after
+signing in; this is navigation, not an access grant.
+
+The installed Workshop build has its HTTPS service preset. Other services and
+local/token access are under **Connection settings**. Sign out revokes the saved
+app session; Disconnect keeps it for next time. Old managed-device credentials
+remain separate, with an explicit removal option in Connection settings.
 
 ## Current acceptance limits
 
@@ -50,7 +62,7 @@ use your area’s public HTTPS address and **Sign in through browser** in the
 connection dialog to exercise them.
 No production memory was approved, rejected or retried during testing.
 
-## Browser sign-in (0.1.1)
+## Previous device enrollment (0.1.1–0.1.2, superseded)
 
 In **Manage connection**, enter your public Codifix HTTPS service origin and
 choose **Sign in through browser**. Compare the code and fingerprint, select
@@ -125,3 +137,33 @@ user code and waited for browser approval without a connection error. The test
 driver and its listening ports were stopped while the desktop remained open.
 Human sign-in and selection of project grants remain the user's steps; they
 were not completed automatically or claimed as tested.
+
+## Simplified human login verification (0.1.3, 25 October 2026)
+
+The normal desktop flow now uses the human OIDC account with PKCE and an
+origin-bound native session. Device onboarding remains available separately for
+managed devices; normal desktop login no longer depends on its project manifests.
+
+Validation: 94 service authentication tests passed against a disposable database;
+14 renderer workflows and 10 native tests passed. Independent review checked
+native/browser credential separation, transactional exchange and audit, current
+permissions, callback validation, cancellation and failed-sign-out recovery.
+Clippy, the host native-keyring write/read/delete test, all three TLS regression
+cases and the frontend/DEB build passed. The installed native WebKit window shows
+one Sign in button with Workshop preset. The live browser reaches Authentik's
+username login directly, including when a stale Codifix browser cookie exists.
+Completion with the user's credentials is still pending; automated callback tests
+are not evidence that the real account has signed in.
+
+Workshop was upgraded to schema 86 with the existing application role granted
+CRUD only on the new auth_desktop_codes table. The service remains verify-only;
+configuration and human/project grants were unchanged. The old executable and a
+PostgreSQL custom-format backup are retained under
+`~/.local/state/codifix-simple-login-20261025/`. Health reports database up/status
+ok. Because the old executable verifies schema 85, rollback after any native
+logins requires a reviewed schema/data recovery, not just swapping binaries.
+
+The per-user 0.1.3 package, install receipt and native sign-in screenshot are in
+`~/Documents/ChatGPT/Codifix/linux-desktop-build/0.1.3/`; 0.1.2 remains available
+for desktop rollback. The build presets only public service URL/name through
+Vite environment variables; saved user connection preferences take precedence.
