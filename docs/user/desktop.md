@@ -196,3 +196,11 @@ Source tests cover routing precedence, identity mismatches without credential
 leakage, unavailable areas, equal project names across areas, pending folder login,
 cache invalidation and stale responses. This source-level validation does not by
 itself confirm an installed package or a real identity-provider login.
+
+Installed acceptance on 28 October 2026 confirmed Homelab browser login as the
+existing human account, area switching, and saved session/project restoration
+after restart. Desktop 0.1.4 returned the same 512 Homelab memory IDs as the TUI's
+service, including 499 active memories. The TUI's default list page and the
+desktop's active filter can still produce different visible row counts. See the
+[deployment and verification record](../reviews/desktop-homelab-routing-2026-10-28.md)
+for package receipts, recovery information and test scope.
