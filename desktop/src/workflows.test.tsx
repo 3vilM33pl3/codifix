@@ -25,6 +25,10 @@ import {
 } from "./testing/fixtures";
 vi.mock("./service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./service")>()),
+  listAreas: vi.fn(),
+  resolveArea: vi.fn(),
+  selectArea: vi.fn(),
+  selectCustomService: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
   request: vi.fn(),
@@ -51,6 +55,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
   api.mockImplementation(async (path) => fixture(path));
+  vi.mocked(service.listAreas).mockResolvedValue([]);
+  vi.mocked(service.resolveArea).mockResolvedValue(null);
+  vi.mocked(service.selectArea).mockResolvedValue(null);
+  vi.mocked(service.disconnect).mockResolvedValue(undefined);
   vi.mocked(service.connect).mockResolvedValue(auth);
   vi.mocked(service.openService).mockResolvedValue(undefined);
 });
@@ -399,5 +407,349 @@ describe("desktop workflows", () => {
     await waitFor(() => expect(ids).toHaveLength(3));
     expect(ids[0]).toBe(ids[1]);
     expect(ids[2]).not.toBe(ids[1]);
+  });
+});
+
+const workshopArea: service.AreaBinding = {
+  name: "workshop",
+  instance_id: "11111111-1111-4111-8111-111111111111",
+  endpoint: "https://workshop.example",
+};
+const homelabArea: service.AreaBinding = {
+  name: "homelab",
+  instance_id: "22222222-2222-4222-8222-222222222222",
+  endpoint: "https://homelab.example",
+};
+function configuredAreas() {
+  vi.mocked(service.listAreas).mockResolvedValue(
+    [workshopArea, homelabArea].map((binding) => ({
+      name: binding.name,
+      instance_id: binding.instance_id,
+      binding,
+      error: null,
+    })),
+  );
+  vi.mocked(service.selectArea).mockImplementation(async (name) =>
+    name === "homelab" ? homelabArea : workshopArea,
+  );
+  localStorage.setItem(
+    "codifix.desktop.preferences",
+    JSON.stringify({
+      endpoint: workshopArea.endpoint,
+      connectionName: "workshop",
+      area: workshopArea,
+    }),
+  );
+}
+describe("desktop area routing", () => {
+  it("keeps equal project slugs and cached data scoped to origin and area UUID", async () => {
+    configuredAreas();
+    localStorage.setItem(
+      "codifix.desktop.projects",
+      JSON.stringify([
+        {
+          project: "codifix",
+          endpoint: workshopArea.endpoint,
+          areaId: workshopArea.instance_id,
+          path: null,
+        },
+        {
+          project: "codifix",
+          endpoint: homelabArea.endpoint,
+          areaId: homelabArea.instance_id,
+          path: null,
+        },
+      ]),
+    );
+    const client = mount(<App />);
+    await screen.findByRole("heading", { name: "Pick up where you left off" });
+    client.setQueryData(["workshop-private"], { private: true });
+    fireEvent.change(screen.getByRole("combobox", { name: "Area" }), {
+      target: { value: "homelab" },
+    });
+    await waitFor(() =>
+      expect(service.connect).toHaveBeenLastCalledWith(
+        homelabArea.endpoint,
+        null,
+      ),
+    );
+    expect(client.getQueryData(["workshop-private"])).toBeUndefined();
+    expect(
+      screen.queryByRole("heading", { name: "Pick up where you left off" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Choose a project" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /codifix/,
+      }),
+    );
+    await screen.findByRole("heading", { name: "Pick up where you left off" });
+    const saved = JSON.parse(localStorage.getItem("codifix.desktop.projects")!);
+    expect(
+      saved.filter((r: { project: string }) => r.project === "codifix"),
+    ).toHaveLength(2);
+    expect(saved[0].areaId).toBe(homelabArea.instance_id);
+  });
+  it("resolves a folder before requests, switches origin, and restores it after browser login", async () => {
+    configuredAreas();
+    vi.mocked(service.chooseProject).mockResolvedValue({
+      path: "/repos/infra",
+      slug: "homelab",
+    });
+    vi.mocked(service.resolveArea).mockResolvedValue(homelabArea);
+    vi.mocked(service.connect).mockImplementation(async (endpoint) =>
+      endpoint === homelabArea.endpoint
+        ? { ...auth, mode: "multi_user", authenticated: false }
+        : auth,
+    );
+    vi.mocked(service.startBrowserLogin).mockResolvedValue({
+      ...browserProgress,
+      status: "approved",
+      auth,
+    });
+    api.mockImplementation(async (path) =>
+      path === "/v1/projects/homelab/overview"
+        ? { ...overview, project: "homelab" }
+        : fixture(path),
+    );
+    const client = mount(<App />);
+    await waitFor(() =>
+      expect(service.connect).toHaveBeenCalledWith(workshopArea.endpoint, null),
+    );
+    client.setQueryData(["workshop-private"], "cached");
+    fireEvent.click(screen.getByRole("button", { name: "Choose a project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open project folder" }),
+    );
+    await screen.findByRole("dialog", { name: "Sign in to Codifix" });
+    expect(service.resolveArea).toHaveBeenCalledWith(
+      null,
+      "/repos/infra",
+      "homelab",
+    );
+    expect(service.selectArea).toHaveBeenLastCalledWith(
+      "homelab",
+      "/repos/infra",
+      "homelab",
+    );
+    expect(api).not.toHaveBeenCalledWith("/v1/projects/homelab/overview");
+    expect(client.getQueryData(["workshop-private"])).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await screen.findByRole("heading", { name: "Pick up where you left off" });
+    expect(service.startBrowserLogin).toHaveBeenCalledWith(
+      homelabArea.endpoint,
+    );
+    expect(
+      JSON.parse(localStorage.getItem("codifix.desktop.projects")!)[0],
+    ).toMatchObject({
+      project: "homelab",
+      path: "/repos/infra",
+      endpoint: homelabArea.endpoint,
+      areaId: homelabArea.instance_id,
+    });
+  });
+  it("fails closed for an unavailable saved area without connecting to Workshop", async () => {
+    configuredAreas();
+    localStorage.setItem(
+      "codifix.desktop.preferences",
+      JSON.stringify({
+        endpoint: homelabArea.endpoint,
+        connectionName: "homelab",
+        area: homelabArea,
+      }),
+    );
+    vi.mocked(service.selectArea).mockRejectedValue(
+      "area homelab config is unavailable; no fallback was attempted",
+    );
+    mount(<App />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "homelab config is unavailable",
+    );
+    expect(service.connect).not.toHaveBeenCalled();
+  });
+  it("discards a previous area's delayed project response after switching", async () => {
+    configuredAreas();
+    localStorage.setItem(
+      "codifix.desktop.projects",
+      JSON.stringify([
+        {
+          project: "codifix",
+          endpoint: workshopArea.endpoint,
+          areaId: workshopArea.instance_id,
+          path: null,
+        },
+      ]),
+    );
+    let finish!: (value: typeof overview) => void;
+    api.mockImplementation((path) =>
+      path === "/v1/projects/codifix/overview"
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve(fixture(path)),
+    );
+    mount(<App />);
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Area" }), {
+      target: { value: "homelab" },
+    });
+    await waitFor(() =>
+      expect(service.connect).toHaveBeenLastCalledWith(
+        homelabArea.endpoint,
+        null,
+      ),
+    );
+    await act(async () => finish(overview));
+    expect(
+      screen.queryByRole("heading", { name: "Pick up where you left off" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Area" })).toHaveValue(
+      "homelab",
+    );
+  });
+});
+
+describe("desktop area upgrade recovery", () => {
+  it("migrates legacy recents by exact origin and never by project name", async () => {
+    configuredAreas();
+    localStorage.setItem(
+      "codifix.desktop.preferences",
+      JSON.stringify({
+        endpoint: homelabArea.endpoint,
+        connectionName: "Homelab",
+      }),
+    );
+    localStorage.setItem(
+      "codifix.desktop.projects",
+      JSON.stringify([
+        { project: "homelab", endpoint: workshopArea.endpoint, path: null },
+        { project: "homelab", endpoint: homelabArea.endpoint, path: null },
+      ]),
+    );
+    api.mockImplementation(async (path) =>
+      path === "/v1/projects/homelab/overview"
+        ? { ...overview, project: "homelab" }
+        : fixture(path),
+    );
+    mount(<App />);
+    await screen.findByRole("heading", { name: "Pick up where you left off" });
+    expect(service.connect).toHaveBeenCalledWith(homelabArea.endpoint, null);
+    const recents = JSON.parse(
+      localStorage.getItem("codifix.desktop.projects")!,
+    );
+    expect(
+      recents.find(
+        (r: { endpoint: string }) => r.endpoint === workshopArea.endpoint,
+      ).areaId,
+    ).toBe(workshopArea.instance_id);
+    expect(
+      recents.find(
+        (r: { endpoint: string }) => r.endpoint === homelabArea.endpoint,
+      ).areaId,
+    ).toBe(homelabArea.instance_id);
+    expect(service.resolveArea).not.toHaveBeenCalled();
+  });
+  it("clears the previous area when a folder's required area is unavailable", async () => {
+    configuredAreas();
+    vi.mocked(service.chooseProject).mockResolvedValue({
+      path: "/repos/infra",
+      slug: "homelab",
+    });
+    vi.mocked(service.resolveArea).mockRejectedValue(
+      "area homelab config is unavailable; no fallback was attempted",
+    );
+    const client = mount(<App />);
+    await waitFor(() =>
+      expect(service.connect).toHaveBeenCalledWith(workshopArea.endpoint, null),
+    );
+    client.setQueryData(["old-area"], "private");
+    fireEvent.click(screen.getByRole("button", { name: "Choose a project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open project folder" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "homelab config is unavailable",
+    );
+    expect(client.getQueryData(["old-area"])).toBeUndefined();
+    expect(api).not.toHaveBeenCalledWith("/v1/projects/homelab/overview");
+    expect(service.disconnect).toHaveBeenCalled();
+  });
+});
+
+describe("desktop stale folder actions", () => {
+  it("ignores an earlier folder route that finishes after a newer area selection", async () => {
+    configuredAreas();
+    vi.mocked(service.chooseProject).mockResolvedValue({
+      path: "/repos/infra",
+      slug: "homelab",
+    });
+    let finish!: (area: service.AreaBinding) => void;
+    vi.mocked(service.resolveArea).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    mount(<App />);
+    await waitFor(() =>
+      expect(service.connect).toHaveBeenCalledWith(workshopArea.endpoint, null),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Choose a project" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open project folder" }),
+    );
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Area", hidden: true }),
+      { target: { value: "custom" } },
+    );
+    await waitFor(() => expect(service.selectCustomService).toHaveBeenCalled());
+    await act(async () => finish(homelabArea));
+    expect(service.selectArea).not.toHaveBeenCalledWith(
+      "homelab",
+      "/repos/infra",
+      "homelab",
+    );
+    expect(service.connect).not.toHaveBeenCalledWith(
+      homelabArea.endpoint,
+      null,
+    );
+    expect(screen.getByRole("combobox", { name: "Area" })).toHaveValue(
+      "custom",
+    );
+  });
+  it("re-resolves a legacy saved folder before restoring its project from another area", async () => {
+    configuredAreas();
+    localStorage.setItem(
+      "codifix.desktop.projects",
+      JSON.stringify([
+        {
+          project: "homelab",
+          endpoint: workshopArea.endpoint,
+          path: "/repos/infra",
+        },
+      ]),
+    );
+    vi.mocked(service.resolveArea).mockResolvedValue(homelabArea);
+    api.mockImplementation(async (path) =>
+      path === "/v1/projects/homelab/overview"
+        ? { ...overview, project: "homelab" }
+        : fixture(path),
+    );
+    mount(<App />);
+    await screen.findByRole("heading", { name: "Pick up where you left off" });
+    expect(service.connect).toHaveBeenLastCalledWith(
+      homelabArea.endpoint,
+      null,
+    );
+    const overviewCall = api.mock.calls.findIndex(
+      ([path]) => path === "/v1/projects/homelab/overview",
+    );
+    expect(api.mock.invocationCallOrder[overviewCall]).toBeGreaterThan(
+      vi.mocked(service.connect).mock.invocationCallOrder[1],
+    );
+    expect(
+      JSON.parse(localStorage.getItem("codifix.desktop.projects")!)[0].areaId,
+    ).toBe(homelabArea.instance_id);
   });
 });

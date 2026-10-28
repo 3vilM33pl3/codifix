@@ -18,6 +18,7 @@ export type Preferences = {
   notifications: boolean;
   endpoint: string;
   connectionName: string;
+  area?: import("./service").AreaBinding | null;
 };
 const sections = [
   "Appearance",
@@ -281,7 +282,7 @@ export function Settings({
           )}
           {section === "About & diagnostics" && (
             <>
-              <h3>Codifix Desktop · 0.1.3</h3>
+              <h3>Codifix Desktop · 0.1.4</h3>
               <p className="muted">Shared Tauri 2 desktop · Linux first</p>
               <p>
                 React and TypeScript provide the shared interface. Rust handles

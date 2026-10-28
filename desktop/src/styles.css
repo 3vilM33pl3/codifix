@@ -911,3 +911,19 @@ dd {
     animation: none !important;
   }
 }
+
+.area-selector {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.area-selector select {
+  width: 100%;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+}

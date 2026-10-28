@@ -14,6 +14,12 @@ import { Review } from "./Review";
 import { Settings, type Preferences } from "./Settings";
 import { Badge, Intro, Modal } from "./ui";
 import {
+  listAreas,
+  resolveArea,
+  selectArea,
+  selectCustomService,
+  type AreaBinding,
+  type AreaChoice,
   chooseProject,
   connect,
   disconnect,
@@ -30,7 +36,12 @@ import {
   type AuthMeResponse,
   type ProjectOverviewResponse,
 } from "./service";
-type Recent = { project: string; endpoint: string; path: string | null };
+type Recent = {
+  project: string;
+  endpoint: string;
+  path: string | null;
+  areaId?: string;
+};
 const defaultPrefs: Preferences = {
   theme: "system",
   notifications: false,
@@ -75,6 +86,17 @@ function readRecents(): Recent[] {
 }
 export function App() {
   const [prefs, setPrefs] = useState(readPrefs);
+  const [areas, setAreas] = useState<AreaChoice[]>([]);
+  const [area, setArea] = useState<AreaBinding | null>(prefs.area ?? null);
+  const [selectedAreaName, setSelectedAreaName] = useState(
+    prefs.area?.name ?? "custom",
+  );
+  const areaRef = useRef<AreaBinding | null>(prefs.area ?? null);
+  const pendingProject = useRef<{
+    project: string;
+    path: string | null;
+    areaId: string;
+  } | null>(null);
   const [recents, setRecents] = useState(readRecents);
   const [project, setProject] = useState("");
   const [repoRoot, setRepoRoot] = useState<string | null>(null);
@@ -173,9 +195,19 @@ export function App() {
     setInitialId(undefined);
     setModal(null);
     const next = [
-      { project: clean, endpoint: connection, path },
+      {
+        project: clean,
+        endpoint: connection,
+        path,
+        areaId: areaRef.current?.instance_id,
+      },
       ...readRecents().filter(
-        (r) => !(r.project === clean && r.endpoint === connection),
+        (r) =>
+          !(
+            r.project === clean &&
+            r.endpoint === connection &&
+            r.areaId === areaRef.current?.instance_id
+          ),
       ),
     ].slice(0, 12);
     setRecents(next);
@@ -194,6 +226,7 @@ export function App() {
       ...prefs,
       endpoint: normalized,
       connectionName: label.trim() || "Codifix service",
+      area: areaRef.current,
     });
     setEndpoint(normalized);
     setAuth(identity);
@@ -206,11 +239,39 @@ export function App() {
       return;
     }
     setModal(null);
-    const last = restore
-      ? readRecents().find((r) => r.endpoint === normalized)
-      : null;
+    const pending =
+      pendingProject.current?.areaId === areaRef.current?.instance_id
+        ? pendingProject.current
+        : null;
+    pendingProject.current = null;
+    const last =
+      pending ??
+      (restore
+        ? readRecents().find(
+            (r) =>
+              r.endpoint === normalized &&
+              r.areaId === areaRef.current?.instance_id,
+          )
+        : null);
     if (last) {
       try {
+        if (last.path) {
+          const resolved = await resolveArea(null, last.path, last.project);
+          if (version !== generation.current) return;
+          if (
+            resolved &&
+            (resolved.instance_id !== areaRef.current?.instance_id ||
+              resolved.endpoint !== normalized)
+          ) {
+            pendingProject.current = {
+              project: last.project,
+              path: last.path,
+              areaId: resolved.instance_id,
+            };
+            await switchArea(resolved.name, last.path, last.project);
+            return;
+          }
+        }
         await setActiveProject(last.project, last.path, normalized, version);
       } catch (e) {
         if (version === generation.current) setProjectError(errorText(e));
@@ -259,6 +320,7 @@ export function App() {
   }
   async function signOutBrowser(forget = false) {
     const version = ++generation.current;
+    pendingProject.current = null;
     setPolling(false);
     setBrowserLogin(null);
     setConnectBusy(true);
@@ -360,28 +422,194 @@ export function App() {
   useEffect(() => {
     if (!started.current) {
       started.current = true;
-      void connectToService(prefs.endpoint, null, prefs.connectionName, true);
+      const startupVersion = generation.current;
+      void (async () => {
+        try {
+          const choices = await listAreas();
+          if (startupVersion !== generation.current) return;
+          setAreas(choices);
+          const migrated = readRecents().map((recent) => {
+            if (recent.areaId) return recent;
+            const exact = choices.filter(
+              (choice) =>
+                choice.binding?.endpoint === recent.endpoint.replace(/\/$/, ""),
+            );
+            return exact.length === 1
+              ? { ...recent, areaId: exact[0].instance_id }
+              : recent;
+          });
+          setRecents(migrated);
+          localStorage.setItem(
+            "codifix.desktop.projects",
+            JSON.stringify(migrated),
+          );
+          let binding: AreaBinding | null = null;
+          // A stored binding is authoritative: unavailable/moved areas never fall back.
+          if (prefs.area) {
+            binding = await selectArea(
+              prefs.area.name,
+              null,
+              null,
+              prefs.area.instance_id,
+            );
+            if (!binding || binding.instance_id !== prefs.area.instance_id)
+              throw new Error(
+                "Saved area identity changed. Select the intended area again.",
+              );
+          } else if (prefs.area === null) {
+            await selectCustomService();
+          } else {
+            const matching = choices.filter(
+              (a) => a.binding?.endpoint === prefs.endpoint.replace(/\/$/, ""),
+            );
+            if (matching.length === 1)
+              binding = await selectArea(matching[0].name);
+            else if (
+              !localStorage.getItem("codifix.desktop.preferences") &&
+              choices.length
+            ) {
+              setSelectedAreaName("general");
+              binding = await selectArea();
+            } else if (choices.length) {
+              setSelectedAreaName("");
+              throw new Error(
+                "Saved service has no matching configured area. Choose an area or explicitly choose Custom service.",
+              );
+            }
+          }
+          if (!binding && !choices.length) await selectCustomService();
+          if (startupVersion !== generation.current) return;
+          areaRef.current = binding;
+          setArea(binding);
+          setSelectedAreaName(binding?.name ?? "custom");
+          await connectToService(
+            binding?.endpoint ?? prefs.endpoint,
+            null,
+            binding?.name ?? prefs.connectionName,
+            true,
+          );
+        } catch (e) {
+          if (startupVersion !== generation.current) return;
+          setConnectionError(errorText(e));
+          setModal("connection");
+        }
+      })();
     }
   }, []);
+  async function switchArea(
+    name: string,
+    repository: string | null = null,
+    projectSlug: string | null = null,
+  ) {
+    const version = ++generation.current;
+    setSelectedAreaName(name || "general");
+    setAuth(null);
+    setProject("");
+    setRepoRoot(null);
+    setBrowserLogin(null);
+    setPolling(false);
+    setConnectBusy(false);
+    setProjectBusy(false);
+    await client.cancelQueries();
+    client.clear();
+    await disconnect();
+    if (version !== generation.current) return null;
+    const binding =
+      name === "custom"
+        ? (await selectCustomService(), null)
+        : await selectArea(name || null, repository, projectSlug);
+    if (version !== generation.current) return null;
+    areaRef.current = binding;
+    setArea(binding);
+    const address = binding?.endpoint ?? prefs.endpoint;
+    setEndpoint(address);
+    setConnectionName(binding?.name ?? prefs.connectionName);
+    savePrefs({
+      ...prefs,
+      endpoint: address,
+      connectionName: binding?.name ?? prefs.connectionName,
+      area: binding,
+    });
+    await connectToService(
+      address,
+      null,
+      binding?.name ?? prefs.connectionName,
+      false,
+    );
+    return binding;
+  }
   async function selectProject(value: string, path: string | null) {
+    const version = generation.current;
     setProjectBusy(true);
     setProjectError("");
     try {
-      await setActiveProject(value, path);
+      if (path) {
+        const resolved = await resolveArea(null, path, value);
+        if (version !== generation.current) return;
+        if (
+          resolved &&
+          (resolved.instance_id !== areaRef.current?.instance_id ||
+            resolved.endpoint !== endpoint)
+        ) {
+          pendingProject.current = {
+            project: value,
+            path,
+            areaId: resolved.instance_id,
+          };
+          await switchArea(resolved.name, path, value);
+          return;
+        }
+      }
+      if (!connected)
+        throw new Error(
+          "Sign in to the selected area before opening a project slug.",
+        );
+      await setActiveProject(value, path, prefs.endpoint, version);
     } catch (e) {
+      if (version !== generation.current) return;
+      pendingProject.current = null;
       setProjectError(errorText(e));
+      if (path) {
+        setProjectBusy(false);
+        ++generation.current;
+        setAuth(null);
+        setProject("");
+        setRepoRoot(null);
+        await client.cancelQueries();
+        client.clear();
+        await disconnect();
+      }
     } finally {
-      setProjectBusy(false);
+      if (version === generation.current) setProjectBusy(false);
     }
   }
   async function pickFolder() {
+    const version = generation.current;
+    setProjectBusy(true);
     setProjectError("");
     try {
       const result = await chooseProject();
+      if (version !== generation.current) return;
       if (result) {
         setFolder(result.path);
         if (result.slug) setSlug(result.slug);
-        else {
+        const resolved = await resolveArea(null, result.path, result.slug);
+        if (version !== generation.current) return;
+        if (
+          resolved &&
+          (resolved.instance_id !== areaRef.current?.instance_id ||
+            resolved.endpoint !== endpoint)
+        ) {
+          pendingProject.current = result.slug
+            ? {
+                project: result.slug,
+                path: result.path,
+                areaId: resolved.instance_id,
+              }
+            : null;
+          await switchArea(resolved.name, result.path, result.slug);
+        }
+        if (!result.slug) {
           setSlug("");
           setProjectError(
             "No Codifix project marker was found. Enter the existing service project slug below.",
@@ -389,7 +617,21 @@ export function App() {
         }
       }
     } catch (e) {
+      if (version !== generation.current) return;
+      setFolder(null);
+      setSlug("");
+      pendingProject.current = null;
+      setProjectBusy(false);
+      ++generation.current;
+      setAuth(null);
+      setProject("");
+      setRepoRoot(null);
+      await client.cancelQueries();
+      client.clear();
+      await disconnect();
       setProjectError(errorText(e));
+    } finally {
+      if (version === generation.current) setProjectBusy(false);
     }
   }
   async function notify(message: string) {
@@ -467,8 +709,53 @@ export function App() {
           <span className="brand-mark">c</span>
           <span>Codifix</span>
         </div>
+        {!!areas.length && (
+          <label className="area-selector">
+            Area
+            <select
+              aria-label="Area"
+              value={selectedAreaName}
+              onChange={(e) => {
+                pendingProject.current = null;
+                setFolder(null);
+                setSlug("");
+                void switchArea(e.target.value).catch((error) => {
+                  pendingProject.current = null;
+                  setConnectionError(errorText(error));
+                  setModal("connection");
+                });
+              }}
+            >
+              <option value="" disabled>
+                Choose an area
+              </option>
+              {areas.map((a) => (
+                <option
+                  key={a.name}
+                  value={a.name}
+                  disabled={!!a.error}
+                  title={a.error ?? undefined}
+                >
+                  {a.name}
+                  {a.error ? " · unavailable" : ""}
+                </option>
+              ))}
+              <option value="custom">Custom service</option>
+            </select>
+            {areas.find((choice) => choice.name === selectedAreaName)
+              ?.error && (
+              <span role="status">
+                {
+                  areas.find((choice) => choice.name === selectedAreaName)
+                    ?.error
+                }
+              </span>
+            )}
+          </label>
+        )}
         <Button
           className="project-selector"
+          aria-label="Choose a project"
           onClick={() => {
             setModal("project");
             setProjectError("");
@@ -728,6 +1015,7 @@ export function App() {
                 type="url"
                 required
                 value={endpoint}
+                readOnly={!!area}
                 onChange={(e) => {
                   setEndpoint(e.target.value);
                   setForgetConfirmed(false);
@@ -844,7 +1132,7 @@ export function App() {
         description="The selected project scopes memories, sessions and actions."
         onClose={() => !projectBusy && setModal(null)}
       >
-        {!connected ? (
+        {!connected && (
           <>
             <p className="notice warning">
               Connect to your Codifix service before choosing a project.
@@ -853,77 +1141,80 @@ export function App() {
               Manage connection
             </Button>
           </>
-        ) : (
-          <>
-            <div className="project-list">
-              {recents
-                .filter((r) => r.endpoint === prefs.endpoint)
-                .map((r) => (
-                  <Button
-                    key={r.project}
-                    className={`result ${r.project === project ? "selected" : ""}`}
-                    disabled={projectBusy}
-                    onClick={() => void selectProject(r.project, r.path)}
-                  >
-                    <strong>{r.project}</strong>
-                    <span className="caption">
-                      {prefs.connectionName}
-                      {r.project === project ? " · Current project" : ""}
-                    </span>
-                  </Button>
-                ))}
-            </div>
-            <form
-              className="form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void selectProject(slug, folder);
-              }}
-            >
-              <Button
-                type="button"
-                disabled={projectBusy}
-                onClick={() => void pickFolder()}
-              >
-                <FolderOpen size={18} />
-                Open project folder
-              </Button>
-              {folder && <p className="caption break">{folder}</p>}
-              <label>
-                Project slug
-                <input
-                  autoComplete="off"
-                  required
-                  placeholder="e.g. codifix"
-                  value={slug}
-                  onChange={(e) => {
-                    setSlug(e.target.value);
-                    setFolder(null);
-                  }}
-                  list="granted-projects"
-                  disabled={projectBusy}
-                />
-                <datalist id="granted-projects">
-                  {currentAuth?.principal.projects.map((p) => (
-                    <option key={p.project} value={p.project} />
-                  ))}
-                </datalist>
-              </label>
-              <p className="caption">
-                Use an existing project slug from this service. A folder’s
-                Codifix marker can fill it in for you.
-              </p>
-              {projectError && (
-                <p role="alert" className="notice danger">
-                  {projectError}
-                </p>
-              )}
-              <Button className="primary" disabled={projectBusy}>
-                {projectBusy ? "Opening…" : "Open project"}
-              </Button>
-            </form>
-          </>
         )}
+        <>
+          <div className="project-list">
+            {recents
+              .filter(
+                (r) =>
+                  r.endpoint === prefs.endpoint &&
+                  r.areaId === areaRef.current?.instance_id,
+              )
+              .map((r) => (
+                <Button
+                  key={r.project}
+                  className={`result ${r.project === project ? "selected" : ""}`}
+                  disabled={projectBusy}
+                  onClick={() => void selectProject(r.project, r.path)}
+                >
+                  <strong>{r.project}</strong>
+                  <span className="caption">
+                    {prefs.connectionName}
+                    {r.project === project ? " · Current project" : ""}
+                  </span>
+                </Button>
+              ))}
+          </div>
+          <form
+            className="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void selectProject(slug, folder);
+            }}
+          >
+            <Button
+              type="button"
+              disabled={projectBusy}
+              onClick={() => void pickFolder()}
+            >
+              <FolderOpen size={18} />
+              Open project folder
+            </Button>
+            {folder && <p className="caption break">{folder}</p>}
+            <label>
+              Project slug
+              <input
+                autoComplete="off"
+                required
+                placeholder="e.g. codifix"
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  setFolder(null);
+                }}
+                list="granted-projects"
+                disabled={projectBusy}
+              />
+              <datalist id="granted-projects">
+                {currentAuth?.principal.projects.map((p) => (
+                  <option key={p.project} value={p.project} />
+                ))}
+              </datalist>
+            </label>
+            <p className="caption">
+              Use an existing project slug from this service. A folder’s Codifix
+              marker can fill it in for you.
+            </p>
+            {projectError && (
+              <p role="alert" className="notice danger">
+                {projectError}
+              </p>
+            )}
+            <Button className="primary" disabled={projectBusy}>
+              {projectBusy ? "Opening…" : "Open project"}
+            </Button>
+          </form>
+        </>
       </Modal>
       <Modal
         open={modal === "palette"}

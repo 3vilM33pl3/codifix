@@ -99,3 +99,34 @@ export const forgetBrowserLogin = (endpoint: string) =>
 
 export const revokeLegacyBrowserLogin = (endpoint: string) =>
   invoke<void>("revoke_legacy_browser_login", { endpoint });
+
+export type AreaBinding = {
+  name: string;
+  instance_id: string;
+  endpoint: string;
+};
+export type AreaChoice = {
+  name: string;
+  instance_id: string;
+  binding: AreaBinding | null;
+  error: string | null;
+};
+export const listAreas = () => invoke<AreaChoice[]>("list_areas");
+export const resolveArea = (
+  area: string | null = null,
+  repository: string | null = null,
+  project: string | null = null,
+) => invoke<AreaBinding | null>("resolve_area", { area, repository, project });
+export const selectArea = (
+  area: string | null = null,
+  repository: string | null = null,
+  project: string | null = null,
+  expectedInstanceId: string | null = null,
+) =>
+  invoke<AreaBinding | null>("select_area", {
+    area,
+    repository,
+    project,
+    expectedInstanceId,
+  });
+export const selectCustomService = () => invoke<void>("select_custom_service");
