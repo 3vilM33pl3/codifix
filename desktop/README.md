@@ -18,8 +18,12 @@ The desktop crate has its own Cargo workspace/lockfile. It does not add GTK requ
 
 ## Connect
 
-1. Click **Sign in**, log in through your default browser, and return to the app automatically. There is no device code or project approval step.
+1. Select an **Area** next to the project selector when operator area routing is configured, then click **Sign in**, log in through your default browser, and return to the app automatically. There is no device code or project approval step.
 2. Choose an existing project slug or its local folder if no recent project is available. Sign-in uses your human account's existing permissions; it does not grant access to new projects.
+
+The native bridge uses the same operator-owned `area-routing.json` and `codifix-config::AreaRouting` resolver as the TUI. Opening a folder resolves its exact repository/common Git directory and project marker before any project request; explicit area selection takes precedence for slug-only project selection. Repository routes precede project-only routes, then the default is General. A project slug never guesses an area name. Each bound client TOML must contain a matching `[area]` name/instance UUID and `[auth].public_base_url` with the exact public HTTPS origin. Relay URLs, client tokens, dotenv files and provider secrets are not used for desktop login. Remote-only, missing and invalid areas show an actionable error without falling back to Workshop.
+
+Area changes cancel pending sign-in, invalidate native generations, clear renderer queries and keep project recents bound to origin plus area UUID. A folder selection remains pending across browser login. Restart restores a stored binding, or infers it only from an exact configured origin match. Legacy recents gain an area UUID only through that exact origin match: a Workshop recent named `homelab` remains a Workshop recent until you select the Homelab area or open its mapped folder. Before reading saved credentials and before authenticated requests, the native client verifies the public origin's unauthenticated `/healthz` `area_instance_id`; identity mismatches send no saved credential. **Custom service** explicitly opts into the existing advanced manual connection instead.
 
 **Connection settings** contains the service's public HTTPS origin and advanced local/token connection. Distribution builds can preset a service using `VITE_CODIFIX_SERVICE_URL` and `VITE_CODIFIX_SERVICE_NAME` at build time. Saved user preferences take precedence. Without a preset, development defaults to `http://127.0.0.1:4250`; use the advanced local connection for a single-user service.
 
@@ -29,7 +33,7 @@ Passwords, PKCE verifiers, callback codes, and native credentials never enter th
 
 **Cancel sign-in** stops a pending login. **Sign out** revokes this app's session before removing it; **Disconnect** retains it for next time. If revocation cannot be confirmed, retry sign-out. If both revocation and keyring persistence fail, keep the app open so its in-memory cleanup credential remains available. Explicitly confirmed local-forget recovery removes local state without claiming remote revocation. Older managed-device credentials stay separate and can be revoked under **Connection settings → Older device sign-ins**.
 
-Pasted service tokens stay in native process memory only. Preferences store appearance, notifications and endpoint/name; recent projects store endpoint, slug and optional folder path. Connection changes clear cached query data. HTTPS uses the OS trust store, including already installed company CAs, with certificate and hostname validation enabled. A second app launch focuses the existing window.
+Pasted service tokens stay in native process memory only. Preferences store appearance, notifications and endpoint/name; recent projects store endpoint, area UUID, slug and optional folder path. Connection changes clear cached query data. HTTPS uses the OS trust store, including already installed company CAs, with certificate and hostname validation enabled. A second app launch focuses the existing window.
 
 ## Workflows
 
@@ -71,6 +75,8 @@ npm run desktop:build
 ```
 
 `npm run dev` also serves `/review.html`, an explicitly illustrative fixture for comparing the design without accessing real project data. Its IPC mock and sample records are **not included** in the packaged `index.html` entry. Fixture actions that require native integrations report that they are unavailable.
+
+Source validation for 0.1.4 passes 22 renderer workflows and 15 native tests (two separate keyring/TLS host probes remain ignored in the ordinary test run), plus the production renderer build. It adds native area precedence/config-identity/unavailable-area tests, credential-free health and stale-generation tests, and renderer coverage for cross-area project slugs, folder routing through browser login, cache clearing and late response rejection. Installed browser/OIDC acceptance must still be performed against the packaged build.
 
 Validation for 0.1.3: fourteen renderer workflow tests and ten native tests cover browser handoff, automatic connection, cancellation, retry, saved-session reuse, PKCE, callback host/state/path validation, provider denial, listener cleanup and recovery state. Service tests exercise real PostgreSQL session issuance, replay, expiry, permissions, cookie separation and transactional audit failures. These checks do not substitute for a user's real identity-provider login. See `docs/user/desktop.md` for installed-build evidence and acceptance limits.
 

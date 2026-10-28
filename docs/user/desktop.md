@@ -169,3 +169,30 @@ The per-user 0.1.3 package, install receipt and native sign-in screenshot are in
 `~/Documents/ChatGPT/Codifix/linux-desktop-build/0.1.3/`; 0.1.2 remains available
 for desktop rollback. The build presets only public service URL/name through
 Vite environment variables; saved user connection preferences take precedence.
+
+
+## Area routing in 0.1.4
+
+The desktop now shares the TUI's operator-owned area routing. Choose **Area** beside
+its project selector, or **Open project folder** to resolve the folder's repository
+route before fetching project data. Entering only a project slug uses the selected
+area; names such as `homelab` do not guess another service. Folder selection remains
+pending while you sign in through the browser.
+
+Each locally available area needs its bound client config's matching `[area]`
+identity and `[auth].public_base_url` set to its exact public HTTPS origin. The
+native bridge verifies that origin's `/healthz` area UUID before restoring or
+sending credentials. It never uses the client config's service token. Missing,
+remote-only and mismatched areas fail explicitly and do not fall back to Workshop.
+The **Custom service** choice retains advanced manual service/local-token access.
+
+Switching areas clears cached data and cancels pending sign-in. Recents keep their
+origin and area UUID. On upgrade, an older recent receives an area UUID only when
+its saved origin exactly matches a configured area: a Workshop recent called
+`homelab` stays bound to Workshop. Select Homelab explicitly or open its mapped
+folder to move to Homelab. Restart preserves the selected area's browser session.
+
+Source tests cover routing precedence, identity mismatches without credential
+leakage, unavailable areas, equal project names across areas, pending folder login,
+cache invalidation and stale responses. This source-level validation does not by
+itself confirm an installed package or a real identity-provider login.
