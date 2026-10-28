@@ -22,6 +22,7 @@ pub(crate) struct Choice {
 #[derive(Default)]
 pub(crate) enum Selection {
     #[default]
+    Uninitialized,
     Custom,
     Unavailable,
     Area(Binding),
@@ -140,9 +141,10 @@ pub(crate) fn select_area(
     area: Option<String>,
     repository: Option<String>,
     project: Option<String>,
+    expected_instance_id: Option<uuid::Uuid>,
     state: State<'_, Transport>,
 ) -> Result<Option<Binding>, String> {
-    {
+    let generation = {
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
         state
@@ -151,9 +153,18 @@ pub(crate) fn select_area(
         c.session = None;
         c.pending = None;
         c.selection = Selection::Unavailable;
-    }
+        c.generation
+    };
     let binding = resolve_area(area, repository, project)?;
+    if expected_instance_id.is_some()
+        && binding.as_ref().map(|b| b.instance_id) != expected_instance_id
+    {
+        return Err("Saved area identity changed. Select the intended area again.".into());
+    }
     let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
+    if c.generation != generation {
+        return Err("Connection changed; discard this area selection".into());
+    }
     c.selection = binding
         .clone()
         .map(Selection::Area)
@@ -175,6 +186,9 @@ pub(crate) fn select_custom_service(state: State<'_, Transport>) -> Result<(), S
 pub(crate) fn selected(state: &Transport, origin: &Url) -> Result<Option<Binding>, String> {
     let c = state.0.lock().map_err(|_| "Connection unavailable")?;
     match &c.selection {
+        Selection::Uninitialized => {
+            if routing()?.is_some() { Err("Choose a configured area or explicitly choose Custom service before connecting".into()) } else { Ok(None) }
+        }
         Selection::Custom => Ok(None),
         Selection::Unavailable => Err("Selected area is unavailable. Select an available area or explicitly choose a custom service.".into()),
         Selection::Area(binding) if binding.endpoint == origin.origin().ascii_serialization() => Ok(Some(binding.clone())),
@@ -401,5 +415,40 @@ mod tests {
             });
             server.join().unwrap();
         }
+    }
+    #[test]
+    fn selected_area_rejects_other_origins_and_unavailable_selection() {
+        let f = Fixture::new();
+        let binding = resolve(&f.routing, Some("homelab"), None, None).unwrap();
+        let state = Transport::default();
+        state.0.lock().unwrap().selection = Selection::Area(binding.clone());
+        assert_eq!(
+            selected(&state, &crate::endpoint(&binding.endpoint).unwrap()).unwrap(),
+            Some(binding)
+        );
+        assert!(selected(
+            &state,
+            &crate::endpoint("https://workshop.example").unwrap()
+        )
+        .unwrap_err()
+        .contains("does not match"));
+        state.0.lock().unwrap().selection = Selection::Unavailable;
+        assert!(selected(
+            &state,
+            &crate::endpoint("https://workshop.example").unwrap()
+        )
+        .unwrap_err()
+        .contains("unavailable"));
+    }
+    #[cfg(unix)]
+    #[test]
+    fn rejects_writable_client_configuration() {
+        use std::os::unix::fs::PermissionsExt;
+        let f = Fixture::new();
+        let config = f.routing.areas["homelab"].config.as_ref().unwrap();
+        std::fs::set_permissions(config, std::fs::Permissions::from_mode(0o666)).unwrap();
+        assert!(resolve(&f.routing, Some("homelab"), None, None)
+            .unwrap_err()
+            .contains("writable"));
     }
 }

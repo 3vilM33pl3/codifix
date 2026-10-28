@@ -502,22 +502,29 @@ async fn complete(
     Ok(())
 }
 #[tauri::command]
-pub(crate) fn open_browser_login(
+pub(crate) async fn open_browser_login(
     request_id: String,
     state: State<'_, Transport>,
 ) -> Result<(), String> {
-    let c = state.0.lock().map_err(|_| "Connection unavailable")?;
-    let p = c
-        .pending
-        .as_ref()
-        .filter(|p| {
-            p.generation == c.generation
-                && p.info.request_id.to_string() == request_id
-                && Instant::now() < p.deadline
-                && p.error.is_none()
-        })
-        .ok_or("No current sign-in request")?;
-    open::that(p.url.as_str()).map_err(|_| {
+    let (url, generation) = {
+        let c = state.0.lock().map_err(|_| "Connection unavailable")?;
+        let p = c
+            .pending
+            .as_ref()
+            .filter(|p| {
+                p.generation == c.generation
+                    && p.info.request_id.to_string() == request_id
+                    && Instant::now() < p.deadline
+                    && p.error.is_none()
+            })
+            .ok_or("No current sign-in request")?;
+        (p.url.clone(), c.generation)
+    };
+    let origin = crate::endpoint(&url.origin().ascii_serialization())?;
+    let binding = crate::area_routing::selected(&state, &origin)?;
+    crate::area_routing::verify(&origin, binding.as_ref()).await?;
+    current(&state, generation)?;
+    open::that(url.as_str()).map_err(|_| {
         "Could not open your default browser. Check your desktop browser settings and retry.".into()
     })
 }

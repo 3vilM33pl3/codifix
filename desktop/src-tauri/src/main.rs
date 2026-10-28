@@ -377,7 +377,7 @@ async fn choose_project(app: tauri::AppHandle) -> Result<Option<ProjectChoice>, 
     }))
 }
 #[tauri::command]
-fn open_service(
+async fn open_service(
     section: String,
     endpoint: Option<String>,
     state: State<'_, Transport>,
@@ -397,6 +397,8 @@ fn open_service(
             .endpoint
             .clone()
     };
+    let binding = area_routing::selected(&state, &origin)?;
+    area_routing::verify(&origin, binding.as_ref()).await?;
     let path = match section.as_str() {
         "home" | "help" => "/",
         "login" => "/v1/auth/login?return_to=%2F",
