@@ -77,7 +77,9 @@ async fn revoke(session: &Session, e: &Enrollment) -> Result<(), String> {
     match result {
         Ok(receipt) if receipt["status"] == "denied" && receipt["request_id"] == e.request_id.to_string() && receipt["device_id"] == e.device_id.to_string() => Ok(()),
         Err(error) if error.contains("HTTP 409.") => {
-            let session = Session::new(session.endpoint.clone(), Some(e.credential.clone()))?;
+            let mut next = Session::new(session.endpoint.clone(), Some(e.credential.clone()))?;
+            next.area = session.area.clone();
+            let session = next;
             let receipt = session.request("/v1/onboarding/device/logout", Method::POST, Some(json!({}))).await?;
             if receipt["logged_out"] != true || receipt["device_id"] != e.device_id.to_string() { return Err("Sign-out receipt identity mismatch; saved sign-in retained".into()); }
             Ok(())
@@ -87,12 +89,17 @@ async fn revoke(session: &Session, e: &Enrollment) -> Result<(), String> {
     }
 }
 
-pub(crate) async fn cleanup(origin: &Url) -> Result<(), String> {
+pub(crate) async fn cleanup(
+    origin: &Url,
+    binding: Option<crate::area_routing::Binding>,
+) -> Result<(), String> {
     let name = origin.origin().ascii_serialization();
     if let Some(mut saved) = store(&name, Store::Read).await? {
         saved.pending_logout = true;
         store(&name, Store::Write(saved.clone())).await?;
-        revoke(&Session::new(origin.clone(), None)?, &saved).await?;
+        let mut session = Session::new(origin.clone(), None)?;
+        session.area = binding;
+        revoke(&session, &saved).await?;
         store(&name, Store::Delete).await?;
     }
     Ok(())

@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod area_routing;
 mod browser_auth;
 mod legacy_browser_auth;
 use reqwest::{
@@ -21,15 +22,18 @@ struct Session {
     client: Client,
     jar: Arc<Jar>,
     token: Option<String>,
+    area: Option<area_routing::Binding>,
+    fence: Option<(Arc<std::sync::atomic::AtomicU64>, u64)>,
 }
 #[derive(Default)]
 struct Connection {
     generation: u64,
     session: Option<Session>,
     pending: Option<browser_auth::Pending>,
+    selection: area_routing::Selection,
 }
 #[derive(Default)]
-struct Transport(Mutex<Connection>);
+struct Transport(Mutex<Connection>, Arc<std::sync::atomic::AtomicU64>);
 fn endpoint(value: &str) -> Result<Url, String> {
     let u = Url::parse(value).map_err(|_| "Invalid service URL")?;
     let local = is_local(&u);
@@ -144,10 +148,26 @@ impl Session {
             client,
             jar,
             token,
+            area: None,
+            fence: None,
         })
     }
 
     async fn request(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<Value>,
+    ) -> Result<Value, String> {
+        area_routing::verify(&self.endpoint, self.area.as_ref()).await?;
+        if self.fence.as_ref().is_some_and(|(epoch, generation)| {
+            epoch.load(std::sync::atomic::Ordering::SeqCst) != *generation
+        }) {
+            return Err("Connection changed; no request was sent".into());
+        }
+        self.request_unchecked(path, method, body).await
+    }
+    async fn request_unchecked(
         &self,
         path: &str,
         method: Method,
@@ -216,21 +236,37 @@ async fn connect_service(
     let generation = {
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
+        state
+            .1
+            .store(c.generation, std::sync::atomic::Ordering::SeqCst);
         c.session = None;
         c.pending = None;
         c.generation
     };
+    let binding = area_routing::selected(&state, &endpoint)?;
     let _operation = browser.0.lock().await;
+    area_routing::verify(&endpoint, binding.as_ref()).await?;
+    if state
+        .0
+        .lock()
+        .map_err(|_| "Connection unavailable")?
+        .generation
+        != generation
+    {
+        return Err("Connection changed".into());
+    }
     browser.check_cleanup(&endpoint)?;
     let saved = if token.is_none() && endpoint.scheme() == "https" {
         browser_auth::restore(&endpoint).await?
     } else {
         None
     };
-    let session = Session::new(
+    let mut session = Session::new(
         endpoint,
         token.or_else(|| saved.as_ref().map(|s| s.credential.clone())),
     )?;
+    session.area = binding;
+    session.fence = Some((state.1.clone(), generation));
     let auth = session.request("/v1/auth/me", Method::GET, None).await?;
     if session.token.is_none()
         && auth["mode"] == "single_user"
@@ -256,6 +292,9 @@ async fn connect_service(
 fn disconnect_service(state: State<'_, Transport>) -> Result<(), String> {
     let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
     c.generation += 1;
+    state
+        .1
+        .store(c.generation, std::sync::atomic::Ordering::SeqCst);
     c.session = None;
     c.pending = None;
     Ok(())
@@ -387,6 +426,10 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
+            area_routing::list_areas,
+            area_routing::resolve_area,
+            area_routing::select_area,
+            area_routing::select_custom_service,
             connect_service,
             disconnect_service,
             api_request,
@@ -501,6 +544,8 @@ mod tests {
                     .unwrap(),
                 jar,
                 token: None,
+                area: None,
+                fence: None,
             };
             session
                 .request("/v1/auth/me", Method::GET, None)

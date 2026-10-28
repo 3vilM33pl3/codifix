@@ -185,15 +185,23 @@ pub(crate) async fn start_browser_login(
     let generation = {
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
+        state
+            .1
+            .store(c.generation, std::sync::atomic::Ordering::SeqCst);
         c.session = None;
         c.pending = None;
         c.generation
     };
     let _operation = browser.0.lock().await;
     current(&state, generation)?;
+    let binding = crate::area_routing::selected(&state, &origin)?;
+    crate::area_routing::verify(&origin, binding.as_ref()).await?;
+    current(&state, generation)?;
     browser.check_cleanup(&origin)?;
     if let Some(saved) = restore(&origin).await? {
-        let session = Session::new(origin.clone(), Some(saved.credential.clone()))?;
+        let mut session = Session::new(origin.clone(), Some(saved.credential.clone()))?;
+        session.area = binding.clone();
+        session.fence = Some((state.1.clone(), generation));
         match session.request("/v1/auth/me", Method::GET, None).await {
             Ok(auth) => {
                 validate_auth(&auth, &saved)?;
@@ -385,8 +393,13 @@ async fn respond(socket: &mut TcpStream, status: &str, message: &str) {
     )
     .await;
 }
-async fn revoke(origin: &Url, e: &Enrollment) -> Result<(), String> {
-    let session = Session::new(origin.clone(), Some(e.credential.clone()))?;
+async fn revoke(
+    origin: &Url,
+    e: &Enrollment,
+    binding: Option<&crate::area_routing::Binding>,
+) -> Result<(), String> {
+    let mut session = Session::new(origin.clone(), Some(e.credential.clone()))?;
+    session.area = binding.cloned();
     let receipt = session
         .request("/v1/auth/desktop/logout", Method::POST, Some(json!({})))
         .await?;
@@ -407,7 +420,13 @@ async fn complete(
     let state = app.state::<Transport>();
     let _operation = browser.0.lock().await;
     current(&state, generation)?;
-    let exchange = Session::new(origin.clone(), None)?
+    let binding = crate::area_routing::selected(&state, &origin)?;
+    crate::area_routing::verify(&origin, binding.as_ref()).await?;
+    current(&state, generation)?;
+    let mut exchange_session = Session::new(origin.clone(), None)?;
+    exchange_session.area = binding.clone();
+    exchange_session.fence = Some((state.1.clone(), generation));
+    let exchange = exchange_session
         .request(
             "/v1/auth/desktop/exchange",
             Method::POST,
@@ -436,7 +455,9 @@ async fn complete(
         if saved.expires_at <= Utc::now() {
             return Err("Sign-in expired. Try again.".into());
         }
-        let session = Session::new(origin.clone(), Some(saved.credential.clone()))?;
+        let mut session = Session::new(origin.clone(), Some(saved.credential.clone()))?;
+        session.area = binding.clone();
+        session.fence = Some((state.1.clone(), generation));
         let auth = session.request("/v1/auth/me", Method::GET, None).await?;
         validate_auth(&auth, &saved)?;
         current(&state, generation)?;
@@ -456,7 +477,7 @@ async fn complete(
     if let Err(error) = activation {
         // Retain a revocation marker if cleanup cannot be confirmed. Never activate it.
         saved.pending_logout = true;
-        if revoke(&origin, &saved).await.is_ok() {
+        if revoke(&origin, &saved, binding.as_ref()).await.is_ok() {
             let _ = store(&saved.origin, Store::Delete).await;
             return Err(error);
         }
@@ -526,10 +547,15 @@ pub(crate) async fn cancel_browser_login(
     {
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
+        state
+            .1
+            .store(c.generation, std::sync::atomic::Ordering::SeqCst);
         c.session = None;
         c.pending = None;
     }
     let _operation = browser.0.lock().await;
+    let binding = crate::area_routing::selected(&state, &origin)?;
+    crate::area_routing::verify(&origin, binding.as_ref()).await?;
     let name = origin.origin().ascii_serialization();
     let outstanding: Vec<_> = browser
         .1
@@ -540,9 +566,11 @@ pub(crate) async fn cancel_browser_login(
         .cloned()
         .collect();
     for saved in outstanding {
-        revoke(&origin, &saved).await.map_err(|e| {
-            format!("{e} Sign-out is unconfirmed; keep Codifix open and retry Sign out.")
-        })?;
+        revoke(&origin, &saved, binding.as_ref())
+            .await
+            .map_err(|e| {
+                format!("{e} Sign-out is unconfirmed; keep Codifix open and retry Sign out.")
+            })?;
         browser
             .1
             .lock()
@@ -557,7 +585,7 @@ pub(crate) async fn cancel_browser_login(
             .map_err(|_| "Sign-in state unavailable")?
             .push(saved.clone());
         let _ = store(&name, Store::Write(saved.clone())).await;
-        revoke(&origin, &saved)
+        revoke(&origin, &saved, binding.as_ref())
             .await
             .map_err(|e| format!("{e} Sign-out is unconfirmed; retry Sign out."))?;
         browser
@@ -583,6 +611,9 @@ pub(crate) async fn forget_browser_login(
     {
         let mut c = state.0.lock().map_err(|_| "Connection unavailable")?;
         c.generation += 1;
+        state
+            .1
+            .store(c.generation, std::sync::atomic::Ordering::SeqCst);
         c.session = None;
         c.pending = None;
     }
@@ -598,11 +629,14 @@ pub(crate) async fn forget_browser_login(
 #[tauri::command]
 pub(crate) async fn revoke_legacy_browser_login(
     endpoint: String,
+    state: State<'_, Transport>,
     browser: State<'_, BrowserAuth>,
 ) -> Result<(), String> {
     let origin = crate::endpoint(&endpoint)?;
     let _operation = browser.0.lock().await;
-    crate::legacy_browser_auth::cleanup(&origin).await
+    let binding = crate::area_routing::selected(&state, &origin)?;
+    crate::area_routing::verify(&origin, binding.as_ref()).await?;
+    crate::legacy_browser_auth::cleanup(&origin, binding).await
 }
 
 #[cfg(test)]
