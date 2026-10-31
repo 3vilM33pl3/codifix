@@ -168,14 +168,13 @@ impl Plan {
                     "issue requires title, acceptance criteria and a project team",
                 ));
             }
-            if let Some(k) = &i.milestone_key {
-                if !self
+            if let Some(k) = &i.milestone_key
+                && !self
                     .milestones
                     .iter()
                     .any(|m| &m.identity.key == k && m.project_key == i.project_key)
-                {
-                    return Err(invalid("issue milestone must belong to issue project"));
-                }
+            {
+                return Err(invalid("issue milestone must belong to issue project"));
             }
         }
         let issue_keys: BTreeSet<_> = self

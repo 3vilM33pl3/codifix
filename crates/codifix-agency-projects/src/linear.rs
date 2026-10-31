@@ -224,7 +224,12 @@ impl LinearClient {
                     phase: StepPhase::Verified,
                     observed: Some(entity.clone()),
                 };
-                journal.save(step.id, &verified).await?;
+                if !receipt
+                    .as_ref()
+                    .is_some_and(|r| r.phase == StepPhase::Verified)
+                {
+                    journal.save(step.id, &verified).await?;
+                }
                 results.push(entity.clone());
                 continue;
             }
