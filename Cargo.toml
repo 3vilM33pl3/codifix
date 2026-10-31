@@ -4,6 +4,7 @@ members = [
   "crates/codifix-area-store",
   "crates/codifix-area-ops",
   "crates/codifix-agenttop",
+  "crates/codifix-agency",
   "crates/codifix-analyze",
   "crates/codifix-atproto",
   "crates/codifix-atproto-verify",
