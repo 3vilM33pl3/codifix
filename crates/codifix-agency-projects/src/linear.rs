@@ -30,6 +30,14 @@ pub trait StepJournal {
         step_id: Uuid,
         receipt: &StepReceipt,
     ) -> impl Future<Output = Result<()>> + Send;
+    /// Mandatory live read admission, including prewrite checks, readback and
+    /// resume reconciliation. Host must meter this read and enforce current
+    /// resource scope, task fencing, deadline and mandate/ancestor revocation.
+    fn authorize_read(
+        &mut self,
+        kind: EntityKind,
+        id: Uuid,
+    ) -> impl Future<Output = Result<()>> + Send;
     fn authorize_step(
         &mut self,
         changes: &PreparedChangeSet,
@@ -311,6 +319,7 @@ impl LinearClient {
                 journal.save(step.id, &prepared).await?;
                 receipt = Some(prepared);
             }
+            journal.authorize_read(step.kind, step.entity_id).await?;
             let current = self.retrieve(step.kind, step.entity_id).await?;
             if let Some(entity) = current
                 .as_ref()
@@ -369,6 +378,7 @@ impl LinearClient {
             };
             journal.save(step.id, &attempted).await?;
             self.mutate(step).await?;
+            journal.authorize_read(step.kind, step.entity_id).await?;
             let entity = self
                 .retrieve(step.kind, step.entity_id)
                 .await?

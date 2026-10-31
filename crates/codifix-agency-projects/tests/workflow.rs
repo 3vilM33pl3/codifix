@@ -39,6 +39,8 @@ fn authority(plan: &Plan) -> Authority {
 struct Journal {
     receipts: BTreeMap<Uuid, StepReceipt>,
     writes: usize,
+    reads: Vec<(EntityKind, Uuid)>,
+    deny_read_at: Option<usize>,
     deny_at: Option<usize>,
     fail_phase: Option<StepPhase>,
 }
@@ -60,6 +62,15 @@ impl StepJournal for Journal {
             assert!(rank(receipt.phase) >= rank(prior.phase));
         }
         self.receipts.insert(id, receipt.clone());
+        Ok(())
+    }
+    async fn authorize_read(&mut self, kind: EntityKind, id: Uuid) -> Result<()> {
+        self.reads.push((kind, id));
+        if self.deny_read_at == Some(self.reads.len()) {
+            return Err(Error::Authority(
+                "read authorization revoked or exhausted".into(),
+            ));
+        }
         Ok(())
     }
     async fn authorize_step(&mut self, _changes: &PreparedChangeSet, _step: &Step) -> Result<()> {
