@@ -442,6 +442,18 @@ pub async fn improve(store: &Store, cfg: &Config, input: Value) -> Result<Value>
                             && d.config_digest == config_digest(cfg, &specialist, &workload)?,
                         "candidate is not current canary"
                     );
+                    // Counters are not sufficient: a task can fail after its
+                    // provider effect but before best-effort observation runs.
+                    // The target lock also prevents new canary assignments while
+                    // this complete persisted-task/assessment set is checked.
+                    let (assigned, verified): (i64, i64) = sqlx::query_as(
+                        "SELECT count(DISTINCT a.task_id), count(DISTINCT a.task_id) FILTER (WHERE t.contract->>'status'='completed' AND q.candidate_id=$1 AND q.quality_passed) FROM agency_learning_assignments a JOIN agency_tasks t ON t.id=a.task_id LEFT JOIN agency_learning_assessments q ON q.task_id=a.task_id WHERE a.binding->>'candidate_id'=$2 AND a.binding->>'arm'='candidate'"
+                    ).bind(id).bind(id.to_string()).fetch_one(&mut *tx).await?;
+                    ensure!(
+                        assigned == verified
+                            && verified >= i64::from(gate().minimum_rollout_successes),
+                        "canary has pending, failed or independently unassessed tasks"
+                    );
                     d.candidate
                         .promote(acceptance(cfg, decision_ref), &gate(), Utc::now())?;
                     sqlx::query("UPDATE agency_learning_heads SET baseline_candidate_id=$3,canary_candidate_id=NULL,revision=revision+1 WHERE specialist_id=$1 AND workload=$2").bind(&specialist).bind(&workload).bind(id).execute(&mut *tx).await?;

@@ -821,3 +821,65 @@ async fn reverting_after_assignment_fences_physical_model_admission_without_debi
     assert_eq!(effects, 0);
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn promotion_rechecks_persisted_failures_before_best_effort_observation() {
+    let Some(f) = fixture().await else { return };
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Prompt {
+            prefix: "Reviewed canary template".into(),
+            suffix: String::new(),
+        },
+    )
+    .await;
+    rollout(&f, &c, &a, &base).await;
+    for index in 0..20 {
+        let t = task(&f, c.id).await;
+        let b = select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+            .await
+            .unwrap()
+            .binding
+            .unwrap();
+        complete(&f, &t, &b).await;
+        improve(
+            &f.store,
+            &f.cfg,
+            json!({"action":"assess","assessment":assessment(&t,&b,index)}),
+        )
+        .await
+        .unwrap();
+    }
+    let mut unobserved = task(&f, c.id).await;
+    select_draft(&f.store, &f.cfg, &unobserved, "Task input", &routing())
+        .await
+        .unwrap();
+    // No observation callback has run yet: the lifecycle counters still show a
+    // clean twenty-case canary, while the task itself has durably failed.
+    unobserved
+        .contract
+        .clarify(
+            "Provider execution stopped before its observer callback".into(),
+            Utc::now(),
+        )
+        .unwrap();
+    f.store.update_contract(&unobserved).await.unwrap();
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(state["candidate"]["rollout_successes"], 20);
+    assert_eq!(state["candidate"]["rollout_failures"], 0);
+    assert!(improve(&f.store,&f.cfg,json!({"action":"promote","id":c.id,"decision_ref":"must-not-promote-unobserved-failure"})).await.is_err());
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(state["candidate"]["stage"], "limited_rollout");
+    observe_task(&f.store, &f.cfg, unobserved.contract.id)
+        .await
+        .unwrap();
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(state["candidate"]["rollout_failures"], 1);
+    f.db.cleanup().await.unwrap();
+}
