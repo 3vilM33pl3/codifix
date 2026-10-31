@@ -742,3 +742,82 @@ async fn deployed_prompt_reaches_mock_model_and_evidence_persists_exact_binding(
     server.abort();
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn reverting_after_assignment_fences_physical_model_admission_without_debit() {
+    let Some(f) = fixture().await else { return };
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Prompt {
+            prefix: "Reviewed template".into(),
+            suffix: String::new(),
+        },
+    )
+    .await;
+    rollout(&f, &c, &a, &base).await;
+    let t = task(&f, c.id).await;
+    let applied = select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+        .await
+        .unwrap();
+    assert_eq!(applied.binding.unwrap().candidate_id, c.id);
+    let before = f.store.get_internal(t.contract.id).await.unwrap();
+    let mandate_before: (i64, i64, i64) = sqlx::query_as(
+        "SELECT used_microusd,used_calls,used_turns FROM agency_mandates WHERE id=$1",
+    )
+    .bind(f.grant.id)
+    .fetch_one(&f.db.pool)
+    .await
+    .unwrap();
+    improve(&f.store,&f.cfg,json!({"action":"revert","id":c.id,"reason":"revoke deployment before physical model admission"})).await.unwrap();
+    let intent = codifix_store::effects::EffectIntent {
+        id: Uuid::new_v5(&t.contract.id, format!("model:{}", t.revision).as_bytes()),
+        project_id: Some(t.project_id),
+        kind: codifix_store::effects::EffectKind::ProviderRequest,
+        host_id: "agency".into(),
+        resource: "model:synthetic-fixture".into(),
+        input_fingerprint: "a".repeat(64),
+        actor_id: t.contract.specialist_id.clone(),
+        source: "agency-model".into(),
+    };
+    assert!(
+        f.store
+            .admit_effect(
+                t.contract.id,
+                t.revision,
+                Usage {
+                    micro_usd: 1,
+                    calls: 1,
+                    turns: 1
+                },
+                &intent
+            )
+            .await
+            .is_err()
+    );
+    let after = f.store.get_internal(t.contract.id).await.unwrap();
+    assert_eq!(
+        (after.used_micro_usd, after.used_calls, after.used_turns),
+        (before.used_micro_usd, before.used_calls, before.used_turns)
+    );
+    let mandate_after: (i64, i64, i64) = sqlx::query_as(
+        "SELECT used_microusd,used_calls,used_turns FROM agency_mandates WHERE id=$1",
+    )
+    .bind(f.grant.id)
+    .fetch_one(&f.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(mandate_after, mandate_before);
+    let attempts: i64 = sqlx::query_scalar("SELECT count(*) FROM agency_attempts WHERE id=$1")
+        .bind(intent.id)
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(attempts, 0);
+    let effects: i64 = sqlx::query_scalar("SELECT count(*) FROM external_effects WHERE id=$1")
+        .bind(intent.id)
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(effects, 0);
+    f.db.cleanup().await.unwrap();
+}
