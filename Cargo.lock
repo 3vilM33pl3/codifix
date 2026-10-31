@@ -821,6 +821,7 @@ dependencies = [
  "chrono",
  "clap",
  "codifix-agency",
+ "codifix-agency-projects",
  "codifix-record",
  "codifix-store",
  "codifix-test-support",

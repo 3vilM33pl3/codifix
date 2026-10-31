@@ -118,7 +118,7 @@ impl Config {
                     "cloud models require TLS"
                 );
             }
-            let bound = (((m.max_input_bytes as u128 + 128)
+            let bound = (((m.max_input_bytes as u128 + 1024)
                 * m.input_micro_usd_per_million as u128)
                 + (m.max_output_tokens as u128 * m.output_micro_usd_per_million as u128))
                 .div_ceil(1_000_000);

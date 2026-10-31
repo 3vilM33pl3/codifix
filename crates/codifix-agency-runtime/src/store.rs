@@ -227,11 +227,10 @@ impl Store {
             "delegation depth exceeded"
         );
         if let Some(parent) = req.parent_id {
-            let p =
-                sqlx::query("SELECT mandate_id,requester,contract FROM agency_tasks WHERE id=$1")
-                    .bind(parent)
-                    .fetch_one(&mut *tx)
-                    .await?;
+            let p = sqlx::query("SELECT * FROM agency_tasks WHERE id=$1 FOR UPDATE")
+                .bind(parent)
+                .fetch_one(&mut *tx)
+                .await?;
             ensure!(
                 p.try_get::<String, _>("requester")? == peer.id,
                 "parent task belongs to another requester"
@@ -242,6 +241,31 @@ impl Store {
             );
             let contract: TaskContract = serde_json::from_value(p.try_get("contract")?)?;
             ensure!(!contract.status.is_terminal(), "parent task closed");
+            let parent_request: Submit = serde_json::from_value(p.try_get("payload")?)?;
+            ensure!(
+                req.deadline <= parent_request.deadline
+                    && parent_request.budget.delegation_depth > 0
+                    && req.budget.delegation_depth < parent_request.budget.delegation_depth,
+                "parent task deadline or depth exceeded"
+            );
+            let parent_used = Usage {
+                micro_usd: u64::try_from(
+                    p.try_get::<i64, _>("used_microusd")?
+                        + p.try_get::<i64, _>("reserved_microusd")?,
+                )?,
+                calls: u32::try_from(
+                    p.try_get::<i64, _>("used_calls")? + p.try_get::<i64, _>("reserved_calls")?,
+                )?,
+                turns: u32::try_from(
+                    p.try_get::<i64, _>("used_turns")? + p.try_get::<i64, _>("reserved_turns")?,
+                )?,
+            };
+            parent_request.budget.remaining(parent_used)?.check(Usage {
+                micro_usd: req.budget.micro_usd,
+                calls: req.budget.calls,
+                turns: req.budget.turns,
+            })?;
+            sqlx::query("UPDATE agency_tasks SET reserved_microusd=reserved_microusd+$2,reserved_calls=reserved_calls+$3,reserved_turns=reserved_turns+$4 WHERE id=$1").bind(parent).bind(req.budget.micro_usd as i64).bind(i64::from(req.budget.calls)).bind(i64::from(req.budget.turns)).execute(&mut *tx).await?;
         }
         let id = Uuid::new_v4();
         let contract = TaskContract {
@@ -290,38 +314,30 @@ impl Store {
     pub async fn authorize(&self, id: Uuid, revision: i64, extra: Usage) -> Result<Mandate> {
         let mut tx = self.pool.begin().await?;
         admission(&mut tx).await?;
-        let row = sqlx::query("SELECT * FROM agency_tasks WHERE id=$1 FOR UPDATE")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-        let task = decode(&row)?;
-        ensure!(
-            task.revision == revision
-                && !task.contract.status.is_terminal()
-                && task.request.deadline > Utc::now(),
-            "task no longer executable"
-        );
-        let total = Usage {
-            micro_usd: task.used_micro_usd,
-            calls: task.used_calls,
-            turns: task.used_turns,
-        }
-        .checked_add(extra)?;
-        task.request.budget.check(total)?;
-        let (m, _, usage) = mandate_tx(&mut tx, task.request.mandate_id).await?;
-        m.authorize(
-            &task.request.capability,
-            &task.request.resource,
-            None,
-            usage.checked_add(extra)?,
-            Utc::now(),
-        )?;
-        sqlx::query("UPDATE agency_mandates SET used_microusd=used_microusd+$2,used_calls=used_calls+$3,used_turns=used_turns+$4 WHERE id=$1")
-            .bind(m.id).bind(i64::try_from(extra.micro_usd)?).bind(i64::from(extra.calls)).bind(i64::from(extra.turns)).execute(&mut *tx).await?;
-        sqlx::query("UPDATE agency_tasks SET used_microusd=used_microusd+$2,used_calls=used_calls+$3,used_turns=used_turns+$4 WHERE id=$1")
-            .bind(id).bind(i64::try_from(extra.micro_usd)?).bind(i64::from(extra.calls)).bind(i64::from(extra.turns)).execute(&mut *tx).await?;
+        let m = authorize_tx(&mut tx, id, revision, extra).await?;
         tx.commit().await?;
         Ok(m)
+    }
+    /// Elect exactly one physical sender atomically with the budget debit and
+    /// intent. An uncertain prior attempt cannot be turned into a resend.
+    pub async fn admit_effect(
+        &self,
+        id: Uuid,
+        revision: i64,
+        usage: Usage,
+        intent: &codifix_store::effects::EffectIntent,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        let inserted:Option<Uuid>=sqlx::query_scalar("INSERT INTO agency_attempts(id,task_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id").bind(intent.id).bind(id).fetch_optional(&mut *tx).await?;
+        ensure!(
+            inserted.is_some(),
+            "effect already admitted; reconciliation required"
+        );
+        authorize_tx(&mut tx, id, revision, usage).await?;
+        codifix_store::effects::begin(&mut *tx, intent).await?;
+        tx.commit().await?;
+        Ok(())
     }
     pub async fn cancel(&self, id: Uuid, peer: &Peer) -> Result<StoredTask> {
         let mut task = self.get(id, peer).await?;
@@ -453,4 +469,44 @@ fn decode(row: &sqlx::postgres::PgRow) -> Result<StoredTask> {
         used_calls: u32::try_from(row.try_get::<i64, _>("used_calls")?)?,
         used_turns: u32::try_from(row.try_get::<i64, _>("used_turns")?)?,
     })
+}
+
+async fn authorize_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+    revision: i64,
+    extra: Usage,
+) -> Result<Mandate> {
+    let row = sqlx::query("SELECT * FROM agency_tasks WHERE id=$1 FOR UPDATE")
+        .bind(id)
+        .fetch_one(&mut **tx)
+        .await?;
+    let task = decode(&row)?;
+    ensure!(
+        task.revision == revision
+            && task.contract.status == TaskStatus::Working
+            && task.request.deadline > Utc::now(),
+        "task no longer executable"
+    );
+    let total = Usage {
+        micro_usd: task.used_micro_usd
+            + u64::try_from(row.try_get::<i64, _>("reserved_microusd")?)?,
+        calls: task.used_calls + u32::try_from(row.try_get::<i64, _>("reserved_calls")?)?,
+        turns: task.used_turns + u32::try_from(row.try_get::<i64, _>("reserved_turns")?)?,
+    }
+    .checked_add(extra)?;
+    task.request.budget.check(total)?;
+    let (m, _, usage) = mandate_tx(tx, task.request.mandate_id).await?;
+    m.authorize(
+        &task.request.capability,
+        &task.request.resource,
+        None,
+        usage.checked_add(extra)?,
+        Utc::now(),
+    )?;
+    sqlx::query("UPDATE agency_mandates SET used_microusd=used_microusd+$2,used_calls=used_calls+$3,used_turns=used_turns+$4 WHERE id=$1")
+            .bind(m.id).bind(i64::try_from(extra.micro_usd)?).bind(i64::from(extra.calls)).bind(i64::from(extra.turns)).execute(&mut **tx).await?;
+    sqlx::query("UPDATE agency_tasks SET used_microusd=used_microusd+$2,used_calls=used_calls+$3,used_turns=used_turns+$4 WHERE id=$1")
+            .bind(id).bind(i64::try_from(extra.micro_usd)?).bind(i64::from(extra.calls)).bind(i64::from(extra.turns)).execute(&mut **tx).await?;
+    Ok(m)
 }
