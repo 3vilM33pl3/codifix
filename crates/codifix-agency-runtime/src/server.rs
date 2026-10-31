@@ -52,8 +52,7 @@ pub fn router(app: App) -> Router {
         .route("/.well-known/agent-card.json", get(card))
         .route("/message:send", post(send_message))
         .route("/tasks", get(a2a_list))
-        .route("/tasks/{id}", get(a2a_get))
-        .route("/tasks/{id}:cancel", post(a2a_cancel))
+        .route("/tasks/{id}", get(a2a_get).post(a2a_cancel_route))
         .route("/v1/tasks", get(list).post(submit))
         .route("/v1/tasks/{id}", get(detail))
         .route("/v1/tasks/{id}/cancel", post(cancel))
@@ -204,6 +203,17 @@ async fn a2a_list(State(app): State<App>, headers: HeaderMap) -> ApiResult<Value
     Ok(Json(
         json!({"tasks":out,"pageSize":out.len(),"nextPageToken":""}),
     ))
+}
+async fn a2a_cancel_route(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(action): Path<String>,
+) -> ApiResult<a2a::Task> {
+    let id = action
+        .strip_suffix(":cancel")
+        .and_then(|id| Uuid::parse_str(id).ok())
+        .ok_or_else(|| failure(StatusCode::NOT_FOUND, "unknown_task_operation"))?;
+    a2a_cancel(State(app), headers, Path(id)).await
 }
 async fn a2a_cancel(
     State(app): State<App>,
