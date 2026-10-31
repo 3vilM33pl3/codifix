@@ -773,3 +773,31 @@ async fn list_tasks_paginates_filters_and_rejects_foreign_or_tampered_cursors() 
     }
     f.cleanup().await;
 }
+
+#[tokio::test]
+async fn private_task_reads_and_cancellation_reject_unknown_credentials() {
+    let Some(f) = fixture().await else { return };
+    let task = f.send().await;
+    let id = task["id"].as_str().unwrap();
+    for token in [None, Some("unregistered-peer-token")] {
+        for (method, path) in [
+            (Method::GET, "/tasks".to_string()),
+            (Method::GET, format!("/tasks/{id}")),
+            (Method::POST, format!("/tasks/{id}:cancel")),
+        ] {
+            let (status, error) = f.request(method, &path, token, Some("1.0"), None).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{path}: {error}");
+            assert_eq!(error["error"]["code"], "unauthorized");
+        }
+    }
+    assert_eq!(
+        f.store
+            .get_internal(Uuid::parse_str(id).unwrap())
+            .await
+            .unwrap()
+            .contract
+            .status,
+        TaskStatus::Submitted
+    );
+    f.cleanup().await;
+}
