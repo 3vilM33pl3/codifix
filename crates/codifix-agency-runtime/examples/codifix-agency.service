@@ -1,0 +1,23 @@
+[Unit]
+Description=Bounded Codifix specialist runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=codifix-agency
+Group=codifix-agency
+EnvironmentFile=/etc/codifix-agency/credentials.env
+ExecStart=/opt/codifix/bin/codifix-agency --config /etc/codifix-agency/config.json serve
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+UMask=0077
+# This account must never have read access to an unseal quorum.
+# Configure TLS proxy, backups and the chosen human alert channel separately.
+
+[Install]
+WantedBy=multi-user.target
