@@ -1,0 +1,8 @@
+{
+  "identity_file": "/etc/codifix-bao/attestor/identity.json",
+  "reader_token_file": "/etc/codifix-bao/attestor/identity-reader.token",
+  "process": {
+    "pid": 0,
+    "marker": "REPLACE_INSPECT_PROCESS_MARKER"
+  }
+}

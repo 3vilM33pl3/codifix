@@ -1,0 +1,57 @@
+{
+  "target": {
+    "endpoint": {
+      "url": "https://bao.example.invalid:8200/",
+      "ca_pem_file": "/etc/codifix-bao/own-role/target-ca.pem",
+      "fixture_localhost_http": false
+    },
+    "identity_endpoint": {
+      "url": "https://bao-attestor.example.invalid:8200/",
+      "ca_pem_file": "/etc/codifix-bao/own-role/target-ca.pem",
+      "fixture_localhost_http": false
+    },
+    "expected": {
+      "installation_id": "REPLACE_REVIEWED_INSTALLATION_ID",
+      "key_generation": 1,
+      "boot_id": "REPLACE_INSPECT_PROCESS_MARKER",
+      "seal_type": "shamir",
+      "shares": 3,
+      "threshold": 2,
+      "valid_until": 0
+    },
+    "attestor_token_file": "/etc/codifix-bao/own-role/identity-reader.token"
+  },
+  "roster": [
+    {
+      "custodian_id": "custodian-1",
+      "share_id": "1111111111111111111111111111111111111111111111111111111111111111",
+      "failure_domain": "REPLACE-INDEPENDENT-HOST-1"
+    },
+    {
+      "custodian_id": "custodian-2",
+      "share_id": "2222222222222222222222222222222222222222222222222222222222222222",
+      "failure_domain": "REPLACE-INDEPENDENT-HOST-2"
+    }
+  ],
+  "peers": [
+    {
+      "custodian_id": "custodian-1",
+      "endpoint": {
+        "url": "https://custodian-1.example.invalid:8200/",
+        "ca_pem_file": "/etc/codifix-bao/own-role/target-ca.pem",
+        "fixture_localhost_http": false
+      },
+      "controller_token_file": "/etc/codifix-bao/controller/custodian-1.token"
+    },
+    {
+      "custodian_id": "custodian-2",
+      "endpoint": {
+        "url": "https://custodian-2.example.invalid:8200/",
+        "ca_pem_file": "/etc/codifix-bao/own-role/target-ca.pem",
+        "fixture_localhost_http": false
+      },
+      "controller_token_file": "/etc/codifix-bao/controller/custodian-2.token"
+    }
+  ],
+  "state_file": "/var/lib/codifix-bao-controller/state.json"
+}
