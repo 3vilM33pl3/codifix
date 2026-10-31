@@ -708,6 +708,11 @@ async fn assess_task(store: &Store, cfg: &Config, a: TaskAssessment) -> Result<V
     // Requiring the operational observation also validates the persisted
     // task/outcome/binding. A caller cannot submit an assessment before work.
     observe_task(store, cfg, a.task_id).await?;
+    let completed = store.get_internal(a.task_id).await?;
+    ensure!(
+        a.assessed_at >= completed.contract.updated_at,
+        "assessment predates persisted task completion"
+    );
     let mut tx = store.pool.begin().await?;
     let b:Value=sqlx::query_scalar("SELECT binding FROM agency_learning_assignments WHERE task_id=$1 ORDER BY task_revision DESC LIMIT 1").bind(a.task_id).fetch_one(&mut *tx).await?;
     let b: DraftBinding = serde_json::from_value(b)?;
