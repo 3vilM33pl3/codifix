@@ -1,0 +1,14 @@
+{
+  "message": {
+    "messageId": "message-config-fixture",
+    "role": "ROLE_USER",
+    "parts": [{"data": {"kind": "inspect"}, "mediaType": "application/json", "metadata": {"source": "synthetic-contract-fixture"}}]
+  },
+  "configuration": {
+    "acceptedOutputModes": ["application/json"],
+    "returnImmediately": true,
+    "historyLength": 0,
+    "taskPushNotificationConfig": {"url": "https://notify.example.com/"}
+  },
+  "metadata": {"trace": "synthetic-contract-fixture"}
+}

@@ -107,7 +107,7 @@ impl AgentCard {
             security_schemes: BTreeMap::new(),
             security_requirements: Vec::new(),
             capabilities: AgentCapabilities::default(),
-            default_input_modes: vec!["text/plain".into(), "application/json".into()],
+            default_input_modes: vec!["application/json".into()],
             default_output_modes: vec!["application/json".into()],
             skills: profile
                 .capabilities
@@ -129,12 +129,89 @@ pub enum Role {
     #[serde(rename = "ROLE_AGENT")]
     Agent,
 }
-/// Externally tagged enum enforces the required one-of union on decoding.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// Supported content union. Optional wire mediaType/metadata are accepted but
+/// intentionally not retained by this minimal content-only domain type.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Part {
     Text(String),
     Data(Value),
+}
+impl Serialize for Part {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::{Error, SerializeMap};
+        let mut map = serializer.serialize_map(Some(1))?;
+        match self {
+            Self::Text(text) => map.serialize_entry("text", text)?,
+            Self::Data(data) => {
+                if !data.is_object() {
+                    return Err(S::Error::custom("data part must be an object"));
+                }
+                map.serialize_entry("data", data)?;
+            }
+        }
+        map.end()
+    }
+}
+impl<'de> Deserialize<'de> for Part {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct PartVisitor;
+        impl<'de> serde::de::Visitor<'de> for PartVisitor {
+            type Value = Part;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(
+                    "an object containing exactly one supported text or object data part",
+                )
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Part, A::Error> {
+                use serde::de::Error;
+                let mut content = None;
+                let mut media_type_seen = false;
+                let mut metadata_seen = false;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "text" | "data" => {
+                            if content.is_some() {
+                                return Err(A::Error::custom(
+                                    "ambiguous or duplicate part content",
+                                ));
+                            }
+                            content = Some(if key == "text" {
+                                Part::Text(map.next_value::<String>()?)
+                            } else {
+                                let value = map.next_value::<Value>()?;
+                                if !value.is_object() {
+                                    return Err(A::Error::custom("data part must be an object"));
+                                }
+                                Part::Data(value)
+                            });
+                        }
+                        "raw" | "url" => {
+                            return Err(A::Error::custom("unsupported or ambiguous part content"));
+                        }
+                        "mediaType" => {
+                            if media_type_seen {
+                                return Err(A::Error::duplicate_field("mediaType"));
+                            }
+                            media_type_seen = true;
+                            let _: String = map.next_value()?;
+                        }
+                        "metadata" => {
+                            if metadata_seen {
+                                return Err(A::Error::duplicate_field("metadata"));
+                            }
+                            metadata_seen = true;
+                            let _: serde_json::Map<String, Value> = map.next_value()?;
+                        }
+                        _ => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
+                    }
+                }
+                content.ok_or_else(|| A::Error::custom("missing part content"))
+            }
+        }
+        deserializer.deserialize_map(PartVisitor)
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -151,6 +228,10 @@ impl Message {
     pub fn validate(&self) -> Result<(), PolicyError> {
         if self.message_id.trim().is_empty()
             || self.parts.is_empty()
+            || self
+                .parts
+                .iter()
+                .any(|part| matches!(part, Part::Data(value) if !value.is_object()))
             || self
                 .context_id
                 .as_ref()
@@ -278,7 +359,25 @@ impl Task {
 pub struct SendMessageRequest {
     pub message: Message,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub configuration: Option<SendMessageConfiguration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Map<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
+}
+/// A2A 1.0 defaults to waiting for a terminal or interrupted task. The runtime
+/// must implement that behavior and explicitly reject unsupported push configs.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendMessageConfiguration {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accepted_output_modes: Vec<String>,
+    #[serde(default)]
+    pub return_immediately: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub history_length: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_push_notification_config: Option<Value>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -294,6 +393,17 @@ impl SendMessageRequest {
         existing_task: Option<&Task>,
     ) -> Result<(), PolicyError> {
         self.message.validate()?;
+        if self.configuration.as_ref().is_some_and(|config| {
+            config
+                .history_length
+                .is_some_and(|length| length > i32::MAX as u32)
+                || config
+                    .accepted_output_modes
+                    .iter()
+                    .any(|mode| mode.trim().is_empty())
+        }) {
+            return Err(PolicyError::Invalid("A2A send configuration"));
+        }
         if self.message.role != Role::User
             || self.tenant != interface.tenant
             || interface.protocol_version != PROTOCOL_VERSION

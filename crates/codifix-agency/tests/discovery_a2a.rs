@@ -177,3 +177,89 @@ fn private_contract_fixture_projects_completed_outputs_as_artifacts() {
     assert!(wire["artifacts"][0]["parts"][0].get("data").is_some());
     assert!(wire["status"].get("message").is_none());
 }
+
+#[test]
+fn send_configuration_preserves_defaults_presence_and_unsupported_push_request() {
+    let base: SendMessageRequest =
+        serde_json::from_str(include_str!("fixtures/a2a-request.json")).expect("base request");
+    assert!(base.configuration.is_none());
+    let default: SendMessageConfiguration =
+        serde_json::from_value(json!({})).expect("default configuration");
+    assert!(!default.return_immediately);
+    assert!(default.history_length.is_none());
+    assert!(default.task_push_notification_config.is_none());
+    let request: SendMessageRequest =
+        serde_json::from_str(include_str!("fixtures/a2a-request-config.json"))
+            .expect("configured request");
+    let config = request.configuration.as_ref().expect("configuration");
+    assert!(config.return_immediately);
+    assert_eq!(config.history_length, Some(0));
+    assert_eq!(config.accepted_output_modes, vec!["application/json"]);
+    assert_eq!(
+        config
+            .task_push_notification_config
+            .as_ref()
+            .expect("preserved for runtime rejection")["url"],
+        "https://notify.example.com/"
+    );
+    assert_eq!(
+        request.metadata.as_ref().expect("request metadata")["trace"],
+        "synthetic-contract-fixture"
+    );
+    let wire = serde_json::to_value(&request).expect("serialize request");
+    assert_eq!(wire["configuration"]["historyLength"], 0);
+    assert_eq!(
+        wire["message"]["parts"][0],
+        json!({"data":{"kind":"inspect"}})
+    );
+    assert!(
+        serde_json::from_value::<SendMessageConfiguration>(json!({"historyLength":-1})).is_err()
+    );
+    let card = AgentCard::from_profile(
+        &profile(),
+        "https://agents.example.com/a2a".into(),
+        "1.0.0".into(),
+        "HTTP+JSON",
+    )
+    .expect("card");
+    let mut too_large = request.clone();
+    too_large
+        .configuration
+        .as_mut()
+        .expect("config")
+        .history_length = Some(u32::MAX);
+    assert!(
+        too_large
+            .validate(&card.supported_interfaces[0], None)
+            .is_err()
+    );
+    assert_eq!(card.default_input_modes, vec!["application/json"]);
+    assert_eq!(card.default_output_modes, vec!["application/json"]);
+}
+#[test]
+fn part_accepts_optional_wire_fields_but_rejects_ambiguous_or_nonobject_data() {
+    let text:Part=serde_json::from_value(json!({"text":"hello","mediaType":"text/plain","metadata":{"source":"fixture"},"futureOptional":true})).expect("text metadata");
+    assert_eq!(text, Part::Text("hello".into()));
+    let data: Part = serde_json::from_value(
+        json!({"data":{"kind":"inspect"},"mediaType":"application/json","metadata":{}}),
+    )
+    .expect("data metadata");
+    assert_eq!(data, Part::Data(json!({"kind":"inspect"})));
+    for value in [
+        json!({"text":"a","data":{}}),
+        json!({"text":"a","raw":"YQ=="}),
+        json!({"data":{},"url":"https://example.com/"}),
+        json!({"data":null}),
+        json!({"data":3}),
+        json!({"data":[]}),
+        json!({"metadata":{}}),
+        json!({"text":"a","metadata":[]}),
+    ] {
+        assert!(serde_json::from_value::<Part>(value).is_err());
+    }
+    assert!(serde_json::from_str::<Part>(r#"{"text":"a","text":"b"}"#).is_err());
+    assert!(serde_json::from_str::<Part>(r#"{"data":{},"data":{}}"#).is_err());
+    assert!(serde_json::to_value(Part::Data(json!(3))).is_err());
+    let schema: Value = serde_json::from_str(CAPABILITY_LEXICON).expect("lexicon");
+    assert_eq!(schema["defs"]["main"]["key"], "any");
+}
