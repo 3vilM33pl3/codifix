@@ -55,46 +55,70 @@ not OpenBao root or application tokens. No token provisioning API exists.
 identity and custodian peers must all use the same fixture/production mode. This
 switch is never appropriate for real shares.
 
-## Identity evidence and limits
+## Stable installation and fresh boot evidence
 
-Native sealed [`/v1/sys/seal-status`](https://openbao.org/api-docs/system/seal-status/) exposes seal parameters, progress and nonce;
-it does **not** independently prove the installation's root/unseal-key generation.
-The included target-adjacent attestor therefore serves an operator-maintained
-expiring identity at `/codifix-agency/v1/identity`. Controller and custodians pin
-that helper's separate HTTPS identity and compare the complete reviewed record:
-installation ID, key generation, native process boot marker, seal type, `n`, `t`
-and absolute lease expiry. They also independently compare actual native
-seal-status fields and reject uninitialized, migrating, recovery or non-Shamir
-seals. There is no silent downgrade if evidence is missing.
+Native sealed [`/v1/sys/seal-status`](https://openbao.org/api-docs/system/seal-status/)
+does not independently prove the installation's root/unseal-key generation. The
+included target-adjacent attestor serves fresh evidence at
+`/codifix-agency/v1/identity?challenge=UUID`. Each reader supplies an unpredictable
+challenge, verifies its echo and a maximum 30-second response lifetime, then
+checks the complete stable enrolled identity: installation ID, key generation,
+reviewed native binding, Shamir seal type, `n`, `t` and absolute authorization
+lease. Actual native seal-status is independently checked as well.
 
-On Linux the helper verifies the native OpenBao PID, `/proc` start time and
-machine boot ID for every identity read. `inspect-process PID` emits the safe
-marker for enrollment. A restarted/exited native process or host reboot requires
-human review and re-enrollment. The attestor must share the native process's PID
-namespace and must be enrolled against the actual OpenBao process, not its
-service manager. Attestor restart alone does not change an unchanged native
-process marker.
+**Ordinary restart or reboot of this known installation is autonomous.** The
+attestor reads the live PID from the protected file maintained automatically by
+OpenBao's [`pid_file` configuration](https://openbao.org/docs/configuration/).
+It obtains fresh Linux PID/start-time/machine-boot evidence and verifies all
+stable bindings before issuing a response:
 
-**The operator's generation record is an attestation, not cryptographic proof
-that an administrator has not rekeyed the running vault.** Before any rekey,
-restore, upgrade, restart or generation-affecting maintenance, withdraw the
-identity lease, stop/fence controller and custodians, finish maintenance, then
-independently re-enroll all roles. Do not renew a lease without checking the
-installation and generation. Native unseal does not support conditional
-identity/nonce submissions, so the operator must prevent target/rekey/reset
-changes during a live ceremony. A privileged actor bypassing this maintenance
-fence is outside this pilot's trust model. The pilot must not be enabled where
-that operational fence and independent evidence cannot be assured.
+- the actual loaded executable path and content digest, including matching
+  on-disk executable identity;
+- a digest of the exact reviewed invocation and a digest of the independently
+  enrolled native configuration file;
+- the protected local storage directory's device/inode and an installation
+  record inside that directory, matching enrolled installation and generation;
+- an explicit `maintenance: false` record and an unexpired authorization lease.
 
-Unexpected identity, key generation, CA, process marker, expiry, seal/threshold,
-missing state, native partial progress or interrupted ceremony stops work and
-emits a secret-free `escalation` observation. A failed standing routine never
-loops through fresh challenges. Manual recovery must inspect native status and
-custodian replay records; there is intentionally no automatic state-delete,
-nonce-reset or retry override. Missing replay state never silently initializes.
-Restoring stale disk snapshots can roll back local replay protection; retain
-monotonic replay state through operator-controlled backup/recovery and do not
-restore it as an unattended routine.
+These stable fingerprints remain in controller and custodian replay enrollment.
+New PIDs and machine boot markers do not change enrollment or require approval.
+The attestor must share the native PID namespace and run under an account that
+can safely read the native configuration, private PID file and installation
+record. It holds no custody share. Use a reviewed, controlled native service
+launch environment; this pilot fingerprints argv and configuration, not the
+entire process environment. To avoid repeatedly hashing a large image, the
+attestor caches a successful digest only for that process marker and loaded
+executable inode/metadata. A restart, exec or replacement invalidates that cache.
+The native config, storage identity, installation/generation and maintenance
+record are checked on every request.
+
+**The generation record remains an operator attestation, not cryptographic proof
+that a privileged administrator has not rekeyed a running vault.** Before rekey,
+restore, binary/config/storage changes or generation-affecting maintenance, set
+`maintenance: true`, fence controller and custodians, perform maintenance, then
+review and re-enroll changed bindings before clearing the fence. Do not renew an
+authorization lease without checking installation and generation. The pilot
+cannot be enabled where this maintenance fence and independent evidence cannot
+be assured. Native unseal has no atomic conditional identity/nonce operation;
+prevent rekey/reset/installation changes during a live ceremony. Routine restart
+of an unchanged installation needs no maintenance edit or re-enrollment.
+
+Unknown executable/config/invocation/storage, changed installation or generation,
+maintenance signals, changed CA, expired authorization, unsupported seal/threshold,
+missing replay state, native partial progress or interrupted ceremonies stop
+submission and emit a secret-free `escalation` observation. Storage device/inode
+is intentionally conservative: a different mount topology, replaced storage or
+restored directory requires review even if paths look unchanged. Missing PID or
+an unavailable native process never yields an attestation. Arrange service start
+order or the independent runtime's readiness checks so the native PID/API and
+attestor are ready before dispatching the standing routine.
+
+A failed started ceremony never loops through fresh challenges. Manual recovery
+must inspect native status and custodian replay records; there is no automatic
+state-delete, nonce-reset or retry override. Missing replay state never silently
+initializes. Restoring stale disk snapshots can roll back local replay protection;
+retain monotonic replay state through reviewed backup/recovery and do not restore
+it as an unattended routine.
 
 ## Bootstrap and executable
 
@@ -114,12 +138,19 @@ there is no controller-side share-import helper.
 2. Establish dedicated TLS identities and distinct scoped controller tokens.
    Supply only the custodian's own share and controller capability to that host.
    Provision the identity-reader token separately; it cannot authorize a ceremony.
-3. Inspect the actual OpenBao process and enroll its marker, installation identity
-   and current key generation with a bounded lease. Copy the reviewed public
-   target/roster into each role's own protected configuration.
-4. Start the read-only attestor with its listener file. Check its authenticated
-   identity through the enrolled TLS anchor. Every role independently holds the
-   matching expected identity and process marker.
+3. Configure native OpenBao `pid_file` in a private native-owned directory and
+   use `UMask=0077` so each ordinary restart writes its own protected current PID.
+   Provision the installation/generation/maintenance record inside the private
+   storage directory, with no custody share there. Inspect the specifically
+   selected actual process with `inspect-native`, and independently review its
+   binary, invocation, config, local storage, installation and current generation.
+   The inspector emits paths and fingerprints; it never prints argv/config contents.
+4. Enroll that stable binding and installation/generation with a bounded lease.
+   Copy the reviewed public target/roster into each role's own protected config.
+   Start the read-only attestor and check its authenticated, fresh boot evidence
+   through its enrolled TLS anchor. Every role independently holds the matching
+   stable identity. `examples/installation.json` starts with maintenance enabled;
+   clear it only after the enrollment review.
 5. Initialize each empty local replay state once with `init-custodian CONFIG` or
    `init-controller CONFIG`. Existing files are never overwritten. These commands
    initialize local state only; they cannot initialize an OpenBao vault.
@@ -132,6 +163,7 @@ Commands:
 
 ```text
 codifix-agency-openbao inspect-process PID
+codifix-agency-openbao inspect-native PID CONFIG_FILE STORAGE_DIRECTORY INSTALLATION_FILE
 codifix-agency-openbao attestor-serve ATTESTOR_CONFIG LISTENER_CONFIG
 codifix-agency-openbao init-custodian CUSTODIAN_CONFIG
 codifix-agency-openbao custodian-serve CUSTODIAN_CONFIG LISTENER_CONFIG
@@ -188,14 +220,16 @@ cargo test -p codifix-agency-openbao --test ceremony actual_openbao_shamir_two_o
 ```
 
 Tests exercise actual HTTP custodian and attestor routers, native nonce/progress,
-replayed/expired/cross-target ceremonies, generation/process/seal drift, scoped
+replayed/expired/cross-target ceremonies, generation/config/storage/process/seal drift, scoped
 authentication, partial failure, missing and unsafe files, exclusive state locks,
 duplicate custody metadata and fingerprint mismatch. A generated TLS fixture
 proves enrolled trust succeeds, an unrelated certificate fails, and redirects
 are rejected. The opt-in native test starts a separate file-storage OpenBao,
 generates synthetic 2-of-3 bootstrap keys, distributes only those synthetic test
 shares and unseals through separate custodian executable processes with actual
-`status` and `controller-once` executable invocations. Fixture bootstrap holds all
+`status` and `controller-once` executable invocations. It then stops and restarts
+the native vault sealed, verifies a fresh native process marker, and automatically
+unseals a second time using the unchanged enrollment and replay state. Fixture bootstrap holds all
 **synthetic** shares solely to construct the isolated test; production binaries
 have no such bootstrap/init path. No real CA, production URL, vault credentials,
 Codifix database, Workshop or cloud account is used. Linux integration has been

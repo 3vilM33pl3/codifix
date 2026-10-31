@@ -1,8 +1,16 @@
 {
   "identity_file": "/etc/codifix-bao/attestor/identity.json",
   "reader_token_file": "/etc/codifix-bao/attestor/identity-reader.token",
-  "process": {
-    "pid": 0,
-    "marker": "REPLACE_INSPECT_PROCESS_MARKER"
+  "pid_file": "/run/openbao-private/bao.pid",
+  "native": {
+    "executable": "/usr/local/bin/bao",
+    "executable_sha256": "REPLACE_REVIEWED_SHA256",
+    "argv_sha256": "REPLACE_REVIEWED_SHA256",
+    "config_file": "/etc/openbao/private/bao.hcl",
+    "config_sha256": "REPLACE_REVIEWED_SHA256",
+    "storage_directory": "/var/lib/openbao/data",
+    "storage_device": 0,
+    "storage_inode": 0,
+    "installation_file": "/var/lib/openbao/data/.codifix-installation.json"
   }
 }
