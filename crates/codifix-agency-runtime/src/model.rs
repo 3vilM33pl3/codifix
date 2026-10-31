@@ -67,7 +67,13 @@ pub async fn draft(
         )
         .await?;
     let started = std::time::Instant::now();
-    let result = send(endpoint, &payload).await;
+    let context_limit = cfg
+        .model_profiles
+        .iter()
+        .find(|p| p.id == decision.profile_id)
+        .ok_or_else(|| anyhow::anyhow!("model profile missing"))?
+        .context_tokens;
+    let result = send(endpoint, &payload, context_limit).await;
     let (status, reason) = if result.is_ok() {
         (
             codifix_store::effects::EffectStatus::Confirmed,
@@ -87,7 +93,11 @@ pub async fn draft(
         json!({"artifact":artifact,"route":decision,"provider_usage":provider_usage,"reserved_micro_usd":endpoint.reserve_micro_usd,"latency_ms":started.elapsed().as_millis()}),
     )
 }
-async fn send(endpoint: &ModelEndpoint, payload: &Value) -> Result<(Value, Value)> {
+async fn send(
+    endpoint: &ModelEndpoint,
+    payload: &Value,
+    context_limit: u32,
+) -> Result<(Value, Value)> {
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(90))
@@ -137,8 +147,7 @@ async fn send(endpoint: &ModelEndpoint, payload: &Value) -> Result<(Value, Value
         .as_u64()
         .ok_or_else(|| anyhow::anyhow!("provider output usage unavailable"))?;
     ensure!(
-        input <= endpoint.max_input_bytes as u64 + 1024
-            && output <= u64::from(endpoint.max_output_tokens),
+        input <= u64::from(context_limit) && output <= u64::from(endpoint.max_output_tokens),
         "provider exceeded token bound"
     );
     let actual = (u128::from(input) * u128::from(endpoint.input_micro_usd_per_million)

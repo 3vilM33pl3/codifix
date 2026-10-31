@@ -11,6 +11,9 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
+hmac = "0.12"
+codifix-agency-openbao = { path = "../codifix-agency-openbao" }
 axum.workspace = true
 chrono.workspace = true
 clap.workspace = true

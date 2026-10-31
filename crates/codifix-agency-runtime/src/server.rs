@@ -4,7 +4,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path, State},
+    extract::{DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
@@ -12,8 +12,9 @@ use codifix_agency::{
     Mandate,
     a2a::{self, Part},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sqlx::Row;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -192,16 +193,91 @@ async fn a2a_get(
     let task = app.store.get(id, &p).await.map_err(safe_error)?;
     Ok(Json(project_task(&app, task).await?))
 }
-async fn a2a_list(State(app): State<App>, headers: HeaderMap) -> ApiResult<Value> {
+#[derive(Deserialize, Serialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ListQuery {
+    page_size: Option<u32>,
+    page_token: Option<String>,
+    context_id: Option<Uuid>,
+    status: Option<a2a::TaskState>,
+    history_length: Option<u32>,
+    status_timestamp_after: Option<i64>,
+    include_artifacts: Option<bool>,
+}
+#[derive(Deserialize, Serialize)]
+struct Cursor {
+    at: chrono::DateTime<chrono::Utc>,
+    id: Uuid,
+    binding: String,
+}
+async fn a2a_list(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> ApiResult<Value> {
     version(&headers)?;
     let p = peer(&app, &headers)?;
-    let tasks = app.store.list(&p).await.map_err(safe_error)?;
-    let mut out = Vec::new();
-    for task in tasks {
-        out.push(project_task(&app, task).await?);
+    let page_size = query.page_size.unwrap_or(50);
+    if !(1..=100).contains(&page_size) {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_page_size"));
+    }
+    let states: Option<Vec<&str>> = query.status.map(|s| match s {
+        a2a::TaskState::Submitted => vec!["submitted"],
+        a2a::TaskState::Working => vec!["working"],
+        a2a::TaskState::Completed => vec!["completed"],
+        a2a::TaskState::Failed => vec!["failed"],
+        a2a::TaskState::Canceled => vec!["canceled"],
+        a2a::TaskState::InputRequired => vec!["input_required", "plan_review_required"],
+        a2a::TaskState::Rejected => vec!["rejected"],
+        _ => vec![],
+    });
+    let binding=crate::store::fingerprint(&json!({"peer":p.id,"page_size":page_size,"context":query.context_id,"states":states,"after":query.status_timestamp_after,"artifacts":query.include_artifacts})).map_err(safe_error)?;
+    let cursor: Option<Cursor> = query
+        .page_token
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|token| app.auth.decode_cursor(token))
+        .transpose()
+        .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_page_token"))?;
+    if cursor.as_ref().is_some_and(|c| c.binding != binding) {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_page_token"));
+    }
+    let after = query
+        .status_timestamp_after
+        .map(|ms| {
+            chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms)
+                .ok_or_else(|| failure(StatusCode::BAD_REQUEST, "invalid_timestamp"))
+        })
+        .transpose()?;
+    let total:i64=sqlx::query_scalar("SELECT count(*) FROM agency_tasks WHERE ($1 OR requester=$2) AND ($3::uuid IS NULL OR id=$3) AND ($4::text[] IS NULL OR contract->>'status'=ANY($4)) AND ($5::timestamptz IS NULL OR (contract->>'updated_at')::timestamptz>$5)")
+        .bind(p.operator).bind(&p.id).bind(query.context_id).bind(&states).bind(after).fetch_one(&app.store.pool).await.map_err(|_|failure(StatusCode::INTERNAL_SERVER_ERROR,"storage_unavailable"))?;
+    let rows=sqlx::query("SELECT * FROM agency_tasks WHERE ($1 OR requester=$2) AND ($3::uuid IS NULL OR id=$3) AND ($4::text[] IS NULL OR contract->>'status'=ANY($4)) AND ($5::timestamptz IS NULL OR (contract->>'updated_at')::timestamptz>$5) AND ($6::timestamptz IS NULL OR (created_at,id)<($6,$7)) ORDER BY created_at DESC,id DESC LIMIT $8")
+        .bind(p.operator).bind(&p.id).bind(query.context_id).bind(&states).bind(after).bind(cursor.as_ref().map(|c|c.at)).bind(cursor.as_ref().map(|c|c.id)).bind(i64::from(page_size)+1).fetch_all(&app.store.pool).await.map_err(|_|failure(StatusCode::INTERNAL_SERVER_ERROR,"storage_unavailable"))?;
+    let more = rows.len() > page_size as usize;
+    let mut tasks = Vec::new();
+    let mut next = String::new();
+    for (index, row) in rows.iter().take(page_size as usize).enumerate() {
+        let task = crate::store::decode(row).map_err(safe_error)?;
+        if more && index + 1 == page_size as usize {
+            next = app
+                .auth
+                .encode_cursor(&Cursor {
+                    at: row.try_get("created_at").map_err(|_| {
+                        failure(StatusCode::INTERNAL_SERVER_ERROR, "invalid_cursor")
+                    })?,
+                    id: task.contract.id,
+                    binding: binding.clone(),
+                })
+                .map_err(safe_error)?;
+        }
+        let mut wire = project_task(&app, task).await?;
+        if !query.include_artifacts.unwrap_or(false) {
+            wire.artifacts.clear();
+        }
+        tasks.push(wire);
     }
     Ok(Json(
-        json!({"tasks":out,"pageSize":out.len(),"nextPageToken":""}),
+        json!({"tasks":tasks,"totalSize":total,"pageSize":page_size,"nextPageToken":next}),
     ))
 }
 async fn a2a_cancel_route(
@@ -232,6 +308,24 @@ async fn send_message(
 ) -> ApiResult<a2a::SendMessageResponse> {
     version(&headers)?;
     let p = peer(&app, &headers)?;
+    let configuration = req.configuration.clone().unwrap_or_default();
+    if configuration.task_push_notification_config.is_some() {
+        return Err(failure(
+            StatusCode::BAD_REQUEST,
+            "PushNotificationNotSupportedError",
+        ));
+    }
+    if !configuration.accepted_output_modes.is_empty()
+        && !configuration
+            .accepted_output_modes
+            .iter()
+            .any(|s| s == "application/json")
+    {
+        return Err(failure(
+            StatusCode::BAD_REQUEST,
+            "ContentTypeNotSupportedError",
+        ));
+    }
     let interface = a2a::AgentInterface {
         url: app.config.public_url.clone(),
         protocol_binding: "HTTP+JSON".into(),
@@ -286,6 +380,27 @@ async fn send_message(
         check_specialist(&app, &submit)?;
         app.store.submit(&submit, &p).await.map_err(safe_error)?
     };
+    let mut task = task;
+    if !configuration.return_immediately {
+        let timeout = tokio::time::Instant::now() + std::time::Duration::from_secs(60);
+        while matches!(
+            task.contract.status,
+            codifix_agency::TaskStatus::Submitted | codifix_agency::TaskStatus::Working
+        ) {
+            if tokio::time::Instant::now() >= timeout {
+                return Err(failure(
+                    StatusCode::REQUEST_TIMEOUT,
+                    "task_continues_poll_by_id",
+                ));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            task = app
+                .store
+                .get(task.contract.id, &p)
+                .await
+                .map_err(safe_error)?;
+        }
+    }
     Ok(Json(a2a::SendMessageResponse::Task(
         project_task(&app, task).await?,
     )))

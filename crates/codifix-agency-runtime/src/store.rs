@@ -372,6 +372,7 @@ impl Store {
             peer.operator || task.requester == peer.id,
             "task unavailable"
         );
+        ensure!(task.request.deadline > Utc::now(), "task deadline expired");
         let body = json!({"answer":answer,"replacement":replacement});
         let prior: Option<Value> = sqlx::query_scalar(
             "SELECT body FROM agency_messages WHERE task_id=$1 AND message_id=$2",
@@ -395,11 +396,13 @@ impl Store {
             ..Usage::default()
         })?)?;
         task.request.budget.check(Usage {
-            micro_usd: task.used_micro_usd,
-            calls: task.used_calls,
+            micro_usd: task.used_micro_usd
+                + u64::try_from(row.try_get::<i64, _>("reserved_microusd")?)?,
+            calls: task.used_calls + u32::try_from(row.try_get::<i64, _>("reserved_calls")?)?,
             turns: task
                 .used_turns
-                .checked_add(1)
+                .checked_add(u32::try_from(row.try_get::<i64, _>("reserved_turns")?)?)
+                .and_then(|n| n.checked_add(1))
                 .ok_or_else(|| anyhow::anyhow!("turn limit"))?,
         })?;
         task.contract
@@ -458,7 +461,7 @@ async fn enqueue(
         .await?;
     Ok(())
 }
-fn decode(row: &sqlx::postgres::PgRow) -> Result<StoredTask> {
+pub(crate) fn decode(row: &sqlx::postgres::PgRow) -> Result<StoredTask> {
     Ok(StoredTask {
         contract: serde_json::from_value(row.try_get("contract")?)?,
         request: serde_json::from_value(row.try_get("payload")?)?,

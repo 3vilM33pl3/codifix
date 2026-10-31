@@ -219,8 +219,16 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
     let baseline = client.retrieve_plan(&plan).await?;
     let changes = codifix_agency_projects::prepare(&plan, &baseline, &authority)?;
     let id = Uuid::new_v5(&task.contract.id, plan.digest().as_bytes());
+    let mut tx = store.pool.begin().await?;
+    let head:Option<Uuid>=sqlx::query_scalar("INSERT INTO agency_plan_heads(plan_id,mandate_id,revision,digest,prepared_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT(plan_id,mandate_id) DO UPDATE SET revision=$3,digest=$4,prepared_id=$5 WHERE agency_plan_heads.revision<$3 OR (agency_plan_heads.revision=$3 AND agency_plan_heads.digest=$4) RETURNING prepared_id")
+        .bind(plan.id).bind(task.request.mandate_id).bind(i64::try_from(plan.revision)?).bind(plan.digest()).bind(id).fetch_optional(&mut *tx).await?;
+    ensure!(
+        head.is_some(),
+        "a newer or conflicting plan revision is already accepted"
+    );
     sqlx::query("INSERT INTO agency_prepared_plans(id,mandate_id,plan,changes) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO NOTHING")
-        .bind(id).bind(task.request.mandate_id).bind(serde_json::to_value(&plan)?).bind(serde_json::to_value(&changes)?).execute(&store.pool).await?;
+        .bind(id).bind(task.request.mandate_id).bind(serde_json::to_value(&plan)?).bind(serde_json::to_value(&changes)?).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(Some(
         json!({"prepared_id":id,"plan_digest":plan.digest(),"changes":changes,"source":plan.source}),
     ))
@@ -252,24 +260,32 @@ async fn apply_plan(
             },
         "plan resource binding mismatch"
     );
+    let mut plan_owner =
+        codifix_store::executions::Execution::acquire(&store.pool, plan.id).await?;
     let mut journal = ProjectJournal {
         store: store.clone(),
         task: task.clone(),
         lease: lease.clone(),
         prepared_id: id,
+        plan_id: plan.id,
+        attempts: std::collections::BTreeMap::new(),
+        owner: &mut plan_owner,
     };
     let outcomes = client
         .execute(&plan, &authority, &changes, &mut journal)
         .await?;
     Ok(json!({"prepared_id":id,"plan_digest":plan.digest(),"objects":outcomes}))
 }
-struct ProjectJournal {
+struct ProjectJournal<'a> {
+    owner: &'a mut codifix_store::executions::Execution,
     store: Store,
     task: StoredTask,
     lease: JobLease,
     prepared_id: Uuid,
+    plan_id: Uuid,
+    attempts: std::collections::BTreeMap<Uuid, Uuid>,
 }
-impl codifix_agency_projects::StepJournal for ProjectJournal {
+impl codifix_agency_projects::StepJournal for ProjectJournal<'_> {
     async fn load(
         &mut self,
         id: Uuid,
@@ -319,16 +335,11 @@ impl codifix_agency_projects::StepJournal for ProjectJournal {
         sqlx::query("INSERT INTO agency_steps(id,task_id,receipt) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET receipt=$3,updated_at=clock_timestamp()")
             .bind(id).bind(self.task.contract.id).bind(serde_json::to_value(receipt).map_err(|_|journal_error())?).execute(&mut *tx).await.map_err(|_|journal_error())?;
         if receipt.phase == StepPhase::Verified {
-            let effect: bool =
-                sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM external_effects WHERE id=$1)")
-                    .bind(id)
-                    .fetch_one(&mut *tx)
-                    .await
-                    .map_err(|_| journal_error())?;
-            if effect {
+            let effects:Vec<Uuid>=sqlx::query_scalar("SELECT id FROM external_effects WHERE source='agency-linear' AND resource=$1 AND status IN ('pending','uncertain')").bind(format!("linear-step:{id}")).fetch_all(&mut *tx).await.map_err(|_|journal_error())?;
+            for effect in effects {
                 codifix_store::effects::conclude_tx(
                     &mut tx,
-                    id,
+                    effect,
                     Uuid::new_v4(),
                     codifix_store::effects::EffectStatus::Confirmed,
                     codifix_store::effects::EffectReason::Observed,
@@ -360,32 +371,44 @@ impl codifix_agency_projects::StepJournal for ProjectJournal {
         if current != serde_json::to_value(changes).map_err(|_| journal_error())? {
             return Err(journal_error());
         }
+        let head: String = sqlx::query_scalar(
+            "SELECT digest FROM agency_plan_heads WHERE plan_id=$1 AND mandate_id=$2",
+        )
+        .bind(self.plan_id)
+        .bind(self.task.request.mandate_id)
+        .fetch_one(&self.store.pool)
+        .await
+        .map_err(|_| journal_error())?;
+        if head != changes.plan_digest {
+            return Err(journal_error());
+        }
+        self.owner
+            .check_ownership()
+            .await
+            .map_err(|_| journal_error())?;
+        let attempt = Uuid::new_v4();
         self.store
-            .authorize(
+            .admit_effect(
                 self.task.contract.id,
                 self.task.revision,
                 Usage {
                     calls: 1,
                     ..Usage::default()
                 },
+                &codifix_store::effects::EffectIntent {
+                    id: attempt,
+                    project_id: Some(self.task.project_id),
+                    kind: codifix_store::effects::EffectKind::ProviderRequest,
+                    host_id: "agency".into(),
+                    resource: format!("linear-step:{}", step.id),
+                    input_fingerprint: fingerprint(step).map_err(|_| journal_error())?,
+                    actor_id: self.task.contract.specialist_id.clone(),
+                    source: "agency-linear".into(),
+                },
             )
             .await
             .map_err(|_| journal_error())?;
-        codifix_store::effects::begin(
-            &self.store.pool,
-            &codifix_store::effects::EffectIntent {
-                id: step.id,
-                project_id: Some(self.task.project_id),
-                kind: codifix_store::effects::EffectKind::ProviderRequest,
-                host_id: "agency".into(),
-                resource: format!("linear:{}", step.entity_id),
-                input_fingerprint: fingerprint(step).map_err(|_| journal_error())?,
-                actor_id: self.task.contract.specialist_id.clone(),
-                source: "agency-linear".into(),
-            },
-        )
-        .await
-        .map_err(|_| journal_error())?;
+        self.attempts.insert(step.id, attempt);
         Ok(())
     }
 }
@@ -408,6 +431,16 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
         let mut req: Submit = serde_json::from_value(row.try_get("template")?)?;
         req.request_id = format!("schedule:{id}:{}", due.timestamp());
         req.deadline = due + chrono::Duration::seconds(i64::from(interval).max(300));
+        if req.deadline <= Utc::now() {
+            sqlx::query(
+                "UPDATE agency_schedules SET next_at=clock_timestamp() WHERE id=$1 AND next_at=$2",
+            )
+            .bind(id)
+            .bind(due)
+            .execute(&store.pool)
+            .await?;
+            continue;
+        }
         if store.submit(&req, peer).await.is_ok() {
             sqlx::query("UPDATE agency_schedules SET next_at=GREATEST(next_at+make_interval(secs=>$2),clock_timestamp()+make_interval(secs=>$2)) WHERE id=$1 AND next_at=$3")
                 .bind(id).bind(f64::from(interval)).bind(due).execute(&store.pool).await?;

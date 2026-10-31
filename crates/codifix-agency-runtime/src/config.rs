@@ -151,6 +151,7 @@ pub fn validate_endpoint(value: &str, local_http: bool) -> Result<()> {
 #[derive(Clone)]
 pub struct Auth {
     credentials: Vec<(Peer, [u8; 32])>,
+    cursor_key: [u8; 32],
 }
 impl Auth {
     pub fn from_config(cfg: &Config) -> Result<Self> {
@@ -178,7 +179,36 @@ impl Auth {
             ensure!(seen.insert(digest), "each peer needs a distinct credential");
             credentials.push((peer, digest));
         }
-        Ok(Self { credentials })
+        Ok(Self {
+            credentials,
+            cursor_key: Sha256::digest(Uuid::new_v4().as_bytes()).into(),
+        })
+    }
+    pub fn encode_cursor(&self, value: &impl Serialize) -> Result<String> {
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use hmac::{Hmac, Mac};
+        let body = serde_json::to_vec(value)?;
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.cursor_key)?;
+        mac.update(&body);
+        Ok(format!(
+            "{}.{}",
+            URL_SAFE_NO_PAD.encode(body),
+            URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+        ))
+    }
+    pub fn decode_cursor<T: serde::de::DeserializeOwned>(&self, token: &str) -> Result<T> {
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use hmac::{Hmac, Mac};
+        ensure!(token.len() <= 2048, "invalid cursor");
+        let (body, tag) = token
+            .split_once('.')
+            .ok_or_else(|| anyhow::anyhow!("invalid cursor"))?;
+        let body = URL_SAFE_NO_PAD.decode(body)?;
+        let tag = URL_SAFE_NO_PAD.decode(tag)?;
+        let mut mac = Hmac::<Sha256>::new_from_slice(&self.cursor_key)?;
+        mac.update(&body);
+        mac.verify_slice(&tag)?;
+        Ok(serde_json::from_slice(&body)?)
     }
     pub fn authenticate(&self, bearer: &str) -> Option<Peer> {
         let digest: [u8; 32] = Sha256::digest(bearer.as_bytes()).into();
@@ -191,6 +221,7 @@ impl Auth {
     pub fn testing(peer: Peer, token: &str) -> Self {
         Self {
             credentials: vec![(peer, Sha256::digest(token.as_bytes()).into())],
+            cursor_key: Sha256::digest(Uuid::new_v4().as_bytes()).into(),
         }
     }
 }
