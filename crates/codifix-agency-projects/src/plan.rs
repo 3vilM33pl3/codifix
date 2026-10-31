@@ -241,7 +241,18 @@ pub struct RemoteEntity {
 pub type Baseline = BTreeMap<Uuid, RemoteEntity>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ExistingResource {
+    pub id: Uuid,
+    pub kind: EntityKind,
+    pub project_key: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Scope {
+    /// Operator-approved stable plan identity; a source reference alone is insufficient.
+    pub plan_id: Uuid,
+    /// Explicit adoption bindings. Absence permits only this plan's derived IDs.
+    pub existing_resources: BTreeMap<String, ExistingResource>,
     pub project_keys: BTreeSet<String>,
     pub team_ids: BTreeSet<Uuid>,
     pub create: bool,
@@ -287,6 +298,11 @@ impl Authority {
         if reference.trim().is_empty() {
             return Err(Error::Authority("authority reference required".into()));
         }
+        if scope.plan_id != plan.id || scope.plan_id.is_nil() {
+            return Err(Error::Authority(
+                "plan identity exceeds approved scope".into(),
+            ));
+        }
         Ok(scope)
     }
 }
@@ -329,12 +345,92 @@ fn description(body: &str, criteria: &[String], source: &Source) -> String {
         source.version
     )
 }
+/// Validate the entire operator-owned resource boundary before any network read.
+/// Authority must come from trusted host configuration, never planner input.
+pub fn authorize_plan(plan: &Plan, authority: &Authority) -> Result<()> {
+    plan.validate()?;
+    let scope = authority.scope(plan)?;
+    let mut resources = Vec::new();
+    for project in &plan.projects {
+        if !project.team_ids.is_subset(&scope.team_ids) {
+            return Err(Error::Authority("project teams exceed scope".into()));
+        }
+        resources.push((
+            &project.identity,
+            EntityKind::Project,
+            project.identity.key.as_str(),
+        ));
+    }
+    for milestone in &plan.milestones {
+        resources.push((
+            &milestone.identity,
+            EntityKind::Milestone,
+            milestone.project_key.as_str(),
+        ));
+    }
+    for issue in &plan.issues {
+        if !scope.team_ids.contains(&issue.team_id) {
+            return Err(Error::Authority("issue team exceeds scope".into()));
+        }
+        resources.push((
+            &issue.identity,
+            EntityKind::Issue,
+            issue.project_key.as_str(),
+        ));
+    }
+    for dependency in &plan.dependencies {
+        let blocking = plan
+            .issues
+            .iter()
+            .find(|i| i.identity.key == dependency.blocking_issue_key)
+            .expect("validated issue");
+        let blocked = plan
+            .issues
+            .iter()
+            .find(|i| i.identity.key == dependency.blocked_issue_key)
+            .expect("validated issue");
+        if !scope.project_keys.contains(&blocked.project_key) {
+            return Err(Error::Authority(
+                "dependency target project exceeds scope".into(),
+            ));
+        }
+        resources.push((
+            &dependency.identity,
+            EntityKind::Dependency,
+            blocking.project_key.as_str(),
+        ));
+    }
+    for (identity, kind, project_key) in resources {
+        if !scope.project_keys.contains(project_key) {
+            return Err(Error::Authority("project exceeds scope".into()));
+        }
+        match (
+            identity.remote_id,
+            scope.existing_resources.get(&identity.key),
+        ) {
+            (None, None) => {}
+            (Some(id), Some(binding))
+                if id == binding.id
+                    && kind == binding.kind
+                    && project_key == binding.project_key
+                    && !id.is_nil() => {}
+            _ => {
+                return Err(Error::Authority(format!(
+                    "resource {} does not match operator-approved identity/kind/project binding",
+                    identity.key
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn prepare(
     plan: &Plan,
     baseline: &Baseline,
     authority: &Authority,
 ) -> Result<PreparedChangeSet> {
-    plan.validate()?;
+    authorize_plan(plan, authority)?;
     if !plan.unresolved_questions.is_empty() {
         return Err(Error::Validation(
             "unresolved questions require clarification or handoff".into(),

@@ -18,6 +18,8 @@ fn authority(plan: &Plan) -> Authority {
         plan_digest: plan.digest(),
         source_version: plan.source.version.clone(),
         scope: Scope {
+            plan_id: plan.id,
+            existing_resources: BTreeMap::new(),
             project_keys: plan
                 .projects
                 .iter()
@@ -643,7 +645,7 @@ fn standing_authority_stays_source_scoped_and_adoption_requires_baseline() {
     p.projects[0].identity.remote_id = Some(Uuid::new_v4());
     assert!(matches!(
         prepare(&p, &Baseline::new(), &authority(&p)),
-        Err(Error::Validation(_))
+        Err(Error::Authority(_))
     ));
     let mut encoded = serde_json::to_value(&p).unwrap();
     encoded["unexpected_auto_publish"] = json!(true);
@@ -675,4 +677,211 @@ async fn completed_step_receipts_remain_immutable_after_unrelated_manual_edits()
         .unwrap();
     assert_eq!(journal.receipts, historical_receipts);
     assert_eq!(mock.writes(), 5);
+}
+
+fn standing(plan: &Plan) -> Authority {
+    let Authority::Agreed { scope, .. } = authority(plan) else {
+        unreachable!()
+    };
+    Authority::Standing {
+        reference: "policy://operator-approved".into(),
+        source_reference: plan.source.reference.clone(),
+        scope,
+    }
+}
+fn scope_mut(authority: &mut Authority) -> &mut Scope {
+    match authority {
+        Authority::Agreed { scope, .. } | Authority::Standing { scope, .. } => scope,
+    }
+}
+
+#[test]
+fn standing_scope_rejects_substituted_plan_uuid_and_arbitrary_remote_adoption() {
+    let original = plan();
+    let auth = standing(&original);
+    let mut attack = original.clone();
+    attack.id = Uuid::new_v4();
+    assert!(matches!(
+        authorize_plan(&attack, &auth),
+        Err(Error::Authority(_))
+    ));
+    for kind in [
+        EntityKind::Project,
+        EntityKind::Milestone,
+        EntityKind::Issue,
+        EntityKind::Dependency,
+    ] {
+        let mut attack = original.clone();
+        let identity = match kind {
+            EntityKind::Project => &mut attack.projects[0].identity,
+            EntityKind::Milestone => &mut attack.milestones[0].identity,
+            EntityKind::Issue => &mut attack.issues[0].identity,
+            EntityKind::Dependency => &mut attack.dependencies[0].identity,
+        };
+        let unrelated_id = Uuid::new_v4();
+        identity.remote_id = Some(unrelated_id);
+        let baseline = Baseline::from([(
+            unrelated_id,
+            RemoteEntity {
+                id: unrelated_id,
+                kind,
+                fields: BTreeMap::new(),
+                updated_at: "reviewed-but-not-authorized".into(),
+            },
+        )]);
+        assert!(matches!(
+            authorize_plan(&attack, &auth),
+            Err(Error::Authority(_))
+        ));
+        assert!(matches!(
+            prepare(&attack, &baseline, &auth),
+            Err(Error::Authority(_))
+        ));
+    }
+    authorize_plan(&original, &auth).unwrap();
+    assert_eq!(
+        prepare(&original, &Baseline::new(), &auth)
+            .unwrap()
+            .steps
+            .len(),
+        5
+    );
+}
+
+#[test]
+fn existing_resource_binding_rejects_replacement_ids_kinds_parent_projects_and_identity_removal() {
+    let mut p = plan();
+    let id = Uuid::new_v4();
+    p.issues[0].identity.remote_id = Some(id);
+    let mut auth = standing(&p);
+    scope_mut(&mut auth).existing_resources.insert(
+        "build".into(),
+        ExistingResource {
+            id,
+            kind: EntityKind::Issue,
+            project_key: "launch".into(),
+        },
+    );
+    authorize_plan(&p, &auth).unwrap();
+    // Even an exact operator binding cannot bypass mandatory baseline capture.
+    assert!(matches!(
+        prepare(&p, &Baseline::new(), &auth),
+        Err(Error::Validation(_))
+    ));
+    let mut attack = p.clone();
+    attack.issues[0].identity.remote_id = Some(Uuid::new_v4());
+    assert!(matches!(
+        authorize_plan(&attack, &auth),
+        Err(Error::Authority(_))
+    ));
+    let mut attack = p.clone();
+    attack.issues[0].identity.remote_id = None;
+    assert!(matches!(
+        authorize_plan(&attack, &auth),
+        Err(Error::Authority(_))
+    ));
+    let mut attack = p.clone();
+    let issue_identity = attack.issues[0].identity.clone();
+    let milestone_identity = attack.milestones[0].identity.clone();
+    attack.milestones[0].identity = issue_identity;
+    attack.issues[0].identity = milestone_identity;
+    for issue in &mut attack.issues {
+        issue.milestone_key = Some("build".into());
+    }
+    attack.dependencies[0].blocking_issue_key = "prototype".into();
+    attack.validate().unwrap();
+    assert!(matches!(
+        authorize_plan(&attack, &auth),
+        Err(Error::Authority(_))
+    ));
+    let mut attack = p.clone();
+    let mut other_project = attack.projects[0].clone();
+    other_project.identity.key = "other".into();
+    attack.projects.push(other_project);
+    attack.issues[0].project_key = "other".into();
+    attack.issues[0].milestone_key = None;
+    scope_mut(&mut auth).project_keys.insert("other".into());
+    attack.validate().unwrap();
+    assert!(matches!(
+        authorize_plan(&attack, &auth),
+        Err(Error::Authority(_))
+    ));
+}
+
+#[tokio::test]
+async fn explicitly_bound_existing_resources_remain_updatable() {
+    let mock = Mock::start().await;
+    let mut p = plan();
+    let baseline = seed(&mock, &p).await;
+    // An operator explicitly approves adopting the selected existing project.
+    let id = stable_id(p.id, "launch");
+    p.projects[0].identity.remote_id = Some(id);
+    p.revision += 1;
+    p.projects[0].name = "Approved existing rename".into();
+    let mut auth = standing(&p);
+    scope_mut(&mut auth).existing_resources.insert(
+        "launch".into(),
+        ExistingResource {
+            id,
+            kind: EntityKind::Project,
+            project_key: "launch".into(),
+        },
+    );
+    authorize_plan(&p, &auth).unwrap();
+    let changes = prepare(&p, &baseline, &auth).unwrap();
+    assert_eq!(changes.steps.len(), 1);
+    mock.client()
+        .execute(&p, &auth, &changes, &mut Journal::default())
+        .await
+        .unwrap();
+    assert_eq!(mock.writes(), 6);
+    assert_eq!(
+        mock.state.lock().unwrap().objects[&id]["name"],
+        "Approved existing rename"
+    );
+}
+
+#[tokio::test]
+async fn uncertain_missing_create_retry_rechecks_current_authorization_before_send() {
+    let mock = Mock::start().await;
+    mock.state.lock().unwrap().fail_before_at = Some(1);
+    let p = plan();
+    let auth = standing(&p);
+    let changes = prepare(&p, &Baseline::new(), &auth).unwrap();
+    let mut journal = Journal::default();
+    assert!(matches!(
+        mock.client()
+            .execute(&p, &auth, &changes, &mut journal)
+            .await,
+        Err(Error::Provider(_))
+    ));
+    assert_eq!(
+        journal.receipts[&changes.steps[0].id].phase,
+        StepPhase::Attempted
+    );
+    assert_eq!(mock.writes(), 1);
+    journal.deny_at = Some(journal.writes + 1);
+    assert!(matches!(
+        mock.client()
+            .execute(&p, &auth, &changes, &mut journal)
+            .await,
+        Err(Error::Authority(_))
+    ));
+    assert_eq!(mock.writes(), 1);
+    assert!(mock.state.lock().unwrap().objects.is_empty());
+}
+
+#[test]
+fn operator_authority_example_authorizes_only_its_bound_plan() {
+    let auth: Authority =
+        serde_json::from_str(include_str!("../examples/standing-authority.json")).unwrap();
+    let p = plan();
+    authorize_plan(&p, &auth).unwrap();
+    assert_eq!(prepare(&p, &Baseline::new(), &auth).unwrap().steps.len(), 5);
+    let mut substituted = p;
+    substituted.id = Uuid::new_v4();
+    assert!(matches!(
+        authorize_plan(&substituted, &auth),
+        Err(Error::Authority(_))
+    ));
 }

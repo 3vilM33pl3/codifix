@@ -6,7 +6,9 @@ projects (roadmap units), milestones, issues and blocking issue dependencies.
 It does not discover credentials, send clarification messages, call a model, or
 write to a workspace unless its host explicitly invokes `LinearClient::execute`.
 
-`examples/plan.json` is a complete input using fictional identifiers. A planning
+`examples/plan.json` is a complete input using fictional identifiers.
+`examples/standing-authority.json` shows its separate operator-owned authority;
+it belongs in trusted runtime configuration, never in a planner response. A planning
 model can emit that structure through the root runtime's configured model route;
 the same deterministic validation and authorization apply to model and manual
 inputs. No model-generated tool calls are executed by this crate.
@@ -31,21 +33,33 @@ plan revisions and source ownership when accepting amended inputs.
 
 `Authority::Agreed` binds an approval reference to the exact plan digest and
 source version. `Authority::Standing` binds a policy reference to the source
-reference. Both require explicit project keys, allowed team IDs, and separate
-create/update permissions. Authority is a trusted host input, not an untrusted
+reference. Both require an operator-approved plan UUID, explicit project keys, allowed
+team IDs, separate create/update permissions, and exact key-to-ID/kind/project
+bindings for every adopted existing object. A project key is a name inside the
+approved plan, never authority to select an arbitrary provider resource. With no
+existing-object binding, only that plan UUID/key's deterministic identity is
+allowed; a binding cannot be silently dropped to mint a replacement identity. Authority is a trusted host input, not an untrusted
 planner assertion. The runtime must establish that the approver/policy owns
 those scopes and recheck revocation immediately before every effect.
 
 ## Runtime integration
 
 1. Parse and validate `Plan`; persist its source/version/revision.
-2. Run bounded clarification, then obtain agreed or standing authority.
+2. Run bounded clarification, then obtain agreed or standing authority strictly
+   from operator-owned configuration. Never accept authority from the planner.
+   `Scope.plan_id` binds the fixed plan UUID; `Scope.existing_resources` maps each
+   approved key to `ExistingResource { id, kind, project_key }`. Empty mappings
+   permit creation within approved team/project identities, not arbitrary adoption.
+   Call `authorize_plan(&plan, &authority)` before any provider read; it checks
+   all source, plan, key, kind, project, ID and team bindings without I/O.
 3. Construct `LinearClient::new(endpoint, authorization_header, timeout)`.
    Use `https://api.linear.app/graphql`; pass raw personal API keys or a complete
    `Bearer ...` header for OAuth explicitly. HTTP is accepted only for loopback
    mock servers. Redirects are disabled and provider errors do not echo bodies.
-4. `retrieve_plan(&plan).await` reads only selected/adopted IDs. Persist this
-   reviewed baseline; do not refresh a conflicting baseline silently.
+4. After successful `authorize_plan`, `retrieve_plan(&plan).await` reads only
+   selected/adopted IDs. Persist this reviewed baseline; do not refresh a
+   conflicting baseline silently. `retrieve_plan` is a low-level read primitive
+   and deliberately does not establish host authority itself.
 5. `prepare(&plan, &baseline, &authority)` returns serializable ordered changes
    (projects, milestones, issues, dependencies). Persist and expose those changes
    for review according to the owning runtime's authority workflow.
@@ -62,6 +76,8 @@ chosen here. Implement:
 - `authorize_step(changes, step)` to check current mandate, source revision,
   revocation, owning task lease, scope and any remaining effect budget.
 
+The current authorization hook also runs before every retry of an uncertain
+missing create; an `Attempted` receipt never authorizes another send by itself.
 Store the exact `step_digest`, reject mismatching receipts, and allow idempotent
 saves of an identical phase. Verified receipts are historical immutable evidence;
 a successful resume reads the current object without rewriting an existing
