@@ -624,3 +624,121 @@ async fn canary_quality_cannot_regress_a_stronger_independent_baseline() {
     assert_eq!(state["candidate"]["rollout_failures"], 1);
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn deployed_prompt_reaches_mock_model_and_evidence_persists_exact_binding() {
+    use axum::{Json, Router, extract::State, routing::post};
+    use std::sync::{Arc, Mutex};
+    async fn provider(
+        State(captured): State<Arc<Mutex<Vec<Value>>>>,
+        Json(body): Json<Value>,
+    ) -> Json<Value> {
+        captured.lock().unwrap().push(body);
+        Json(
+            json!({"choices":[{"message":{"content":"{\"reviewed\":true}"}}],"usage":{"prompt_tokens":20,"completion_tokens":10}}),
+        )
+    }
+    let Some(mut f) = fixture().await else { return };
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let app = Router::new()
+        .route("/chat", post(provider))
+        .with_state(captured.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}/chat", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let destination = ModelDestination::Local {
+        runtime: "learning-mock".into(),
+    };
+    f.grant.destinations.insert(destination.clone());
+    sqlx::query("UPDATE agency_mandates SET document=$2 WHERE id=$1")
+        .bind(f.grant.id)
+        .bind(serde_json::to_value(&f.grant).unwrap())
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    f.cfg.model_profiles.push(ModelProfile {
+        id: "learning-model".into(),
+        model_revision: "learning-model-v1".into(),
+        destination: destination.clone(),
+        accepted_locally: true,
+        context_tokens: 4096,
+        local_memory_mib: 1024,
+        evaluations: vec![ModelEvaluation {
+            evidence_id: "learning-model-heldout".into(),
+            model_revision: "learning-model-v1".into(),
+            workload: "draft-json".into(),
+            evaluated_at: Utc::now() - Duration::minutes(1),
+            valid_until: Utc::now() + Duration::hours(1),
+            held_out_cases: 20,
+            quality_ppm: 950000,
+            micro_usd_per_call: 1,
+            latency_ms: 100,
+        }],
+    });
+    f.cfg.models.push(config::ModelEndpoint {
+        profile_id: "learning-model".into(),
+        url: endpoint,
+        token_env: None,
+        model: "learning-model-v1".into(),
+        max_input_bytes: 1024,
+        max_output_tokens: 64,
+        reserve_micro_usd: 1,
+        input_micro_usd_per_million: 0,
+        output_micro_usd_per_million: 0,
+    });
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Prompt {
+            prefix: "Reviewed drafting template: include source fields.".into(),
+            suffix: "End with the requested JSON.".into(),
+        },
+    )
+    .await;
+    rollout(&f, &c, &a, &base).await;
+    let t = task(&f, c.id).await;
+    let mut route = routing();
+    route.permitted_destinations.insert(destination);
+    let result =
+        codifix_agency_runtime::model::draft(&f.store, &f.cfg, &t, "Original task input", &route)
+            .await
+            .unwrap();
+    assert_eq!(result["artifact"]["reviewed"], true);
+    assert_eq!(result["learning"]["candidate_id"], c.id.to_string());
+    assert_eq!(result["learning"]["artifact_digest"], a.digest);
+    {
+        let captured = captured.lock().unwrap();
+        assert_eq!(captured.len(), 1);
+        let prompt = captured[0]["messages"][1]["content"].as_str().unwrap();
+        assert!(prompt.contains("Reviewed drafting template: include source fields."));
+        assert!(prompt.contains("Original task input"));
+        assert_eq!(captured[0]["messages"][0]["content"], BASE_SYSTEM_PROMPT);
+    }
+    let binding: DraftBinding = serde_json::from_value(result["learning"].clone()).unwrap();
+    complete(&f, &t, &binding).await;
+    sqlx::query("UPDATE agency_outcomes SET evidence=$2 WHERE task_id=$1")
+        .bind(t.contract.id)
+        .bind(&result)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    let observed = observe_task(&f.store, &f.cfg, t.contract.id).await.unwrap();
+    assert_eq!(observed["observed"], true);
+    let persisted: Value = sqlx::query_scalar(
+        "SELECT binding FROM agency_learning_assignments WHERE task_id=$1 AND task_revision=$2",
+    )
+    .bind(t.contract.id)
+    .bind(t.revision)
+    .fetch_one(&f.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(persisted, result["learning"]);
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(
+        state["candidate"]["rollout_successes"], 0,
+        "provider JSON success must not count as independently verified quality"
+    );
+    server.abort();
+    f.db.cleanup().await.unwrap();
+}
