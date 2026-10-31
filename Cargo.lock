@@ -798,6 +798,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "codifix-agency-runtime"
+version = "3.0.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "codifix-agency",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "http-body-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "tower",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-agenttop"
 version = "3.0.0"
 dependencies = [
