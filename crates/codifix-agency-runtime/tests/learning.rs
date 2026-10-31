@@ -179,6 +179,9 @@ async fn task(f: &Fixture, selected_candidate: Uuid) -> store::StoredTask {
             f.store.update_contract(&t).await.unwrap();
             return f.store.get_internal(t.contract.id).await.unwrap();
         }
+        // Keep the real runtime's active-task admission bound intact while
+        // sampling server-assigned IDs for deterministic canary membership.
+        f.store.cancel(t.contract.id, &f.peer).await.unwrap();
     }
     panic!("could not allocate canary fixture task");
 }
