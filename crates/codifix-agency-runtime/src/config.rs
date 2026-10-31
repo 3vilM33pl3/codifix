@@ -154,15 +154,29 @@ pub struct Auth {
 }
 impl Auth {
     pub fn from_config(cfg: &Config) -> Result<Self> {
+        let pairs = cfg
+            .peers
+            .iter()
+            .map(|peer| {
+                let token = std::env::var(&peer.token_env)
+                    .map_err(|_| anyhow::anyhow!("required peer credential unavailable"))?;
+                Ok((peer.clone(), token))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Self::from_credentials(pairs)
+    }
+    pub fn from_credentials(pairs: Vec<(Peer, String)>) -> Result<Self> {
         let mut credentials = Vec::new();
         let mut seen = BTreeSet::new();
-        for peer in &cfg.peers {
-            let token = std::env::var(&peer.token_env)
-                .map_err(|_| anyhow::anyhow!("required peer credential unavailable"))?;
-            ensure!(token.len() >= 32, "peer credentials need at least 32 bytes");
+        let mut ids = BTreeSet::new();
+        for (peer, token) in pairs {
+            ensure!(
+                token.len() >= 32 && ids.insert(peer.id.clone()),
+                "invalid peer credential"
+            );
             let digest: [u8; 32] = Sha256::digest(token.as_bytes()).into();
             ensure!(seen.insert(digest), "each peer needs a distinct credential");
-            credentials.push((peer.clone(), digest));
+            credentials.push((peer, digest));
         }
         Ok(Self { credentials })
     }
