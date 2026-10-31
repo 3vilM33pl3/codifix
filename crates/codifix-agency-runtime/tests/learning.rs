@@ -572,3 +572,52 @@ async fn model_profile_artifact_filters_routes_without_expanding_authority_and_d
     );
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn canary_quality_cannot_regress_a_stronger_independent_baseline() {
+    let Some(f) = fixture().await else { return };
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Prompt {
+            prefix: "Use the reviewed template.".into(),
+            suffix: String::new(),
+        },
+    )
+    .await;
+    let evaluation = ImprovementEvaluation {
+        evidence_id: "strong-baseline-heldout".into(),
+        candidate_revision: c.candidate_revision.clone(),
+        baseline_revision: c.baseline_revision.clone(),
+        held_out_set_id: "heldout-v1".into(),
+        training_set_id: "training-v1".into(),
+        held_out_cases: 20,
+        candidate_quality_ppm: 995000,
+        baseline_quality_ppm: 990000,
+        safety_failures: 0,
+        evaluated_at: Utc::now(),
+    };
+    improve(&f.store,&f.cfg,json!({"action":"evaluate","id":c.id,"evaluation":evaluation,"artifact_digest":a.digest,"baseline_digest":base,"verifier_id":"external-review-v1"})).await.unwrap();
+    improve(&f.store,&f.cfg,json!({"action":"rollout","id":c.id,"fraction_ppm":100000,"decision_ref":"high-baseline-rollout"})).await.unwrap();
+    let t = task(&f, c.id).await;
+    let applied = select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+        .await
+        .unwrap();
+    let binding = applied.binding.unwrap();
+    complete(&f, &t, &binding).await;
+    let mut assessment = assessment(&t, &binding, 0);
+    assessment.quality_ppm = 940000;
+    let result = improve(
+        &f.store,
+        &f.cfg,
+        json!({"action":"assess","assessment":assessment}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result["quality_passed"], false);
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(state["candidate"]["rollout_successes"], 0);
+    assert_eq!(state["candidate"]["rollout_failures"], 1);
+    f.db.cleanup().await.unwrap();
+}

@@ -391,6 +391,7 @@ pub async fn improve(store: &Store, cfg: &Config, input: Value) -> Result<Value>
                 d.candidate.owner_instance_id == cfg.instance_id,
                 "foreign improvement owner"
             );
+            let is_get = matches!(&other, Action::Get { .. });
             match other {
                 Action::Evaluate {
                     evaluation,
@@ -456,7 +457,9 @@ pub async fn improve(store: &Store, cfg: &Config, input: Value) -> Result<Value>
                 Action::Get { .. } => {}
                 _ => unreachable!(),
             }
-            save_candidate(&mut tx, &d.candidate).await?;
+            if !is_get {
+                save_candidate(&mut tx, &d.candidate).await?;
+            }
             json!({"candidate":d.candidate,"artifact":d.artifact,"baseline_digest":d.baseline_digest})
         }
     };
@@ -743,7 +746,10 @@ async fn assess_task(store: &Store, cfg: &Config, a: TaskAssessment) -> Result<V
             && a.assessed_at >= evaluation.evaluated_at,
         "assessment verifier/dataset/time binding invalid"
     );
-    let passed = a.quality_ppm >= gate().minimum_quality_ppm && a.safety_failures == 0;
+    let required_quality = gate()
+        .minimum_quality_ppm
+        .max(evaluation.baseline_quality_ppm);
+    let passed = a.quality_ppm >= required_quality && a.safety_failures == 0;
     let existing: Option<Value> =
         sqlx::query_scalar("SELECT document FROM agency_learning_assessments WHERE task_id=$1")
             .bind(a.task_id)
