@@ -9,6 +9,7 @@ use uuid::Uuid;
 #[serde(rename_all = "snake_case")]
 pub enum ImprovementKind {
     Prompt,
+    Procedure,
     Retrieval,
     ModelProfile,
 }
@@ -227,5 +228,45 @@ impl ImprovementCandidate {
             return Err(PolicyError::Invalid("local acceptance"));
         }
         Ok(())
+    }
+}
+
+/// Stable task bucketing for a bounded canary (at most 10%). This is scheduling,
+/// not an authorization check. Task IDs must be assigned by the trusted runtime.
+pub fn canary_selected(
+    candidate_id: Uuid,
+    task_id: Uuid,
+    rollout_ppm: u32,
+) -> Result<bool, PolicyError> {
+    if candidate_id.is_nil() || task_id.is_nil() || rollout_ppm > 100_000 {
+        return Err(PolicyError::Invalid("canary selection"));
+    }
+    let digest = Uuid::new_v5(&candidate_id, task_id.as_bytes());
+    let mut prefix = [0u8; 8];
+    prefix.copy_from_slice(&digest.as_bytes()[..8]);
+    Ok(u64::from_be_bytes(prefix) % 1_000_000 < u64::from(rollout_ppm))
+}
+impl ImprovementCandidate {
+    pub fn selects_task(&self, task_id: Uuid, gate: &ImprovementGate) -> Result<bool, PolicyError> {
+        self.validate_gate(gate)?;
+        match self.stage {
+            ImprovementStage::LimitedRollout => {
+                if self.rollout_ppm == 0 || self.rollout_ppm > gate.maximum_rollout_ppm {
+                    return Err(PolicyError::Invalid("rollout fraction"));
+                }
+                canary_selected(self.id, task_id, self.rollout_ppm)
+            }
+            ImprovementStage::Promoted if self.rollout_ppm == 1_000_000 && !task_id.is_nil() => {
+                Ok(true)
+            }
+            ImprovementStage::Candidate
+            | ImprovementStage::Evaluated
+            | ImprovementStage::Reverted
+                if self.rollout_ppm == 0 && !task_id.is_nil() =>
+            {
+                Ok(false)
+            }
+            _ => Err(PolicyError::Invalid("rollout state")),
+        }
     }
 }
