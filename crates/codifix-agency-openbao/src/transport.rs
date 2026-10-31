@@ -139,8 +139,19 @@ async fn controller_inner(
     {
         return Err(Error::Configuration);
     }
+    let reader = token(&config.target.attestor_token_file)?;
+    let mut credentials = BTreeSet::new();
     for p in &config.peers {
         p.endpoint.validate()?;
+        if p.endpoint.fixture_localhost_http != config.target.endpoint.fixture_localhost_http {
+            return Err(Error::Configuration);
+        }
+        let secret = token(&p.controller_token_file)?;
+        if *secret == *reader
+            || !credentials.insert(format!("{:x}", Sha256::digest(secret.as_bytes())))
+        {
+            return Err(Error::Configuration);
+        }
     }
     let _lock = protected::StateLock::acquire(&config.state_file)?;
     let mut state: ControllerState = protected::load(&config.state_file)?;
@@ -148,7 +159,7 @@ async fn controller_inner(
     if state.binding != binding {
         return Err(Error::TargetChanged);
     }
-    let status = verified_status(&config.target).await?;
+    let mut status = verified_status(&config.target).await?;
     if !status.sealed {
         state.active = None;
         protected::save(&config.state_file, &state)?;
@@ -195,7 +206,11 @@ async fn controller_inner(
         let response = client(&p.endpoint)?
             .post(url(&p.endpoint, "/v1/ceremony")?)
             .bearer_auth(&*secret)
-            .json(&ceremony)
+            .json(&Submission {
+                ceremony: ceremony.clone(),
+                expected_progress: status.progress,
+                expected_nonce: status.nonce.clone(),
+            })
             .send()
             .await
             .map_err(|_| Error::Transport)?;
@@ -210,7 +225,7 @@ async fn controller_inner(
             custodian_id: id.clone(),
             sequence: ceremony.sequence,
         });
-        let status = verified_status(&config.target).await?;
+        status = verified_status(&config.target).await?;
         if !status.sealed {
             state.active = None;
             protected::save(&config.state_file, &state)?;
@@ -223,8 +238,14 @@ async fn controller_inner(
 
 /// Authenticated server calls this after verifying its scoped controller token.
 /// Replay consumption is durable *before* reading the share or touching OpenBao.
-pub async fn custodian_submit(config: &CustodianConfig, ceremony: &Ceremony) -> Result<()> {
+pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission) -> Result<()> {
+    let ceremony = &submission.ceremony;
     config.validate(now())?;
+    let controller_token = token(&config.controller_token_file)?;
+    let reader_token = token(&config.target.attestor_token_file)?;
+    if *controller_token == *reader_token {
+        return Err(Error::Configuration);
+    }
     ceremony.validate(&config.target, &config.roster, now())?;
     if !ceremony.selected.contains(&config.custodian_id) {
         return Err(Error::Ceremony);
@@ -240,9 +261,7 @@ pub async fn custodian_submit(config: &CustodianConfig, ceremony: &Ceremony) -> 
         return Err(Error::Ceremony);
     }
     let status = verified_status(&config.target).await?;
-    if !status.sealed {
-        return Err(Error::Ceremony);
-    }
+    submission.check_progress(&status, &config.custodian_id)?;
     state.last_sequence = ceremony.sequence;
     state.last_challenge = Some(ceremony.challenge.clone());
     protected::save(&config.state_file, &state)?;
@@ -258,9 +277,18 @@ pub async fn custodian_submit(config: &CustodianConfig, ceremony: &Ceremony) -> 
     {
         return Err(Error::ProtectedFile);
     }
+    let enrolled = config
+        .roster
+        .iter()
+        .find(|m| m.custodian_id == config.custodian_id)
+        .ok_or(Error::Configuration)?;
+    if enrolled.share_id != format!("{:x}", Sha256::digest(share.as_bytes())) {
+        return Err(Error::Configuration);
+    }
     // Recheck after disk I/O. TLS and attestor bind this enrolled target; the
     // operator must fence rekey/restart while the identity lease is published.
-    verified_status(&config.target).await?;
+    let checked = verified_status(&config.target).await?;
+    submission.check_progress(&checked, &config.custodian_id)?;
     ceremony.validate(&config.target, &config.roster, now())?;
     #[derive(Serialize)]
     struct Body<'a> {
@@ -277,5 +305,10 @@ pub async fn custodian_submit(config: &CustodianConfig, ceremony: &Ceremony) -> 
         .map_err(|_| Error::Transport)?;
     let result: SealStatus = decode(response).await?;
     result.check(&config.target)?;
+    if result.sealed
+        && (result.progress != submission.expected_progress + 1 || result.nonce.is_empty())
+    {
+        return Err(Error::Incomplete);
+    }
     Ok(())
 }

@@ -45,7 +45,7 @@ pub struct Endpoint {
 impl Endpoint {
     pub fn validate(&self) -> Result<()> {
         let u = reqwest::Url::parse(&self.url).map_err(|_| Error::Configuration)?;
-        if u.username() != ""
+        if !u.username().is_empty()
             || u.password().is_some()
             || u.query().is_some()
             || u.fragment().is_some()
@@ -95,6 +95,9 @@ impl Target {
     pub fn validate(&self, now: u64) -> Result<()> {
         self.endpoint.validate()?;
         self.identity_endpoint.validate()?;
+        if self.endpoint.fixture_localhost_http != self.identity_endpoint.fixture_localhost_http {
+            return Err(Error::Configuration);
+        }
         let i = &self.expected;
         // Shamir is the sole share-based seal implemented here. Auto-unseal recovery
         // keys cannot be substituted for ordinary unseal shares.
@@ -111,10 +114,18 @@ impl Target {
         Ok(())
     }
     pub fn binding(&self) -> Result<String> {
+        let pin = |endpoint: &Endpoint| -> Result<String> {
+            match &endpoint.ca_pem_file {
+                Some(path) => Ok(format!("{:x}", Sha256::digest(&*protected::read(path)?))),
+                None => Ok("fixture-only".into()),
+            }
+        };
         let bytes = serde_json::to_vec(&(
             &self.endpoint.url,
             &self.identity_endpoint.url,
             &self.expected,
+            pin(&self.endpoint)?,
+            pin(&self.identity_endpoint)?,
         ))
         .map_err(|_| Error::Configuration)?;
         Ok(format!("{:x}", Sha256::digest(bytes)))
@@ -134,7 +145,11 @@ pub fn validate_roster(roster: &[Member], target: &Target) -> Result<()> {
     let mut domains = BTreeSet::new();
     for m in roster {
         if m.custodian_id.is_empty()
-            || m.share_id.is_empty()
+            || m.share_id.len() != 64
+            || !m
+                .share_id
+                .bytes()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
             || m.failure_domain.is_empty()
             || !ids.insert(&m.custodian_id)
             || !shares.insert(&m.share_id)
@@ -293,4 +308,33 @@ pub fn now() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+/// Per-step native nonce/progress prevents continuing an unrelated/reset ceremony.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Submission {
+    pub ceremony: Ceremony,
+    pub expected_progress: u32,
+    pub expected_nonce: String,
+}
+impl Submission {
+    fn check_progress(&self, status: &SealStatus, custodian_id: &str) -> Result<()> {
+        let position = self
+            .ceremony
+            .selected
+            .iter()
+            .position(|id| id == custodian_id)
+            .ok_or(Error::Ceremony)?;
+        if !status.sealed
+            || self.expected_progress != position as u32
+            || status.progress != self.expected_progress
+            || status.nonce != self.expected_nonce
+            || (position == 0 && !self.expected_nonce.is_empty())
+            || (position > 0 && self.expected_nonce.is_empty())
+        {
+            return Err(Error::Ceremony);
+        }
+        Ok(())
+    }
 }

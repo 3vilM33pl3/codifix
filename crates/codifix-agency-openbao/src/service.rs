@@ -20,17 +20,17 @@ fn failure(_: Error) -> StatusCode {
 async fn submit(
     State(config): State<Arc<CustodianConfig>>,
     headers: HeaderMap,
-    Json(ceremony): Json<Ceremony>,
+    Json(submission): Json<Submission>,
 ) -> std::result::Result<Json<Acknowledgement>, StatusCode> {
     transport::authenticate(&config.controller_token_file, &headers)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    transport::custodian_submit(&config, &ceremony)
+    transport::custodian_submit(&config, &submission)
         .await
         .map_err(failure)?;
     Ok(Json(Acknowledgement {
         custodian_id: config.custodian_id.clone(),
-        sequence: ceremony.sequence,
-        challenge: ceremony.challenge,
+        sequence: submission.ceremony.sequence,
+        challenge: submission.ceremony.challenge,
     }))
 }
 pub fn custodian_router(config: CustodianConfig) -> Result<Router> {
