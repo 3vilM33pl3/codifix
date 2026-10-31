@@ -799,6 +799,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "codifix-agency-projects"
+version = "3.0.0"
+dependencies = [
+ "axum",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-agency-runtime"
 version = "3.0.0"
 dependencies = [
