@@ -61,6 +61,10 @@ pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
         )
         .await?;
     }
+    // Operational evidence is independently durable. Failure to record an
+    // observation never fabricates a passing quality result; operators may
+    // reconcile observations later through the same deduplicated endpoint.
+    let _ = crate::learning::observe_task(store, cfg, lease.job.operation_id).await;
     Ok(true)
 }
 async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> {
@@ -91,6 +95,7 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
         "inspect" => "status_observed",
         "plan_prepare" => "plan_valid",
         "plan_apply" => "linear_readback_verified",
+        "plan_inspect" => "linear_state_observed",
         "model_draft" => "model_output_valid_json",
         "openbao_recover" => "openbao_unsealed",
         "delegate" => "delegated_result_reported",
@@ -114,6 +119,7 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
             None => return Ok(()),
         },
         "plan_apply" => apply_plan(store, cfg, &task, lease).await?,
+        "plan_inspect" => crate::inspection::plan_inspect(store, cfg, &task).await?,
         "model_draft" => {
             let prompt = task.request.payload["prompt"]
                 .as_str()
@@ -208,17 +214,47 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             },
         "plan resource binding mismatch"
     );
-    store
-        .authorize(
-            task.contract.id,
-            task.revision,
-            Usage {
-                calls: 1,
-                ..Usage::default()
-            },
+    let selected = plan
+        .projects
+        .iter()
+        .map(|p| (&p.identity, codifix_agency_projects::EntityKind::Project))
+        .chain(
+            plan.milestones
+                .iter()
+                .map(|m| (&m.identity, codifix_agency_projects::EntityKind::Milestone)),
         )
+        .chain(
+            plan.issues
+                .iter()
+                .map(|i| (&i.identity, codifix_agency_projects::EntityKind::Issue)),
+        )
+        .chain(
+            plan.dependencies
+                .iter()
+                .map(|d| (&d.identity, codifix_agency_projects::EntityKind::Dependency)),
+        );
+    let mut baseline = codifix_agency_projects::Baseline::new();
+    for (identity, kind) in selected {
+        store
+            .authorize(
+                task.contract.id,
+                task.revision,
+                Usage {
+                    calls: 1,
+                    ..Usage::default()
+                },
+            )
+            .await?;
+        let id = identity
+            .remote_id
+            .unwrap_or_else(|| codifix_agency_projects::stable_id(plan.id, &identity.key));
+        if let Some(entity) = client.retrieve(kind, id).await? {
+            baseline.insert(id, entity);
+        }
+    }
+    store
+        .authorize(task.contract.id, task.revision, Usage::default())
         .await?;
-    let baseline = client.retrieve_plan(&plan).await?;
     let changes = codifix_agency_projects::prepare(&plan, &baseline, &authority)?;
     let id = Uuid::new_v5(&task.contract.id, plan.digest().as_bytes());
     let mut tx = store.pool.begin().await?;
@@ -281,6 +317,7 @@ async fn apply_plan(
         lease: lease.clone(),
         prepared_id: id,
         plan_id: plan.id,
+        plan_digest: changes.plan_digest.clone(),
         attempts: std::collections::BTreeMap::new(),
         owner: &mut plan_owner,
     };
@@ -296,9 +333,35 @@ struct ProjectJournal<'a> {
     lease: JobLease,
     prepared_id: Uuid,
     plan_id: Uuid,
+    plan_digest: String,
     attempts: std::collections::BTreeMap<Uuid, Uuid>,
 }
 impl codifix_agency_projects::StepJournal for ProjectJournal<'_> {
+    async fn authorize_read(
+        &mut self,
+        _kind: codifix_agency_projects::EntityKind,
+        _id: Uuid,
+    ) -> codifix_agency_projects::Result<()> {
+        self.owner
+            .check_ownership()
+            .await
+            .map_err(|_| journal_error())?;
+        self.store
+            .authorize_plan(crate::store::PlanAdmission {
+                task_id: self.task.contract.id,
+                revision: self.task.revision,
+                plan_id: self.plan_id,
+                plan_digest: &self.plan_digest,
+                lease: &self.lease,
+                usage: Usage {
+                    calls: 1,
+                    ..Usage::default()
+                },
+                intent: None,
+            })
+            .await
+            .map_err(|_| journal_error())
+    }
     async fn load(
         &mut self,
         id: Uuid,
@@ -401,14 +464,17 @@ impl codifix_agency_projects::StepJournal for ProjectJournal<'_> {
             .map_err(|_| journal_error())?;
         let attempt = Uuid::new_v4();
         self.store
-            .admit_effect(
-                self.task.contract.id,
-                self.task.revision,
-                Usage {
+            .authorize_plan(crate::store::PlanAdmission {
+                task_id: self.task.contract.id,
+                revision: self.task.revision,
+                plan_id: self.plan_id,
+                plan_digest: &changes.plan_digest,
+                lease: &self.lease,
+                usage: Usage {
                     calls: 1,
                     ..Usage::default()
                 },
-                &codifix_store::effects::EffectIntent {
+                intent: Some(&codifix_store::effects::EffectIntent {
                     id: attempt,
                     project_id: Some(self.task.project_id),
                     kind: codifix_store::effects::EffectKind::ProviderRequest,
@@ -417,8 +483,8 @@ impl codifix_agency_projects::StepJournal for ProjectJournal<'_> {
                     input_fingerprint: fingerprint(step).map_err(|_| journal_error())?,
                     actor_id: self.task.contract.specialist_id.clone(),
                     source: "agency-linear".into(),
-                },
-            )
+                }),
+            })
             .await
             .map_err(|_| journal_error())?;
         self.attempts.insert(step.id, attempt);
@@ -469,86 +535,5 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
     Ok(())
 }
 pub async fn improve(store: &Store, cfg: &Config, input: Value) -> Result<Value> {
-    use codifix_agency::improvement::*;
-    let action = input["action"]
-        .as_str()
-        .ok_or_else(|| anyhow::anyhow!("action required"))?;
-    let mut tx = store.pool.begin().await?;
-    let mut candidate: ImprovementCandidate = if action == "propose" {
-        let c: ImprovementCandidate = serde_json::from_value(input["candidate"].clone())?;
-        ensure!(
-            c.stage == ImprovementStage::Candidate
-                && c.evaluation.is_none()
-                && c.local_acceptance.is_none()
-                && c.rollout_ppm == 0
-                && c.rollout_successes == 0
-                && c.rollout_failures == 0
-                && c.owner_instance_id == cfg.instance_id,
-            "invalid candidate origin"
-        );
-        c
-    } else {
-        let id: Uuid = serde_json::from_value(input["id"].clone())?;
-        let value: Value =
-            sqlx::query_scalar("SELECT document FROM agency_improvements WHERE id=$1 FOR UPDATE")
-                .bind(id)
-                .fetch_one(&mut *tx)
-                .await?;
-        serde_json::from_value(value)?
-    };
-    let gate = ImprovementGate {
-        minimum_held_out_cases: 20,
-        minimum_quality_ppm: 900000,
-        maximum_rollout_ppm: 100000,
-        minimum_rollout_successes: 20,
-    };
-    let acceptance = || LocalAcceptance {
-        owner_instance_id: cfg.instance_id,
-        decision_ref: Uuid::new_v4().to_string(),
-        accepted_at: Utc::now(),
-    };
-    match action {
-        "propose" => {}
-        "evaluate" => candidate.record_evaluation(
-            serde_json::from_value(input["evaluation"].clone())?,
-            &gate,
-            Utc::now(),
-        )?,
-        "rollout" => candidate.start_rollout(100000, acceptance(), &gate, Utc::now())?,
-        "observe" => candidate.record_rollout_result(
-            input["passed"]
-                .as_bool()
-                .ok_or_else(|| anyhow::anyhow!("result required"))?,
-        )?,
-        "promote" => candidate.promote(acceptance(), &gate, Utc::now())?,
-        "revert" => candidate.revert(
-            input["reason"]
-                .as_str()
-                .unwrap_or("operator reverted")
-                .into(),
-        )?,
-        _ => anyhow::bail!("unknown improvement action"),
-    }
-    let value = serde_json::to_value(&candidate)?;
-    if action == "propose" {
-        let specialist = input["specialist_id"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("specialist required"))?;
-        ensure!(
-            cfg.specialists
-                .iter()
-                .any(|s| s.specialist_id == specialist),
-            "unknown specialist"
-        );
-        sqlx::query("INSERT INTO agency_improvements(id,specialist_id,document) VALUES($1,$2,$3)")
-            .bind(candidate.id)
-            .bind(specialist)
-            .bind(&value)
-            .execute(&mut *tx)
-            .await?;
-    } else {
-        sqlx::query("UPDATE agency_improvements SET document=$2,revision=revision+1,updated_at=clock_timestamp() WHERE id=$1").bind(candidate.id).bind(&value).execute(&mut *tx).await?;
-    }
-    tx.commit().await?;
-    Ok(value)
+    crate::learning::improve(store, cfg, input).await
 }

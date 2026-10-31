@@ -258,7 +258,7 @@ enum Action {
     Propose {
         specialist_id: String,
         workload: String,
-        candidate: ImprovementCandidate,
+        candidate: Box<ImprovementCandidate>,
         artifact: ArtifactDocument,
         baseline_digest: String,
     },

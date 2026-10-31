@@ -332,6 +332,15 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                 anyhow::bail!("remote task did not complete")
             }
             _ => {
+                // Polling may block while a source grant is revoked. Renewal is
+                // a new admission and must check the current authority again.
+                if let Err(error) = store
+                    .authorize(task.contract.id, task.revision, Usage::default())
+                    .await
+                {
+                    let _ = cancel_remote(store, cfg, task.contract.id).await;
+                    return Err(error);
+                }
                 bounded(
                     client
                         .post(format!(

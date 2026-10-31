@@ -43,6 +43,16 @@ pub struct Store {
     pub pool: PgPool,
 }
 
+pub struct PlanAdmission<'a> {
+    pub task_id: Uuid,
+    pub revision: i64,
+    pub plan_id: Uuid,
+    pub plan_digest: &'a str,
+    pub lease: &'a jobs::JobLease,
+    pub usage: Usage,
+    pub intent: Option<&'a codifix_store::effects::EffectIntent>,
+}
+
 pub fn fingerprint(value: &impl Serialize) -> Result<String> {
     use sha2::{Digest, Sha256};
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
@@ -346,9 +356,54 @@ impl Store {
             inserted.is_some(),
             "effect already admitted; reconciliation required"
         );
+        if intent.source == "agency-model" {
+            let binding: Option<Value> = sqlx::query_scalar("SELECT binding FROM agency_learning_assignments WHERE task_id=$1 AND task_revision=$2").bind(id).bind(revision).fetch_optional(&mut *tx).await?;
+            if let Some(binding) = binding {
+                let binding: crate::learning::DraftBinding = serde_json::from_value(binding)?;
+                let (baseline,canary):(Option<Uuid>,Option<Uuid>)=sqlx::query_as("SELECT baseline_candidate_id,canary_candidate_id FROM agency_learning_heads WHERE specialist_id=$1 AND workload=$2 FOR SHARE").bind(&binding.specialist_id).bind(&binding.workload).fetch_one(&mut *tx).await?;
+                ensure!(
+                    canary.or(baseline) == Some(binding.candidate_id),
+                    "assigned improvement no longer active"
+                );
+            }
+        }
         authorize_tx(&mut tx, id, revision, usage).await?;
         codifix_store::effects::begin(&mut *tx, intent).await?;
         tx.commit().await?;
+        Ok(())
+    }
+    /// Fences the accepted plan head and worker lease in the same transaction as
+    /// budget/authority and physical intent. A later head may invalidate future
+    /// admissions, but cannot retroactively unsend an admitted operation.
+    pub async fn authorize_plan(&self, request: PlanAdmission<'_>) -> Result<()> {
+        let mut guard = jobs::begin_result(&self.pool, request.lease).await?;
+        let tx = guard.transaction();
+        admission(tx).await?;
+        ensure!(
+            request.lease.job.operation_id == request.task_id,
+            "job task mismatch"
+        );
+        let (mandate, job): (Uuid, Option<Uuid>) =
+            sqlx::query_as("SELECT mandate_id,job_id FROM agency_tasks WHERE id=$1")
+                .bind(request.task_id)
+                .fetch_one(&mut **tx)
+                .await?;
+        ensure!(job == Some(request.lease.job.id), "task replaced job");
+        let head: String = sqlx::query_scalar(
+            "SELECT digest FROM agency_plan_heads WHERE plan_id=$1 AND mandate_id=$2 FOR SHARE",
+        )
+        .bind(request.plan_id)
+        .bind(mandate)
+        .fetch_one(&mut **tx)
+        .await?;
+        ensure!(head == request.plan_digest, "plan head changed");
+        if let Some(intent) = request.intent {
+            let inserted:Option<Uuid>=sqlx::query_scalar("INSERT INTO agency_attempts(id,task_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING id").bind(intent.id).bind(request.task_id).fetch_optional(&mut **tx).await?;
+            ensure!(inserted.is_some(), "effect already admitted");
+            codifix_store::effects::begin(&mut **tx, intent).await?;
+        }
+        authorize_tx(tx, request.task_id, request.revision, request.usage).await?;
+        jobs::checkpoint_result(guard).await?;
         Ok(())
     }
     pub async fn live_authority(&self, task: &StoredTask) -> Result<()> {

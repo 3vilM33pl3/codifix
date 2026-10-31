@@ -476,3 +476,98 @@ async fn orphaned_and_denied_schedules_cannot_starve_valid_work() {
     assert_eq!(f.store.list(&f.peer).await.unwrap().len(), 1);
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn plan_head_and_worker_lease_are_checked_inside_physical_admission() {
+    use codifix_agency_runtime::store::PlanAdmission;
+    use codifix_store::jobs;
+    let Some(f) = fixture().await else { return };
+    let task = working(&f).await;
+    let lease = jobs::claim_kinds(
+        &f.store.pool,
+        codifix_agency_runtime::worker::policy(),
+        &[codifix_record::JobKind::SpecialistTask],
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let plan = Uuid::new_v4();
+    sqlx::query("INSERT INTO agency_plan_heads(plan_id,mandate_id,revision,digest,prepared_id) VALUES($1,$2,1,'v1',$3)").bind(plan).bind(f.grant.id).bind(Uuid::new_v4()).execute(&f.db.pool).await.unwrap();
+    let effect = codifix_store::effects::EffectIntent {
+        id: Uuid::new_v4(),
+        project_id: Some(f.project),
+        kind: codifix_store::effects::EffectKind::ProviderRequest,
+        host_id: "agency".into(),
+        resource: "synthetic-plan".into(),
+        input_fingerprint: "a".repeat(64),
+        actor_id: "operations".into(),
+        source: "agency-linear".into(),
+    };
+    let mut replacement = f.db.pool.begin().await.unwrap();
+    sqlx::query("UPDATE agency_plan_heads SET digest='v2',revision=2 WHERE plan_id=$1")
+        .bind(plan)
+        .execute(&mut *replacement)
+        .await
+        .unwrap();
+    let future = f.store.authorize_plan(PlanAdmission {
+        task_id: task.contract.id,
+        revision: task.revision,
+        plan_id: plan,
+        plan_digest: "v1",
+        lease: &lease,
+        usage: Usage {
+            calls: 1,
+            ..Usage::default()
+        },
+        intent: Some(&effect),
+    });
+    tokio::pin!(future);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(50), &mut future)
+            .await
+            .is_err()
+    );
+    replacement.commit().await.unwrap();
+    assert!(future.await.is_err());
+    let attempts: i64 = sqlx::query_scalar("SELECT count(*) FROM agency_attempts WHERE id=$1")
+        .bind(effect.id)
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(attempts, 0);
+    assert_eq!(
+        f.store
+            .get_internal(task.contract.id)
+            .await
+            .unwrap()
+            .used_calls,
+        0
+    );
+    sqlx::query("UPDATE background_project_slots SET lease_until=clock_timestamp()-interval '1 second' WHERE project_id=$1").bind(f.project).execute(&f.db.pool).await.unwrap();
+    assert!(
+        f.store
+            .authorize_plan(PlanAdmission {
+                task_id: task.contract.id,
+                revision: task.revision,
+                plan_id: plan,
+                plan_digest: "v2",
+                lease: &lease,
+                usage: Usage {
+                    calls: 1,
+                    ..Usage::default()
+                },
+                intent: Some(&effect)
+            })
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        f.store
+            .get_internal(task.contract.id)
+            .await
+            .unwrap()
+            .used_calls,
+        0
+    );
+    f.db.cleanup().await.unwrap();
+}

@@ -64,6 +64,7 @@ fn safe_error(_: anyhow::Error) -> (StatusCode, Json<Value>) {
 pub fn router(app: App) -> Router {
     Router::new()
         .route("/health", get(|| async { Json(json!({"status":"ok"})) }))
+        .route("/operator", get(crate::operator::shell))
         .route("/.well-known/agent-card.json", get(card))
         .route("/message:send", post(send_message))
         .route("/tasks", get(a2a_list))
