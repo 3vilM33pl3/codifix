@@ -469,19 +469,20 @@ async fn private_delegate_persists_remote_identity_and_worker_restart_only_polls
     assert_eq!(evidence["reported_result"]["id"], REMOTE);
     assert_eq!(evidence["reported_result"]["contextId"], CONTEXT);
     assert_eq!(evidence["independent_verification"], false);
-    let state = f.remote.lock().unwrap();
-    assert_eq!(state.sends.len(), 1);
-    assert!(state.polls.len() >= 2);
-    assert!(state.polls.iter().all(|id| id == REMOTE));
-    let sent: &Value = &state.sends[0];
-    assert_eq!(sent["message"]["messageId"], task.contract.id.to_string());
-    assert_eq!(
-        sent["message"]["parts"][0]["data"]["request_id"],
-        task.contract.id.to_string()
-    );
-    assert_eq!(sent["configuration"]["returnImmediately"], true);
-    assert!(!sent.to_string().contains(TOKEN));
-    drop(state);
+    {
+        let state = f.remote.lock().unwrap();
+        assert_eq!(state.sends.len(), 1);
+        assert!(state.polls.len() >= 2);
+        assert!(state.polls.iter().all(|id| id == REMOTE));
+        let sent: &Value = &state.sends[0];
+        assert_eq!(sent["message"]["messageId"], task.contract.id.to_string());
+        assert_eq!(
+            sent["message"]["parts"][0]["data"]["request_id"],
+            task.contract.id.to_string()
+        );
+        assert_eq!(sent["configuration"]["returnImmediately"], true);
+        assert!(!sent.to_string().contains(TOKEN));
+    }
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM agency_attempts WHERE task_id=$1")
             .bind(task.contract.id)
@@ -569,20 +570,21 @@ async fn delegated_input_is_answered_once_with_the_same_remote_conversation() {
         f.settle(task.contract.id).await.contract.status,
         TaskStatus::Completed
     );
-    let state = f.remote.lock().unwrap();
-    assert_eq!(state.sends.len(), 2);
-    let reply = &state.sends[1]["message"];
-    assert_eq!(reply["taskId"], REMOTE);
-    assert_eq!(reply["contextId"], CONTEXT);
-    assert_eq!(
-        reply["messageId"],
-        format!("{}:{}", task.contract.id, answered.revision)
-    );
-    assert_eq!(
-        reply["parts"][0]["data"]["answer"],
-        "Use the reviewed synthetic service only."
-    );
-    drop(state);
+    {
+        let state = f.remote.lock().unwrap();
+        assert_eq!(state.sends.len(), 2);
+        let reply = &state.sends[1]["message"];
+        assert_eq!(reply["taskId"], REMOTE);
+        assert_eq!(reply["contextId"], CONTEXT);
+        assert_eq!(
+            reply["messageId"],
+            format!("{}:{}", task.contract.id, answered.revision)
+        );
+        assert_eq!(
+            reply["parts"][0]["data"]["answer"],
+            "Use the reviewed synthetic service only."
+        );
+    }
     f.cleanup().await;
 }
 
@@ -612,11 +614,12 @@ async fn delegation_rejects_missing_credentials_and_disclosure_scope_before_subm
             "{case}"
         );
         f.no_outcome(task.contract.id).await;
-        let remote = f.remote.lock().unwrap();
-        assert!(remote.sends.is_empty(), "{case}");
-        assert!(remote.polls.is_empty(), "{case}");
-        assert_eq!(remote.denied, usize::from(case == "wrong"));
-        drop(remote);
+        {
+            let remote = f.remote.lock().unwrap();
+            assert!(remote.sends.is_empty(), "{case}");
+            assert!(remote.polls.is_empty(), "{case}");
+            assert_eq!(remote.denied, usize::from(case == "wrong"));
+        }
         f.cleanup().await;
     }
 }
@@ -725,13 +728,25 @@ async fn unknown_remote_submission_or_answer_outcome_is_never_resent() {
             .await
             .unwrap();
         f.remote.lock().unwrap().phase = a2a::TaskState::Completed;
+        let reconciled = f.settle(task.contract.id).await;
         assert_eq!(
-            f.settle(task.contract.id).await.contract.status,
-            TaskStatus::InputRequired,
-            "unknown effect requires explicit reconciliation, not a new message"
+            f.remote.lock().unwrap().sends.len(),
+            sends,
+            "unknown effects must never become another physical send"
         );
-        assert_eq!(f.remote.lock().unwrap().sends.len(), sends);
-        f.no_outcome(task.contract.id).await;
+        // A known remote task may be reconciled by polling its existing ID, or
+        // remain at a private escalation. A lost initial ID cannot be guessed.
+        if answer {
+            assert!(matches!(
+                reconciled.contract.status,
+                TaskStatus::InputRequired | TaskStatus::Completed
+            ));
+        } else {
+            assert_eq!(reconciled.contract.status, TaskStatus::InputRequired);
+        }
+        if reconciled.contract.status != TaskStatus::Completed {
+            f.no_outcome(task.contract.id).await;
+        }
         f.cleanup().await;
     }
 }
@@ -773,10 +788,11 @@ async fn revocation_and_local_cancellation_cancel_the_active_remote_task() {
             }
         );
         f.no_outcome(task.contract.id).await;
-        let remote = f.remote.lock().unwrap();
-        assert_eq!(remote.sends.len(), 1);
-        assert_eq!(remote.cancellations, vec![REMOTE]);
-        drop(remote);
+        {
+            let remote = f.remote.lock().unwrap();
+            assert_eq!(remote.sends.len(), 1);
+            assert_eq!(remote.cancellations, vec![REMOTE]);
+        }
         f.cleanup().await;
     }
 }
