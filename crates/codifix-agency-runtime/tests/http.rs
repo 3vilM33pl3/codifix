@@ -81,7 +81,7 @@ impl Fixture {
         }
     }
     fn message(&self) -> Value {
-        json!({"message":{"messageId":Uuid::new_v4().to_string(),"role":"ROLE_USER","parts":[{"data":self.submit()}]}})
+        json!({"message":{"messageId":Uuid::new_v4().to_string(),"role":"ROLE_USER","parts":[{"data":self.submit()}]},"configuration":{"returnImmediately":true}})
     }
     async fn send(&self) -> Value {
         let (status, value) = self
@@ -429,7 +429,7 @@ async fn context_mismatch_rejected_and_clarification_continues_existing_task() {
             .unwrap()
             .contains("synthetic revision")
     );
-    let answer = json!({"message":{"messageId":"answer-1","role":"ROLE_USER","taskId":id,"contextId":created["contextId"],"parts":[{"data":{"answer":"Use revision two","replacement_payload":{"kind":"inspect","revision":2}}}]}});
+    let answer = json!({"message":{"messageId":"answer-1","role":"ROLE_USER","taskId":id,"contextId":created["contextId"],"parts":[{"data":{"answer":"Use revision two","replacement_payload":{"kind":"inspect","revision":2}}}]},"configuration":{"returnImmediately":true}});
     let mut bad = answer.clone();
     bad["message"]["contextId"] = json!(Uuid::new_v4());
     let (status, error) = f
@@ -618,5 +618,158 @@ async fn operator_controls_and_http_schedule_run_real_persisted_work() {
         )
         .await;
     assert_eq!(status, StatusCode::CONFLICT);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn default_send_message_waits_for_worker_completion() {
+    let Some(f) = fixture().await else { return };
+    let mut request = f.message();
+    request.as_object_mut().unwrap().remove("configuration");
+    let response = f.request(
+        Method::POST,
+        "/message:send",
+        Some(MEMBER_TOKEN),
+        Some("1.0"),
+        Some(request),
+    );
+    let run_worker = async {
+        for _ in 0..100 {
+            if !f.store.list(&f.member).await.unwrap().is_empty() {
+                assert!(worker::run_once(&f.store, &f.cfg).await.unwrap());
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        panic!("HTTP task was not admitted before worker deadline");
+    };
+    let ((status, response), ()) = tokio::join!(response, run_worker);
+    assert_eq!(status, StatusCode::OK, "{response}");
+    assert_eq!(response["task"]["status"]["state"], "TASK_STATE_COMPLETED");
+    assert!(response["task"]["artifacts"].as_array().unwrap().len() >= 2);
+    f.cleanup().await;
+}
+
+#[tokio::test]
+async fn list_tasks_paginates_filters_and_rejects_foreign_or_tampered_cursors() {
+    let Some(f) = fixture().await else { return };
+    let mut ids = BTreeSet::new();
+    let mut sample = Value::Null;
+    for _ in 0..5 {
+        let task = f.send().await;
+        ids.insert(task["id"].as_str().unwrap().to_string());
+        sample = task;
+    }
+    let (status, page) = f
+        .request(
+            Method::GET,
+            "/tasks?pageSize=2",
+            Some(MEMBER_TOKEN),
+            Some("1.0"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["pageSize"], 2);
+    assert_eq!(page["totalSize"], 5);
+    assert_eq!(page["tasks"].as_array().unwrap().len(), 2);
+    let token = page["nextPageToken"].as_str().unwrap();
+    assert!(!token.is_empty());
+    let cursor_path = |token: &str| {
+        let mut url = reqwest::Url::parse(&format!("{}/tasks", f.url)).unwrap();
+        url.query_pairs_mut()
+            .append_pair("pageSize", "2")
+            .append_pair("pageToken", token);
+        url.as_str().strip_prefix(&f.url).unwrap().to_string()
+    };
+    let (status, foreign) = f
+        .request(
+            Method::GET,
+            &cursor_path(token),
+            Some(OUTSIDER_TOKEN),
+            Some("1.0"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{foreign}");
+    let (status, tampered) = f
+        .request(
+            Method::GET,
+            &cursor_path(&format!("{token}tampered")),
+            Some(MEMBER_TOKEN),
+            Some("1.0"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{tampered}");
+    let mut seen = BTreeSet::new();
+    let mut current = page;
+    loop {
+        assert_eq!(current["totalSize"], 5);
+        for task in current["tasks"].as_array().unwrap() {
+            assert!(
+                seen.insert(task["id"].as_str().unwrap().to_string()),
+                "duplicate task across cursor pages"
+            );
+        }
+        let next = current["nextPageToken"].as_str().unwrap();
+        if next.is_empty() {
+            break;
+        }
+        let (status, page) = f
+            .request(
+                Method::GET,
+                &cursor_path(next),
+                Some(MEMBER_TOKEN),
+                Some("1.0"),
+                None,
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        current = page;
+    }
+    assert_eq!(seen, ids);
+    let context = sample["contextId"].as_str().unwrap();
+    let (status, filtered) = f
+        .request(
+            Method::GET,
+            &format!("/tasks?contextId={context}&status=TASK_STATE_SUBMITTED"),
+            Some(MEMBER_TOKEN),
+            Some("1.0"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{filtered}");
+    assert_eq!(filtered["totalSize"], 1);
+    assert_eq!(filtered["tasks"][0]["id"], sample["id"]);
+    let (status, empty) = f
+        .request(
+            Method::GET,
+            "/tasks?status=TASK_STATE_COMPLETED",
+            Some(MEMBER_TOKEN),
+            Some("1.0"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(empty["totalSize"], 0);
+    assert_eq!(empty["tasks"], json!([]));
+    for query in [
+        "pageSize=0",
+        "pageSize=101",
+        "status=invalid-state",
+        "contextId=invalid-context",
+    ] {
+        let (status, error) = f
+            .request(
+                Method::GET,
+                &format!("/tasks?{query}"),
+                Some(MEMBER_TOKEN),
+                Some("1.0"),
+                None,
+            )
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{query}: {error}");
+    }
     f.cleanup().await;
 }
