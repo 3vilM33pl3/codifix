@@ -443,3 +443,37 @@ fn policy_has_bounded_defaults() {
         .is_err()
     );
 }
+
+#[tokio::test]
+async fn specialist_and_memory_workers_claim_only_their_own_job_kinds() {
+    let Some(db) = codifix_test_support::IsolatedDatabase::new().await else {
+        return;
+    };
+    let mut specialist = setup(&db.pool).await;
+    specialist.kind = JobKind::SpecialistTask;
+    put(&db.pool, &specialist).await;
+    assert!(
+        claim(&db.pool, JobPolicy::default())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        claim_kinds(&db.pool, JobPolicy::default(), &[])
+            .await
+            .is_err()
+    );
+    let memory = setup(&db.pool).await;
+    put(&db.pool, &memory).await;
+    let agency = claim_kinds(&db.pool, JobPolicy::default(), &[JobKind::SpecialistTask])
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(agency.job.id, specialist.id);
+    let ordinary = claim(&db.pool, JobPolicy::default())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ordinary.job.id, memory.id);
+    db.cleanup().await.unwrap();
+}

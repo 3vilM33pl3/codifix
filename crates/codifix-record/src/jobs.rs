@@ -30,6 +30,8 @@ pub enum JobKind {
     ValidationDue,
     Consolidation,
     ConsolidationSynthesis,
+    /// Claimed only by an explicitly configured specialist worker.
+    SpecialistTask,
 }
 
 /// Safe, enumerated reasons: raw provider/SQL errors never become API output.
