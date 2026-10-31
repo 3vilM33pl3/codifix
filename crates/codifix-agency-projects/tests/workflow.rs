@@ -83,6 +83,7 @@ impl StepJournal for Journal {
 }
 #[derive(Default)]
 struct ServerState {
+    reads: Vec<Uuid>,
     objects: BTreeMap<Uuid, Value>,
     mutations: Vec<Value>,
     fail_before_at: Option<usize>,
@@ -133,10 +134,11 @@ async fn handle(
     let response = {
         let mut state = state.lock().unwrap();
         if query.starts_with("query") {
+            let id = Uuid::parse_str(body["variables"]["id"].as_str().unwrap()).unwrap();
+            state.reads.push(id);
             if state.graphql_read_error {
                 return Json(json!({"errors":[{"message":"permission denied","extensions":{"code":"FORBIDDEN"}}]})).into_response();
             }
-            let id = Uuid::parse_str(body["variables"]["id"].as_str().unwrap()).unwrap();
             if let Some(object) = state.objects.get(&id) {
                 let mut object = object.clone();
                 if state.malformed_readback {
@@ -895,4 +897,120 @@ fn operator_authority_example_authorizes_only_its_bound_plan() {
         authorize_plan(&substituted, &auth),
         Err(Error::Authority(_))
     ));
+}
+
+#[tokio::test]
+async fn denied_initial_read_prevents_provider_access_and_mutation() {
+    let mock = Mock::start().await;
+    let p = plan();
+    let auth = authority(&p);
+    let changes = prepare(&p, &Baseline::new(), &auth).unwrap();
+    let mut journal = Journal {
+        deny_read_at: Some(1),
+        ..Default::default()
+    };
+    assert!(matches!(
+        mock.client()
+            .execute(&p, &auth, &changes, &mut journal)
+            .await,
+        Err(Error::Authority(_))
+    ));
+    let first = &changes.steps[0];
+    assert_eq!(journal.reads, vec![(first.kind, first.entity_id)]);
+    assert!(mock.state.lock().unwrap().reads.is_empty());
+    assert_eq!(mock.writes(), 0);
+    assert_eq!(journal.receipts[&first.id].phase, StepPhase::Prepared);
+}
+#[tokio::test]
+async fn denied_readback_leaves_attempted_receipt_and_resume_reconciles_without_rewrite() {
+    let mock = Mock::start().await;
+    let p = plan();
+    let auth = authority(&p);
+    let changes = prepare(&p, &Baseline::new(), &auth).unwrap();
+    let mut journal = Journal {
+        deny_read_at: Some(2),
+        ..Default::default()
+    };
+    assert!(matches!(
+        mock.client()
+            .execute(&p, &auth, &changes, &mut journal)
+            .await,
+        Err(Error::Authority(_))
+    ));
+    assert_eq!(mock.state.lock().unwrap().reads.len(), 1);
+    assert_eq!(mock.writes(), 1);
+    assert_eq!(
+        journal.receipts[&changes.steps[0].id].phase,
+        StepPhase::Attempted
+    );
+    // Once a fresh host decision permits reading, observe the first completed
+    // mutation instead of submitting it again, then finish the remaining steps.
+    journal.deny_read_at = None;
+    let result = mock
+        .client()
+        .execute(&p, &auth, &changes, &mut journal)
+        .await
+        .unwrap();
+    assert_eq!(result.len(), changes.steps.len());
+    assert_eq!(mock.writes(), changes.steps.len());
+    assert!(
+        journal
+            .receipts
+            .values()
+            .all(|r| r.phase == StepPhase::Verified)
+    );
+    assert_eq!(
+        mock.state.lock().unwrap().reads.len(),
+        changes.steps.len() * 2
+    );
+}
+#[tokio::test]
+async fn completed_receipts_do_not_bypass_live_read_authorization_on_resume() {
+    let mock = Mock::start().await;
+    let p = plan();
+    let auth = authority(&p);
+    let changes = prepare(&p, &Baseline::new(), &auth).unwrap();
+    let mut journal = Journal::default();
+    mock.client()
+        .execute(&p, &auth, &changes, &mut journal)
+        .await
+        .unwrap();
+    let before = mock.state.lock().unwrap().reads.len();
+    let historical = journal.receipts.clone();
+    let mut resumed = Journal {
+        receipts: historical.clone(),
+        deny_read_at: Some(1),
+        ..Default::default()
+    };
+    assert!(matches!(
+        mock.client()
+            .execute(&p, &auth, &changes, &mut resumed)
+            .await,
+        Err(Error::Authority(_))
+    ));
+    assert_eq!(mock.state.lock().unwrap().reads.len(), before);
+    assert_eq!(mock.writes(), changes.steps.len());
+    assert_eq!(resumed.receipts, historical);
+}
+#[tokio::test]
+async fn each_prewrite_and_readback_has_exact_resource_read_admission() {
+    let mock = Mock::start().await;
+    let p = plan();
+    let auth = authority(&p);
+    let changes = prepare(&p, &Baseline::new(), &auth).unwrap();
+    let mut journal = Journal::default();
+    mock.client()
+        .execute(&p, &auth, &changes, &mut journal)
+        .await
+        .unwrap();
+    let expected: Vec<_> = changes
+        .steps
+        .iter()
+        .flat_map(|s| [(s.kind, s.entity_id); 2])
+        .collect();
+    assert_eq!(journal.reads, expected);
+    assert_eq!(
+        mock.state.lock().unwrap().reads,
+        journal.reads.iter().map(|(_, id)| *id).collect::<Vec<_>>()
+    );
 }
