@@ -326,3 +326,249 @@ async fn immutable_artifact_applies_deterministically_and_json_completion_does_n
     assert!(plain.binding.is_none());
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn independent_quality_cases_gate_promotion_and_procedure_reversion() {
+    let Some(f) = fixture().await else { return };
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Procedure {
+            steps: vec![
+                "Extract the requested fields.".into(),
+                "Check facts against supplied data.".into(),
+            ],
+        },
+    )
+    .await;
+    rollout(&f, &c, &a, &base).await;
+    let mut first_assessment = None;
+    for index in 0..20 {
+        let t = task(&f, c.id).await;
+        let applied = select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+            .await
+            .unwrap();
+        assert!(applied.prompt.starts_with("Drafting procedure:"));
+        let b = applied.binding.unwrap();
+        complete(&f, &t, &b).await;
+        let mut assess = assessment(&t, &b, index);
+        if index == 1 {
+            let first: TaskAssessment = first_assessment.clone().unwrap();
+            assess.case_id = first.case_id.clone();
+            assert!(
+                improve(
+                    &f.store,
+                    &f.cfg,
+                    json!({"action":"assess","assessment":assess})
+                )
+                .await
+                .is_err()
+            );
+            assess.case_id = format!("case-{index}");
+            let mut forged = assess.clone();
+            forged.artifact_digest = "0".repeat(64);
+            assert!(
+                improve(
+                    &f.store,
+                    &f.cfg,
+                    json!({"action":"assess","assessment":forged})
+                )
+                .await
+                .is_err()
+            );
+            let mut forged = assess.clone();
+            forged.verifier_id = "candidate-self-report".into();
+            assert!(
+                improve(
+                    &f.store,
+                    &f.cfg,
+                    json!({"action":"assess","assessment":forged})
+                )
+                .await
+                .is_err()
+            );
+            let mut forged = assess.clone();
+            forged.dataset_id = "training-v1".into();
+            assert!(
+                improve(
+                    &f.store,
+                    &f.cfg,
+                    json!({"action":"assess","assessment":forged})
+                )
+                .await
+                .is_err()
+            );
+        }
+        improve(
+            &f.store,
+            &f.cfg,
+            json!({"action":"assess","assessment":assess}),
+        )
+        .await
+        .unwrap();
+        if index == 0 {
+            first_assessment = Some(assess);
+        }
+    }
+    let promoted = improve(
+        &f.store,
+        &f.cfg,
+        json!({"action":"promote","id":c.id,"decision_ref":"independent-local-promotion"}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(promoted["candidate"]["stage"], "promoted");
+    assert_eq!(promoted["candidate"]["rollout_successes"], 20);
+    let t = task(&f, c.id).await;
+    let applied = select_draft(&f.store, &f.cfg, &t, "Fresh input", &routing())
+        .await
+        .unwrap();
+    assert!(
+        applied
+            .prompt
+            .contains("Check facts against supplied data.")
+    );
+    improve(
+        &f.store,
+        &f.cfg,
+        json!({"action":"revert","id":c.id,"reason":"restore built-in baseline"}),
+    )
+    .await
+    .unwrap();
+    let restored = select_draft(&f.store, &f.cfg, &t, "Fresh input", &routing())
+        .await
+        .unwrap();
+    assert_eq!(restored.prompt, "Fresh input");
+    assert!(restored.binding.is_none());
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn artifact_digest_evaluation_binding_and_operational_failure_fail_closed() {
+    let Some(f) = fixture().await else { return };
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::Prompt {
+            prefix: "Be precise.".into(),
+            suffix: String::new(),
+        },
+    )
+    .await;
+    let mut corrupt = a.clone();
+    corrupt.content = DraftArtifact::Prompt {
+        prefix: "Unreviewed replacement".into(),
+        suffix: String::new(),
+    };
+    assert_ne!(
+        ArtifactDocument::new(corrupt.revision.clone(), corrupt.content.clone())
+            .unwrap()
+            .digest,
+        corrupt.digest
+    );
+    let evaluation = ImprovementEvaluation {
+        evidence_id: "bound-heldout".into(),
+        candidate_revision: c.candidate_revision.clone(),
+        baseline_revision: c.baseline_revision.clone(),
+        held_out_set_id: "heldout-v1".into(),
+        training_set_id: "training-v1".into(),
+        held_out_cases: 20,
+        candidate_quality_ppm: 950000,
+        baseline_quality_ppm: 900000,
+        safety_failures: 0,
+        evaluated_at: Utc::now(),
+    };
+    assert!(improve(&f.store,&f.cfg,json!({"action":"evaluate","id":c.id,"evaluation":evaluation,"artifact_digest":"0".repeat(64),"baseline_digest":base,"verifier_id":"external-review-v1"})).await.is_err());
+    rollout(&f, &c, &a, &base).await;
+    let mut t = task(&f, c.id).await;
+    select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+        .await
+        .unwrap();
+    t.contract
+        .clarify("Provider result uncertain".into(), Utc::now())
+        .unwrap();
+    f.store.update_contract(&t).await.unwrap();
+    observe_task(&f.store, &f.cfg, t.contract.id).await.unwrap();
+    observe_task(&f.store, &f.cfg, t.contract.id).await.unwrap();
+    let state = improve(&f.store, &f.cfg, json!({"action":"get","id":c.id}))
+        .await
+        .unwrap();
+    assert_eq!(state["candidate"]["rollout_failures"], 1);
+    assert_eq!(state["candidate"]["rollout_successes"], 0);
+    let mut unsupported = serde_json::to_value(&a).unwrap();
+    unsupported["content"] = json!({"kind":"retrieval","path":"/private"});
+    assert!(serde_json::from_value::<ArtifactDocument>(unsupported).is_err());
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn model_profile_artifact_filters_routes_without_expanding_authority_and_detects_drift() {
+    let Some(mut f) = fixture().await else { return };
+    let destination = ModelDestination::Local {
+        runtime: "synthetic-local".into(),
+    };
+    for id in ["baseline-model", "candidate-model"] {
+        f.cfg.model_profiles.push(ModelProfile {
+            id: id.into(),
+            model_revision: format!("{id}-v1"),
+            destination: destination.clone(),
+            accepted_locally: true,
+            context_tokens: 4096,
+            local_memory_mib: 1024,
+            evaluations: vec![ModelEvaluation {
+                evidence_id: format!("eval-{id}"),
+                model_revision: format!("{id}-v1"),
+                workload: "draft-json".into(),
+                evaluated_at: Utc::now() - Duration::minutes(1),
+                valid_until: Utc::now() + Duration::hours(1),
+                held_out_cases: 20,
+                quality_ppm: 950000,
+                micro_usd_per_call: 1,
+                latency_ms: 100,
+            }],
+        });
+        f.cfg.models.push(config::ModelEndpoint {
+            profile_id: id.into(),
+            url: "http://127.0.0.1:1/never-called".into(),
+            token_env: None,
+            model: format!("{id}-v1"),
+            max_input_bytes: 1024,
+            max_output_tokens: 64,
+            reserve_micro_usd: 1,
+            input_micro_usd_per_million: 0,
+            output_micro_usd_per_million: 0,
+        });
+    }
+    let digest = configured_profile_digest(&f.cfg, "candidate-model").unwrap();
+    let (c, a, base) = candidate(
+        &f,
+        DraftArtifact::ModelProfile {
+            profile_id: "candidate-model".into(),
+            profile_digest: digest,
+        },
+    )
+    .await;
+    rollout(&f, &c, &a, &base).await;
+    let t = task(&f, c.id).await;
+    let applied = select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+        .await
+        .unwrap();
+    assert_eq!(applied.profiles.len(), 1);
+    assert_eq!(applied.profiles[0].id, "candidate-model");
+    // Neither task nor mandate permits the destination: deployment cannot grant it.
+    assert!(
+        select_model(
+            &applied.profiles,
+            &routing(),
+            &f.grant,
+            Usage::default(),
+            Utc::now()
+        )
+        .is_err()
+    );
+    f.cfg.models[1].model = "unreviewed-provider-revision".into();
+    assert!(
+        select_draft(&f.store, &f.cfg, &t, "Task input", &routing())
+            .await
+            .is_err()
+    );
+    f.db.cleanup().await.unwrap();
+}
