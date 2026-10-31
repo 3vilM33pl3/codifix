@@ -134,6 +134,7 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             client
                 .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
                 .header("A2A-Version", "1.0")
+                .header("Content-Type", "application/a2a+json")
                 .bearer_auth(&token)
                 .json(&body)
                 .send()
@@ -179,87 +180,87 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         .clarification
         .as_ref()
         .and_then(|c| c.answer.as_ref())
+        && row.try_get::<Option<i64>, _>("reply_revision")? != Some(task.revision)
     {
-        if row.try_get::<Option<i64>, _>("reply_revision")? != Some(task.revision) {
-            let pending: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM external_effects e JOIN agency_attempts a ON a.id=e.id WHERE a.task_id=$1 AND e.resource=$2 AND e.status IN ('pending','uncertain'))").bind(task.contract.id).bind(format!("peer-reply:{peer_id}")).fetch_one(&store.pool).await?;
-            ensure!(
-                !pending,
-                "previous reply outcome uncertain; explicit reconciliation required"
-            );
-            store
-                .authorize(task.contract.id, task.revision, Usage::default())
-                .await?;
-            let body = a2a::SendMessageRequest {
-                message: a2a::Message {
-                    message_id: format!("{}:{}", task.contract.id, task.revision),
-                    role: a2a::Role::User,
-                    parts: vec![Part::Data(
-                        json!({"answer":answer,"replacement_payload":task.request.payload.get("answer_payload")}),
-                    )],
-                    context_id: Some(context.clone()),
-                    task_id: Some(remote_id.clone()),
+        let pending: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM external_effects e JOIN agency_attempts a ON a.id=e.id WHERE a.task_id=$1 AND e.resource=$2 AND e.status IN ('pending','uncertain'))").bind(task.contract.id).bind(format!("peer-reply:{peer_id}")).fetch_one(&store.pool).await?;
+        ensure!(
+            !pending,
+            "previous reply outcome uncertain; explicit reconciliation required"
+        );
+        store
+            .authorize(task.contract.id, task.revision, Usage::default())
+            .await?;
+        let body = a2a::SendMessageRequest {
+            message: a2a::Message {
+                message_id: format!("{}:{}", task.contract.id, task.revision),
+                role: a2a::Role::User,
+                parts: vec![Part::Data(
+                    json!({"answer":answer,"replacement_payload":task.request.payload.get("answer_payload")}),
+                )],
+                context_id: Some(context.clone()),
+                task_id: Some(remote_id.clone()),
+            },
+            tenant: None,
+            configuration: Some(a2a::SendMessageConfiguration {
+                return_immediately: true,
+                ..Default::default()
+            }),
+            metadata: None,
+        };
+        let effect = Uuid::new_v5(
+            &task.contract.id,
+            format!("reply:{}", task.revision).as_bytes(),
+        );
+        store
+            .admit_effect(
+                task.contract.id,
+                task.revision,
+                Usage::default(),
+                &codifix_store::effects::EffectIntent {
+                    id: effect,
+                    project_id: Some(task.project_id),
+                    kind: codifix_store::effects::EffectKind::ProviderRequest,
+                    host_id: "agency".into(),
+                    resource: format!("peer-reply:{peer_id}"),
+                    input_fingerprint: fingerprint(&body)?,
+                    actor_id: task.contract.specialist_id.clone(),
+                    source: "agency-delegate".into(),
                 },
-                tenant: None,
-                configuration: Some(a2a::SendMessageConfiguration {
-                    return_immediately: true,
-                    ..Default::default()
-                }),
-                metadata: None,
-            };
-            let effect = Uuid::new_v5(
-                &task.contract.id,
-                format!("reply:{}", task.revision).as_bytes(),
-            );
-            store
-                .admit_effect(
-                    task.contract.id,
-                    task.revision,
-                    Usage::default(),
-                    &codifix_store::effects::EffectIntent {
-                        id: effect,
-                        project_id: Some(task.project_id),
-                        kind: codifix_store::effects::EffectKind::ProviderRequest,
-                        host_id: "agency".into(),
-                        resource: format!("peer-reply:{peer_id}"),
-                        input_fingerprint: fingerprint(&body)?,
-                        actor_id: task.contract.specialist_id.clone(),
-                        source: "agency-delegate".into(),
-                    },
-                )
-                .await?;
-            let response = bounded(
-                client
-                    .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
-                    .header("A2A-Version", "1.0")
-                    .bearer_auth(&token)
-                    .json(&body)
-                    .send()
-                    .await?,
             )
             .await?;
-            let response: a2a::SendMessageResponse = serde_json::from_value(response)?;
-            let a2a::SendMessageResponse::Task(remote) = response else {
-                anyhow::bail!("follow-up requires task response")
-            };
-            remote.validate()?;
-            ensure!(
-                remote.id == remote_id && remote.context_id == context,
-                "reply changed remote task identity"
-            );
-            codifix_store::effects::conclude(
-                &store.pool,
-                effect,
-                Uuid::new_v4(),
-                codifix_store::effects::EffectStatus::Confirmed,
-                codifix_store::effects::EffectReason::Observed,
-            )
+        let response = bounded(
+            client
+                .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
+                .header("A2A-Version", "1.0")
+                .header("Content-Type", "application/a2a+json")
+                .bearer_auth(&token)
+                .json(&body)
+                .send()
+                .await?,
+        )
+        .await?;
+        let response: a2a::SendMessageResponse = serde_json::from_value(response)?;
+        let a2a::SendMessageResponse::Task(remote) = response else {
+            anyhow::bail!("follow-up requires task response")
+        };
+        remote.validate()?;
+        ensure!(
+            remote.id == remote_id && remote.context_id == context,
+            "reply changed remote task identity"
+        );
+        codifix_store::effects::conclude(
+            &store.pool,
+            effect,
+            Uuid::new_v4(),
+            codifix_store::effects::EffectStatus::Confirmed,
+            codifix_store::effects::EffectReason::Observed,
+        )
+        .await?;
+        sqlx::query("UPDATE agency_remote_tasks SET reply_revision=$2 WHERE task_id=$1")
+            .bind(task.contract.id)
+            .bind(task.revision)
+            .execute(&store.pool)
             .await?;
-            sqlx::query("UPDATE agency_remote_tasks SET reply_revision=$2 WHERE task_id=$1")
-                .bind(task.contract.id)
-                .bind(task.revision)
-                .execute(&store.pool)
-                .await?;
-        }
     }
     loop {
         if let Err(error) = store
@@ -278,6 +279,7 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                         urlencoding::encode(&remote_id)
                     ))
                     .header("A2A-Version", "1.0")
+                    .header("Content-Type", "application/a2a+json")
                     .bearer_auth(&token)
                     .send()
                     .await?,
@@ -338,6 +340,7 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                             urlencoding::encode(&remote_id)
                         ))
                         .header("A2A-Version", "1.0")
+                        .header("Content-Type", "application/a2a+json")
                         .bearer_auth(&token)
                         .json(&json!({}))
                         .send()
@@ -388,6 +391,7 @@ pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> 
                 urlencoding::encode(&remote)
             ))
             .header("A2A-Version", "1.0")
+            .header("Content-Type", "application/a2a+json")
             .bearer_auth(token)
             .json(&json!({}))
             .send()

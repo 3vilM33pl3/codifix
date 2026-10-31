@@ -4,8 +4,11 @@ use crate::{
 };
 use axum::{
     Json, Router,
+    extract::Request,
     extract::{DefaultBodyLimit, Path, Query, State},
     http::{HeaderMap, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use codifix_agency::{
@@ -26,7 +29,18 @@ pub struct App {
 }
 type ApiResult<T> = Result<Json<T>, (StatusCode, Json<Value>)>;
 fn failure(status: StatusCode, code: &str) -> (StatusCode, Json<Value>) {
-    (status, Json(json!({"error":{"code":code}})))
+    let kind = match code {
+        "VersionNotSupportedError" => "https://a2a-protocol.org/errors/version-not-supported",
+        "PushNotificationNotSupportedError" => {
+            "https://a2a-protocol.org/errors/push-notification-not-supported"
+        }
+        _ => "about:blank",
+    };
+    let mut body = json!({"type":kind,"title":status.canonical_reason().unwrap_or("Request failed"),"status":status.as_u16(),"detail":code,"error":{"code":code}});
+    if code == "VersionNotSupportedError" {
+        body["supportedVersions"] = json!(["1.0"]);
+    }
+    (status, Json(body))
 }
 fn peer(app: &App, headers: &HeaderMap) -> Result<Peer, (StatusCode, Json<Value>)> {
     let token = headers
@@ -63,7 +77,38 @@ pub fn router(app: App) -> Router {
         .route("/v1/schedules", post(schedule))
         .route("/v1/improvements", post(improvement))
         .layer(DefaultBodyLimit::max(262144))
+        .layer(middleware::from_fn(wire_format))
         .with_state(app)
+}
+// Normalize extractor failures as well as application failures. Provider errors
+// and request bodies are never copied into public protocol errors.
+async fn wire_format(request: Request, next: Next) -> Response {
+    let a2a = request.uri().path() == "/message:send"
+        || request.uri().path() == "/tasks"
+        || request.uri().path().starts_with("/tasks/");
+    let mut response = next.run(request).await;
+    if a2a {
+        if !response.status().is_success()
+            && response
+                .headers()
+                .get("content-type")
+                .is_none_or(|v| v != "application/json")
+        {
+            response = failure(response.status(), "invalid_request").into_response();
+        }
+        let kind = if response.status().is_success() {
+            "application/a2a+json"
+        } else {
+            "application/problem+json"
+        };
+        response
+            .headers_mut()
+            .insert("content-type", axum::http::HeaderValue::from_static(kind));
+        response
+            .headers_mut()
+            .insert("a2a-version", axum::http::HeaderValue::from_static("1.0"));
+    }
+    response
 }
 async fn card(State(app): State<App>) -> ApiResult<a2a::AgentCard> {
     let value = app
@@ -418,10 +463,11 @@ async fn send_message(
             codifix_agency::TaskStatus::Submitted | codifix_agency::TaskStatus::Working
         ) {
             if tokio::time::Instant::now() >= timeout {
-                return Err(failure(
-                    StatusCode::REQUEST_TIMEOUT,
-                    "task_continues_poll_by_id",
-                ));
+                let (status, Json(mut problem)) =
+                    failure(StatusCode::REQUEST_TIMEOUT, "task_continues_poll_by_id");
+                problem["taskId"] = json!(task.contract.id);
+                problem["contextId"] = json!(task.contract.id);
+                return Err((status, Json(problem)));
             }
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             task = app

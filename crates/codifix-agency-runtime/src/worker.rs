@@ -42,11 +42,11 @@ pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
     if result.is_err() {
         // No payload/provider errors in operational logs; the private task has a
         // bounded escalation. Unknown external effects are never replayed here.
-        if let Ok(mut task) = store.get_internal(lease.job.operation_id).await {
-            if task.contract.status == TaskStatus::Working {
-                task.contract.clarify("Execution stopped at an authorization, validation, or uncertain-effect boundary. Inspect the private effect ledger before resuming.".into(),Utc::now())?;
-                let _ = store.update_contract(&task).await;
-            }
+        if let Ok(mut task) = store.get_internal(lease.job.operation_id).await
+            && task.contract.status == TaskStatus::Working
+        {
+            task.contract.clarify("Execution stopped at an authorization, validation, or uncertain-effect boundary. Inspect the private effect ledger before resuming.".into(),Utc::now())?;
+            let _ = store.update_contract(&task).await;
         }
     }
     if let Ok(result_guard) = jobs::begin_result(&store.pool, &lease).await {
