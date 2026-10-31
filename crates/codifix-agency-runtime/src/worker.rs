@@ -123,7 +123,10 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
             crate::model::draft(store, cfg, &task, prompt, &routing).await?
         }
         "openbao_recover" => crate::openbao::recover(store, cfg, &task).await?,
-        "delegate" => crate::exchange::delegate(store, cfg, &task).await?,
+        "delegate" => match crate::exchange::delegate(store, cfg, &task).await? {
+            Some(value) => value,
+            None => return Ok(()),
+        },
         _ => unreachable!(),
     };
     let reference = format!("agency:task:{}:evidence", task.contract.id);
@@ -252,6 +255,17 @@ async fn apply_plan(
     let changes: codifix_agency_projects::PreparedChangeSet =
         serde_json::from_value(row.try_get("changes")?)?;
     let (client, authority) = linear(cfg, task)?;
+    let head: String = sqlx::query_scalar(
+        "SELECT digest FROM agency_plan_heads WHERE plan_id=$1 AND mandate_id=$2",
+    )
+    .bind(plan.id)
+    .bind(task.request.mandate_id)
+    .fetch_one(&store.pool)
+    .await?;
+    ensure!(
+        head == changes.plan_digest,
+        "prepared plan revision is no longer current"
+    );
     ensure!(
         task.request.resource
             == codifix_agency::ResourceScope {

@@ -359,7 +359,10 @@ async fn send_message(
                 id,
                 &req.message.message_id,
                 answer,
-                data[0].get("replacement_payload").cloned(),
+                data[0]
+                    .get("replacement_payload")
+                    .filter(|v| !v.is_null())
+                    .cloned(),
                 &p,
             )
             .await

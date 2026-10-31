@@ -29,6 +29,7 @@ sqlx.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 url = "2.5"
+urlencoding.workspace = true
 
 [dev-dependencies]
 codifix-test-support = { path = "../codifix-test-support" }
