@@ -37,6 +37,22 @@ pub trait StepJournal {
     ) -> impl Future<Output = Result<()>> + Send;
 }
 
+/// Read-only observation, separate from the managed fields used to prepare writes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InspectionSnapshot {
+    pub entity: RemoteEntity,
+    pub url: Option<String>,
+    pub workflow_state: Option<ObservedWorkflowState>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedWorkflowState {
+    pub id: Uuid,
+    pub name: String,
+    pub category: String,
+}
+
 /// HTTP adapter has no credential discovery, implicit retry, or live default.
 /// Supply `https://api.linear.app/graphql` and a raw API key or `Bearer ...`
 /// authorization header explicitly. Debug deliberately excludes credentials.
@@ -157,6 +173,87 @@ impl LinearClient {
         }
         Ok(Some(observed))
     }
+    /// Observe one already-authorized resource. No workspace search, related-object
+    /// expansion, mutations, guessed links, or forecasting occurs here.
+    pub async fn inspect(&self, kind: EntityKind, id: Uuid) -> Result<Option<InspectionSnapshot>> {
+        let extra = match kind {
+            EntityKind::Project => "url status { id name type }",
+            EntityKind::Issue => "url state { id name type }",
+            EntityKind::Milestone | EntityKind::Dependency => "",
+        };
+        let query = format!(
+            "query AgencyInspect($id: String!) {{ object: {}(id: $id) {{ {} {} }} }}",
+            query_name(kind),
+            selection(kind),
+            extra
+        );
+        let Some(data) = self.graphql(&query, json!({"id":id}), true).await? else {
+            return Ok(None);
+        };
+        let object = data
+            .get("object")
+            .ok_or_else(|| Error::Provider("missing inspection object".into()))?;
+        if object.is_null() {
+            return Ok(None);
+        }
+        let entity = normalize(kind, object)?;
+        if entity.id != id {
+            return Err(Error::Provider(
+                "inspection returned another object ID".into(),
+            ));
+        }
+        let state_key = match kind {
+            EntityKind::Project => Some("status"),
+            EntityKind::Issue => Some("state"),
+            _ => None,
+        };
+        let (url, workflow_state) = if let Some(state_key) = state_key {
+            let link = object
+                .get("url")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::Provider("inspection URL missing".into()))?;
+            let parsed = reqwest::Url::parse(link)
+                .map_err(|_| Error::Provider("invalid inspection URL".into()))?;
+            if parsed.scheme() != "https"
+                || !parsed.username().is_empty()
+                || parsed.password().is_some()
+                || parsed.host_str().is_none()
+            {
+                return Err(Error::Provider("invalid inspection URL".into()));
+            }
+            let state = object
+                .get(state_key)
+                .ok_or_else(|| Error::Provider("inspection workflow state missing".into()))?;
+            let get = |key| {
+                state
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| Error::Provider("invalid inspection workflow state".into()))
+            };
+            let state_id = Uuid::parse_str(get("id")?)
+                .map_err(|_| Error::Provider("invalid workflow state UUID".into()))?;
+            if state_id.is_nil() {
+                return Err(Error::Provider("invalid workflow state UUID".into()));
+            }
+            (
+                Some(link.to_owned()),
+                Some(ObservedWorkflowState {
+                    id: state_id,
+                    name: get("name")?.into(),
+                    category: get("type")?.into(),
+                }),
+            )
+        } else {
+            (None, None)
+        };
+        Ok(Some(InspectionSnapshot {
+            entity,
+            url,
+            workflow_state,
+        }))
+    }
+
     /// Retrieve only explicitly selected plan IDs, including deterministic new IDs.
     pub async fn retrieve_plan(&self, plan: &Plan) -> Result<Baseline> {
         plan.validate()?;
