@@ -90,7 +90,7 @@ pub async fn draft(
     // Keep the upper-bound debit; actual usage is evidence, never an automatic
     // refund after an ambiguous send or provider accounting mismatch.
     Ok(
-        json!({"artifact":artifact,"route":decision,"provider_usage":provider_usage,"reserved_micro_usd":endpoint.reserve_micro_usd,"latency_ms":started.elapsed().as_millis()}),
+        json!({"artifact":artifact,"route":decision,"provider_usage":provider_usage,"reserved_micro_usd":endpoint.reserve_micro_usd,"estimated_actual_micro_usd": actual_cost(endpoint,&provider_usage)?,"cost_basis":"operator configured rates; local rates must include compute","latency_ms":started.elapsed().as_millis()}),
     )
 }
 async fn send(
@@ -147,7 +147,8 @@ async fn send(
         .as_u64()
         .ok_or_else(|| anyhow::anyhow!("provider output usage unavailable"))?;
     ensure!(
-        input <= u64::from(context_limit) && output <= u64::from(endpoint.max_output_tokens),
+        input.saturating_add(output) <= u64::from(context_limit)
+            && output <= u64::from(endpoint.max_output_tokens),
         "provider exceeded token bound"
     );
     let actual = (u128::from(input) * u128::from(endpoint.input_micro_usd_per_million)
@@ -158,4 +159,18 @@ async fn send(
         "provider exceeded reserved cost; operator reconciliation required"
     );
     Ok((artifact, usage))
+}
+
+fn actual_cost(endpoint: &ModelEndpoint, usage: &Value) -> Result<u128> {
+    let input = usage["prompt_tokens"]
+        .as_u64()
+        .ok_or_else(|| anyhow::anyhow!("usage absent"))?;
+    let output = usage["completion_tokens"]
+        .as_u64()
+        .ok_or_else(|| anyhow::anyhow!("usage absent"))?;
+    Ok(
+        (u128::from(input) * u128::from(endpoint.input_micro_usd_per_million)
+            + u128::from(output) * u128::from(endpoint.output_micro_usd_per_million))
+        .div_ceil(1_000_000),
+    )
 }

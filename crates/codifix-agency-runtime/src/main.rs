@@ -203,7 +203,7 @@ async fn run() -> Result<()> {
             let db = std::env::var(&cfg.database_env)
                 .map_err(|_| anyhow::anyhow!("database credential unavailable"))?;
             let pool = sqlx::postgres::PgPoolOptions::new()
-                .max_connections(10)
+                .max_connections(24)
                 .connect(&db)
                 .await?;
             let store = Store { pool };
@@ -227,13 +227,29 @@ async fn run() -> Result<()> {
                         config: cfg.clone(),
                         auth,
                     };
-                    let worker = tokio::spawn(async move {
+                    let mut workers = tokio::task::JoinSet::new();
+                    for _ in 0..4 {
+                        let store = store.clone();
+                        let cfg = cfg.clone();
+                        workers.spawn(async move {
+                            loop {
+                                match codifix_agency_runtime::worker::run_once(&store, &cfg).await {
+                                    Ok(true) => {}
+                                    _ => {
+                                        tokio::time::sleep(std::time::Duration::from_secs(1)).await
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    workers.spawn(async move {
                         loop {
                             let _ = codifix_agency_runtime::worker::schedules(&store, &cfg).await;
-                            match codifix_agency_runtime::worker::run_once(&store, &cfg).await {
-                                Ok(true) => {}
-                                _ => tokio::time::sleep(std::time::Duration::from_secs(1)).await,
-                            }
+                            let _ = codifix_agency_runtime::exchange::reconcile_cancellations(
+                                &store, &cfg,
+                            )
+                            .await;
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
                     });
                     let result = axum::serve(listener, router(app))
@@ -241,7 +257,7 @@ async fn run() -> Result<()> {
                             let _ = tokio::signal::ctrl_c().await;
                         })
                         .await;
-                    worker.abort();
+                    workers.abort_all();
                     result?;
                 }
                 _ => unreachable!(),

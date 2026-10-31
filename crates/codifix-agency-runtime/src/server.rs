@@ -57,6 +57,7 @@ pub fn router(app: App) -> Router {
         .route("/v1/tasks", get(list).post(submit))
         .route("/v1/tasks/{id}", get(detail))
         .route("/v1/tasks/{id}/cancel", post(cancel))
+        .route("/v1/tasks/{id}/lease", post(renew_lease))
         .route("/v1/mandates", post(grant))
         .route("/v1/mandates/{id}/{action}", post(control))
         .route("/v1/schedules", post(schedule))
@@ -83,6 +84,20 @@ async fn card(State(app): State<App>) -> ApiResult<a2a::AgentCard> {
     Ok(Json(card))
 }
 fn check_specialist(app: &App, req: &Submit) -> Result<(), (StatusCode, Json<Value>)> {
+    if let Some(trace) = req.payload.get("delegation_trace") {
+        let trace: Vec<Uuid> = serde_json::from_value(trace.clone())
+            .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_delegation_trace"))?;
+        if trace.len() > 16
+            || trace.contains(&app.config.instance_id)
+            || trace
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != trace.len()
+        {
+            return Err(failure(StatusCode::BAD_REQUEST, "delegation_cycle"));
+        }
+    }
     if !app
         .config
         .specialists
@@ -118,6 +133,18 @@ async fn detail(
 ) -> ApiResult<StoredTask> {
     let p = peer(&app, &headers)?;
     Ok(Json(app.store.get(id, &p).await.map_err(safe_error)?))
+}
+async fn renew_lease(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Value> {
+    let p = peer(&app, &headers)?;
+    app.store
+        .renew_execution_lease(id, &p)
+        .await
+        .map_err(safe_error)?;
+    Ok(Json(json!({"renewed":true})))
 }
 async fn cancel(
     State(app): State<App>,

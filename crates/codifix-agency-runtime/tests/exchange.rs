@@ -223,6 +223,19 @@ async fn cancel(
         Json(serde_json::to_value(remote_task(REMOTE, CONTEXT, a2a::TaskState::Canceled)).unwrap()),
     )
 }
+async fn renew(
+    State(state): State<Arc<Mutex<Remote>>>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    if authenticate(&mut state.lock().unwrap(), &headers) {
+        (StatusCode::OK, Json(json!({"renewed":true})))
+    } else {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error":"unauthorized"})),
+        )
+    }
+}
 struct Fixture {
     db: codifix_test_support::IsolatedDatabase,
     store: Store,
@@ -278,6 +291,7 @@ impl Fixture {
         let remote = Arc::new(Mutex::new(Remote::default()));
         let router = Router::new()
             .route("/message:send", post(send))
+            .route("/v1/tasks/{id}/lease", post(renew))
             .route("/tasks/{id}", get(poll).post(cancel))
             .with_state(remote.clone());
         let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

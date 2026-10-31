@@ -58,6 +58,33 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                 && request.budget.delegation_depth < task.request.budget.delegation_depth,
             "delegated task exceeds deadline or depth"
         );
+        let mut trace: Vec<Uuid> = serde_json::from_value(
+            task.request
+                .payload
+                .get("delegation_trace")
+                .cloned()
+                .unwrap_or(json!([])),
+        )?;
+        ensure!(
+            !trace.contains(&cfg.instance_id)
+                && !trace.contains(&peer.instance_id)
+                && trace.len() < 16,
+            "delegation cycle"
+        );
+        trace.push(cfg.instance_id);
+        let payload = request
+            .payload
+            .as_object_mut()
+            .ok_or_else(|| anyhow::anyhow!("delegated payload must be object"))?;
+        payload.insert("delegation_trace".into(), serde_json::to_value(trace)?);
+        payload.insert("execution_lease_seconds".into(), json!(60));
+        let source = store
+            .authorize(task.contract.id, task.revision, Usage::default())
+            .await?;
+        payload.insert(
+            "source_destinations".into(),
+            serde_json::to_value(source.destinations)?,
+        );
         request.request_id = task.contract.id.to_string();
         request.parent_id = None;
         let body = a2a::SendMessageRequest {
@@ -154,6 +181,11 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         .and_then(|c| c.answer.as_ref())
     {
         if row.try_get::<Option<i64>, _>("reply_revision")? != Some(task.revision) {
+            let pending: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM external_effects e JOIN agency_attempts a ON a.id=e.id WHERE a.task_id=$1 AND e.resource=$2 AND e.status IN ('pending','uncertain'))").bind(task.contract.id).bind(format!("peer-reply:{peer_id}")).fetch_one(&store.pool).await?;
+            ensure!(
+                !pending,
+                "previous reply outcome uncertain; explicit reconciliation required"
+            );
             store
                 .authorize(task.contract.id, task.revision, Usage::default())
                 .await?;
@@ -174,7 +206,28 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                 }),
                 metadata: None,
             };
-            bounded(
+            let effect = Uuid::new_v5(
+                &task.contract.id,
+                format!("reply:{}", task.revision).as_bytes(),
+            );
+            store
+                .admit_effect(
+                    task.contract.id,
+                    task.revision,
+                    Usage::default(),
+                    &codifix_store::effects::EffectIntent {
+                        id: effect,
+                        project_id: Some(task.project_id),
+                        kind: codifix_store::effects::EffectKind::ProviderRequest,
+                        host_id: "agency".into(),
+                        resource: format!("peer-reply:{peer_id}"),
+                        input_fingerprint: fingerprint(&body)?,
+                        actor_id: task.contract.specialist_id.clone(),
+                        source: "agency-delegate".into(),
+                    },
+                )
+                .await?;
+            let response = bounded(
                 client
                     .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
                     .header("A2A-Version", "1.0")
@@ -182,6 +235,23 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                     .json(&body)
                     .send()
                     .await?,
+            )
+            .await?;
+            let response: a2a::SendMessageResponse = serde_json::from_value(response)?;
+            let a2a::SendMessageResponse::Task(remote) = response else {
+                anyhow::bail!("follow-up requires task response")
+            };
+            remote.validate()?;
+            ensure!(
+                remote.id == remote_id && remote.context_id == context,
+                "reply changed remote task identity"
+            );
+            codifix_store::effects::conclude(
+                &store.pool,
+                effect,
+                Uuid::new_v4(),
+                codifix_store::effects::EffectStatus::Confirmed,
+                codifix_store::effects::EffectReason::Observed,
             )
             .await?;
             sqlx::query("UPDATE agency_remote_tasks SET reply_revision=$2 WHERE task_id=$1")
@@ -259,11 +329,31 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             a2a::TaskState::Failed | a2a::TaskState::Canceled | a2a::TaskState::Rejected => {
                 anyhow::bail!("remote task did not complete")
             }
-            _ => tokio::time::sleep(std::time::Duration::from_secs(1)).await,
+            _ => {
+                bounded(
+                    client
+                        .post(format!(
+                            "{}/v1/tasks/{}/lease",
+                            endpoint.trim_end_matches('/'),
+                            urlencoding::encode(&remote_id)
+                        ))
+                        .header("A2A-Version", "1.0")
+                        .bearer_auth(&token)
+                        .json(&json!({}))
+                        .send()
+                        .await?,
+                )
+                .await?;
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
         }
     }
 }
 pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> {
+    sqlx::query("UPDATE agency_remote_tasks SET cancel_requested=true WHERE task_id=$1")
+        .bind(id)
+        .execute(&store.pool)
+        .await?;
     let row: Option<(String, Option<String>)> =
         sqlx::query_as("SELECT peer_id,remote_id FROM agency_remote_tasks WHERE task_id=$1")
             .bind(id)
@@ -304,5 +394,35 @@ pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> 
             .await?,
     )
     .await?;
+    sqlx::query("UPDATE agency_remote_tasks SET cancel_completed=true WHERE task_id=$1")
+        .bind(id)
+        .execute(&store.pool)
+        .await?;
+    Ok(())
+}
+
+/// Maintenance runs independently of task workers, including after restarts.
+pub async fn reconcile_cancellations(store: &Store, cfg: &Config) -> Result<()> {
+    let rows: Vec<(Uuid, bool)> = sqlx::query_as("SELECT task_id,cancel_requested FROM agency_remote_tasks WHERE NOT cancel_completed ORDER BY last_control_check LIMIT 64").fetch_all(&store.pool).await?;
+    for (id, requested) in rows {
+        sqlx::query(
+            "UPDATE agency_remote_tasks SET last_control_check=clock_timestamp() WHERE task_id=$1",
+        )
+        .bind(id)
+        .execute(&store.pool)
+        .await?;
+        let task = store.get_internal(id).await?;
+        if task.contract.status == codifix_agency::TaskStatus::Completed {
+            sqlx::query("UPDATE agency_remote_tasks SET cancel_completed=true WHERE task_id=$1")
+                .bind(id)
+                .execute(&store.pool)
+                .await?;
+        } else if requested
+            || task.contract.status.is_terminal()
+            || store.live_authority(&task).await.is_err()
+        {
+            let _ = cancel_remote(store, cfg, id).await;
+        }
+    }
     Ok(())
 }

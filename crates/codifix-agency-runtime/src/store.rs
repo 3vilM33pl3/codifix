@@ -216,6 +216,7 @@ impl Store {
             m.specialist_id == req.specialist_id,
             "specialist binding mismatch"
         );
+        ensure!(req.deadline <= m.expires_at, "task exceeds mandate expiry");
         m.authorize(&req.capability, &req.resource, None, usage, Utc::now())?;
         m.budget.remaining(usage)?.check(Usage {
             micro_usd: req.budget.micro_usd,
@@ -267,6 +268,17 @@ impl Store {
             })?;
             sqlx::query("UPDATE agency_tasks SET reserved_microusd=reserved_microusd+$2,reserved_calls=reserved_calls+$3,reserved_turns=reserved_turns+$4 WHERE id=$1").bind(parent).bind(req.budget.micro_usd as i64).bind(i64::from(req.budget.calls)).bind(i64::from(req.budget.turns)).execute(&mut *tx).await?;
         }
+        let active:i64=sqlx::query_scalar("SELECT count(*) FROM agency_tasks WHERE requester=$1 AND contract->>'status' IN ('submitted','working','input_required','plan_review_required')").bind(&peer.id).fetch_one(&mut *tx).await?;
+        ensure!(active < 128, "too many active tasks for this requester");
+        let execution_lease = req
+            .payload
+            .get("execution_lease_seconds")
+            .map(|v| {
+                v.as_i64()
+                    .filter(|n| (5..=60).contains(n))
+                    .ok_or_else(|| anyhow::anyhow!("invalid execution lease"))
+            })
+            .transpose()?;
         let id = Uuid::new_v4();
         let contract = TaskContract {
             id,
@@ -282,8 +294,8 @@ impl Store {
             updated_at: Utc::now(),
         };
         contract.validate()?;
-        sqlx::query("INSERT INTO agency_tasks(id,project_id,mandate_id,requester,request_id,parent_id,contract,payload,request_digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")
-            .bind(id).bind(project).bind(m.id).bind(&peer.id).bind(&req.request_id).bind(req.parent_id).bind(serde_json::to_value(&contract)?).bind(serde_json::to_value(req)?).bind(fingerprint(req)?).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO agency_tasks(id,project_id,mandate_id,requester,request_id,parent_id,contract,payload,request_digest,execution_lease_seconds,execution_lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CASE WHEN $10::integer IS NULL THEN NULL ELSE clock_timestamp()+make_interval(secs=>$10) END)")
+            .bind(id).bind(project).bind(m.id).bind(&peer.id).bind(&req.request_id).bind(req.parent_id).bind(serde_json::to_value(&contract)?).bind(serde_json::to_value(req)?).bind(fingerprint(req)?).bind(execution_lease.map(|n|n as i32)).execute(&mut *tx).await?;
         enqueue(&mut tx, project, id, 1).await?;
         tx.commit().await?;
         self.get(id, peer).await
@@ -339,13 +351,79 @@ impl Store {
         tx.commit().await?;
         Ok(())
     }
+    pub async fn live_authority(&self, task: &StoredTask) -> Result<()> {
+        ensure!(task.request.deadline > Utc::now(), "deadline expired");
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        mandate_tx(&mut tx, task.request.mandate_id).await?;
+        let expiry: Option<DateTime<Utc>> =
+            sqlx::query_scalar("SELECT execution_lease_until FROM agency_tasks WHERE id=$1")
+                .bind(task.contract.id)
+                .fetch_one(&mut *tx)
+                .await?;
+        ensure!(
+            expiry.is_none_or(|e| e > Utc::now()),
+            "execution lease expired"
+        );
+        task_ancestors(&mut tx, task.request.parent_id).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+    /// Charge the initial activation once even across a recovered worker lease.
+    pub async fn start_task(&self, id: Uuid, revision: i64) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        let first: Option<Uuid> = sqlx::query_scalar("INSERT INTO agency_task_starts(task_id) VALUES($1) ON CONFLICT DO NOTHING RETURNING task_id").bind(id).fetch_optional(&mut *tx).await?;
+        authorize_tx(
+            &mut tx,
+            id,
+            revision,
+            Usage {
+                turns: u32::from(first.is_some()),
+                ..Usage::default()
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+    pub async fn renew_execution_lease(&self, id: Uuid, peer: &Peer) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        let row = sqlx::query("SELECT * FROM agency_tasks WHERE id=$1 FOR UPDATE")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
+        let task = decode(&row)?;
+        ensure!(
+            peer.operator || peer.id == task.requester,
+            "task unavailable"
+        );
+        ensure!(
+            !task.contract.status.is_terminal() && task.request.deadline > Utc::now(),
+            "task closed"
+        );
+        let (m, _, _) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+        let seconds: Option<i32> = row.try_get("execution_lease_seconds")?;
+        ensure!(seconds.is_some(), "task has no renewable lease");
+        sqlx::query("UPDATE agency_tasks SET execution_lease_until=LEAST($2,$3,clock_timestamp()+make_interval(secs=>$4)) WHERE id=$1").bind(id).bind(task.request.deadline).bind(m.expires_at).bind(f64::from(seconds.unwrap_or(5))).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
     pub async fn cancel(&self, id: Uuid, peer: &Peer) -> Result<StoredTask> {
         let mut task = self.get(id, peer).await?;
         if task.contract.status.is_terminal() {
             return Ok(task);
         }
         task.contract.transition(TaskStatus::Canceled, Utc::now())?;
-        self.update_contract(&task).await?;
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        ensure!(sqlx::query("UPDATE agency_tasks SET contract=$2,revision=revision+1 WHERE id=$1 AND revision=$3").bind(id).bind(serde_json::to_value(&task.contract)?).bind(task.revision).execute(&mut *tx).await?.rows_affected()==1,"task revision conflict");
+        sqlx::query("UPDATE agency_remote_tasks SET cancel_requested=true WHERE task_id=$1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
         self.get(id, peer).await
     }
     pub async fn update_contract(&self, task: &StoredTask) -> Result<()> {
@@ -412,6 +490,19 @@ impl Store {
                 serde_json::to_vec(&payload)?.len() <= 262144,
                 "payload too large"
             );
+            let mut payload = payload;
+            for key in [
+                "delegation_trace",
+                "execution_lease_seconds",
+                "source_destinations",
+            ] {
+                if let Some(trace) = task.request.payload.get(key).cloned() {
+                    payload
+                        .as_object_mut()
+                        .ok_or_else(|| anyhow::anyhow!("payload must be object"))?
+                        .insert(key.into(), trace);
+                }
+            }
             task.request.payload = payload;
         }
         sqlx::query(
@@ -423,7 +514,7 @@ impl Store {
         .bind(body)
         .execute(&mut *tx)
         .await?;
-        sqlx::query("UPDATE agency_tasks SET contract=$2,payload=$3,revision=revision+1,used_turns=used_turns+1 WHERE id=$1").bind(id).bind(serde_json::to_value(&task.contract)?).bind(serde_json::to_value(&task.request)?).execute(&mut *tx).await?;
+        sqlx::query("UPDATE agency_tasks SET contract=$2,payload=$3,revision=revision+1,used_turns=used_turns+1,execution_lease_until=CASE WHEN execution_lease_seconds IS NULL THEN NULL ELSE LEAST((payload->>'deadline')::timestamptz,clock_timestamp()+make_interval(secs=>execution_lease_seconds)) END WHERE id=$1").bind(id).bind(serde_json::to_value(&task.contract)?).bind(serde_json::to_value(&task.request)?).execute(&mut *tx).await?;
         sqlx::query("UPDATE agency_mandates SET used_turns=used_turns+1 WHERE id=$1")
             .bind(m.id)
             .execute(&mut *tx)
@@ -486,11 +577,17 @@ async fn authorize_tx(
         .await?;
     let task = decode(&row)?;
     ensure!(
+        row.try_get::<Option<DateTime<Utc>>, _>("execution_lease_until")?
+            .is_none_or(|expiry| expiry > Utc::now()),
+        "execution lease expired"
+    );
+    ensure!(
         task.revision == revision
             && task.contract.status == TaskStatus::Working
             && task.request.deadline > Utc::now(),
         "task no longer executable"
     );
+    task_ancestors(tx, task.request.parent_id).await?;
     let total = Usage {
         micro_usd: task.used_micro_usd
             + u64::try_from(row.try_get::<i64, _>("reserved_microusd")?)?,
@@ -499,7 +596,14 @@ async fn authorize_tx(
     }
     .checked_add(extra)?;
     task.request.budget.check(total)?;
-    let (m, _, usage) = mandate_tx(tx, task.request.mandate_id).await?;
+    let (mut m, _, usage) = mandate_tx(tx, task.request.mandate_id).await?;
+    // Enrolled senders may narrow, never broaden, the destination grant. The
+    // bound survives clarification and is propagated on every further delegation.
+    if let Some(value) = task.request.payload.get("source_destinations") {
+        let permitted: std::collections::BTreeSet<codifix_agency::ModelDestination> =
+            serde_json::from_value(value.clone())?;
+        m.destinations = m.destinations.intersection(&permitted).cloned().collect();
+    }
     m.authorize(
         &task.request.capability,
         &task.request.resource,
@@ -512,4 +616,30 @@ async fn authorize_tx(
     sqlx::query("UPDATE agency_tasks SET used_microusd=used_microusd+$2,used_calls=used_calls+$3,used_turns=used_turns+$4 WHERE id=$1")
             .bind(id).bind(i64::try_from(extra.micro_usd)?).bind(i64::from(extra.calls)).bind(i64::from(extra.turns)).execute(&mut **tx).await?;
     Ok(m)
+}
+
+async fn task_ancestors(
+    tx: &mut Transaction<'_, Postgres>,
+    mut parent: Option<Uuid>,
+) -> Result<()> {
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(id) = parent {
+        ensure!(seen.len() < 16 && seen.insert(id), "invalid task ancestry");
+        let row = sqlx::query("SELECT * FROM agency_tasks WHERE id=$1")
+            .bind(id)
+            .fetch_one(&mut **tx)
+            .await?;
+        let task = decode(&row)?;
+        ensure!(
+            !task.contract.status.is_terminal() && task.request.deadline > Utc::now(),
+            "parent task closed"
+        );
+        ensure!(
+            row.try_get::<Option<DateTime<Utc>>, _>("execution_lease_until")?
+                .is_none_or(|e| e > Utc::now()),
+            "parent execution lease expired"
+        );
+        parent = task.request.parent_id;
+    }
+    Ok(())
 }

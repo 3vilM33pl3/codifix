@@ -350,3 +350,129 @@ async fn clarification_is_bounded_idempotent_and_preserves_initial_request_ident
     );
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn leases_expiry_and_parent_cancellation_stop_future_actions() {
+    let Some(f) = fixture().await else { return };
+    let mut req = submit(&f);
+    req.deadline = f.grant.expires_at + Duration::seconds(1);
+    assert!(f.store.submit(&req, &f.peer).await.is_err());
+    req.deadline = Utc::now() + Duration::minutes(10);
+    req.payload = json!({"kind":"inspect","execution_lease_seconds":30,"source_destinations":[]});
+    let mut task = f.store.submit(&req, &f.peer).await.unwrap();
+    task.contract
+        .transition(TaskStatus::Working, Utc::now())
+        .unwrap();
+    f.store.update_contract(&task).await.unwrap();
+    let task = f.store.get_internal(task.contract.id).await.unwrap();
+    sqlx::query("UPDATE agency_tasks SET execution_lease_until=clock_timestamp()-interval '1 second' WHERE id=$1").bind(task.contract.id).execute(&f.db.pool).await.unwrap();
+    assert!(
+        f.store
+            .authorize(task.contract.id, task.revision, Usage::default())
+            .await
+            .is_err()
+    );
+    assert!(f.store.live_authority(&task).await.is_err());
+    f.store
+        .renew_execution_lease(task.contract.id, &f.peer)
+        .await
+        .unwrap();
+    f.store
+        .authorize(task.contract.id, task.revision, Usage::default())
+        .await
+        .unwrap();
+    let mut child = f.grant.clone();
+    child.id = Uuid::new_v4();
+    child.parent_id = Some(f.grant.id);
+    child.budget = req.budget;
+    child.budget.delegation_depth = 1;
+    f.store
+        .install_mandate(f.project, &child, &f.peer, f.cfg.instance_id)
+        .await
+        .unwrap();
+    let mut child_req = req.clone();
+    child_req.request_id = Uuid::new_v4().to_string();
+    child_req.parent_id = Some(task.contract.id);
+    child_req.mandate_id = child.id;
+    child_req.budget.delegation_depth = 1;
+    let mut ct = f.store.submit(&child_req, &f.peer).await.unwrap();
+    ct.contract
+        .transition(TaskStatus::Working, Utc::now())
+        .unwrap();
+    f.store.update_contract(&ct).await.unwrap();
+    let ct = f.store.get_internal(ct.contract.id).await.unwrap();
+    f.store
+        .authorize(ct.contract.id, ct.revision, Usage::default())
+        .await
+        .unwrap();
+    f.store.cancel(task.contract.id, &f.peer).await.unwrap();
+    assert!(
+        f.store
+            .authorize(ct.contract.id, ct.revision, Usage::default())
+            .await
+            .is_err()
+    );
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn task_activation_debits_once_and_model_destinations_survive_clarification() {
+    let Some(f) = fixture().await else { return };
+    let mut req = submit(&f);
+    req.payload = json!({"kind":"inspect","source_destinations":[],"delegation_trace":[Uuid::new_v4()],"execution_lease_seconds":30});
+    let mut task = f.store.submit(&req, &f.peer).await.unwrap();
+    task.contract
+        .transition(TaskStatus::Working, Utc::now())
+        .unwrap();
+    f.store.update_contract(&task).await.unwrap();
+    let mut task = f.store.get_internal(task.contract.id).await.unwrap();
+    f.store
+        .start_task(task.contract.id, task.revision)
+        .await
+        .unwrap();
+    f.store
+        .start_task(task.contract.id, task.revision)
+        .await
+        .unwrap();
+    assert_eq!(
+        f.store
+            .get_internal(task.contract.id)
+            .await
+            .unwrap()
+            .used_turns,
+        1
+    );
+    task.contract.clarify("Detail?".into(), Utc::now()).unwrap();
+    f.store.update_contract(&task).await.unwrap();
+    let answered=f.store.respond(task.contract.id,"response","Yes",Some(json!({"kind":"inspect","source_destinations":[{"kind":"cloud","provider":"any","region":"any"}]})),&f.peer).await.unwrap();
+    assert_eq!(answered.request.payload["source_destinations"], json!([]));
+    assert_eq!(
+        answered.request.payload["delegation_trace"],
+        req.payload["delegation_trace"]
+    );
+    assert!(
+        f.store
+            .authorize(answered.contract.id, answered.revision, Usage::default())
+            .await
+            .unwrap()
+            .destinations
+            .is_empty()
+    );
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn orphaned_and_denied_schedules_cannot_starve_valid_work() {
+    let Some(f) = fixture().await else { return };
+    let template = serde_json::to_value(submit(&f)).unwrap();
+    for _ in 0..16 {
+        sqlx::query("INSERT INTO agency_schedules(id,mandate_id,requester,interval_seconds,next_at,template,enabled) VALUES($1,$2,'removed-peer',60,clock_timestamp()-interval '60 seconds',$3,true)").bind(Uuid::new_v4()).bind(f.grant.id).bind(&template).execute(&f.db.pool).await.unwrap();
+    }
+    sqlx::query("INSERT INTO agency_schedules(id,mandate_id,requester,interval_seconds,next_at,template,enabled) VALUES($1,$2,$3,60,clock_timestamp(),$4,true)").bind(Uuid::new_v4()).bind(f.grant.id).bind(&f.peer.id).bind(template).execute(&f.db.pool).await.unwrap();
+    codifix_agency_runtime::worker::schedules(&f.store, &f.cfg)
+        .await
+        .unwrap();
+    codifix_agency_runtime::worker::schedules(&f.store, &f.cfg)
+        .await
+        .unwrap();
+    assert_eq!(f.store.list(&f.peer).await.unwrap().len(), 1);
+    f.db.cleanup().await.unwrap();
+}

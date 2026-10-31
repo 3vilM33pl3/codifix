@@ -82,9 +82,8 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
         task.contract.status == TaskStatus::Working,
         "task awaits input"
     );
-    store
-        .authorize(task.contract.id, task.revision, Usage::default())
-        .await?;
+    store.start_task(task.contract.id, task.revision).await?;
+    task = store.get_internal(task.contract.id).await?;
     let kind = task.request.payload["kind"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("operation kind required"))?;
@@ -440,6 +439,10 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
         let interval: i32 = row.try_get("interval_seconds")?;
         let requester: String = row.try_get("requester")?;
         let Some(peer) = cfg.peers.iter().find(|p| p.id == requester) else {
+            sqlx::query("UPDATE agency_schedules SET enabled=false WHERE id=$1")
+                .bind(id)
+                .execute(&store.pool)
+                .await?;
             continue;
         };
         let mut req: Submit = serde_json::from_value(row.try_get("template")?)?;
@@ -455,7 +458,10 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
             .await?;
             continue;
         }
-        if store.submit(&req, peer).await.is_ok() {
+        // Every due slot advances even if permission or budget is unavailable;
+        // an orphan cannot starve other schedules. No failed slot is replayed.
+        let _ = store.submit(&req, peer).await;
+        {
             sqlx::query("UPDATE agency_schedules SET next_at=GREATEST(next_at+make_interval(secs=>$2),clock_timestamp()+make_interval(secs=>$2)) WHERE id=$1 AND next_at=$3")
                 .bind(id).bind(f64::from(interval)).bind(due).execute(&store.pool).await?;
         }
