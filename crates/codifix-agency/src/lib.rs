@@ -3,6 +3,7 @@
 //! issuers, load current ancestor mandates, and reserve shared budgets atomically.
 pub mod a2a;
 pub mod discovery;
+pub mod evaluation;
 pub mod improvement;
 pub mod mandate;
 pub mod routing;
