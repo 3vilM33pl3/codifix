@@ -791,6 +791,7 @@ name = "codifix-agency"
 version = "3.0.0"
 dependencies = [
  "chrono",
+ "http",
  "serde",
  "serde_json",
  "thiserror 2.0.18",

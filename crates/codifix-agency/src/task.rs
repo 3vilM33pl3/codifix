@@ -105,6 +105,9 @@ impl TaskContract {
         {
             return Err(PolicyError::Invalid("plan revision state"));
         }
+        if self.status != TaskStatus::Completed && self.outcome.is_some() {
+            return Err(PolicyError::Invalid("premature outcome"));
+        }
         if self.status == TaskStatus::Completed {
             self.validate_outcome(
                 self.outcome
@@ -229,7 +232,16 @@ impl TaskContract {
         Ok(())
     }
     fn validate_outcome(&self, outcome: &TaskOutcome) -> Result<(), PolicyError> {
-        if outcome.summary.trim().is_empty()
+        if outcome
+            .artifact_refs
+            .iter()
+            .chain(&outcome.evidence_refs)
+            .any(|r| r.trim().is_empty())
+            || outcome.acceptance.iter().any(|a| {
+                !outcome.evidence_refs.contains(&a.evidence_ref)
+                    && !outcome.artifact_refs.contains(&a.evidence_ref)
+            })
+            || outcome.summary.trim().is_empty()
             || outcome.acceptance.len() != self.acceptance_criteria.len()
             || self.acceptance_criteria.iter().any(|criterion| {
                 outcome

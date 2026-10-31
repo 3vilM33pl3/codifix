@@ -1,0 +1,26 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.v1.capability",
+  "revision": 1,
+  "description": "Owner-approved public specialist discovery only. Discovery does not grant access or authority.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["schemaVersion", "instanceId", "specialistId", "displayName", "summary", "capabilities", "agentCardUrl", "publishedAt"],
+        "properties": {
+          "schemaVersion": {"type": "integer", "const": 1},
+          "instanceId": {"type": "string", "maxLength": 36},
+          "specialistId": {"type": "string", "maxLength": 128},
+          "displayName": {"type": "string", "maxLength": 200},
+          "summary": {"type": "string", "maxLength": 1000},
+          "capabilities": {"type": "array", "minLength": 1, "maxLength": 100, "items": {"type": "string", "maxLength": 128}},
+          "agentCardUrl": {"type": "string", "format": "uri", "maxLength": 2000},
+          "publishedAt": {"type": "string", "format": "datetime"}
+        }
+      }
+    }
+  }
+}

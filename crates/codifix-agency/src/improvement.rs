@@ -93,22 +93,7 @@ impl ImprovementCandidate {
         if self.stage != ImprovementStage::Candidate {
             return Err(PolicyError::Transition);
         }
-        if !valid_identifier(&evaluation.evidence_id)
-            || !valid_identifier(&evaluation.held_out_set_id)
-            || !valid_identifier(&evaluation.training_set_id)
-            || evaluation.held_out_set_id == evaluation.training_set_id
-            || evaluation.candidate_revision != self.candidate_revision
-            || evaluation.baseline_revision != self.baseline_revision
-            || evaluation.held_out_cases < gate.minimum_held_out_cases
-            || evaluation.safety_failures != 0
-            || evaluation.candidate_quality_ppm > 1_000_000
-            || evaluation.baseline_quality_ppm > 1_000_000
-            || evaluation.candidate_quality_ppm < gate.minimum_quality_ppm
-            || evaluation.candidate_quality_ppm < evaluation.baseline_quality_ppm
-            || evaluation.evaluated_at > now
-        {
-            return Err(PolicyError::Invalid("held-out evaluation"));
-        }
+        self.check_evaluation(&evaluation, gate, now)?;
         self.evaluation = Some(evaluation);
         self.stage = ImprovementStage::Evaluated;
         Ok(())
@@ -124,6 +109,13 @@ impl ImprovementCandidate {
         if self.stage != ImprovementStage::Evaluated || self.evaluation.is_none() {
             return Err(PolicyError::Transition);
         }
+        self.check_evaluation(
+            self.evaluation
+                .as_ref()
+                .ok_or(PolicyError::Invalid("missing evaluation"))?,
+            gate,
+            now,
+        )?;
         self.check_acceptance(&acceptance, now)?;
         if fraction_ppm == 0 || fraction_ppm > gate.maximum_rollout_ppm {
             return Err(PolicyError::Invalid("rollout fraction"));
@@ -157,9 +149,18 @@ impl ImprovementCandidate {
         now: DateTime<Utc>,
     ) -> Result<(), PolicyError> {
         self.validate_gate(gate)?;
+        self.check_evaluation(
+            self.evaluation
+                .as_ref()
+                .ok_or(PolicyError::Invalid("missing evaluation"))?,
+            gate,
+            now,
+        )?;
         self.check_acceptance(&acceptance, now)?;
         if self.stage != ImprovementStage::LimitedRollout
             || self.rollout_successes < gate.minimum_rollout_successes
+            || self.rollout_ppm == 0
+            || self.rollout_ppm > gate.maximum_rollout_ppm
             || self.rollout_failures != 0
             || self.local_acceptance.as_ref().is_none_or(|previous| {
                 acceptance.decision_ref == previous.decision_ref
@@ -184,6 +185,30 @@ impl ImprovementCandidate {
         self.rollout_ppm = 0;
         self.stage = ImprovementStage::Reverted;
         self.revert_reason = Some(reason);
+        Ok(())
+    }
+    fn check_evaluation(
+        &self,
+        evaluation: &ImprovementEvaluation,
+        gate: &ImprovementGate,
+        now: DateTime<Utc>,
+    ) -> Result<(), PolicyError> {
+        if !valid_identifier(&evaluation.evidence_id)
+            || !valid_identifier(&evaluation.held_out_set_id)
+            || !valid_identifier(&evaluation.training_set_id)
+            || evaluation.held_out_set_id == evaluation.training_set_id
+            || evaluation.candidate_revision != self.candidate_revision
+            || evaluation.baseline_revision != self.baseline_revision
+            || evaluation.held_out_cases < gate.minimum_held_out_cases
+            || evaluation.safety_failures != 0
+            || evaluation.candidate_quality_ppm > 1_000_000
+            || evaluation.baseline_quality_ppm > 1_000_000
+            || evaluation.candidate_quality_ppm < gate.minimum_quality_ppm
+            || evaluation.candidate_quality_ppm < evaluation.baseline_quality_ppm
+            || evaluation.evaluated_at > now
+        {
+            return Err(PolicyError::Invalid("held-out evaluation"));
+        }
         Ok(())
     }
     fn check_acceptance(

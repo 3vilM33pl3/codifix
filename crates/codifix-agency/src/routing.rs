@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 #[serde(deny_unknown_fields)]
 pub struct ModelEvaluation {
     pub evidence_id: String,
+    pub model_revision: String,
     pub workload: String,
     pub evaluated_at: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
@@ -102,7 +103,9 @@ pub fn select_model(
         let Some(e) = evaluation else {
             continue;
         };
-        if !valid_identifier(&e.evidence_id) || e.valid_until <= now || e.valid_until <= e.evaluated_at
+        if e.model_revision != profile.model_revision
+            || profile.evaluations.iter().any(|other| other.workload == e.workload && other.evaluated_at == e.evaluated_at && !std::ptr::eq(other, e))
+            || !valid_identifier(&e.evidence_id) || e.valid_until <= now || e.valid_until <= e.evaluated_at
             || e.held_out_cases < request.minimum_held_out_cases || e.quality_ppm > 1_000_000
             || e.quality_ppm < request.minimum_quality_ppm || e.latency_ms == 0 || e.latency_ms > request.max_latency_ms
             // Local compute is not represented as a free alternative.
