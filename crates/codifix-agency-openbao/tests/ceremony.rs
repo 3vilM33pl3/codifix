@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
 };
 use codifix_agency_openbao::{
-    service::{self, AttestorConfig, ProcessBinding},
+    service::{self, AttestorConfig, InstallationRecord, NativeBinding, ProcessBinding},
     *,
 };
 use sha2::{Digest, Sha256};
@@ -46,6 +46,25 @@ async fn spawn(router: Router) -> (Endpoint, JoinHandle<()>) {
         tokio::spawn(async move {
             axum::serve(tcp, router).await.unwrap();
         }),
+    )
+}
+fn native_fixture(
+    parent: &Path,
+    pid: u32,
+    paths: Option<(PathBuf, PathBuf, PathBuf)>,
+) -> (NativeBinding, PathBuf) {
+    let (config, storage, pid_file) = paths.unwrap_or_else(|| {
+        let config = parent.join("native-config.hcl");
+        write(&config, b"fixture config");
+        let storage = private(parent, "native-storage");
+        let pid_file = parent.join("native.pid");
+        write(&pid_file, pid.to_string().as_bytes());
+        (config, storage, pid_file)
+    });
+    let installation = storage.join(".codifix-installation.json");
+    (
+        NativeBinding::inspect(pid, config, storage, installation).unwrap(),
+        pid_file,
     )
 }
 #[derive(Clone)]
@@ -97,6 +116,7 @@ struct Fixture {
     controller: ControllerConfig,
     custodians: Vec<CustodianConfig>,
     identity_file: PathBuf,
+    attestor: AttestorConfig,
     mock: Mock,
 }
 impl Drop for Fixture {
@@ -125,6 +145,7 @@ impl Fixture {
             mock,
             vec![SHARE_A.into(), SHARE_B.into()],
             std::process::id(),
+            None,
         )
         .await
     }
@@ -134,34 +155,43 @@ impl Fixture {
         mock: Mock,
         shares: Vec<String>,
         pid: u32,
+        paths: Option<(PathBuf, PathBuf, PathBuf)>,
     ) -> Self {
         let temp = TempDir::new().unwrap();
         fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o700)).unwrap();
         let control_dir = private(temp.path(), "controller");
         let attest_dir = private(temp.path(), "attestor");
-        let process = ProcessBinding::inspect(pid).unwrap();
+        let (native, pid_file) = native_fixture(&attest_dir, pid, paths);
         let identity = Identity {
             installation_id: uuid::Uuid::new_v4().to_string(),
             key_generation: 1,
-            boot_id: process.marker.clone(),
+            native_binding: native.binding().unwrap(),
             seal_type: "shamir".into(),
             shares: 3,
             threshold: 2,
             valid_until: now() + 600,
         };
+        protected::save(
+            &native.installation_file,
+            &InstallationRecord {
+                installation_id: identity.installation_id.clone(),
+                key_generation: identity.key_generation,
+                maintenance: false,
+            },
+        )
+        .unwrap();
         let identity_file = attest_dir.join("identity.json");
         protected::save(&identity_file, &identity).unwrap();
         let reader = attest_dir.join("reader");
         write(&reader, READER.as_bytes());
-        let (identity_endpoint, t) = spawn(
-            service::attestor_router(AttestorConfig {
-                identity_file: identity_file.clone(),
-                reader_token_file: reader,
-                process,
-            })
-            .unwrap(),
-        )
-        .await;
+        let attestor = AttestorConfig {
+            identity_file: identity_file.clone(),
+            reader_token_file: reader,
+            native,
+            pid_file,
+        };
+        let (identity_endpoint, t) =
+            spawn(service::attestor_router(attestor.clone()).unwrap()).await;
         tasks.push(t);
         let controller_reader = control_dir.join("reader");
         write(&controller_reader, READER.as_bytes());
@@ -240,6 +270,7 @@ impl Fixture {
             controller,
             custodians,
             identity_file,
+            attestor,
             mock,
         }
     }
@@ -330,7 +361,7 @@ async fn changed_identity_generation_seal_and_missing_state_never_submit() {
     for field in [
         "installation",
         "generation",
-        "boot",
+        "binding",
         "expired",
         "migration",
         "threshold",
@@ -341,7 +372,7 @@ async fn changed_identity_generation_seal_and_missing_state_never_submit() {
         match field {
             "installation" => i.installation_id = "different-installation".into(),
             "generation" => i.key_generation += 1,
-            "boot" => i.boot_id = "different-process".into(),
+            "binding" => i.native_binding = "different-native-binding".into(),
             "expired" => i.valid_until = now(),
             "migration" => f.mock.status.lock().unwrap().migration = true,
             "threshold" => f.mock.status.lock().unwrap().t = 1,
@@ -532,14 +563,15 @@ async fn actual_openbao_shamir_two_of_three() {
     drop(socket);
     let config = dir.path().join("bao.hcl");
     let storage = dir.path().join("data");
-    fs::create_dir(&storage).unwrap();
-    write(&config,format!("disable_mlock = true\napi_addr = \"http://{address}\"\nlistener \"tcp\" {{\n address = \"{address}\"\n tls_disable = true\n}}\nstorage \"file\" {{\n path = \"{}\"\n}}\n",storage.display()).as_bytes());
+    protected::create_private_directory(&storage).unwrap();
+    let native_pid_file = dir.path().join("native.pid");
+    write(&config,format!("disable_mlock = true\npid_file = \"{}\"\napi_addr = \"http://{address}\"\nlistener \"tcp\" {{\n address = \"{address}\"\n tls_disable = true\n}}\nstorage \"file\" {{\n path = \"{}\"\n}}\n",native_pid_file.display(),storage.display()).as_bytes());
     let executable = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
         .map(|p| p.join("bao"))
         .find(|p| p.is_file())
         .expect("bao executable on PATH");
     let mut child = Child(
-        std::process::Command::new(executable)
+        std::process::Command::new(&executable)
             .arg("server")
             .arg("-config")
             .arg(&config)
@@ -589,7 +621,15 @@ async fn actual_openbao_shamir_two_of_three() {
         status: Arc::new(Mutex::new(initial_status())),
         submitted: Arc::new(Mutex::new(vec![])),
     };
-    let mut f = Fixture::with_target(endpoint(address), vec![], mock, shares, child.0.id()).await;
+    let mut f = Fixture::with_target(
+        endpoint(address),
+        vec![],
+        mock,
+        shares,
+        child.0.id(),
+        Some((config.clone(), storage.clone(), native_pid_file.clone())),
+    )
+    .await;
     // Exercise the real custodian executable in separate processes. This fixture
     // still shares a test account; independent production hosts remain untested.
     let mut workers = vec![];
@@ -689,6 +729,8 @@ async fn actual_openbao_shamir_two_of_three() {
             1
         );
     }
+    let original_process = ProcessBinding::inspect(child.0.id()).unwrap();
+    let original_binding = f.controller.target.binding().unwrap();
     child.0.kill().unwrap();
     child.0.wait().unwrap();
     assert!(
@@ -696,6 +738,78 @@ async fn actual_openbao_shamir_two_of_three() {
             .await
             .is_err()
     );
+    // Ordinary native restart: OpenBao maintains its own protected pid_file.
+    // No operator updates enrollment, identities, generations or replay records.
+    child = Child(
+        std::process::Command::new(&executable)
+            .arg("server")
+            .arg("-config")
+            .arg(&config)
+            .env_clear()
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let mut ready = false;
+    for _ in 0..100 {
+        if http
+            .get(format!("{base}/v1/sys/seal-status"))
+            .send()
+            .await
+            .is_ok()
+        {
+            ready = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+    }
+    assert!(ready);
+    assert_eq!(
+        protected::read(&native_pid_file).unwrap().as_slice(),
+        child.0.id().to_string().as_bytes()
+    );
+    let restarted = ProcessBinding::inspect(child.0.id()).unwrap();
+    assert_ne!(original_process.marker, restarted.marker);
+    assert!(
+        transport::verified_status(&f.controller.target)
+            .await
+            .unwrap()
+            .sealed
+    );
+    let result = tokio::process::Command::new(env!("CARGO_BIN_EXE_codifix-agency-openbao"))
+        .arg("controller-once")
+        .arg(&config_file)
+        .env_clear()
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "controller restart recovery failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(
+        !transport::verified_status(&f.controller.target)
+            .await
+            .unwrap()
+            .sealed
+    );
+    assert_eq!(f.controller.target.binding().unwrap(), original_binding);
+    assert_eq!(
+        protected::load::<ControllerState>(&f.controller.state_file)
+            .unwrap()
+            .sequence,
+        2
+    );
+    for c in &f.custodians {
+        assert_eq!(
+            protected::load::<CustodianState>(&c.state_file)
+                .unwrap()
+                .last_sequence,
+            2
+        );
+    }
 }
 
 #[tokio::test]
@@ -711,16 +825,25 @@ async fn https_server_requires_enrolled_ca_and_does_not_follow_redirects() {
     let wrong = rcgen::generate_simple_self_signed(vec!["127.0.0.1".into()]).unwrap();
     let wrong_file = dir.path().join("wrong.pem");
     write(&wrong_file, wrong.cert.pem().as_bytes());
-    let process = ProcessBinding::inspect(std::process::id()).unwrap();
+    let (native, pid_file) = native_fixture(dir.path(), std::process::id(), None);
     let identity = Identity {
         installation_id: uuid::Uuid::new_v4().to_string(),
         key_generation: 1,
-        boot_id: process.marker.clone(),
+        native_binding: native.binding().unwrap(),
         seal_type: "shamir".into(),
         shares: 3,
         threshold: 2,
         valid_until: now() + 600,
     };
+    protected::save(
+        &native.installation_file,
+        &InstallationRecord {
+            installation_id: identity.installation_id.clone(),
+            key_generation: identity.key_generation,
+            maintenance: false,
+        },
+    )
+    .unwrap();
     let identity_file = dir.path().join("identity.json");
     protected::save(&identity_file, &identity).unwrap();
     let reader = dir.path().join("reader");
@@ -728,7 +851,8 @@ async fn https_server_requires_enrolled_ca_and_does_not_follow_redirects() {
     let config = AttestorConfig {
         identity_file,
         reader_token_file: reader.clone(),
-        process,
+        native,
+        pid_file,
     };
     let mock = Mock {
         status: Arc::new(Mutex::new(initial_status())),
@@ -786,4 +910,90 @@ async fn https_server_requires_enrolled_ca_and_does_not_follow_redirects() {
     target.identity_endpoint = ep;
     assert!(transport::verified_status(&target).await.is_err());
     task.abort();
+}
+
+#[tokio::test]
+async fn stable_installation_guards_unknown_config_storage_generation_and_maintenance() {
+    for field in [
+        "config",
+        "storage",
+        "installation",
+        "generation",
+        "maintenance",
+        "pid",
+        "binary",
+    ] {
+        let f = Fixture::new().await;
+        match field {
+            "config" => write(
+                &f.attestor.native.config_file,
+                b"unexpected native configuration",
+            ),
+            "storage" => {
+                let storage = &f.attestor.native.storage_directory;
+                let moved = storage.with_extension("old");
+                fs::rename(storage, &moved).unwrap();
+                protected::create_private_directory(storage).unwrap();
+                let record = protected::read(&moved.join(".codifix-installation.json")).unwrap();
+                write(&f.attestor.native.installation_file, &record);
+            }
+            "pid" => write(&f.attestor.pid_file, b"4294967295"),
+            "binary" => {
+                let mut wrong = f.attestor.native.clone();
+                wrong.executable_sha256 = "0".repeat(64);
+                assert!(wrong.verify(std::process::id()).is_err());
+                continue;
+            }
+            _ => {
+                let mut record: InstallationRecord =
+                    protected::load(&f.attestor.native.installation_file).unwrap();
+                match field {
+                    "installation" => record.installation_id = "unknown-installation".into(),
+                    "generation" => record.key_generation += 1,
+                    _ => record.maintenance = true,
+                };
+                protected::save(&f.attestor.native.installation_file, &record).unwrap();
+            }
+        }
+        assert!(
+            transport::controller_tick(&f.controller, |_| {})
+                .await
+                .is_err(),
+            "{field}"
+        );
+        assert!(f.mock.submitted.lock().unwrap().is_empty());
+    }
+}
+#[tokio::test]
+async fn fresh_challenge_and_process_attestation_expiry_are_verified() {
+    let f = Fixture::new().await;
+    let attestation = f.attestor.attest(uuid::Uuid::new_v4().to_string()).unwrap();
+    assert_eq!(attestation.identity, f.controller.target.expected);
+    for field in ["challenge", "expired", "process"] {
+        let mut reply = attestation.clone();
+        match field {
+            "challenge" => reply.challenge = uuid::Uuid::new_v4().to_string(),
+            "expired" => reply.expires_at = now(),
+            _ => reply.process.marker.clear(),
+        };
+        let (ep, task) = spawn(Router::new().route(
+            "/codifix-agency/v1/identity",
+            get(
+                move |axum::extract::Query(query): axum::extract::Query<
+                    std::collections::HashMap<String, String>,
+                >| {
+                    let mut reply = reply.clone();
+                    if field != "challenge" {
+                        reply.challenge = query.get("challenge").cloned().unwrap_or_default();
+                    }
+                    async move { Json(reply) }
+                },
+            ),
+        ))
+        .await;
+        let mut target = f.controller.target.clone();
+        target.identity_endpoint = ep;
+        assert!(transport::verified_status(&target).await.is_err());
+        task.abort();
+    }
 }

@@ -130,3 +130,10 @@ pub fn create_private_directory(path: &Path) -> Result<()> {
     fs::create_dir(path).map_err(|_| Error::ProtectedFile)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|_| Error::ProtectedFile)
 }
+
+/// Stable local directory binding. Replacing/moving storage requires enrollment.
+pub fn directory_identity(path: &Path) -> Result<(u64, u64)> {
+    private_dir(path)?;
+    let metadata = fs::metadata(path).map_err(|_| Error::ProtectedFile)?;
+    Ok((metadata.dev(), metadata.ino()))
+}

@@ -73,8 +73,8 @@ pub struct Identity {
     pub installation_id: String,
     /// Operator-controlled root/unseal-key generation, not the data encryption term.
     pub key_generation: u64,
-    /// Fresh attestor process boot ID forces escalation on unreviewed target restart.
-    pub boot_id: String,
+    /// Stable reviewed executable/config/invocation/storage enrollment fingerprint.
+    pub native_binding: String,
     pub seal_type: String,
     pub shares: u32,
     pub threshold: u32,
@@ -103,7 +103,8 @@ impl Target {
         // keys cannot be substituted for ordinary unseal shares.
         if i.seal_type != "shamir"
             || i.installation_id.is_empty()
-            || i.boot_id.is_empty()
+            || i.native_binding.len() != 64
+            || !i.native_binding.bytes().all(|b| b.is_ascii_hexdigit())
             || i.key_generation == 0
             || i.threshold == 0
             || i.shares < i.threshold

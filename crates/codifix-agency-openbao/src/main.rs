@@ -44,9 +44,16 @@ mod app {
             config: PathBuf,
             listener: PathBuf,
         },
-        /// Secret-free process marker to include in reviewed identity/attestor config.
+        /// Secret-free current process evidence for local diagnostics.
         InspectProcess {
             pid: u32,
+        },
+        /// Inspect stable native enrollment; outputs only paths and fingerprints.
+        InspectNative {
+            pid: u32,
+            config_file: PathBuf,
+            storage_directory: PathBuf,
+            installation_file: PathBuf,
         },
     }
     fn output<T: serde::Serialize>(value: &T) {
@@ -124,6 +131,20 @@ mod app {
                 service::serve(service::attestor_router(c)?, l).await?;
             }
             Command::InspectProcess { pid } => output(&service::ProcessBinding::inspect(pid)?),
+            Command::InspectNative {
+                pid,
+                config_file,
+                storage_directory,
+                installation_file,
+            } => {
+                let native = service::NativeBinding::inspect(
+                    pid,
+                    config_file,
+                    storage_directory,
+                    installation_file,
+                )?;
+                output(&serde_json::json!({"native_binding":native.binding()?,"native":native}));
+            }
         }
         Ok(())
     }

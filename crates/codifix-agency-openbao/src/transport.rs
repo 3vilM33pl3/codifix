@@ -75,19 +75,34 @@ pub async fn verified_status(target: &Target) -> Result<SealStatus> {
     target.validate(now())?;
     let http = client(&target.endpoint)?;
     let credential = token(&target.attestor_token_file)?;
-    let identity: Identity = decode(
+    let challenge = uuid::Uuid::new_v4().to_string();
+    let mut identity_url = url(&target.identity_endpoint, "/codifix-agency/v1/identity")?;
+    identity_url
+        .query_pairs_mut()
+        .append_pair("challenge", &challenge);
+    let attestation: crate::service::Attestation = decode(
         client(&target.identity_endpoint)?
-            .get(url(
-                &target.identity_endpoint,
-                "/codifix-agency/v1/identity",
-            )?)
+            .get(identity_url)
             .bearer_auth(&*credential)
             .send()
             .await
             .map_err(|_| Error::Transport)?,
     )
     .await?;
-    if identity != target.expected {
+    let checked_at = now();
+    if attestation.identity != target.expected
+        || attestation.challenge != challenge
+        || attestation.issued_at > checked_at
+        || attestation.expires_at <= checked_at
+        || attestation.expires_at > attestation.issued_at.saturating_add(30)
+        || attestation.process.pid == 0
+        || attestation.process.marker.len() != 64
+        || !attestation
+            .process
+            .marker
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit())
+    {
         return Err(Error::TargetChanged);
     }
     let status: SealStatus = decode(
@@ -286,7 +301,7 @@ pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission)
         return Err(Error::Configuration);
     }
     // Recheck after disk I/O. TLS and attestor bind this enrolled target; the
-    // operator must fence rekey/restart while the identity lease is published.
+    // operator must fence rekey/reset and installation changes during a ceremony.
     let checked = verified_status(&config.target).await?;
     submission.check_progress(&checked, &config.custodian_id)?;
     ceremony.validate(&config.target, &config.roster, now())?;
