@@ -342,6 +342,47 @@ async fn linear_prepare_apply_preserves_reviewed_baseline_and_durable_step_recei
             .fetch_one(&db.pool)
             .await
             .unwrap();
+    // New accepted revisions invalidate older preparation IDs, even if the
+    // older desired state currently matches and would otherwise need no writes.
+    let stale = execute(
+        &store,
+        &cfg,
+        &peer,
+        &request(
+            &grant,
+            &plan,
+            "plan_apply",
+            json!({"kind":"plan_apply","prepared_id":prepared_id}),
+        ),
+    )
+    .await;
+    assert_eq!(stale.contract.status, TaskStatus::InputRequired);
+    assert_eq!(state.lock().unwrap().writes.len(), 5);
+    // A reused revision number with different content cannot replace the head.
+    let mut conflicting = revised.clone();
+    conflicting.projects[0].name = "Conflicting content with reused revision".into();
+    let rejected = execute(
+        &store,
+        &cfg,
+        &peer,
+        &request(
+            &grant,
+            &conflicting,
+            "plan_prepare",
+            json!({"kind":"plan_prepare","plan":conflicting}),
+        ),
+    )
+    .await;
+    assert_eq!(rejected.contract.status, TaskStatus::InputRequired);
+    let head: Uuid = sqlx::query_scalar(
+        "SELECT prepared_id FROM agency_plan_heads WHERE plan_id=$1 AND mandate_id=$2",
+    )
+    .bind(plan.id)
+    .bind(grant.id)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(head.to_string(), evidence["prepared_id"].as_str().unwrap());
     let remote_id = codifix_agency_projects::stable_id(plan.id, "launch").to_string();
     {
         let mut state = state.lock().unwrap();

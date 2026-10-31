@@ -579,7 +579,7 @@ async fn operator_controls_and_http_schedule_run_real_persisted_work() {
     let (status, list) = f
         .request(
             Method::GET,
-            "/tasks",
+            "/tasks?includeArtifacts=true",
             Some(OPERATOR_TOKEN),
             Some("1.0"),
             None,
