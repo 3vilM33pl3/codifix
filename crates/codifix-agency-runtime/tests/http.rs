@@ -802,3 +802,25 @@ async fn private_task_reads_and_cancellation_reject_unknown_credentials() {
     );
     f.cleanup().await;
 }
+
+#[tokio::test]
+async fn request_id_reconciliation_is_private_to_the_original_sender() {
+    let Some(f) = fixture().await else { return };
+    let request = f.submit();
+    let created = f.store.submit(&request, &f.member).await.unwrap();
+    let path = format!("/v1/task-requests/{}", request.request_id);
+    let (status, found) = f
+        .request(Method::GET, &path, Some(MEMBER_TOKEN), None, None)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(found["contract"]["id"], created.contract.id.to_string());
+    for token in [OPERATOR_TOKEN, OUTSIDER_TOKEN] {
+        let (status, body) = f.request(Method::GET, &path, Some(token), None, None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(!body.to_string().contains(&created.contract.id.to_string()));
+    }
+    let (status, _) = f.request(Method::GET, &path, None, None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    f.server.abort();
+    f.db.cleanup().await.unwrap();
+}

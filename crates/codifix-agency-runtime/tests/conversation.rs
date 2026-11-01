@@ -499,6 +499,8 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
     f.cfg.inbox_enabled = true;
     let human = Uuid::new_v4();
     sqlx::query("INSERT INTO auth_principals(id,kind,display_name,global_role) VALUES($1,'human_oidc','Synthetic human','admin')").bind(human).execute(&f.db.pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role,source) SELECT $1,$2,project_id,'reader','direct' FROM agency_mandates WHERE id=$3")
+        .bind(Uuid::new_v4()).bind(human).bind(f.mandate.id).execute(&f.db.pool).await.unwrap();
     let inbox = codifix_inbox::store::Store {
         pool: f.db.pool.clone(),
         home_instance_id: f.cfg.instance_id,
@@ -566,6 +568,34 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
         .send(human, chat.conversation.id, &message)
         .await
         .unwrap();
+    assert!(
+        codifix_agency_runtime::inbox::dispatch_once(&f.store, &f.cfg)
+            .await
+            .unwrap()
+    );
+    codifix_agency_runtime::inbox::reconcile(&f.store, &f.cfg)
+        .await
+        .unwrap();
+    let submitted = inbox.detail(human, chat.conversation.id).await.unwrap();
+    assert_eq!(submitted.tasks[0].status, "submitted");
+    let mut working = f.store.get_internal(submitted.tasks[0].id).await.unwrap();
+    working
+        .contract
+        .transition(TaskStatus::Working, Utc::now())
+        .unwrap();
+    f.store.update_contract(&working).await.unwrap();
+    codifix_agency_runtime::inbox::reconcile(&f.store, &f.cfg)
+        .await
+        .unwrap();
+    assert_eq!(
+        inbox
+            .detail(human, chat.conversation.id)
+            .await
+            .unwrap()
+            .tasks[0]
+            .status,
+        "working"
+    );
     assert!(worker::run_once(&f.store, &f.cfg).await.unwrap());
     assert!(
         worker::run_once(&f.store, &f.cfg).await.unwrap(),

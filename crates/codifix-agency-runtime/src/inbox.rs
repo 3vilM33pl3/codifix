@@ -5,10 +5,7 @@ use crate::{
     store::{Store, Submit},
 };
 use anyhow::{Result, ensure};
-use codifix_agency::{
-    TaskStatus,
-    conversation::{ConversationReply, ConversationTurn},
-};
+use codifix_agency::conversation::{ConversationReply, ConversationTurn};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -78,17 +75,13 @@ pub async fn reconcile(store: &Store, cfg: &Config) -> Result<()> {
     }
     cancel_commands(store, cfg).await?;
     let ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT t.id FROM agency_tasks t JOIN inbox_task_origins o ON o.task_id=t.id LEFT JOIN agency_inbox_projections p ON p.task_id=t.id WHERE o.home_instance_id=$1 AND (p.revision IS NULL OR p.revision<>t.revision) ORDER BY t.updated_at,t.id LIMIT 256"
+        "SELECT t.id FROM agency_tasks t JOIN inbox_task_origins o ON o.task_id=t.id LEFT JOIN agency_inbox_projections p ON p.task_id=t.id WHERE o.home_instance_id=$1 AND (p.revision IS NULL OR p.revision<>t.revision OR t.contract->>'status' IN ('submitted','working','input_required','plan_review_required') OR EXISTS(SELECT 1 FROM inbox_task_commands c WHERE c.task_id=t.id AND NOT c.done) OR EXISTS(SELECT 1 FROM agency_remote_tasks r WHERE r.task_id=t.id AND r.cancel_requested AND NOT r.cancel_completed) OR EXISTS(SELECT 1 FROM inbox_task_cards c WHERE c.task_id=t.id AND c.document->>'cancel_requested'='true')) ORDER BY t.updated_at,t.id LIMIT 256"
     ).bind(cfg.instance_id).fetch_all(&store.pool).await?;
     for id in ids {
         let mut task = store.get_internal(id).await?;
         if !task.contract.status.is_terminal() && store.live_authority(&task).await.is_err() {
             task = store.cancel(id, &gateway(cfg.instance_id)).await?;
             let _ = crate::exchange::cancel_remote(store, cfg, id).await;
-        }
-        if !task.contract.status.is_terminal() && task.contract.status != TaskStatus::InputRequired
-        {
-            continue;
         }
         let evidence: Option<Value> =
             sqlx::query_scalar("SELECT evidence FROM agency_outcomes WHERE task_id=$1")
