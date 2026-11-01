@@ -57,6 +57,11 @@ pub struct Message {
     pub recipient_member_ids: Vec<Uuid>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MessagePage {
+    pub messages: Vec<Message>,
+    pub has_more: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskCard {
     pub id: Uuid,
     pub member_id: Uuid,

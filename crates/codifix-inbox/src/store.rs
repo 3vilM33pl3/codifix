@@ -5,6 +5,11 @@ use serde::Serialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Row, Transaction, postgres::PgRow};
+use std::{
+    collections::{BTreeSet, HashMap},
+    future::Future,
+    pin::Pin,
+};
 
 pub fn digest(value: &impl Serialize) -> Result<String> {
     // JSON Value sorts object keys, matching ticket verification in the runtime.
@@ -20,7 +25,7 @@ pub async fn admission(tx: &mut Transaction<'_, Postgres>) -> Result<()> {
     Ok(())
 }
 pub async fn human(tx: &mut Transaction<'_, Postgres>, id: Uuid) -> Result<()> {
-    ensure!(sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM auth_principals WHERE id=$1 AND kind='human_oidc' AND disabled_at IS NULL)").bind(id).fetch_one(&mut **tx).await?, "human unavailable");
+    ensure!(sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM auth_principals WHERE id=$1 AND kind='human_oidc' AND disabled_at IS NULL FOR SHARE)").bind(id).fetch_one(&mut **tx).await?, "human unavailable");
     Ok(())
 }
 #[derive(Clone)]
@@ -70,9 +75,39 @@ async fn project_access(
     owner: Uuid,
     mandate_id: Uuid,
 ) -> Result<()> {
-    let can_read: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_principals p JOIN agency_mandates m ON m.id=$2 WHERE p.id=$1 AND ((p.global_permissions_json IS NOT NULL AND p.global_permissions_json ? 'memory_read') OR (p.global_permissions_json IS NULL AND p.global_role IS NOT NULL) OR EXISTS(SELECT 1 FROM auth_project_memberships a WHERE a.principal_id=p.id AND a.project_id=m.project_id AND ((a.permissions_json IS NOT NULL AND a.permissions_json ? 'memory_read') OR (a.permissions_json IS NULL AND a.role IS NOT NULL)))))").bind(owner).bind(mandate_id).fetch_one(&mut **tx).await?;
-    ensure!(can_read, "project access revoked");
+    // Human global_role is deliberately ignored, matching service authentication.
+    // The companion cannot evaluate service-local group mappings; explicit global
+    // permissions or a persisted project membership are required for invocation.
+    let principal = sqlx::query("SELECT global_permissions_json FROM auth_principals WHERE id=$1 AND kind='human_oidc' AND disabled_at IS NULL FOR SHARE")
+        .bind(owner).fetch_one(&mut **tx).await?;
+    let project: Uuid =
+        sqlx::query_scalar("SELECT project_id FROM agency_mandates WHERE id=$1 FOR SHARE")
+            .bind(mandate_id)
+            .fetch_one(&mut **tx)
+            .await?;
+    let memberships = sqlx::query("SELECT role,permissions_json FROM auth_project_memberships WHERE principal_id=$1 AND project_id=$2 FOR SHARE")
+        .bind(owner).bind(project).fetch_all(&mut **tx).await?;
+    let explicit: Option<Value> = principal.try_get("global_permissions_json")?;
+    let mut can_read = explicit.as_ref().is_some_and(permission_read);
+    for membership in memberships {
+        let permissions: Option<Value> = membership.try_get("permissions_json")?;
+        can_read |= match permissions {
+            Some(permissions) => permission_read(&permissions),
+            None => matches!(
+                membership.try_get::<String, _>("role")?.as_str(),
+                "reader" | "writer" | "operator" | "admin"
+            ),
+        };
+    }
+    ensure!(can_read, "persisted project access required or revoked");
     Ok(())
+}
+fn permission_read(value: &Value) -> bool {
+    value.as_array().is_some_and(|permissions| {
+        permissions
+            .iter()
+            .any(|p| p.as_str() == Some("memory_read"))
+    })
 }
 async fn check_mandate(
     tx: &mut Transaction<'_, Postgres>,
@@ -103,7 +138,7 @@ async fn owner(
     conversation: Uuid,
 ) -> Result<PgRow> {
     human(tx, principal).await?;
-    Ok(sqlx::query("SELECT * FROM inbox_conversations WHERE id=$1 AND home_instance_id=$2 AND principal_id=$3 FOR UPDATE").bind(conversation).bind(home).bind(principal).fetch_one(&mut **tx).await?)
+    Ok(sqlx::query("SELECT c.*,(SELECT COUNT(*) FROM inbox_messages m WHERE m.conversation_id=c.id AND m.role<>'human' AND m.sequence>c.read_sequence) AS unread_count FROM inbox_conversations c WHERE c.id=$1 AND c.home_instance_id=$2 AND c.principal_id=$3 FOR UPDATE OF c").bind(conversation).bind(home).bind(principal).fetch_one(&mut **tx).await?)
 }
 fn conversation(row: &PgRow) -> Result<Conversation> {
     Ok(Conversation {
@@ -114,10 +149,7 @@ fn conversation(row: &PgRow) -> Result<Conversation> {
         revision: row.try_get("revision")?,
         created_at: row.try_get("created_at")?,
         updated_at: row.try_get("updated_at")?,
-        unread_count: (row.try_get::<i64, _>("next_sequence")?
-            - 1
-            - row.try_get::<i64, _>("read_sequence")?)
-        .max(0),
+        unread_count: row.try_get("unread_count")?,
     })
 }
 fn message(row: &PgRow) -> Result<Message> {
@@ -162,6 +194,7 @@ impl Store {
         {
             let (id, cap, resource, budget) = template(request)?;
             let m = check_mandate(&mut tx, id, &cap, &resource, self.home_instance_id).await?;
+            project_access(&mut tx, grant.principal_id, id).await?;
             ensure!(
                 request["specialist_id"] == m.specialist_id && grant.expires_at <= m.expires_at,
                 "grant exceeds mandate"
@@ -176,7 +209,47 @@ impl Store {
                 "grant depth exceeds mandate"
             );
         }
+        let remote = grant.request["payload"]["kind"] == "delegate";
+        let target = if remote {
+            &grant.request["payload"]["request"]
+        } else {
+            &grant.request
+        };
+        ensure!(
+            grant.contact.remote == remote
+                && target["specialist_id"].as_str() == Some(grant.contact.specialist_id.as_str())
+                && if remote {
+                    grant.contact.instance_id != self.home_instance_id
+                } else {
+                    grant.contact.instance_id == self.home_instance_id
+                },
+            "contact/template identity mismatch"
+        );
+        if remote {
+            ensure!(
+                grant.request["payload"]["peer"]
+                    .as_str()
+                    .is_some_and(|p| !p.is_empty())
+                    && target["payload"]["kind"] == "conversation_turn"
+                    && target["parent_id"].is_null(),
+                "invalid remote conversation template"
+            );
+            template(target)?;
+        }
         for a in &grant.actions {
+            ensure!(
+                matches!(
+                    a.request["payload"]["kind"].as_str(),
+                    Some(
+                        "inspect"
+                            | "plan_prepare"
+                            | "plan_apply"
+                            | "plan_inspect"
+                            | "openbao_recover"
+                    )
+                ),
+                "unsupported action template"
+            );
             ensure!(
                 (!a.key.is_empty()
                     && a.key.len() <= 128
@@ -226,7 +299,7 @@ impl Store {
     pub async fn list(&self, principal: Uuid) -> Result<Vec<Conversation>> {
         let mut tx = self.pool.begin().await?;
         human(&mut tx, principal).await?;
-        let rows=sqlx::query("SELECT * FROM inbox_conversations WHERE home_instance_id=$1 AND principal_id=$2 ORDER BY updated_at DESC LIMIT 200").bind(self.home_instance_id).bind(principal).fetch_all(&mut *tx).await?;
+        let rows=sqlx::query("SELECT c.*,(SELECT COUNT(*) FROM inbox_messages m WHERE m.conversation_id=c.id AND m.role<>'human' AND m.sequence>c.read_sequence) AS unread_count FROM inbox_conversations c WHERE c.home_instance_id=$1 AND c.principal_id=$2 ORDER BY c.updated_at DESC LIMIT 200").bind(self.home_instance_id).bind(principal).fetch_all(&mut *tx).await?;
         rows.iter().map(conversation).collect()
     }
     pub async fn detail(&self, principal: Uuid, id: Uuid) -> Result<Detail> {
@@ -268,6 +341,30 @@ impl Store {
             messages,
             tasks,
         })
+    }
+    pub async fn message_page(
+        &self,
+        principal: Uuid,
+        id: Uuid,
+        before_sequence: i64,
+        limit: u32,
+    ) -> Result<MessagePage> {
+        ensure!(
+            before_sequence > 0 && (1..=100).contains(&limit),
+            "invalid message page"
+        );
+        let mut tx = self.pool.begin().await?;
+        owner(&mut tx, self.home_instance_id, principal, id).await?;
+        let mut rows = sqlx::query("SELECT * FROM inbox_messages WHERE conversation_id=$1 AND sequence<$2 ORDER BY sequence DESC LIMIT $3")
+            .bind(id).bind(before_sequence).bind(i64::from(limit)+1).fetch_all(&mut *tx).await?;
+        let has_more = rows.len() > limit as usize;
+        if has_more {
+            rows.pop();
+        }
+        rows.reverse();
+        let messages = rows.iter().map(message).collect::<Result<Vec<_>>>()?;
+        tx.commit().await?;
+        Ok(MessagePage { messages, has_more })
     }
     pub async fn create(&self, principal: Uuid, req: &CreateConversation) -> Result<Detail> {
         ensure!(
@@ -333,6 +430,7 @@ impl Store {
                 && req.recipient_member_ids.len() <= 8,
             "invalid message"
         );
+        ensure!(context_message(&json!({"body":req.body,"artifact":req.artifact,"role":"human"}))["body"].as_str().is_some_and(|body| body.len()<=32768), "message and plan artifact exceed context limit");
         let mut tx = self.pool.begin().await?;
         admission(&mut tx).await?;
         let c = owner(&mut tx, self.home_instance_id, principal, id).await?;
@@ -590,8 +688,146 @@ fn context_message(m: &Value) -> Value {
         body.push_str("\nPlan artifact:\n");
         body.push_str(&m["artifact"].to_string());
     }
+    // A validated model reply may include a separate clarification question.
+    // Keep the complete owner-visible message, but bound its context projection.
+    if m["role"] != "human" && body.len() > 32768 {
+        let end = body
+            .char_indices()
+            .map(|(index, _)| index)
+            .take_while(|index| *index <= 32740)
+            .last()
+            .unwrap_or(0);
+        body.truncate(end);
+        body.push_str("\n[context truncated]");
+    }
     json!({"message_id":m["id"],"role":role,"speaker":m["member_id"].as_str().unwrap_or("human"),"body":body})
 }
+fn turn_payload(request: &Value) -> &Value {
+    if request["payload"]["kind"] == "delegate" {
+        &request["payload"]["request"]["payload"]["turn"]
+    } else {
+        &request["payload"]["turn"]
+    }
+}
+
+/// Prove that model-derived text cannot carry excluded history into another
+/// member's context. Exact human-selected messages are an explicit new disclosure;
+/// otherwise a specialist message inherits its immutable source ticket's inputs.
+/// Bounded traversal fails closed rather than trusting a model's summary claim.
+struct DisclosureFilter {
+    conversation: Uuid,
+    member: Uuid,
+    joined_sequence: i64,
+    selected: BTreeSet<Uuid>,
+    messages: HashMap<Uuid, bool>,
+    tickets: HashMap<Uuid, bool>,
+    visited: usize,
+}
+type DisclosureFuture<'a> = Pin<Box<dyn Future<Output = Result<bool>> + Send + 'a>>;
+impl DisclosureFilter {
+    async fn new(
+        tx: &mut Transaction<'_, Postgres>,
+        conversation: Uuid,
+        member: Uuid,
+    ) -> Result<Self> {
+        let row = sqlx::query("SELECT joined_sequence,selected_message_ids FROM inbox_members WHERE id=$1 AND conversation_id=$2")
+            .bind(member).bind(conversation).fetch_one(&mut **tx).await?;
+        Ok(Self {
+            conversation,
+            member,
+            joined_sequence: row.try_get("joined_sequence")?,
+            selected: serde_json::from_value(row.try_get("selected_message_ids")?)?,
+            messages: HashMap::new(),
+            tickets: HashMap::new(),
+            visited: 0,
+        })
+    }
+    fn message_allowed<'a>(
+        &'a mut self,
+        tx: &'a mut Transaction<'_, Postgres>,
+        id: Uuid,
+        depth: usize,
+    ) -> DisclosureFuture<'a> {
+        Box::pin(async move {
+            if id == Uuid::new_v5(&self.member, b"joining-summary") || self.selected.contains(&id) {
+                return Ok(true);
+            }
+            if let Some(allowed) = self.messages.get(&id) {
+                return Ok(*allowed);
+            }
+            // A cycle or an oversized lineage cannot establish disclosure consent.
+            self.messages.insert(id, false);
+            self.visited += 1;
+            if depth > 64 || self.visited > 4096 {
+                return Ok(false);
+            }
+            let Some(row) = sqlx::query("SELECT role,sequence,source_ticket_id FROM inbox_messages WHERE id=$1 AND conversation_id=$2")
+                .bind(id).bind(self.conversation).fetch_optional(&mut **tx).await? else { return Ok(false); };
+            if row.try_get::<i64, _>("sequence")? < self.joined_sequence {
+                return Ok(false);
+            }
+            let allowed = match row.try_get::<String, _>("role")?.as_str() {
+                "human" | "system" => true,
+                "specialist" => match row.try_get::<Option<Uuid>, _>("source_ticket_id")? {
+                    Some(ticket) => self.ticket_allowed(tx, ticket, depth + 1).await?,
+                    None => false,
+                },
+                _ => false,
+            };
+            self.messages.insert(id, allowed);
+            Ok(allowed)
+        })
+    }
+    fn ticket_allowed<'a>(
+        &'a mut self,
+        tx: &'a mut Transaction<'_, Postgres>,
+        id: Uuid,
+        depth: usize,
+    ) -> DisclosureFuture<'a> {
+        Box::pin(async move {
+            if let Some(allowed) = self.tickets.get(&id) {
+                return Ok(*allowed);
+            }
+            self.tickets.insert(id, false);
+            self.visited += 1;
+            if depth > 64 || self.visited > 4096 {
+                return Ok(false);
+            }
+            let Some(row) = sqlx::query("SELECT request,source_ticket_id FROM inbox_dispatches WHERE id=$1 AND conversation_id=$2")
+                .bind(id).bind(self.conversation).fetch_optional(&mut **tx).await? else { return Ok(false); };
+            let request: Value = row.try_get("request")?;
+            let turn: codifix_agency::conversation::ConversationTurn =
+                match serde_json::from_value(turn_payload(&request).clone()) {
+                    Ok(turn) => turn,
+                    Err(_) => return Ok(false),
+                };
+            if turn.validate().is_err()
+                || turn.conversation_id != self.conversation
+                || turn.turn_id != id
+            {
+                return Ok(false);
+            }
+            let parent: Option<Uuid> = row.try_get("source_ticket_id")?;
+            for input in turn.context {
+                let allowed = if input.message_id == Uuid::new_v5(&id, b"peer-request") {
+                    match parent {
+                        Some(source) => self.ticket_allowed(tx, source, depth + 1).await?,
+                        None => false,
+                    }
+                } else {
+                    self.message_allowed(tx, input.message_id, depth + 1)
+                        .await?
+                };
+                if !allowed {
+                    return Ok(false);
+                }
+            }
+            self.tickets.insert(id, true);
+            Ok(true)
+        })
+    }
+}
+
 async fn context(
     tx: &mut Transaction<'_, Postgres>,
     conversation: Uuid,
@@ -613,8 +849,11 @@ async fn context(
         context.extend(selected.iter().map(context_message));
     }
     let rows=sqlx::query("SELECT * FROM (SELECT * FROM inbox_messages WHERE conversation_id=$1 AND sequence>=$2 ORDER BY sequence DESC LIMIT 80) m ORDER BY sequence").bind(conversation).bind(row.try_get::<i64,_>("joined_sequence")?).fetch_all(&mut **tx).await?;
+    let mut filter = DisclosureFilter::new(tx, conversation, member).await?;
     for row in rows {
-        context.push(context_message(&serde_json::to_value(message(&row)?)?));
+        if filter.message_allowed(tx, row.try_get("id")?, 0).await? {
+            context.push(context_message(&serde_json::to_value(message(&row)?)?));
+        }
     }
     ensure!(
         context.len() <= 128
@@ -642,7 +881,7 @@ async fn enqueue_turn(
     member: Uuid,
     root: Uuid,
     source: Uuid,
-    peer_message: Option<&str>,
+    peer_message: Option<(&str, Uuid)>,
 ) -> Result<()> {
     let id = Uuid::new_v5(&source, member.as_bytes());
     if sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM inbox_dispatches WHERE id=$1)")
@@ -653,16 +892,25 @@ async fn enqueue_turn(
         return Ok(());
     }
     let (g, gr, mr) = member_live(tx, home, principal, conversation, member).await?;
-    let r=sqlx::query("SELECT turns,deadline,cancelled FROM inbox_roots WHERE id=$1 AND conversation_id=$2 FOR UPDATE").bind(root).bind(conversation).fetch_one(&mut **tx).await?;
+    let r=sqlx::query("SELECT turns,budget,deadline,cancelled FROM inbox_roots WHERE id=$1 AND conversation_id=$2 FOR UPDATE").bind(root).bind(conversation).fetch_one(&mut **tx).await?;
+    let root_budget: Budget = serde_json::from_value(r.try_get("budget")?)?;
     ensure!(
-        !r.try_get::<bool, _>("cancelled")? && r.try_get::<i32, _>("turns")? < 8,
+        !r.try_get::<bool, _>("cancelled")?
+            && u32::try_from(r.try_get::<i32, _>("turns")?)? < root_budget.turns.min(8),
         "response turn budget exhausted"
     );
     let deadline = r.try_get::<DateTime<Utc>, _>("deadline")?.min(g.expires_at);
     ensure!(deadline > Utc::now(), "response deadline passed");
-    let (mut ctx, disclosure_digest) = context(tx, conversation, member).await?;
-    if let Some(body) = peer_message {
+    let (mut ctx, mut disclosure_digest) = context(tx, conversation, member).await?;
+    if let Some((body, source_ticket)) = peer_message {
+        let mut disclosure = DisclosureFilter::new(tx, conversation, member).await?;
+        ensure!(
+            disclosure.ticket_allowed(tx, source_ticket, 0).await?,
+            "peer request includes undisclosed context"
+        );
         ctx.push(json!({"message_id":Uuid::new_v5(&id,b"peer-request"),"role":"context","speaker":"participant-request","body":body}));
+        disclosure_digest =
+            digest(&json!({"base":disclosure_digest,"context":ctx,"source_ticket":source_ticket}))?;
     }
     let actions=g.actions.iter().map(|a|json!({"key":a.key,"capability":a.request["capability"],"resource":a.request["resource"]})).collect::<Vec<_>>();
     let others=sqlx::query("SELECT g.document,m.id FROM inbox_members m JOIN inbox_grants g ON g.id=m.grant_id WHERE m.conversation_id=$1 AND m.id<>$2 AND m.active AND NOT g.revoked AND g.expires_at>clock_timestamp()").bind(conversation).bind(member).fetch_all(&mut **tx).await?;
@@ -701,7 +949,15 @@ async fn enqueue_turn(
         &request,
         deadline,
     )
-    .await
+    .await?;
+    if let Some((_, source_ticket)) = peer_message {
+        sqlx::query("UPDATE inbox_dispatches SET source_ticket_id=$2 WHERE id=$1")
+            .bind(id)
+            .bind(source_ticket)
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
 }
 #[allow(clippy::too_many_arguments)]
 async fn insert_ticket(
@@ -911,11 +1167,25 @@ pub async fn record_task_result(
             serde_json::from_value::<codifix_agency::conversation::ConversationReply>(v.clone())
         })
         .transpose()?;
+    if let Some(response) = &response {
+        let request: Value = sqlx::query_scalar("SELECT request FROM inbox_dispatches WHERE id=$1")
+            .bind(o.try_get::<Uuid, _>("ticket_id")?)
+            .fetch_one(&mut *tx)
+            .await?;
+        let turn: codifix_agency::conversation::ConversationTurn =
+            serde_json::from_value(turn_payload(&request).clone())?;
+        response.validate_for(&turn)?;
+    }
     let question = response
         .as_ref()
         .and_then(|r| r.question.as_deref())
         .or(question);
-    let hash = digest(&json!({"status":status,"question":question,"evidence":evidence}))?;
+    let cancel_requested = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM inbox_task_commands c WHERE c.task_id=$1 AND c.kind='cancel' AND (NOT c.done OR EXISTS(SELECT 1 FROM agency_remote_tasks r WHERE r.task_id=c.task_id AND r.cancel_requested AND NOT r.cancel_completed)))",
+    ).bind(task).fetch_one(&mut *tx).await?;
+    let hash = digest(
+        &json!({"status":status,"question":question,"evidence":evidence,"cancel_requested":cancel_requested}),
+    )?;
     let old: Option<String> =
         sqlx::query_scalar("SELECT result_digest FROM inbox_task_cards WHERE task_id=$1")
             .bind(task)
@@ -925,12 +1195,6 @@ pub async fn record_task_result(
     if old.as_deref() == Some(&hash) {
         return Ok(());
     }
-    let cancel_requested = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM inbox_task_commands WHERE task_id=$1 AND kind='cancel')",
-    )
-    .bind(task)
-    .fetch_one(&mut *tx)
-    .await?;
     let payload: Value = o.try_get("payload")?;
     let card = TaskCard {
         id: task,
@@ -982,8 +1246,26 @@ pub async fn record_task_result(
                 "confirmed",
             )
             .await?;
+            sqlx::query("UPDATE inbox_messages SET source_ticket_id=$2 WHERE id=$1")
+                .bind(event)
+                .bind(o.try_get::<Uuid, _>("ticket_id")?)
+                .execute(&mut *tx)
+                .await?;
             // A late result is visible to its owner, but never authorizes new work.
-            if ticket_live(&mut tx, o.try_get("ticket_id")?).await.is_ok() {
+            // Rejected SQL admissions must not poison the result transaction.
+            sqlx::query("SAVEPOINT inbox_result_authority")
+                .execute(&mut *tx)
+                .await?;
+            let live = ticket_live(&mut tx, o.try_get("ticket_id")?).await.is_ok();
+            if !live {
+                sqlx::query("ROLLBACK TO SAVEPOINT inbox_result_authority")
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            sqlx::query("RELEASE SAVEPOINT inbox_result_authority")
+                .execute(&mut *tx)
+                .await?;
+            if live {
                 let home = o.try_get("home_instance_id")?;
                 let principal = o.try_get("principal_id")?;
                 for (index, action) in response.actions.iter().enumerate() {
@@ -1033,7 +1315,7 @@ pub async fn record_task_result(
                             target,
                             root,
                             Uuid::new_v5(&event, format!("peer:{index}").as_bytes()),
-                            Some(&peer.message),
+                            Some((&peer.message, o.try_get("ticket_id")?)),
                         )
                         .await
                     }
