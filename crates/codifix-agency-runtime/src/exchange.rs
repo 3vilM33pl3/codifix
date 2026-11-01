@@ -416,6 +416,7 @@ pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> 
 
 /// Maintenance runs independently of task workers, including after restarts.
 pub async fn reconcile_cancellations(store: &Store, cfg: &Config) -> Result<()> {
+    reconcile_submissions(store, cfg).await?;
     let rows: Vec<(Uuid, bool)> = sqlx::query_as("SELECT task_id,cancel_requested FROM agency_remote_tasks WHERE NOT cancel_completed ORDER BY last_control_check LIMIT 64").fetch_all(&store.pool).await?;
     for (id, requested) in rows {
         sqlx::query(
@@ -436,6 +437,55 @@ pub async fn reconcile_cancellations(store: &Store, cfg: &Config) -> Result<()> 
         {
             let _ = cancel_remote(store, cfg, id).await;
         }
+    }
+    Ok(())
+}
+
+/// Read back the original request after a lost response. Absence or mismatch is
+/// not permission to resend. Existing peers without this additive endpoint stay
+/// at the explicit uncertain boundary.
+pub async fn reconcile_submissions(store: &Store, cfg: &Config) -> Result<()> {
+    let pending:Vec<(Uuid,String,Value)>=sqlx::query_as(
+        "SELECT task_id,peer_id,request FROM agency_remote_tasks WHERE remote_id IS NULL ORDER BY last_control_check LIMIT 32")
+        .fetch_all(&store.pool).await?;
+    for (id, peer_id, body) in pending {
+        let result=async {
+            let peer=cfg.peers.iter().find(|p|p.id==peer_id).ok_or_else(||anyhow::anyhow!("peer unavailable"))?;
+            let token=std::env::var(peer.outbound_token_env.as_ref().ok_or_else(||anyhow::anyhow!("peer credential unavailable"))?)?;
+            let endpoint=peer.endpoint.as_ref().ok_or_else(||anyhow::anyhow!("peer endpoint unavailable"))?;
+            let request:a2a::SendMessageRequest=serde_json::from_value(body)?;
+            let [Part::Data(data)]=request.message.parts.as_slice() else {anyhow::bail!("invalid stored submission")};
+            let expected:Submit=serde_json::from_value(data.clone())?;
+            let client=reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).timeout(std::time::Duration::from_secs(10)).build()?;
+            let response=bounded(client.get(format!("{}/v1/task-requests/{}",endpoint.trim_end_matches('/'),urlencoding::encode(&expected.request_id)))
+                .bearer_auth(&token).send().await?).await?;
+            let remote:StoredTask=serde_json::from_value(response)?;
+            ensure!(fingerprint(&remote.request)?==fingerprint(&expected)?,"reconciled request mismatch");
+            sqlx::query("UPDATE agency_remote_tasks SET remote_id=$2,context_id=$2,last_response=$3 WHERE task_id=$1 AND remote_id IS NULL")
+                .bind(id).bind(remote.contract.id.to_string()).bind(serde_json::to_value(&remote)?).execute(&store.pool).await?;
+            codifix_store::effects::conclude(&store.pool,Uuid::new_v5(&id,b"delegate"),Uuid::new_v4(),
+                codifix_store::effects::EffectStatus::Confirmed,codifix_store::effects::EffectReason::Observed).await?;
+            let task=store.get_internal(id).await?;
+            if task.contract.status==codifix_agency::TaskStatus::InputRequired && store.live_authority(&task).await.is_ok() {
+                let caller=crate::config::Peer{id:task.requester.clone(),instance_id:cfg.instance_id,token_env:String::new(),operator:false,
+                    mandates:std::collections::BTreeSet::from([task.request.mandate_id]),endpoint:None,outbound_token_env:None};
+                let resumed=store.respond(id,&format!("reconciled:{id}"),"Remote admission confirmed by original request ID.",None,&caller).await?;
+                // This is local reconciliation, not an answer from the human;
+                // never forward it as a fresh remote model turn.
+                sqlx::query("UPDATE agency_remote_tasks SET reply_revision=$2 WHERE task_id=$1")
+                    .bind(id).bind(resumed.revision).execute(&store.pool).await?;
+            }
+            Ok::<(),anyhow::Error>(())
+        }.await;
+        // Reconciliation failures leave the recorded uncertain state intact;
+        // they never trigger another private submission or emit payload logs.
+        let _ = result;
+        sqlx::query(
+            "UPDATE agency_remote_tasks SET last_control_check=clock_timestamp() WHERE task_id=$1",
+        )
+        .bind(id)
+        .execute(&store.pool)
+        .await?;
     }
     Ok(())
 }

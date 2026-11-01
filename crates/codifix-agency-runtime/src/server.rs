@@ -70,6 +70,7 @@ pub fn router(app: App) -> Router {
         .route("/tasks", get(a2a_list))
         .route("/tasks/{id}", get(a2a_get).post(a2a_cancel_route))
         .route("/v1/tasks", get(list).post(submit))
+        .route("/v1/task-requests/{request_id}", get(request_lookup))
         .route("/v1/tasks/{id}", get(detail))
         .route("/v1/tasks/{id}/cancel", post(cancel))
         .route("/v1/tasks/{id}/lease", post(renew_lease))
@@ -171,6 +172,28 @@ async fn submit(
 async fn list(State(app): State<App>, headers: HeaderMap) -> ApiResult<Vec<StoredTask>> {
     let p = peer(&app, &headers)?;
     Ok(Json(app.store.list(&p).await.map_err(safe_error)?))
+}
+/// Exact original-request lookup is restricted to its authenticated sender. It
+/// reconciles a lost submission response without repeating the POST or exposing
+/// another sender's tasks, even when the caller also has operator privileges.
+async fn request_lookup(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> ApiResult<StoredTask> {
+    let p = peer(&app, &headers)?;
+    if request_id.is_empty() || request_id.len() > 128 {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_request_id"));
+    }
+    let id: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM agency_tasks WHERE requester=$1 AND request_id=$2")
+            .bind(&p.id)
+            .bind(request_id)
+            .fetch_optional(&app.store.pool)
+            .await
+            .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "storage_unavailable"))?;
+    let id = id.ok_or_else(|| failure(StatusCode::NOT_FOUND, "task_unavailable"))?;
+    Ok(Json(app.store.get(id, &p).await.map_err(safe_error)?))
 }
 async fn detail(
     State(app): State<App>,
