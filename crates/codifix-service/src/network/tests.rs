@@ -88,6 +88,28 @@ async fn http_requires_current_human_and_feature_opt_in() {
             .status(),
         StatusCode::OK
     );
+    let history_url = format!("{url}/messages?before_sequence=100&limit=20");
+    let response = client
+        .get(&history_url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let page: Value = response.json().await.unwrap();
+    assert_eq!(page["messages"], json!([]));
+    assert_eq!(page["has_more"], false);
+    assert_ne!(
+        client
+            .get(&history_url)
+            .bearer_auth(&other_token)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
     assert_eq!(
         client
             .get(format!("{origin}/v1/network/oauth/client-metadata.json"))
@@ -171,7 +193,7 @@ fn human_route_policy_rejects_machine_and_unknown_routes() {
 /// socket and session revocation/unlink occurring during the external poll.
 #[cfg(unix)]
 #[tokio::test]
-async fn identity_completion_is_session_bound_and_survives_poll_replay() {
+async fn identity_start_cleanup_and_session_bound_completion_survive_retries() {
     use crate::auth::CredentialSource;
     use codifix_record::{AuthPrincipalKind, PermissionSet};
     use std::{
@@ -252,7 +274,15 @@ async fn identity_completion_is_session_bound_and_survives_poll_replay() {
                 .to_owned();
             let body: Value =
                 serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap();
-            let result = if path.contains("/poll ") {
+            let mut response_status = "200 OK";
+            let result = if path.contains("/begin ") {
+                if mode2.lock().unwrap().as_str() == "begin_failed" {
+                    response_status = "400 Bad Request";
+                    json!({"error":"unresolvable_handle"})
+                } else {
+                    json!({"authorization_url":"https://issuer.example.org/authorize?request_uri=synthetic","expires_at":chrono::Utc::now()+chrono::Duration::minutes(5)})
+                }
+            } else if path.contains("/poll ") {
                 polls2.fetch_add(1, Ordering::SeqCst);
                 let current = mode2.lock().unwrap().clone();
                 let attempt: Uuid =
@@ -274,7 +304,7 @@ async fn identity_completion_is_session_bound_and_survives_poll_replay() {
             };
             let response = serde_json::to_vec(&result).unwrap();
             let header = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 {response_status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                 response.len()
             );
             stream.write_all(header.as_bytes()).await.unwrap();
@@ -282,6 +312,52 @@ async fn identity_completion_is_session_bound_and_survives_poll_replay() {
             stream.shutdown().await.unwrap();
         }
     });
+    *mode.lock().unwrap() = "begin_failed".into();
+    for _ in 0..4 {
+        assert!(
+            link(
+                State(state.clone()),
+                Extension(principal.clone()),
+                Json(Identifier {
+                    identifier: "invalid.example.org".into()
+                }),
+            )
+            .await
+            .is_err()
+        );
+    }
+    let failed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM inbox_identity_attempts WHERE principal_id=$1 AND status='failed'",
+    )
+    .bind(owner)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(failed, 4);
+    *mode.lock().unwrap() = "complete".into();
+    let started = link(
+        State(state.clone()),
+        Extension(principal.clone()),
+        Json(Identifier {
+            identifier: "person.example.org".into(),
+        }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(started.0["status"], "pending");
+    // A corrected request is admitted immediately; no ten-minute quota wait.
+    let pending: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM inbox_identity_attempts WHERE principal_id=$1 AND status='pending'",
+    )
+    .bind(owner)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(pending, 1);
+    let unlinked = unlink(State(state.clone()), Extension(principal.clone()))
+        .await
+        .unwrap();
+    assert_eq!(unlinked.0["unlinked"], true);
     for scenario in ["conflict", "complete", "cancelled", "revoked"] {
         let conflicting_owner = Uuid::new_v4();
         if scenario == "conflict" {

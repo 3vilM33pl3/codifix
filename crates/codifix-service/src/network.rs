@@ -150,6 +150,7 @@ pub(crate) async fn link(
     if q.identifier.len() > 2048 {
         return Err(error("identifier too long"));
     }
+    let client = broker(&s)?;
     let b = binding(&s, &p, Uuid::new_v4())?;
     let db = store(&s)?;
     let mut tx = db.pool.begin().await.map_err(error)?;
@@ -161,7 +162,19 @@ pub(crate) async fn link(
     }
     sqlx::query("INSERT INTO inbox_identity_attempts(id,home_instance_id,principal_id,session_binding,status,expires_at) VALUES($1,$2,$3,$4,'pending',clock_timestamp()+interval '10 minutes')").bind(b.attempt_id).bind(b.home_instance_id).bind(p.id).bind(&b.session_binding).execute(&mut *tx).await.map_err(error)?;
     tx.commit().await.map_err(error)?;
-    let start = broker(&s)?.begin(&b, &q.identifier).await.map_err(error)?;
+    let start = match client.begin(&b, &q.identifier).await {
+        Ok(start) => start,
+        Err(cause) => {
+            // The caller has not received an attempt ID and cannot poll this
+            // row. Release its quota rather than stranding it for ten minutes.
+            sqlx::query("UPDATE inbox_identity_attempts SET status='failed',authorization_url=NULL WHERE id=$1 AND status='pending'")
+                .bind(b.attempt_id)
+                .execute(&db.pool)
+                .await
+                .map_err(error)?;
+            return Err(error(cause));
+        }
+    };
     sqlx::query(
         "UPDATE inbox_identity_attempts SET authorization_url=$2,expires_at=$3 WHERE id=$1",
     )
