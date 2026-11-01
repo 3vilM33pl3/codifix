@@ -20,6 +20,7 @@ use uuid::Uuid;
 struct Provider {
     calls: Vec<Value>,
     invalid: bool,
+    reply: Option<Value>,
 }
 async fn complete(
     State(state): State<Arc<Mutex<Provider>>>,
@@ -27,7 +28,9 @@ async fn complete(
 ) -> Json<Value> {
     let mut state = state.lock().unwrap();
     state.calls.push(body);
-    let reply = if state.invalid {
+    let reply = if let Some(reply) = &state.reply {
+        reply.clone()
+    } else if state.invalid {
         json!({"version":1,"reply":"I deployed it","actions":[{"key":"ungranted-deploy","payload":{}}]})
     } else {
         json!({"version":1,"reply":"The roadmap is ready to discuss.","question":"Which milestone comes first?","actions":[],"peer_requests":[]})
@@ -63,7 +66,11 @@ impl Fixture {
             issuer_instance_id: instance,
             subject_instance_id: instance,
             specialist_id: "planner".into(),
-            capabilities: BTreeSet::from(["conversation_turn".into(), "delegate".into()]),
+            capabilities: BTreeSet::from([
+                "conversation_turn".into(),
+                "delegate".into(),
+                "inspect".into(),
+            ]),
             resources: BTreeSet::from([
                 ResourceScope {
                     kind: "conversation".into(),
@@ -482,4 +489,114 @@ async fn two_instances_exchange_one_bounded_private_conversation_turn() {
         home.cleanup().await;
         remote.cleanup().await;
     }
+}
+
+#[tokio::test]
+async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_dispatch() {
+    let Some(mut f) = Fixture::new().await else {
+        return;
+    };
+    f.cfg.inbox_enabled = true;
+    let human = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name,global_role) VALUES($1,'human_oidc','Synthetic human','admin')").bind(human).execute(&f.db.pool).await.unwrap();
+    let inbox = codifix_inbox::store::Store {
+        pool: f.db.pool.clone(),
+        home_instance_id: f.cfg.instance_id,
+    };
+    let request = f.request(f.cfg.instance_id);
+    let mut action = request.clone();
+    action.capability = "inspect".into();
+    action.acceptance_criteria = vec!["status_observed".into()];
+    action.payload = json!({"kind":"inspect"});
+    action.budget = Budget {
+        micro_usd: 1,
+        calls: 1,
+        turns: 1,
+        delegation_depth: 0,
+    };
+    let contact = Uuid::new_v4();
+    let grant = codifix_inbox::InvocationGrant {
+        id: Uuid::new_v4(),
+        home_instance_id: f.cfg.instance_id,
+        principal_id: human,
+        contact: codifix_inbox::Specialist {
+            id: contact,
+            instance_id: f.cfg.instance_id,
+            specialist_id: "planner".into(),
+            display_name: "Planner".into(),
+            summary: "Synthetic".into(),
+            capabilities: vec!["conversation_turn".into(), "inspect".into()],
+            enrolled: true,
+            available: true,
+            grant_id: None,
+            mandate_id: Some(f.mandate.id),
+            remote: false,
+        },
+        request: serde_json::to_value(&request).unwrap(),
+        routing: request.payload["routing"].clone(),
+        actions: vec![codifix_inbox::ActionTemplate {
+            key: "inspect".into(),
+            request: serde_json::to_value(action).unwrap(),
+        }],
+        expires_at: Utc::now() + Duration::minutes(30),
+    };
+    inbox.install_grant(&grant).await.unwrap();
+    let chat = inbox
+        .create(
+            human,
+            &codifix_inbox::CreateConversation {
+                client_request_id: Uuid::new_v4(),
+                title: "Private synthetic chat".into(),
+                specialist_id: contact,
+            },
+        )
+        .await
+        .unwrap();
+    f.provider.lock().unwrap().reply = Some(
+        json!({"version":1,"reply":"I will inspect the permitted service.","question":null,"actions":[{"key":"inspect","payload":{}}],"peer_requests":[]}),
+    );
+    let message = codifix_inbox::SendMessage {
+        client_message_id: Uuid::new_v4(),
+        body: "Inspect the service".into(),
+        format: "text".into(),
+        artifact: None,
+        recipient_member_ids: vec![],
+    };
+    inbox
+        .send(human, chat.conversation.id, &message)
+        .await
+        .unwrap();
+    assert!(worker::run_once(&f.store, &f.cfg).await.unwrap());
+    assert!(
+        worker::run_once(&f.store, &f.cfg).await.unwrap(),
+        "granted action runs without another human approval"
+    );
+    let detail = inbox.detail(human, chat.conversation.id).await.unwrap();
+    assert_eq!(detail.messages.len(), 2);
+    assert_eq!(detail.messages[0].delivery, "confirmed");
+    assert_eq!(detail.tasks.len(), 2);
+    assert!(detail.tasks.iter().all(|t| t.status == "completed"));
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    inbox
+        .send(human, chat.conversation.id, &message)
+        .await
+        .unwrap();
+    assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    inbox
+        .send(
+            human,
+            chat.conversation.id,
+            &codifix_inbox::SendMessage {
+                client_message_id: Uuid::new_v4(),
+                body: "Inspect again".into(),
+                ..message
+            },
+        )
+        .await
+        .unwrap();
+    inbox.revoke_grant(grant.id).await.unwrap();
+    assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    f.cleanup().await;
 }
