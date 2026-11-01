@@ -1191,6 +1191,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "codifix-identity"
+version = "3.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-agency",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-inbox"
 version = "3.0.0"
 dependencies = [
