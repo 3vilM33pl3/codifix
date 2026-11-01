@@ -62,6 +62,18 @@ export class IdentityBroker {
   bound(binding) { const key=bindingKey(binding); this.sweep(); const item=this.attempts.get(binding.attempt_id); if(!item || item.key!==key) throw new Error('unknown or expired link attempt'); return item; }
   async poll(binding) { const item=this.bound(binding); return item.result || {status:'pending'}; }
   async acknowledge(binding) { const item=this.bound(binding); if(!item.result) throw new Error('attempt not complete'); this.attempts.delete(binding.attempt_id); return {acknowledged:true}; }
+  async cleanup(session) {
+    let cleanup='revoked';
+    try {
+      const saved=await this.sessionStore.get(session.did);
+      if(!saved?.tokenSet?.access_token) throw new Error('session unavailable');
+      // SDK revoke() swallows endpoint failures. Use its public request method
+      // for a truthful receipt, then signOut to clear the SDK session cache.
+      for(const token of [saved.tokenSet.refresh_token,saved.tokenSet.access_token].filter(Boolean)) await session.server.request('revocation',{token});
+    } catch { cleanup='discarded_revocation_failed'; }
+    finally { try { await session.signOut(); } catch {} await this.sessionStore.del(session.did); }
+    return cleanup;
+  }
   async callback(params) {
     // Inspect the SDK's own CSRF state before calling it; no user identity comes from callback input.
     const state=params.get('state');
@@ -78,14 +90,12 @@ export class IdentityBroker {
       const verified=await this.resolve(session.did);
       if(token.sub!==verified.did || token.scope!=='atproto' || new URL(token.aud).origin!==verified.pds || token.iss!==session.serverMetadata.issuer) throw new Error('OAuth issuer/resource/scope mismatch');
       publicUrl(token.iss);
-      let cleanup='revoked';
-      try { await session.signOut(); } catch { cleanup='discarded_revocation_failed'; }
-      await this.sessionStore.del(session.did);
+      const cleanup=await this.cleanup(session);
       item.result={status:'complete',...verified,verified_at:new Date(this.now()).toISOString(),cleanup};
       item.status='complete';
       return {ok:true};
     } catch {
-      if(session) { try { await session.signOut(); } catch {} await this.sessionStore.del(session.did); }
+      if(session) await this.cleanup(session);
       item.result={status:'failed',code:'verification_failed'}; item.status='failed';
       throw new Error('identity verification failed');
     } finally { await this.stateStore.del(state); }

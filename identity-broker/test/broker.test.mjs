@@ -15,7 +15,7 @@ function fixture(options={}) {
     clientMetadata:metadata('https://codifix.net'),
     identityResolver:{async resolve(){return {did,handle:'olivier.codifix.net',didDoc:options.doc||doc};}},
     async authorize(_,{state:appState,scope}) {assert.equal(scope,'atproto');state=randomUUID();await stateStore.set(state,{appState});return new URL('https://auth.codifix.net/authorize');},
-    async callback(){callbackCount++;const saved=await stateStore.get(state);await sessionStore.set(options.did||did,{secret:'synthetic-token'});return {state:saved.appState,session:{did:options.did||did,serverMetadata:{issuer:'https://auth.codifix.net'},async getTokenInfo(){return {sub:did,scope:options.scope||'atproto',aud:options.aud||'https://pds.codifix.net',iss:options.issuer||'https://auth.codifix.net'};},async signOut(){revoked++;if(options.revokeFails)throw new Error('remote revoke failed');}}};},
+    async callback(){callbackCount++;const saved=await stateStore.get(state);await sessionStore.set(options.did||did,{tokenSet:{access_token:'synthetic-token'}});return {state:saved.appState,session:{did:options.did||did,server:{async request(){revoked++;if(options.revokeFails)throw new Error('revocation failed');}},serverMetadata:{issuer:'https://auth.codifix.net'},async getTokenInfo(){return {sub:did,scope:options.scope||'atproto',aud:options.aud||'https://pds.codifix.net',iss:options.issuer||'https://auth.codifix.net'};},async signOut(){}}};},
   };
   const requests=[];
   const fetch=async(url)=>{requests.push(String(url));return Response.json(options.record||{records:[]});};
