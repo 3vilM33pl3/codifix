@@ -42,6 +42,8 @@ Pasted service tokens stay in native process memory only. Preferences store appe
 - **Sessions:** live agent monitor filtered by exact selected folder, or by project name when no folder is selected. Capture time is explicitly project-wide because the monitoring API has no per-session capture state. Resume loads an existing service briefing; it does not launch or resume another agent process.
 - **Review:** current/proposed memory comparison and permission-gated approve/reject. Success requires a matching service receipt. Sources/history remain service-owned.
 - **Activity:** latest 100 events, errors within that window, paged jobs, failure details and explicit retry confirmation. A retry preserves its request ID after an uncertain outcome and retires it after a matching receipt.
+- **Network:** enrolled specialists, public AT capability discovery and optional AT identity linking. Sign in with a human account; linking an AT identity does not create private grants. Network is available without a selected project.
+- **Inbox:** private conversations with a lead and multiple trusted specialists. Mentions select responders, while messages remain shared with the listed participants. Adding a participant requires review of an editable summary and selected earlier messages. Task cards show clarification, results and cancellation progress; uncertain sends retain their request IDs. Inbox is available without a selected project and uses the current service's explicit invocation grants.
 - **Settings:** system/light/dark themes, opt-in native notifications, current project/connection, read-only diagnostics. Integrations, sharing and advanced service administration open the existing web interface in the default browser. They are not duplicate native administration forms.
 - **Keyboard:** Ctrl/Command K, Tab/Shift Tab, arrow keys/Enter in the command palette, Escape in dialogs, skip-to-content link. Native window decorations and persisted window size/position belong to the OS.
 
@@ -75,6 +77,39 @@ npm run desktop:build
 ```
 
 `npm run dev` also serves `/review.html`, an explicitly illustrative fixture for comparing the design without accessing real project data. Its IPC mock and sample records are **not included** in the packaged `index.html` entry. Fixture actions that require native integrations report that they are unavailable.
+
+The opt-in Network/Inbox feature requires a compatible service with the feature
+enabled and an enrolled specialist grant. An older or disabled service displays
+an unavailable state. The desktop never receives agency peer/operator tokens or
+AT OAuth tokens. Browser account linking takes an attempt ID, reads its current
+server-bound authorization URL through the native connection and opens only a
+matching, unexpired HTTPS attempt. Conversation data is not saved in localStorage.
+
+`/network-review.html` is a separate development-only, in-memory fixture. A real
+Chromium smoke can exercise navigation without a project, message readback,
+reviewed invitation, pending cancellation and the specialist directory:
+
+```sh
+CODIFIX_DESKTOP_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+  node tests/network-smoke.mjs
+```
+
+The smoke uses `/usr/bin/google-chrome` by default; override it with
+`CODIFIX_DESKTOP_CHROME`. `CODIFIX_DESKTOP_REVIEW_SCREENSHOT=/tmp/network.png`
+optionally saves both Network and Inbox screenshots. This is renderer acceptance
+with synthetic service responses, not a live AT login or Linear write.
+
+Network/Inbox validation on 1 November 2026: 32 renderer workflow tests and
+17 native tests passed (two existing host-specific keyring/TLS probes remain
+ignored). Strict native Clippy, formatting, the production frontend and a native
+build with embedded assets passed. The Chromium fixture smoke passed and both
+views were visually inspected. An isolated Xvfb/D-Bus startup with disposable
+XDG directories and deliberately unavailable area routing stayed alive until
+the ten-second harness timeout. Portal/Wayland integration warnings under Xvfb
+mean this establishes startup, not native portal or notification acceptance.
+Native tests run serially to avoid an existing ephemeral-port reuse race in the
+browser cancellation test. No installed application, live identity or production
+grant was changed by these checks.
 
 Source validation for 0.1.4 passes 22 renderer workflows and 15 native tests (two separate keyring/TLS host probes remain ignored in the ordinary test run), plus the production renderer build. It adds native area precedence/config-identity/unavailable-area tests, credential-free health and stale-generation tests, and renderer coverage for cross-area project slugs, folder routing through browser login, cache clearing and late response rejection. Installed browser/OIDC acceptance must still be performed against the packaged build.
 
