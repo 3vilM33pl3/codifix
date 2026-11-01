@@ -38,8 +38,10 @@ until CI executes it.
 Automated checks and browser visual review do not establish GNOME/KDE, Wayland,
 Orca, native file chooser and notification acceptance on every desktop. Windows
 and macOS share the source architecture but have not been built or validated in
-this increment. Native external-agent chat handoff is unavailable; use the
-session reference and project resume briefing. Advanced service administration
+this increment. Resuming arbitrary external LLM sessions is unavailable; use the
+session reference and project resume briefing. Enrolled specialist conversations
+are available through the opt-in [Network and Inbox](network-inbox.md) feature.
+Advanced service administration
 remains available through explicit browser links.
 
 Code Connect templates are saved locally. Figma requires an Organization or
