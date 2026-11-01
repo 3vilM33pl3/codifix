@@ -2,6 +2,7 @@
 //! secret, sends a request, or executes a task. The runtime must authenticate
 //! issuers, load current ancestor mandates, and reserve shared budgets atomically.
 pub mod a2a;
+pub mod conversation;
 pub mod discovery;
 pub mod evaluation;
 pub mod improvement;
