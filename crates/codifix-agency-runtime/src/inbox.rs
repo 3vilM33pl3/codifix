@@ -16,6 +16,9 @@ pub async fn dispatch_once(store: &Store, cfg: &Config) -> Result<bool> {
     let tickets = codifix_inbox::store::pending_dispatches(&store.pool, cfg.instance_id).await?;
     let mut dispatched = false;
     for ticket in tickets {
+        if dispatch_paused(store, cfg.instance_id, ticket.id).await? {
+            continue;
+        }
         let result = async {
             let request: Submit = serde_json::from_value(ticket.request)?;
             ensure!(
@@ -53,6 +56,11 @@ pub async fn dispatch_once(store: &Store, cfg: &Config) -> Result<bool> {
         }
         .await;
         if result.is_err() {
+            // A pause racing redemption defers the original ticket. It is not
+            // a rejected message and must not manufacture a replacement ID.
+            if dispatch_paused(store, cfg.instance_id, ticket.id).await? {
+                continue;
+            }
             codifix_inbox::store::reject_dispatch(
                 &store.pool,
                 ticket.id,
@@ -67,6 +75,28 @@ pub async fn dispatch_once(store: &Store, cfg: &Config) -> Result<bool> {
     Ok(dispatched)
 }
 
+async fn dispatch_paused(store: &Store, home: Uuid, id: Uuid) -> Result<bool> {
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM inbox_dispatches d JOIN inbox_conversations c ON c.id=d.conversation_id WHERE d.id=$1 AND d.home_instance_id=$2 AND c.paused)")
+        .bind(id).bind(home).fetch_one(&store.pool).await?)
+}
+
+async fn task_paused(store: &Store, home: Uuid, id: Uuid) -> Result<bool> {
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM inbox_task_origins o JOIN inbox_conversations c ON c.id=o.conversation_id WHERE o.task_id=$1 AND o.home_instance_id=$2 AND c.paused)")
+        .bind(id).bind(home).fetch_one(&store.pool).await?)
+}
+
+/// Defer unclaimed inbox jobs without consuming worker attempts or changing
+/// task identity. Other specialist jobs remain eligible. Resume latency is at
+/// most two seconds; work already claimed retains its physical admission fence.
+pub async fn defer_paused_jobs(store: &Store, cfg: &Config) -> Result<()> {
+    if !cfg.inbox_enabled {
+        return Ok(());
+    }
+    sqlx::query("UPDATE background_jobs j SET available_at=GREATEST(j.available_at,clock_timestamp()+interval '2 seconds') FROM inbox_task_origins o JOIN inbox_conversations c ON c.id=o.conversation_id WHERE j.operation_id=o.task_id AND o.home_instance_id=$1 AND c.paused AND j.status IN ('queued','retry_wait')")
+        .bind(cfg.instance_id).execute(&store.pool).await?;
+    Ok(())
+}
+
 /// Project durable outcomes after restarts too; a missed notification cannot
 /// strand the inbox. The home store deduplicates task revisions/results.
 pub async fn reconcile(store: &Store, cfg: &Config) -> Result<()> {
@@ -79,7 +109,10 @@ pub async fn reconcile(store: &Store, cfg: &Config) -> Result<()> {
     ).bind(cfg.instance_id).fetch_all(&store.pool).await?;
     for id in ids {
         let mut task = store.get_internal(id).await?;
-        if !task.contract.status.is_terminal() && store.live_authority(&task).await.is_err() {
+        if !task.contract.status.is_terminal()
+            && !task_paused(store, cfg.instance_id, id).await?
+            && store.live_authority(&task).await.is_err()
+        {
             task = store.cancel(id, &gateway(cfg.instance_id)).await?;
             let _ = crate::exchange::cancel_remote(store, cfg, id).await;
         }

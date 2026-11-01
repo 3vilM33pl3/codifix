@@ -22,6 +22,7 @@ pub fn policy() -> JobPolicy {
 pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
     crate::inbox::dispatch_once(store, cfg).await?;
     crate::inbox::reconcile(store, cfg).await?;
+    crate::inbox::defer_paused_jobs(store, cfg).await?;
     let Some(lease) = jobs::claim_kinds(
         &store.pool,
         policy(),

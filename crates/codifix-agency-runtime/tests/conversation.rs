@@ -568,6 +568,30 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
         .send(human, chat.conversation.id, &message)
         .await
         .unwrap();
+    let ticket: Uuid =
+        sqlx::query_scalar("SELECT id FROM inbox_dispatches WHERE root_message_id=$1")
+            .bind(message.client_message_id)
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap();
+    inbox
+        .pause(human, chat.conversation.id, true)
+        .await
+        .unwrap();
+    assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status FROM inbox_dispatches WHERE id=$1")
+            .bind(ticket)
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        "queued"
+    );
+    assert!(f.provider.lock().unwrap().calls.is_empty());
+    inbox
+        .pause(human, chat.conversation.id, false)
+        .await
+        .unwrap();
     assert!(
         codifix_agency_runtime::inbox::dispatch_once(&f.store, &f.cfg)
             .await
@@ -578,6 +602,43 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
         .unwrap();
     let submitted = inbox.detail(human, chat.conversation.id).await.unwrap();
     assert_eq!(submitted.tasks[0].status, "submitted");
+    assert_eq!(
+        sqlx::query_scalar::<_, Uuid>("SELECT id FROM inbox_dispatches WHERE task_id=$1")
+            .bind(submitted.tasks[0].id)
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        ticket
+    );
+    // Pausing after ticket redemption also holds the queued worker job rather
+    // than rejecting the message or consuming a worker attempt.
+    inbox
+        .pause(human, chat.conversation.id, true)
+        .await
+        .unwrap();
+    assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
+    assert_eq!(
+        sqlx::query_scalar::<_, i32>("SELECT attempts FROM background_jobs WHERE operation_id=$1")
+            .bind(submitted.tasks[0].id)
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        f.store
+            .get_internal(submitted.tasks[0].id)
+            .await
+            .unwrap()
+            .contract
+            .status,
+        TaskStatus::Submitted
+    );
+    inbox
+        .pause(human, chat.conversation.id, false)
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(2100)).await;
     let mut working = f.store.get_internal(submitted.tasks[0].id).await.unwrap();
     working
         .contract
