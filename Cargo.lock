@@ -1191,6 +1191,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "codifix-inbox"
+version = "3.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-agency",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-loops"
 version = "3.0.0"
 dependencies = [

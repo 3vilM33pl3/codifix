@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/codifix-inbox",
   "crates/codifix-agency-openbao",
   "crates/codifix-agency-projects",
   "crates/codifix-agency-runtime",
