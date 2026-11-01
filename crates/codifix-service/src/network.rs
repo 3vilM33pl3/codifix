@@ -2,7 +2,7 @@
 use crate::{ApiError, AppState, AuthenticatedPrincipal};
 use axum::{
     Extension, Json,
-    extract::{Path, RawQuery, State},
+    extract::{Path, Query, RawQuery, State},
     http::StatusCode,
 };
 use codifix_identity::{BrokerClient, LinkBinding, LinkPoll};
@@ -381,3 +381,23 @@ pub(crate) async fn respond(
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct HistoryPage {
+    before_sequence: i64,
+    limit: Option<u32>,
+}
+pub(crate) async fn history(
+    State(s): State<AppState>,
+    Extension(p): Extension<AuthenticatedPrincipal>,
+    Path(id): Path<Uuid>,
+    Query(q): Query<HistoryPage>,
+) -> Result<Json<MessagePage>, ApiError> {
+    Ok(Json(
+        store(&s)?
+            .message_page(p.id, id, q.before_sequence, q.limit.unwrap_or(100))
+            .await
+            .map_err(error)?,
+    ))
+}

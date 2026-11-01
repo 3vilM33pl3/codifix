@@ -184,14 +184,24 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
         ),
         (
             "/v1/inbox/conversations/{conversation_id}/messages",
-            &[(
-                Method::POST,
-                RoutePolicy {
-                    permission: Permission::MemoryRead,
-                    scope: ProjectScope::HumanClient,
-                    semantic_read: false,
-                },
-            )],
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: true,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: false,
+                    },
+                ),
+            ],
         ),
         (
             "/v1/inbox/conversations/{conversation_id}/members",

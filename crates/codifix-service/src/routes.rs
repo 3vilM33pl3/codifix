@@ -60,7 +60,7 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
         .route("/v1/network/oauth/callback", get(crate::network::callback).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/inbox/conversations", get(crate::network::list).post(crate::network::create).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/inbox/conversations/{conversation_id}", get(crate::network::detail).layer(axum::extract::DefaultBodyLimit::max(131072)))
-        .route("/v1/inbox/conversations/{conversation_id}/messages", post(crate::network::send).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/messages", get(crate::network::history).post(crate::network::send).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/inbox/conversations/{conversation_id}/members", post(crate::network::join).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/inbox/conversations/{conversation_id}/members/{member_id}/remove", post(crate::network::remove).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/inbox/conversations/{conversation_id}/lead", post(crate::network::lead).layer(axum::extract::DefaultBodyLimit::max(131072)))

@@ -166,3 +166,180 @@ fn human_route_policy_rejects_machine_and_unknown_routes() {
         "/v1/network/discover"
     ));
 }
+
+/// Exercise the post-broker transaction boundary with a real protected Unix
+/// socket and session revocation/unlink occurring during the external poll.
+#[cfg(unix)]
+#[tokio::test]
+async fn identity_completion_is_session_bound_and_survives_poll_replay() {
+    use crate::auth::CredentialSource;
+    use codifix_record::{AuthPrincipalKind, PermissionSet};
+    use std::{
+        collections::BTreeMap,
+        os::unix::fs::PermissionsExt,
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let Some(db) = IsolatedDatabase::new().await else {
+        return;
+    };
+    let home = Uuid::new_v4();
+    let owner = Uuid::new_v4();
+    let session = Uuid::new_v4();
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Identity fixture')").bind(owner).execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,session_kind,expires_at) VALUES($1,$2,$3,$4,'desktop',now()+interval '1 hour')").bind(session).bind(owner).bind(crate::auth::hash_secret(&Uuid::new_v4().to_string())).bind(vec![0u8;32]).execute(&db.pool).await.unwrap();
+    let dir = std::env::temp_dir().join(format!("codifix-inbox-identity-{}", Uuid::new_v4()));
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = dir.join("broker.sock");
+    let cfg=serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"synthetic-unused"},"database":{"url":db.pool.connect_options().to_url_lossy().as_str()},"offline":{"enabled":false},"cluster":{"enabled":false},"reinforcement":{"enabled":false},"consolidation":{"enabled":false},"background_work":{"enabled":false},"mcp":{"enabled":false},"embeddings":{"enabled":false,"create_enabled":false},"inbox":{"enabled":true,"home_instance_id":home,"identity_broker_socket":socket}})).unwrap();
+    let state = crate::runtime::build_state(cfg, Arc::new(Mutex::new(None)))
+        .await
+        .unwrap();
+    let principal = AuthenticatedPrincipal {
+        id: owner,
+        kind: AuthPrincipalKind::HumanOidc,
+        display_name: "Fixture".into(),
+        email: None,
+        issuer: None,
+        subject: None,
+        groups: vec![],
+        global_role: None,
+        global: PermissionSet::EMPTY,
+        project_roles: BTreeMap::new(),
+        credential_source: CredentialSource::NativeSession,
+        token_id: None,
+        session_id: Some(session),
+        session_csrf_hash: None,
+    };
+    let mode = Arc::new(Mutex::new("complete".to_owned()));
+    let polls = Arc::new(AtomicUsize::new(0));
+    let acks = Arc::new(AtomicUsize::new(0));
+    let listener = tokio::net::UnixListener::bind(&socket).unwrap();
+    std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o660)).unwrap();
+    let pool = db.pool.clone();
+    let mode2 = mode.clone();
+    let polls2 = polls.clone();
+    let acks2 = acks.clone();
+    let broker = tokio::spawn(async move {
+        loop {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            let mut buffer = [0u8; 4096];
+            let (header_end, length) = loop {
+                let n = stream.read(&mut buffer).await.unwrap();
+                assert!(n > 0);
+                bytes.extend_from_slice(&buffer[..n]);
+                if let Some(i) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&bytes[..i]);
+                    let length = headers
+                        .lines()
+                        .find_map(|s| {
+                            s.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|s| s.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if bytes.len() >= i + 4 + length {
+                        break (i + 4, length);
+                    }
+                }
+            };
+            let path = String::from_utf8_lossy(&bytes[..header_end])
+                .lines()
+                .next()
+                .unwrap()
+                .to_owned();
+            let body: Value =
+                serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap();
+            let result = if path.contains("/poll ") {
+                polls2.fetch_add(1, Ordering::SeqCst);
+                let current = mode2.lock().unwrap().clone();
+                let attempt: Uuid =
+                    serde_json::from_value(body["binding"]["attempt_id"].clone()).unwrap();
+                if current == "cancelled" {
+                    sqlx::query("UPDATE inbox_identity_attempts SET status='cancelled',authorization_url=NULL WHERE id=$1").bind(attempt).execute(&pool).await.unwrap();
+                }
+                if current == "revoked" {
+                    sqlx::query("UPDATE auth_web_sessions SET revoked_at=now() WHERE id=$1")
+                        .bind(session)
+                        .execute(&pool)
+                        .await
+                        .unwrap();
+                }
+                json!({"status":"complete","did":"did:plc:syntheticverifiedidentity","handle":"person.example.org","pds":"https://pds.example.org","verified_at":chrono::Utc::now(),"cleanup":"revoked_and_discarded"})
+            } else {
+                acks2.fetch_add(1, Ordering::SeqCst);
+                json!({"ok":true})
+            };
+            let response = serde_json::to_vec(&result).unwrap();
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                response.len()
+            );
+            stream.write_all(header.as_bytes()).await.unwrap();
+            stream.write_all(&response).await.unwrap();
+            stream.shutdown().await.unwrap();
+        }
+    });
+    for scenario in ["conflict", "complete", "cancelled", "revoked"] {
+        let conflicting_owner = Uuid::new_v4();
+        if scenario == "conflict" {
+            sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Other human')").bind(conflicting_owner).execute(&db.pool).await.unwrap();
+            sqlx::query("INSERT INTO inbox_identity_links(home_instance_id,principal_id,did,pds) VALUES($1,$2,'did:plc:syntheticverifiedidentity','https://pds.example.org')").bind(home).bind(conflicting_owner).execute(&db.pool).await.unwrap();
+        }
+        *mode.lock().unwrap() = scenario.into();
+        let id = Uuid::new_v4();
+        let b = binding(&state, &principal, id).unwrap();
+        sqlx::query("INSERT INTO inbox_identity_attempts(id,home_instance_id,principal_id,session_binding,status,expires_at) VALUES($1,$2,$3,$4,'pending',now()+interval '5 minutes')").bind(id).bind(home).bind(owner).bind(b.session_binding).execute(&db.pool).await.unwrap();
+        let mut wrong_session = principal.clone();
+        wrong_session.session_id = Some(Uuid::new_v4());
+        let before_poll = polls.load(Ordering::SeqCst);
+        assert!(
+            link_poll(State(state.clone()), Extension(wrong_session), Path(id))
+                .await
+                .is_err()
+        );
+        assert_eq!(polls.load(Ordering::SeqCst), before_poll);
+        let result = link_poll(State(state.clone()), Extension(principal.clone()), Path(id)).await;
+        if scenario == "complete" {
+            let body = result.unwrap().0;
+            assert_eq!(body["status"], "complete");
+            let previous = polls.load(Ordering::SeqCst);
+            let again = link_poll(State(state.clone()), Extension(principal.clone()), Path(id))
+                .await
+                .unwrap();
+            assert_eq!(again.0["status"], "complete");
+            assert_eq!(polls.load(Ordering::SeqCst), previous);
+            sqlx::query("DELETE FROM inbox_identity_links WHERE principal_id=$1")
+                .bind(owner)
+                .execute(&db.pool)
+                .await
+                .unwrap();
+        } else if scenario == "cancelled" {
+            assert_eq!(result.unwrap().0["status"], "cancelled");
+        } else {
+            assert!(result.is_err());
+        }
+        let count: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM inbox_identity_links WHERE principal_id=$1")
+                .bind(owner)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+        if scenario == "conflict" {
+            sqlx::query("DELETE FROM inbox_identity_links WHERE principal_id=$1")
+                .bind(conflicting_owner)
+                .execute(&db.pool)
+                .await
+                .unwrap();
+        }
+    }
+    assert_eq!(acks.load(Ordering::SeqCst), 2);
+    broker.abort();
+    let _ = broker.await;
+    state.pool().unwrap().close().await;
+    db.cleanup().await.unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+}
