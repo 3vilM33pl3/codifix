@@ -71,7 +71,8 @@ body {
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button {
@@ -145,7 +146,8 @@ p {
   overflow-wrap: anywhere;
 }
 input:not([type="checkbox"]),
-select {
+select,
+textarea {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -154,6 +156,12 @@ select {
   min-height: 44px;
   min-width: 0;
   max-width: 100%;
+}
+textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  line-height: 1.5;
 }
 input[type="checkbox"] {
   accent-color: var(--accent);
@@ -926,4 +934,199 @@ dd {
   border-radius: 0.5rem;
   background: var(--surface);
   color: var(--text);
+}
+
+/* Private specialist network */
+.network-stack,
+.conversation-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.specialist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.specialist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.network-discovery {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-top: 16px;
+}
+.network-discovery label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+.discovered-profile {
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inbox-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.inbox-list-item {
+  justify-content: space-between;
+  align-items: start;
+  padding: 12px;
+  text-align: left;
+  flex-wrap: wrap;
+}
+.inbox-list-item > span:first-child,
+.member > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inbox-detail {
+  min-width: 0;
+}
+.conversation-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+.member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.message {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.message.human {
+  margin-left: 24px;
+  background: var(--accent-soft);
+}
+.message.specialist {
+  margin-right: 24px;
+}
+.message.system {
+  color: var(--muted);
+}
+.message.pending {
+  border-style: dashed;
+}
+.message .message-markdown {
+  margin: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0;
+  max-height: none;
+}
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.composer > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.composer-format {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.composer-format label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.recipient-picker,
+.disclosure-messages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0;
+  min-width: 0;
+}
+.recipient-picker legend {
+  padding: 0 4px;
+}
+.recipient-picker legend span {
+  display: block;
+}
+.recipient-picker label,
+.disclosure-messages label,
+.checkbox-label {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+}
+.disclosure-messages {
+  max-height: 260px;
+  overflow-y: auto;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.disclosure-messages label > span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 1050px) {
+  .inbox-layout {
+    grid-template-columns: 1fr;
+  }
+  .inbox-list {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .conversation-stack > .row {
+    align-items: start;
+    flex-wrap: wrap;
+  }
+  .message.human,
+  .message.specialist {
+    margin: 0;
+  }
 }

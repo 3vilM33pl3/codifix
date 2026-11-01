@@ -11,6 +11,8 @@ import { Memories } from "./Memories";
 import { Sessions } from "./Sessions";
 import { Activity } from "./Activity";
 import { Review } from "./Review";
+import { Network } from "./Network";
+import { Inbox, useInboxUpdates } from "./Inbox";
 import { Settings, type Preferences } from "./Settings";
 import { Badge, Intro, Modal } from "./ui";
 import {
@@ -138,6 +140,12 @@ export function App() {
   });
   const currentAuth = health.data ?? auth;
   const connected = !!auth && !health.error;
+  const unreadInbox = useInboxUpdates({
+    scope,
+    auth: currentAuth,
+    connected,
+    notify: (message) => void notify(message),
+  });
   function savePrefs(value: Preferences) {
     setPrefs(value);
     localStorage.setItem("codifix.desktop.preferences", JSON.stringify(value));
@@ -647,6 +655,18 @@ export function App() {
   }
   const commands = [
     {
+      label: "Open Inbox",
+      hint: "Private conversations with specialists",
+      action: () => navigate("Inbox"),
+      needsProject: false,
+    },
+    {
+      label: "Open Network",
+      hint: "Specialists and your AT identity",
+      action: () => navigate("Network"),
+      needsProject: false,
+    },
+    {
       label: "Go to Memories",
       hint: "Find project knowledge",
       action: () => navigate("Memories"),
@@ -768,16 +788,21 @@ export function App() {
           <span className="caption">{prefs.connectionName}</span>
         </Button>
         <nav aria-label="Main navigation">
-          {["Home", "Memories", "Sessions", "Activity"].map((item) => (
-            <Navigation
-              key={item}
-              className={`nav-item ${page === item || (item === "Home" && page === "Review") ? "selected" : ""}`}
-              aria-current={page === item ? "page" : undefined}
-              onClick={() => navigate(item)}
-            >
-              {item}
-            </Navigation>
-          ))}
+          {["Home", "Memories", "Sessions", "Activity", "Network", "Inbox"].map(
+            (item) => (
+              <Navigation
+                key={item}
+                className={`nav-item ${page === item || (item === "Home" && page === "Review") ? "selected" : ""}`}
+                aria-current={page === item ? "page" : undefined}
+                onClick={() => navigate(item)}
+              >
+                {item}
+                {item === "Inbox" && unreadInbox > 0 && (
+                  <Badge tone="positive">{unreadInbox}</Badge>
+                )}
+              </Navigation>
+            ),
+          )}
         </nav>
         <div className="sidebar-footer">
           <Button
@@ -832,6 +857,29 @@ export function App() {
               onConnect={() => setModal("connection")}
               onProject={() => setModal("project")}
             />
+          ) : page === "Network" || page === "Inbox" ? (
+            <div
+              className="page"
+              key={`${scope}:${currentAuth?.principal.id}:${page}`}
+            >
+              {page === "Network" ? (
+                <Network
+                  scope={scope}
+                  auth={currentAuth}
+                  connected={connected}
+                  onConnect={() => setModal("connection")}
+                  onInbox={() => navigate("Inbox")}
+                />
+              ) : (
+                <Inbox
+                  scope={scope}
+                  auth={currentAuth}
+                  connected={connected}
+                  onConnect={() => setModal("connection")}
+                  onNetwork={() => navigate("Network")}
+                />
+              )}
+            </div>
           ) : !project ? (
             <>
               <Intro
