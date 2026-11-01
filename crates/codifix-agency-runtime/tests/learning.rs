@@ -60,6 +60,7 @@ async fn fixture() -> Option<Fixture> {
         .await
         .unwrap();
     let cfg = Config {
+        inbox_enabled: false,
         instance_id: instance,
         listen: "127.0.0.1:0".parse().unwrap(),
         public_url: "https://agency.example.test".into(),

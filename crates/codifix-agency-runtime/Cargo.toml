@@ -19,6 +19,7 @@ chrono.workspace = true
 clap.workspace = true
 codifix-agency-projects = { path = "../codifix-agency-projects" }
 codifix-agency = { path = "../codifix-agency" }
+codifix-inbox = { path = "../codifix-inbox" }
 codifix-record = { path = "../codifix-record" }
 codifix-store = { path = "../codifix-store" }
 reqwest.workspace = true

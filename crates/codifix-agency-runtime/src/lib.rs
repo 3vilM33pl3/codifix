@@ -2,6 +2,7 @@
 pub mod config;
 pub mod discovery;
 pub mod exchange;
+pub mod inbox;
 pub mod inspection;
 pub mod learning;
 pub mod model;

@@ -878,6 +878,7 @@ dependencies = [
  "codifix-agency",
  "codifix-agency-openbao",
  "codifix-agency-projects",
+ "codifix-inbox",
  "codifix-record",
  "codifix-store",
  "codifix-test-support",

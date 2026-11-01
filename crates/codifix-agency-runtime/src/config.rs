@@ -8,6 +8,9 @@ use uuid::Uuid;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Redeem same-database human inbox tickets. No HTTP peer receives this identity.
+    #[serde(default)]
+    pub inbox_enabled: bool,
     pub instance_id: Uuid,
     pub listen: SocketAddr,
     pub public_url: String,
@@ -82,7 +85,10 @@ impl Config {
         let mut peers = BTreeSet::new();
         for p in &self.peers {
             ensure!(
-                !p.id.is_empty() && peers.insert(&p.id) && !p.instance_id.is_nil(),
+                !p.id.is_empty()
+                    && !p.id.starts_with("inbox-gateway:")
+                    && peers.insert(&p.id)
+                    && !p.instance_id.is_nil(),
                 "invalid peer identity"
             );
             if let Some(url) = &p.endpoint {
@@ -171,7 +177,9 @@ impl Auth {
         let mut ids = BTreeSet::new();
         for (peer, token) in pairs {
             ensure!(
-                token.len() >= 32 && ids.insert(peer.id.clone()),
+                token.len() >= 32
+                    && !peer.id.starts_with("inbox-gateway:")
+                    && ids.insert(peer.id.clone()),
                 "invalid peer credential"
             );
             let digest: [u8; 32] = Sha256::digest(token.as_bytes()).into();

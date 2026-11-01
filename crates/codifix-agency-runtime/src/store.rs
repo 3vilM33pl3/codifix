@@ -181,6 +181,30 @@ impl Store {
         Ok(())
     }
     pub async fn submit(&self, req: &Submit, peer: &Peer) -> Result<StoredTask> {
+        self.submit_inner(req, peer, None).await
+    }
+
+    /// A same-database dispatch ticket is the only way to obtain this internal
+    /// caller. It has no HTTP credential and no operator authority.
+    pub async fn submit_inbox(&self, req: &Submit, ticket: Uuid, home: Uuid) -> Result<StoredTask> {
+        let peer = Peer {
+            id: format!("inbox-gateway:{home}"),
+            instance_id: home,
+            token_env: String::new(),
+            operator: false,
+            mandates: std::collections::BTreeSet::from([req.mandate_id]),
+            endpoint: None,
+            outbound_token_env: None,
+        };
+        self.submit_inner(req, &peer, Some((ticket, home))).await
+    }
+
+    async fn submit_inner(
+        &self,
+        req: &Submit,
+        peer: &Peer,
+        inbox: Option<(Uuid, Uuid)>,
+    ) -> Result<StoredTask> {
         ensure!(
             peer.operator || peer.mandates.contains(&req.mandate_id),
             "peer has no grant"
@@ -218,6 +242,16 @@ impl Store {
                 value == fingerprint(req)?,
                 "request id reused with different input"
             );
+            if let Some((ticket, home)) = inbox {
+                codifix_inbox::store::redeem_dispatch(
+                    &mut tx,
+                    ticket,
+                    id,
+                    &fingerprint(&serde_json::to_value(req)?)?,
+                    home,
+                )
+                .await?;
+            }
             tx.commit().await?;
             return self.get(id, peer).await;
         }
@@ -226,6 +260,15 @@ impl Store {
             m.specialist_id == req.specialist_id,
             "specialist binding mismatch"
         );
+        if req.capability == "conversation_turn" {
+            let turn: codifix_agency::conversation::ConversationTurn =
+                serde_json::from_value(req.payload["turn"].clone())?;
+            ensure!(
+                req.payload["kind"] == "conversation_turn",
+                "conversation operation mismatch"
+            );
+            turn.validate_recipient(peer.instance_id, m.subject_instance_id, &req.specialist_id)?;
+        }
         ensure!(req.deadline <= m.expires_at, "task exceeds mandate expiry");
         m.authorize(&req.capability, &req.resource, None, usage, Utc::now())?;
         m.budget.remaining(usage)?.check(Usage {
@@ -306,6 +349,18 @@ impl Store {
         contract.validate()?;
         sqlx::query("INSERT INTO agency_tasks(id,project_id,mandate_id,requester,request_id,parent_id,contract,payload,request_digest,execution_lease_seconds,execution_lease_until) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CASE WHEN $10::integer IS NULL THEN NULL ELSE clock_timestamp()+make_interval(secs=>$10) END)")
             .bind(id).bind(project).bind(m.id).bind(&peer.id).bind(&req.request_id).bind(req.parent_id).bind(serde_json::to_value(&contract)?).bind(serde_json::to_value(req)?).bind(fingerprint(req)?).bind(execution_lease.map(|n|n as i32)).execute(&mut *tx).await?;
+        if let Some((ticket, home)) = inbox {
+            codifix_inbox::store::redeem_dispatch(
+                &mut tx,
+                ticket,
+                id,
+                &fingerprint(&serde_json::to_value(req)?)?,
+                home,
+            )
+            .await?;
+        } else if let Some(parent) = req.parent_id {
+            codifix_inbox::store::inherit_task_origin(&mut tx, parent, id).await?;
+        }
         enqueue(&mut tx, project, id, 1).await?;
         tx.commit().await?;
         self.get(id, peer).await
@@ -421,6 +476,14 @@ impl Store {
             "execution lease expired"
         );
         task_ancestors(&mut tx, task.request.parent_id).await?;
+        codifix_inbox::store::authorize_task_origin(
+            &mut tx,
+            task.contract.id,
+            &task.request.capability,
+            &task.request.resource,
+            Usage::default(),
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -459,6 +522,14 @@ impl Store {
             "task closed"
         );
         let (m, _, _) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+        codifix_inbox::store::authorize_task_origin(
+            &mut tx,
+            task.contract.id,
+            &task.request.capability,
+            &task.request.resource,
+            Usage::default(),
+        )
+        .await?;
         let seconds: Option<i32> = row.try_get("execution_lease_seconds")?;
         ensure!(seconds.is_some(), "task has no renewable lease");
         sqlx::query("UPDATE agency_tasks SET execution_lease_until=LEAST($2,$3,clock_timestamp()+make_interval(secs=>$4)) WHERE id=$1").bind(id).bind(task.request.deadline).bind(m.expires_at).bind(f64::from(seconds.unwrap_or(5))).execute(&mut *tx).await?;
@@ -501,6 +572,10 @@ impl Store {
             .fetch_one(&mut *tx)
             .await?;
         let mut task = decode(&row)?;
+        ensure!(
+            task.request.capability != "conversation_turn",
+            "conversation answers require a new home dispatch ticket"
+        );
         ensure!(
             peer.operator || task.requester == peer.id,
             "task unavailable"
@@ -631,6 +706,14 @@ async fn authorize_tx(
         .fetch_one(&mut **tx)
         .await?;
     let task = decode(&row)?;
+    codifix_inbox::store::authorize_task_origin(
+        tx,
+        id,
+        &task.request.capability,
+        &task.request.resource,
+        extra,
+    )
+    .await?;
     ensure!(
         row.try_get::<Option<DateTime<Utc>>, _>("execution_lease_until")?
             .is_none_or(|expiry| expiry > Utc::now()),

@@ -64,6 +64,18 @@ enum Command {
         #[arg(long)]
         file: PathBuf,
     },
+    InboxEnroll {
+        #[arg(long)]
+        peer: String,
+        #[arg(long)]
+        file: PathBuf,
+    },
+    InboxRevoke {
+        #[arg(long)]
+        peer: String,
+        #[arg(long)]
+        id: uuid::Uuid,
+    },
     Publish {
         #[arg(long)]
         pds: String,
@@ -150,6 +162,43 @@ async fn run() -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("--config required"))?,
     )?;
     match cli.command {
+        Command::InboxEnroll { peer, file } => {
+            ensure!(cfg.inbox_enabled, "inbox gateway disabled");
+            ensure!(
+                cfg.peers
+                    .iter()
+                    .any(|p| p.id == peer && p.operator && p.instance_id == cfg.instance_id),
+                "local operator required"
+            );
+            let grant: codifix_inbox::InvocationGrant = read(&file)?;
+            ensure!(
+                grant.home_instance_id == cfg.instance_id,
+                "grant home mismatch"
+            );
+            let pool = sqlx::PgPool::connect(&std::env::var(&cfg.database_env)?).await?;
+            let store = codifix_inbox::store::Store {
+                pool,
+                home_instance_id: cfg.instance_id,
+            };
+            store.install_grant(&grant).await?;
+            println!("{}", json!({"enrolled":true,"grant_id":grant.id}));
+        }
+        Command::InboxRevoke { peer, id } => {
+            ensure!(cfg.inbox_enabled, "inbox gateway disabled");
+            ensure!(
+                cfg.peers
+                    .iter()
+                    .any(|p| p.id == peer && p.operator && p.instance_id == cfg.instance_id),
+                "local operator required"
+            );
+            let pool = sqlx::PgPool::connect(&std::env::var(&cfg.database_env)?).await?;
+            let store = codifix_inbox::store::Store {
+                pool,
+                home_instance_id: cfg.instance_id,
+            };
+            store.revoke_grant(id).await?;
+            println!("{}", json!({"revoked":true,"grant_id":id}));
+        }
         Command::Check => println!(
             "{}",
             json!({"valid":true,"instance_id":cfg.instance_id,"specialists":cfg.specialists.len(),"peers":cfg.peers.len()})
@@ -249,6 +298,7 @@ async fn run() -> Result<()> {
                                 &store, &cfg,
                             )
                             .await;
+                            let _ = codifix_agency_runtime::inbox::reconcile(&store, &cfg).await;
                             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
                     });

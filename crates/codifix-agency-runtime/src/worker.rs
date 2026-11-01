@@ -20,6 +20,8 @@ pub fn policy() -> JobPolicy {
     }
 }
 pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
+    crate::inbox::dispatch_once(store, cfg).await?;
+    crate::inbox::reconcile(store, cfg).await?;
     let Some(lease) = jobs::claim_kinds(
         &store.pool,
         policy(),
@@ -65,6 +67,7 @@ pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
     // observation never fabricates a passing quality result; operators may
     // reconcile observations later through the same deduplicated endpoint.
     let _ = crate::learning::observe_task(store, cfg, lease.job.operation_id).await;
+    crate::inbox::reconcile(store, cfg).await?;
     Ok(true)
 }
 async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> {
@@ -97,6 +100,7 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
         "plan_apply" => "linear_readback_verified",
         "plan_inspect" => "linear_state_observed",
         "model_draft" => "model_output_valid_json",
+        "conversation_turn" => codifix_agency::conversation::ACCEPTANCE,
         "openbao_recover" => "openbao_unsealed",
         "delegate" => "delegated_result_reported",
         _ => anyhow::bail!("unsupported specialist operation"),
@@ -126,6 +130,17 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
                 .ok_or_else(|| anyhow::anyhow!("prompt required"))?;
             let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
             crate::model::draft(store, cfg, &task, prompt, &routing).await?
+        }
+        "conversation_turn" => {
+            let turn: codifix_agency::conversation::ConversationTurn =
+                serde_json::from_value(task.request.payload["turn"].clone())?;
+            ensure!(
+                turn.recipient_instance_id == cfg.instance_id
+                    && turn.recipient_specialist_id == task.contract.specialist_id,
+                "conversation target mismatch"
+            );
+            let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
+            crate::model::conversation(store, cfg, &task, &turn, &routing).await?
         }
         "openbao_recover" => crate::openbao::recover(store, cfg, &task).await?,
         "delegate" => match crate::exchange::delegate(store, cfg, &task).await? {
