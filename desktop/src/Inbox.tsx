@@ -11,9 +11,11 @@ import {
 import {
   canContact,
   conversation,
+  conversationHistory,
   conversations,
   inboxPath,
   networkStatus,
+  messageValidation,
   openNetworkLink,
   safePublicLink,
   specialists,
@@ -137,6 +139,12 @@ function InboxContents({
       specialist_id: specialistId || candidates[0]?.id,
     };
     if (!payload.title || !payload.specialist_id) return;
+    if (new TextEncoder().encode(payload.title).byteLength > 200) {
+      setError(
+        "The title is too long. Shorten it before creating the conversation.",
+      );
+      return;
+    }
     setCreateRequest(payload);
     setBusy(true);
     setError("");
@@ -212,6 +220,12 @@ function InboxContents({
                 )}
               </Button>
             ))
+          )}
+          {(list.data?.length ?? 0) >= 200 && (
+            <p role="status" className="caption">
+              Showing the 200 most recently updated conversations. Older
+              conversations are retained by the service.
+            </p>
           )}
         </aside>
         <div className="inbox-detail">
@@ -327,6 +341,10 @@ function ConversationView({
   const [receipt, setReceipt] = useState("");
   const [joining, setJoining] = useState(false);
   const [remove, setRemove] = useState<Member | null>(null);
+  const [timeline, setTimeline] = useState<Message[]>([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyMore, setHistoryMore] = useState(true);
+  const [historyError, setHistoryError] = useState("");
   const readSequence = useRef(0);
   const data = detail.data;
   const active = data?.members.filter((member) => member.active) ?? [];
@@ -345,6 +363,34 @@ function ConversationView({
       canContact(specialist) &&
       !active.some((member) => member.specialist.id === specialist.id),
   );
+  useEffect(() => {
+    if (data) setTimeline((current) => mergeMessages(current, data.messages));
+  }, [data?.messages]);
+  async function loadOlder() {
+    const before = timeline[0]?.sequence;
+    if (!connected || historyBusy || !before || before <= 1) return;
+    setHistoryBusy(true);
+    setHistoryError("");
+    try {
+      const page = await conversationHistory(id, before);
+      if (!mounted.current) return;
+      if (
+        page.messages.some(
+          (message) =>
+            message.conversation_id !== id || message.sequence >= before,
+        )
+      )
+        throw new Error(
+          "The history response did not match this conversation and cursor.",
+        );
+      setTimeline((current) => mergeMessages(current, page.messages));
+      setHistoryMore(page.has_more);
+    } catch (cause) {
+      if (mounted.current) setHistoryError(errorText(cause));
+    } finally {
+      if (mounted.current) setHistoryBusy(false);
+    }
+  }
   useEffect(() => {
     if (
       !data ||
@@ -429,6 +475,11 @@ function ConversationView({
       recipient_member_ids: recipients,
     };
     if (!payload.body) return;
+    const validation = messageValidation(payload.body, payload.artifact);
+    if (validation) {
+      setError(`${validation} Nothing was sent.`);
+      return;
+    }
     setPendingSend(payload);
     if (
       await update(
@@ -559,7 +610,25 @@ function ConversationView({
         aria-label="Conversation messages"
         aria-live="polite"
       >
-        {!data.messages.length && (
+        {historyMore && (timeline[0]?.sequence ?? 0) > 1 && (
+          <div className="row">
+            <p className="caption">Earlier messages are available.</p>
+            <Button
+              disabled={!connected || historyBusy}
+              onClick={() => void loadOlder()}
+            >
+              {historyBusy
+                ? "Loading earlier messages…"
+                : "Load earlier messages"}
+            </Button>
+          </div>
+        )}
+        {historyError && (
+          <p role="alert" className="notice warning">
+            {historyError}
+          </p>
+        )}
+        {!timeline.length && (
           <Empty title="What would you like to work on?">
             <p>
               Ask a question, share a plan or describe an outcome. Specialists
@@ -567,7 +636,7 @@ function ConversationView({
             </p>
           </Empty>
         )}
-        {data.messages.map((message) => (
+        {timeline.map((message) => (
           <MessageView
             key={message.id}
             message={message}
@@ -575,7 +644,7 @@ function ConversationView({
           />
         ))}
         {pendingSend &&
-          !data.messages.some(
+          !timeline.some(
             (message) => message.id === pendingSend.client_message_id,
           ) && (
             <article className="message human pending" role="status">
@@ -692,7 +761,7 @@ function ConversationView({
             Structured plan
             <textarea
               rows={8}
-              maxLength={128000}
+              maxLength={32768}
               value={plan}
               onChange={(event) => setPlan(event.target.value)}
               disabled={locked || !!busy || !!pendingSend}
@@ -714,7 +783,7 @@ function ConversationView({
         open={joining}
         onClose={() => setJoining(false)}
         candidates={candidates}
-        detail={data}
+        detail={{ ...data, messages: timeline }}
         locked={locked || !!busy}
         onUpdate={update}
       />
@@ -744,6 +813,12 @@ function ConversationView({
       </Modal>
     </div>
   );
+}
+
+function mergeMessages(previous: Message[], incoming: Message[]): Message[] {
+  const byId = new Map(previous.map((message) => [message.id, message]));
+  incoming.forEach((message) => byId.set(message.id, message));
+  return Array.from(byId.values()).sort((a, b) => a.sequence - b.sequence);
 }
 
 function MessageView({
@@ -840,6 +915,28 @@ function JoinDialog({
             selected_message_ids: selected,
             confirmed: true as const,
           };
+          const selectedMessages = detail.messages.filter((message) =>
+            payload.selected_message_ids.includes(message.id),
+          );
+          const bytes = (text: string) =>
+            new TextEncoder().encode(text).byteLength;
+          if (
+            bytes(payload.summary) > 16_384 ||
+            selectedMessages.length > 32 ||
+            bytes(
+              JSON.stringify({
+                summary: payload.summary,
+                selected: selectedMessages,
+                watermark: detail.messages.at(-1)?.sequence ?? 0,
+                recipient: payload.specialist_id,
+              }),
+            ) > 64_512
+          ) {
+            setInviteError(
+              "This context is too large. Shorten the summary or select fewer messages before sharing.",
+            );
+            return;
+          }
           setAttempt(payload);
           setInviteError("");
           if (
@@ -905,6 +1002,9 @@ function JoinDialog({
                 <input
                   type="checkbox"
                   checked={selected.includes(message.id)}
+                  disabled={
+                    !selected.includes(message.id) && selected.length >= 32
+                  }
                   onChange={(event) => {
                     setSelected((current) =>
                       event.target.checked
@@ -1000,6 +1100,7 @@ function TaskView({
     answer: string;
   } | null>(null);
   const [linkError, setLinkError] = useState("");
+  const [replyError, setReplyError] = useState("");
   const terminal = [
     "completed",
     "succeeded",
@@ -1043,6 +1144,12 @@ function TaskView({
               client_message_id: crypto.randomUUID(),
               answer: answer.trim(),
             };
+            const validation = messageValidation(payload.answer);
+            if (validation) {
+              setReplyError(validation);
+              return;
+            }
+            setReplyError("");
             setReply(payload);
             if (
               await onUpdate(
@@ -1073,6 +1180,11 @@ function TaskView({
           >
             {reply ? "Retry same clarification" : "Send clarification"}
           </Button>
+          {replyError && (
+            <p role="alert" className="notice warning">
+              {replyError}
+            </p>
+          )}
         </form>
       )}
       {task.result != null && (

@@ -99,8 +99,8 @@ The smoke uses `/usr/bin/google-chrome` by default; override it with
 optionally saves both Network and Inbox screenshots. This is renderer acceptance
 with synthetic service responses, not a live AT login or Linear write.
 
-Network/Inbox validation on 1 November 2026: 32 renderer workflow tests and
-17 native tests passed (two existing host-specific keyring/TLS probes remain
+Network/Inbox validation on 1 November 2026: 39 renderer workflow tests and
+18 native tests passed (two existing host-specific keyring/TLS probes remain
 ignored). Strict native Clippy, formatting, the production frontend and a native
 build with embedded assets passed. The Chromium fixture smoke passed and both
 views were visually inspected. An isolated Xvfb/D-Bus startup with disposable
@@ -110,6 +110,13 @@ mean this establishes startup, not native portal or notification acceptance.
 Native tests run serially to avoid an existing ephemeral-port reuse race in the
 browser cancellation test. No installed application, live identity or production
 grant was changed by these checks.
+
+Older transcript pages load through bounded numeric cursors, and later polling
+preserves already loaded history. The conversation list explicitly reports its
+200-item window. Message and plan drafts are checked against UTF-8 limits before
+saving a retry ID, so oversized drafts stay editable. A pending AT link survives
+navigation in the account/service-scoped query cache; sign-out and service
+switching clear it together with all other private client state.
 
 Source validation for 0.1.4 passes 22 renderer workflows and 15 native tests (two separate keyring/TLS host probes remain ignored in the ordinary test run), plus the production renderer build. It adds native area precedence/config-identity/unavailable-area tests, credential-free health and stale-generation tests, and renderer coverage for cross-area project slugs, folder routing through browser login, cache clearing and late response rejection. Installed browser/OIDC acceptance must still be performed against the packaged build.
 

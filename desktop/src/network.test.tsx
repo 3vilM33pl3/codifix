@@ -161,6 +161,221 @@ beforeEach(() => {
 });
 
 describe("private Network and Inbox", () => {
+  it("matches UTF-8 message and combined artifact limits before a retry ID is fixed", () => {
+    expect(network.messageValidation("é".repeat(20_000))).toMatch(
+      /message exceeds/,
+    );
+    expect(
+      network.messageValidation("plan", { body: "x".repeat(32_768) }),
+    ).toMatch(/structured plan exceeds/);
+    const overhead = new TextEncoder().encode(
+      "\nPlan artifact:\n{}",
+    ).byteLength;
+    expect(
+      network.messageValidation("x".repeat(32_768 - overhead), {}),
+    ).toBeNull();
+    expect(
+      network.messageValidation("x".repeat(32_769 - overhead), {}),
+    ).toMatch(/together exceed/);
+  });
+  it("keeps oversized draft text editable and sends nothing", async () => {
+    mount(<Inbox {...props} onNetwork={vi.fn()} />);
+    const input = await screen.findByRole("textbox", { name: "Message" });
+    fireEvent.change(input, { target: { value: "é".repeat(20_000) } });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Nothing was sent",
+    );
+    expect(input).toBeEnabled();
+    expect(
+      api.mock.calls.filter(([path]) => path.endsWith("/messages")),
+    ).toHaveLength(0);
+    expect(
+      screen.queryByRole("button", { name: "Retry same message" }),
+    ).not.toBeInTheDocument();
+  });
+  it("loads earlier messages and retains them alongside later poll results", async () => {
+    detail.messages = [
+      { ...detail.messages[0], sequence: 101, body: "Recent message" },
+    ];
+    const older = {
+      ...detail.messages[0],
+      id: ids.other,
+      sequence: 1,
+      body: "Earlier planning decision",
+    };
+    api.mockImplementation(async (path) => {
+      if (path.endsWith("/messages?before_sequence=101&limit=100"))
+        return { messages: [older], has_more: false };
+      return defaults(path);
+    });
+    const { client } = mount(<Inbox {...props} onNetwork={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load earlier messages" }),
+    );
+    expect(await screen.findByText("Earlier planning decision")).toBeVisible();
+    expect(screen.getByText("Recent message")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Load earlier messages" }),
+    ).not.toBeInTheDocument();
+    await act(async () =>
+      client.setQueryData(
+        [props.scope, "network", ids.human, "conversation", ids.conversation],
+        {
+          ...detail,
+          messages: [
+            {
+              ...detail.messages[0],
+              id: ids.task,
+              sequence: 102,
+              body: "Latest response",
+            },
+          ],
+        },
+      ),
+    );
+    expect(await screen.findByText("Latest response")).toBeVisible();
+    expect(screen.getByText("Earlier planning decision")).toBeVisible();
+    expect(screen.getByText("Recent message")).toBeVisible();
+  });
+  it("rejects a history page from a different conversation", async () => {
+    detail.messages[0].sequence = 101;
+    api.mockImplementation(async (path) => {
+      if (path.includes("/messages?"))
+        return {
+          messages: [
+            {
+              ...detail.messages[0],
+              id: ids.other,
+              sequence: 1,
+              conversation_id: ids.other,
+              body: "Wrong conversation content",
+            },
+          ],
+          has_more: false,
+        };
+      return defaults(path);
+    });
+    mount(<Inbox {...props} onNetwork={vi.fn()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Load earlier messages" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "history response did not match",
+    );
+    expect(
+      screen.queryByText("Wrong conversation content"),
+    ).not.toBeInTheDocument();
+  });
+  it("resumes a cached pending AT link after navigating away and back", async () => {
+    const pending: IdentityAttempt = {
+      attempt_id: ids.task,
+      status: "pending",
+      authorization_url: "https://pds.example/authorize",
+      expires_at: "2099-01-01T00:00:00Z",
+    };
+    let completed = false;
+    api.mockImplementation(async (path) => {
+      if (path === "/v1/network/status")
+        return {
+          ...status,
+          identity: completed
+            ? {
+                did: "did:plc:verified",
+                handle: "me.example.com",
+                linked_at: timestamp,
+              }
+            : null,
+        };
+      if (path === "/v1/network/identity/link") return pending;
+      if (path === `/v1/network/identity/link/${ids.task}`) {
+        completed = true;
+        return { ...pending, status: "complete", authorization_url: null };
+      }
+      return defaults(path);
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <Network {...props} onInbox={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    fireEvent.change(
+      await screen.findByRole("textbox", { name: "AT handle or DID" }),
+      { target: { value: "me.example.com" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Link AT identity" }));
+    await screen.findByText("Finish linking in your browser");
+    rerender(
+      <QueryClientProvider client={client}>
+        <p>Another page</p>
+      </QueryClientProvider>,
+    );
+    rerender(
+      <QueryClientProvider client={client}>
+        <Network {...props} onInbox={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(
+      await screen.findByText("Finish linking in your browser"),
+    ).toBeVisible();
+    expect(
+      await screen.findByText("me.example.com", {}, { timeout: 3500 }),
+    ).toBeVisible();
+    expect(
+      api.mock.calls.filter(([path]) => path === "/v1/network/identity/link"),
+    ).toHaveLength(1);
+    expect(network.openIdentityAttempt).toHaveBeenCalledTimes(1);
+  });
+  it("shows cancelled identity linking and allows a fresh attempt", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 10_000 } },
+    });
+    client.setQueryData(
+      [props.scope, "network", ids.human, "identity-attempt"],
+      {
+        attempt_id: ids.task,
+        status: "cancelled",
+        authorization_url: null,
+        expires_at: timestamp,
+      },
+    );
+    render(
+      <QueryClientProvider client={client}>
+        <Network {...props} onInbox={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/Account linking cancelled/)).toBeVisible();
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "AT handle or DID" }),
+      { target: { value: "me.example.com" } },
+    );
+    expect(
+      screen.getByRole("button", { name: "Link AT identity" }),
+    ).toBeEnabled();
+  });
+  it("makes the conversation-list limit visible", async () => {
+    api.mockImplementation(async (path) => {
+      if (path === "/v1/inbox/conversations")
+        return Array.from({ length: 200 }, (_, index) => ({
+          ...detail.conversation,
+          id:
+            index === 0
+              ? ids.conversation
+              : `00000000-0000-4000-8000-${String(index + 500).padStart(12, "0")}`,
+          title: `Conversation ${index}`,
+        }));
+      return defaults(path);
+    });
+    mount(<Inbox {...props} onNetwork={vi.fn()} />);
+    expect(
+      await screen.findByText(
+        /Showing the 200 most recently updated conversations/,
+      ),
+    ).toBeVisible();
+  });
   it("opens Inbox and Network without selecting a project", async () => {
     mount(<App />);
     await screen.findByRole("button", { name: "Connected" });

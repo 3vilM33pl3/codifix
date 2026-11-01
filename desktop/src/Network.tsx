@@ -179,7 +179,17 @@ function NetworkContents({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
-  const [attempt, setAttempt] = useState<IdentityAttempt | null>(null);
+  const attemptKey = [...key, "identity-attempt"];
+  const attemptState = useQuery<IdentityAttempt | null>({
+    queryKey: attemptKey,
+    queryFn: async () => null,
+    initialData: null,
+    enabled: false,
+    gcTime: 10 * 60_000,
+  });
+  const attempt = attemptState.data ?? null;
+  const setAttempt = (value: IdentityAttempt | null) =>
+    client.setQueryData(attemptKey, value);
   const [unlinkReview, setUnlinkReview] = useState(false);
   const roster = useQuery({
     queryKey: [...key, "specialists"],
@@ -214,6 +224,7 @@ function NetworkContents({
           );
         setAttempt(next);
         if (next.status === "complete") {
+          setError("");
           setReceipt(
             "AT identity linked. Your existing permissions are unchanged.",
           );
@@ -285,6 +296,7 @@ function NetworkContents({
                         await request("/v1/network/identity/unlink", {});
                         if (!mounted.current) return;
                         setUnlinkReview(false);
+                        setAttempt(null);
                         setReceipt(
                           "AT identity unlinked. Conversation history is preserved.",
                         );
@@ -373,12 +385,13 @@ function NetworkContents({
             </Button>
           </div>
         )}
-        {attempt && ["expired", "failed"].includes(attempt.status) && (
-          <p className="notice warning" role="status">
-            Account linking {attempt.status}.{" "}
-            {attempt.error || "Start a new attempt when ready."}
-          </p>
-        )}
+        {attempt &&
+          ["expired", "failed", "cancelled"].includes(attempt.status) && (
+            <p className="notice warning" role="status">
+              Account linking {attempt.status}.{" "}
+              {attempt.error || "Start a new attempt when ready."}
+            </p>
+          )}
       </section>
       {error && (
         <div className="notice danger" role="alert">
