@@ -2,6 +2,7 @@
 mod area_routing;
 mod browser_auth;
 mod legacy_browser_auth;
+mod network;
 use reqwest::{
     cookie::{CookieStore, Jar},
     Client, Method,
@@ -74,6 +75,9 @@ fn allowed(path: &str, method: &str) -> bool {
     }
     let raw = path.split('?').next().unwrap_or("");
     let p: Vec<_> = raw.split('/').collect();
+    if network::allowed(raw, method) {
+        return !path.contains('?');
+    }
     if method == "GET" && matches!(raw, "/v1/auth/me" | "/v1/agents") {
         return true;
     }
@@ -437,6 +441,8 @@ fn main() {
             api_request,
             choose_project,
             open_service,
+            network::open_network_identity,
+            network::open_network_link,
             browser_auth::start_browser_login,
             browser_auth::poll_browser_login,
             browser_auth::cancel_browser_login,
