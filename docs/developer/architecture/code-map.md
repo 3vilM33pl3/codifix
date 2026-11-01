@@ -4,6 +4,9 @@ Use this map to find the right PR boundary before opening the large files.
 
 ## Crates
 
+- `crates/codifix-inbox`: human-owned conversation persistence, reviewed disclosure, invocation grants and same-database agency tickets.
+- `crates/codifix-identity` and `identity-broker/`: protected Rust client and isolated official-SDK AT identity/discovery sidecar. See [Network and Inbox](../../user/network-inbox.md).
+
 - `crates/codifix-platform-files`: narrow protected filesystem primitives shared by
   platform journals and offline/federation operators. Native Windows ACL,
   handle/identity and atomic-replacement checks; no configuration, SQL, network,
