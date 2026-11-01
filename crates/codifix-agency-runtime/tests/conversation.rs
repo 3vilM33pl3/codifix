@@ -662,18 +662,51 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
         worker::run_once(&f.store, &f.cfg).await.unwrap(),
         "granted action runs without another human approval"
     );
+    let action_done = inbox.detail(human, chat.conversation.id).await.unwrap();
+    assert_eq!(action_done.messages.len(), 3);
+    assert!(action_done.messages.iter().any(|m| {
+        serde_json::from_str::<Value>(&m.body)
+            .ok()
+            .is_some_and(|v| v["type"] == "codifix.action_result.v1")
+    }));
+    f.provider.lock().unwrap().reply = Some(
+        json!({"version":1,"reply":"The authorized inspection completed successfully.","question":null,"actions":[],"peer_requests":[]}),
+    );
+    assert!(
+        worker::run_once(&f.store, &f.cfg).await.unwrap(),
+        "action result continues the same response under its remaining budget"
+    );
     let detail = inbox.detail(human, chat.conversation.id).await.unwrap();
-    assert_eq!(detail.messages.len(), 2);
+    assert_eq!(detail.messages.len(), 4);
     assert_eq!(detail.messages[0].delivery, "confirmed");
-    assert_eq!(detail.tasks.len(), 2);
+    assert_eq!(detail.tasks.len(), 3);
+    assert!(
+        detail
+            .tasks
+            .iter()
+            .all(|t| t.root_id == message.client_message_id)
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i32>("SELECT turns FROM inbox_roots WHERE id=$1")
+            .bind(message.client_message_id)
+            .fetch_one(&f.db.pool)
+            .await
+            .unwrap(),
+        2
+    );
+    let second_prompt = f.provider.lock().unwrap().calls[1]["messages"][1]["content"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(second_prompt.contains("codifix.action_result.v1"));
     assert!(detail.tasks.iter().all(|t| t.status == "completed"));
-    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 2);
     inbox
         .send(human, chat.conversation.id, &message)
         .await
         .unwrap();
     assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
-    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 2);
     inbox
         .send(
             human,
@@ -688,7 +721,7 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
         .unwrap();
     inbox.revoke_grant(grant.id).await.unwrap();
     assert!(!worker::run_once(&f.store, &f.cfg).await.unwrap());
-    assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
+    assert_eq!(f.provider.lock().unwrap().calls.len(), 2);
     f.cleanup().await;
 }
 
