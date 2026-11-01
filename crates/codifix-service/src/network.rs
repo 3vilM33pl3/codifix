@@ -77,6 +77,20 @@ fn binding(
         session_binding: digest(&(home, p.id, session)).map_err(error)?,
     })
 }
+async fn current_session(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    p: &AuthenticatedPrincipal,
+) -> Result<(), ApiError> {
+    human(tx, p.id).await.map_err(error)?;
+    let id = p
+        .session_id
+        .ok_or_else(|| ApiError::forbidden("current human session required"))?;
+    let session = sqlx::query("SELECT id FROM auth_web_sessions WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE").bind(id).bind(p.id).fetch_optional(&mut **tx).await.map_err(error)?;
+    if session.is_none() {
+        return Err(ApiError::forbidden("human session revoked or expired"));
+    }
+    Ok(())
+}
 pub(crate) async fn status(
     State(s): State<AppState>,
     Extension(p): Extension<AuthenticatedPrincipal>,
@@ -139,7 +153,8 @@ pub(crate) async fn link(
     let b = binding(&s, &p, Uuid::new_v4())?;
     let db = store(&s)?;
     let mut tx = db.pool.begin().await.map_err(error)?;
-    human(&mut tx, p.id).await.map_err(error)?;
+    admission(&mut tx).await.map_err(error)?;
+    current_session(&mut tx, &p).await?;
     let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM inbox_identity_attempts WHERE home_instance_id=$1 AND principal_id=$2 AND status='pending' AND expires_at>clock_timestamp()").bind(b.home_instance_id).bind(p.id).fetch_one(&mut *tx).await.map_err(error)?;
     if count >= 4 {
         return Err(error("too many pending attempts"));
@@ -195,7 +210,7 @@ pub(crate) async fn link_poll(
                 };
                 let mut tx = db.pool.begin().await.map_err(error)?;
                 admission(&mut tx).await.map_err(error)?;
-                human(&mut tx, p.id).await.map_err(error)?;
+                current_session(&mut tx, &p).await?;
                 let still_pending:bool=sqlx::query_scalar("SELECT status='pending' AND expires_at>clock_timestamp() FROM inbox_identity_attempts WHERE id=$1 AND session_binding=$2 FOR UPDATE").bind(id).bind(&b.session_binding).fetch_one(&mut *tx).await.map_err(error)?;
                 if still_pending {
                     sqlx::query("INSERT INTO inbox_identity_links(home_instance_id,principal_id,did,handle,pds) VALUES($1,$2,$3,$4,$5) ON CONFLICT(home_instance_id,principal_id) DO UPDATE SET did=excluded.did,handle=excluded.handle,pds=excluded.pds,linked_at=clock_timestamp()").bind(b.home_instance_id).bind(p.id).bind(did).bind(handle).bind(pds).execute(&mut *tx).await.map_err(error)?;
@@ -226,7 +241,7 @@ pub(crate) async fn unlink(
     let db = store(&s)?;
     let mut tx = db.pool.begin().await.map_err(error)?;
     admission(&mut tx).await.map_err(error)?;
-    human(&mut tx, p.id).await.map_err(error)?;
+    current_session(&mut tx, &p).await?;
     sqlx::query("DELETE FROM inbox_identity_links WHERE home_instance_id=$1 AND principal_id=$2")
         .bind(db.home_instance_id)
         .bind(p.id)
@@ -363,3 +378,6 @@ pub(crate) async fn respond(
             .map_err(error)?,
     ))
 }
+
+#[cfg(test)]
+mod tests;
