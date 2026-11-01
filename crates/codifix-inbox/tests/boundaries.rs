@@ -676,3 +676,214 @@ async fn revoking_action_project_blocks_effect_while_chat_project_remains_access
         .unwrap();
     f.db.cleanup().await.unwrap();
 }
+
+#[tokio::test]
+async fn completed_action_returns_bounded_context_and_one_same_root_followup() {
+    let Some(f) = Fixture::new(true).await else {
+        return;
+    };
+    let c = f.create().await;
+    let root = f.msg("Prepare roadmap", vec![]);
+    f.store
+        .send(f.human, c.conversation.id, &root)
+        .await
+        .unwrap();
+    let conversation_task = f.redeem(&f.tickets().await.remove(0)).await;
+    record_task_result(&f.db.pool,conversation_task,"completed",None,Some(&json!({"conversation_reply":{"version":1,"reply":"Preparing","actions":[{"key":"inspect","payload":{"kind":"inspect"}}]}}))).await.unwrap();
+    let action_task = f.redeem(&f.tickets().await.remove(0)).await;
+    let prepared = Uuid::new_v4();
+    let evidence = json!({"prepared_id":prepared,"plan_digest":"a".repeat(64),"changes":{"large":"x".repeat(60000)}});
+    record_task_result(&f.db.pool, action_task, "completed", None, Some(&evidence))
+        .await
+        .unwrap();
+    record_task_result(&f.db.pool, action_task, "completed", None, Some(&evidence))
+        .await
+        .unwrap();
+    let tickets = f.tickets().await;
+    assert_eq!(tickets.len(), 1);
+    let turn = &tickets[0].request["payload"]["turn"];
+    assert_eq!(turn["root_message_id"], root.client_message_id.to_string());
+    let context = turn["context"].to_string();
+    assert!(context.contains(&prepared.to_string()));
+    assert!(context.contains("codifix.action_result.v1"));
+    assert!(context.contains("full_result_in_task_card"));
+    assert!(!context.contains(&"x".repeat(1000)));
+    let messages = f
+        .store
+        .detail(f.human, c.conversation.id)
+        .await
+        .unwrap()
+        .messages;
+    assert_eq!(
+        messages
+            .iter()
+            .filter(|m| m.body.contains("codifix.action_result.v1"))
+            .count(),
+        1
+    );
+    assert!(messages.iter().all(|m| m.body.len() <= 32768));
+    let turns: i32 = sqlx::query_scalar("SELECT turns FROM inbox_roots")
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(turns, 2);
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn action_question_waits_for_human_and_failed_action_does_not_retry() {
+    let Some(f) = Fixture::new(true).await else {
+        return;
+    };
+    let c = f.create().await;
+    let root = f.msg("Inspect roadmap", vec![]);
+    f.store
+        .send(f.human, c.conversation.id, &root)
+        .await
+        .unwrap();
+    let task = f.redeem(&f.tickets().await.remove(0)).await;
+    record_task_result(&f.db.pool,task,"completed",None,Some(&json!({"conversation_reply":{"version":1,"reply":"Inspecting","actions":[{"key":"inspect","payload":{"kind":"inspect"}}]}}))).await.unwrap();
+    let action = f.redeem(&f.tickets().await.remove(0)).await;
+    record_task_result(
+        &f.db.pool,
+        action,
+        "input_required",
+        Some("Which milestone owns this dependency?"),
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(f.tickets().await.is_empty());
+    f.store
+        .respond(
+            f.human,
+            c.conversation.id,
+            action,
+            Uuid::new_v4(),
+            "The release milestone".into(),
+        )
+        .await
+        .unwrap();
+    let resumed = f.tickets().await.remove(0);
+    assert!(
+        resumed.request["payload"]["turn"]["context"]
+            .to_string()
+            .contains("Which milestone owns this dependency?")
+    );
+    let resumed_task = f.redeem(&resumed).await;
+    f.reply(resumed_task, "Clarification recorded", None).await;
+    record_task_result(
+        &f.db.pool,
+        action,
+        "failed",
+        None,
+        Some(&json!({"error":"synthetic failure"})),
+    )
+    .await
+    .unwrap();
+    assert!(f.tickets().await.is_empty());
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn new_external_action_data_stays_with_source_member_until_reviewed_disclosure() {
+    let Some(f) = Fixture::new(true).await else {
+        return;
+    };
+    let c = f.create().await;
+    let other = f.invite(c.conversation.id, "", vec![]).await;
+    f.store
+        .send(
+            f.human,
+            c.conversation.id,
+            &f.msg("Inspect roadmap", vec![]),
+        )
+        .await
+        .unwrap();
+    let task = f.redeem(&f.tickets().await.remove(0)).await;
+    record_task_result(&f.db.pool,task,"completed",None,Some(&json!({"conversation_reply":{"version":1,"reply":"Inspecting","actions":[{"key":"inspect","payload":{"kind":"inspect"}}]}}))).await.unwrap();
+    let action = f.redeem(&f.tickets().await.remove(0)).await;
+    record_task_result(
+        &f.db.pool,
+        action,
+        "completed",
+        None,
+        Some(&json!({"inspection":"EFFECT RESULT PRIVATE"})),
+    )
+    .await
+    .unwrap();
+    let followup = f.tickets().await.remove(0);
+    assert!(
+        followup
+            .request
+            .to_string()
+            .contains("EFFECT RESULT PRIVATE")
+    );
+    let followup_task = f.redeem(&followup).await;
+    f.reply(followup_task, "EFFECT RESULT PRIVATE paraphrase", None)
+        .await;
+    f.store
+        .send(
+            f.human,
+            c.conversation.id,
+            &f.msg("Discuss only shared context", vec![other]),
+        )
+        .await
+        .unwrap();
+    assert!(
+        !f.tickets()
+            .await
+            .remove(0)
+            .request
+            .to_string()
+            .contains("EFFECT RESULT PRIVATE")
+    );
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn paused_dispatch_backlog_does_not_starve_active_conversations() {
+    let Some(f) = Fixture::new(true).await else {
+        return;
+    };
+    let paused = f.create().await;
+    for i in 0..33 {
+        f.store
+            .send(
+                f.human,
+                paused.conversation.id,
+                &f.msg(&format!("Queued {i}"), vec![]),
+            )
+            .await
+            .unwrap();
+    }
+    f.store
+        .pause(f.human, paused.conversation.id, true)
+        .await
+        .unwrap();
+    let active = f
+        .store
+        .create(
+            f.human,
+            &CreateConversation {
+                client_request_id: Uuid::new_v4(),
+                title: "Active".into(),
+                specialist_id: f.grant.contact.id,
+            },
+        )
+        .await
+        .unwrap();
+    f.store
+        .send(
+            f.human,
+            active.conversation.id,
+            &f.msg("Deliver active request", vec![]),
+        )
+        .await
+        .unwrap();
+    let tickets = f.tickets().await;
+    assert_eq!(tickets.len(), 1);
+    assert_eq!(
+        tickets[0].request["payload"]["turn"]["conversation_id"],
+        active.conversation.id.to_string()
+    );
+    f.db.cleanup().await.unwrap();
+}

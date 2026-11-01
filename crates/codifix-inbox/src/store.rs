@@ -767,11 +767,20 @@ impl DisclosureFilter {
                 return Ok(false);
             }
             let allowed = match row.try_get::<String, _>("role")?.as_str() {
-                "human" | "system" => true,
-                "specialist" => match row.try_get::<Option<Uuid>, _>("source_ticket_id")? {
-                    Some(ticket) => self.ticket_allowed(tx, ticket, depth + 1).await?,
-                    None => false,
-                },
+                "human" => true,
+                "system"
+                    if row
+                        .try_get::<Option<Uuid>, _>("source_ticket_id")?
+                        .is_none() =>
+                {
+                    true
+                }
+                "specialist" | "system" => {
+                    match row.try_get::<Option<Uuid>, _>("source_ticket_id")? {
+                        Some(ticket) => self.ticket_allowed(tx, ticket, depth + 1).await?,
+                        None => false,
+                    }
+                }
                 _ => false,
             };
             self.messages.insert(id, allowed);
@@ -793,9 +802,31 @@ impl DisclosureFilter {
             if depth > 64 || self.visited > 4096 {
                 return Ok(false);
             }
-            let Some(row) = sqlx::query("SELECT request,source_ticket_id FROM inbox_dispatches WHERE id=$1 AND conversation_id=$2")
+            let Some(row) = sqlx::query("SELECT request,source_ticket_id,member_id,principal_id FROM inbox_dispatches WHERE id=$1 AND conversation_id=$2")
                 .bind(id).bind(self.conversation).fetch_optional(&mut **tx).await? else { return Ok(false); };
             let request: Value = row.try_get("request")?;
+            if !turn_payload(&request).is_object() {
+                // External action results are new scoped data. They can return to
+                // their original participant; other members need an explicit
+                // human-selected disclosure, not merely compatible old inputs.
+                if row.try_get::<Uuid, _>("member_id")? != self.member {
+                    return Ok(false);
+                }
+                let (mandate, _, _, _) = template(&request)?;
+                if let Err(error) = project_access(tx, row.try_get("principal_id")?, mandate).await
+                {
+                    if error.downcast_ref::<sqlx::Error>().is_some() {
+                        return Err(error);
+                    }
+                    return Ok(false);
+                }
+                let allowed = match row.try_get::<Option<Uuid>, _>("source_ticket_id")? {
+                    Some(source) => self.ticket_allowed(tx, source, depth + 1).await?,
+                    None => false,
+                };
+                self.tickets.insert(id, allowed);
+                return Ok(allowed);
+            }
             let turn: codifix_agency::conversation::ConversationTurn =
                 match serde_json::from_value(turn_payload(&request).clone()) {
                     Ok(turn) => turn,
@@ -992,7 +1023,7 @@ async fn invalidate(
 }
 
 pub async fn pending_dispatches(pool: &PgPool, home: Uuid) -> Result<Vec<DispatchTicket>> {
-    let rows=sqlx::query("SELECT id,request FROM inbox_dispatches WHERE home_instance_id=$1 AND status='queued' ORDER BY created_at,id LIMIT 32").bind(home).fetch_all(pool).await?;
+    let rows=sqlx::query("SELECT d.id,d.request FROM inbox_dispatches d JOIN inbox_conversations c ON c.id=d.conversation_id WHERE d.home_instance_id=$1 AND d.status='queued' AND NOT c.paused ORDER BY d.created_at,d.id LIMIT 32").bind(home).fetch_all(pool).await?;
     rows.into_iter()
         .map(|r| {
             let request: Value = r.try_get("request")?;
@@ -1219,6 +1250,75 @@ pub async fn record_task_result(
         root_id: root,
     };
     sqlx::query("INSERT INTO inbox_task_cards(task_id,conversation_id,document,result_digest) VALUES($1,$2,$3,$4) ON CONFLICT(task_id) DO UPDATE SET document=excluded.document,result_digest=excluded.result_digest").bind(task).bind(conversation).bind(serde_json::to_value(card)?).bind(hash).execute(&mut *tx).await?;
+    if response.is_none()
+        && matches!(
+            payload["payload"]["kind"].as_str(),
+            Some("inspect" | "plan_prepare" | "plan_apply" | "plan_inspect" | "openbao_recover")
+        )
+        && (question.is_some()
+            || matches!(status, "completed" | "failed" | "cancelled" | "rejected"))
+    {
+        let body = action_result_body(task, status, question, evidence)?;
+        let event = Uuid::new_v5(
+            &task,
+            format!("action-result:{}", digest(&body)?).as_bytes(),
+        );
+        if !sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM inbox_messages WHERE id=$1)")
+            .bind(event)
+            .fetch_one(&mut *tx)
+            .await?
+        {
+            append(
+                &mut tx,
+                conversation,
+                event,
+                "system",
+                Some(member),
+                root,
+                &body,
+                "text",
+                None,
+                &[],
+                &digest(&body)?,
+                "confirmed",
+            )
+            .await?;
+            sqlx::query("UPDATE inbox_messages SET source_ticket_id=$2 WHERE id=$1")
+                .bind(event)
+                .bind(o.try_get::<Uuid, _>("ticket_id")?)
+                .execute(&mut *tx)
+                .await?;
+            if status == "completed" && question.is_none() {
+                sqlx::query("SAVEPOINT inbox_action_followup")
+                    .execute(&mut *tx)
+                    .await?;
+                let resumed = async {
+                    ticket_live(&mut tx, o.try_get("ticket_id")?).await?;
+                    enqueue_turn(
+                        &mut tx,
+                        o.try_get("home_instance_id")?,
+                        o.try_get("principal_id")?,
+                        conversation,
+                        member,
+                        root,
+                        Uuid::new_v5(&task, b"action-followup"),
+                        None,
+                    )
+                    .await
+                }
+                .await;
+                if resumed.is_err() {
+                    sqlx::query("ROLLBACK TO SAVEPOINT inbox_action_followup")
+                        .execute(&mut *tx)
+                        .await?;
+                    append_denial(&mut tx, conversation, event, root, "action-followup").await?;
+                }
+                sqlx::query("RELEASE SAVEPOINT inbox_action_followup")
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
+    }
     if let Some(response) = response {
         let event = Uuid::new_v5(&task, b"conversation-reply");
         if !sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM inbox_messages WHERE id=$1)")
@@ -1281,6 +1381,7 @@ pub async fn record_task_result(
                         root,
                         Uuid::new_v5(&event, format!("action:{index}").as_bytes()),
                         action,
+                        o.try_get("ticket_id")?,
                     )
                     .await;
                     if result.is_err() {
@@ -1337,6 +1438,51 @@ pub async fn record_task_result(
     tx.commit().await?;
     Ok(())
 }
+fn action_result_body(
+    task: Uuid,
+    status: &str,
+    question: Option<&str>,
+    evidence: Option<&Value>,
+) -> Result<String> {
+    let question = question.map(|text| bounded_text(text, 8192));
+    let full = json!({"type":"codifix.action_result.v1","task_id":task,"status":status,"question":question,"evidence":evidence});
+    let body = serde_json::to_string(&full)?;
+    if body.len() <= 32768 {
+        return Ok(body);
+    }
+    let question = question.map(|mut text| {
+        while serde_json::to_vec(&text).map_or(usize::MAX, |v| v.len()) > 8192 {
+            text = bounded_text(&text, text.len() / 2);
+        }
+        text
+    });
+    let mut references = serde_json::Map::new();
+    if let Some(evidence) = evidence {
+        for key in ["prepared_id", "plan_digest", "links", "source", "objects"] {
+            if let Some(value) = evidence.get(key)
+                && serde_json::to_vec(value)?.len() <= 4096
+            {
+                references.insert(key.into(), value.clone());
+            }
+        }
+    }
+    let compact = json!({"type":"codifix.action_result.v1","task_id":task,"status":status,"question":question,"evidence_refs":references,"evidence_digest":digest(&evidence)?,"full_result_in_task_card":task});
+    let body = serde_json::to_string(&compact)?;
+    ensure!(body.len() <= 32768, "action result summary exceeds limit");
+    Ok(body)
+}
+fn bounded_text(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_owned();
+    }
+    let end = text
+        .char_indices()
+        .map(|(index, _)| index)
+        .take_while(|index| *index <= max - 24)
+        .last()
+        .unwrap_or(0);
+    format!("{}\n[context truncated]", &text[..end])
+}
 async fn append_denial(
     tx: &mut Transaction<'_, Postgres>,
     conversation: Uuid,
@@ -1357,6 +1503,7 @@ async fn enqueue_action(
     root: Uuid,
     id: Uuid,
     action: &codifix_agency::conversation::ActionProposal,
+    source_ticket: Uuid,
 ) -> Result<()> {
     let (g, gr, mr) = member_live(tx, home, principal, conversation, member).await?;
     let a = g
@@ -1421,7 +1568,13 @@ async fn enqueue_action(
         &request,
         deadline,
     )
-    .await
+    .await?;
+    sqlx::query("UPDATE inbox_dispatches SET source_ticket_id=$2 WHERE id=$1")
+        .bind(id)
+        .bind(source_ticket)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
 }
 impl Store {
     pub async fn cancel(&self, principal: Uuid, conversation: Uuid, task: Uuid) -> Result<Detail> {
