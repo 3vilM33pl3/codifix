@@ -691,3 +691,263 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
     assert_eq!(f.provider.lock().unwrap().calls.len(), 1);
     f.cleanup().await;
 }
+
+#[tokio::test]
+async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget() {
+    const CHILD: &str = "CODIFIX_HUMAN_REMOTE_INBOX_CHILD";
+    const TOKEN: &str = "synthetic-human-remote-inbox-peer-only-token";
+    if std::env::var_os(CHILD).is_none() {
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget",
+                "--nocapture",
+            ])
+            .env(CHILD, "yes")
+            .env("CODIFIX_INBOX_TEST_PEER_TOKEN", TOKEN)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        return;
+    }
+    let Some(mut home) = Fixture::new().await else {
+        return;
+    };
+    let Some(mut remote) = Fixture::new().await else {
+        return;
+    };
+    home.cfg.inbox_enabled = true;
+    let source = Peer {
+        id: "human-home".into(),
+        instance_id: home.cfg.instance_id,
+        token_env: "UNUSED_REMOTE_INBOUND".into(),
+        operator: false,
+        mandates: BTreeSet::from([remote.mandate.id]),
+        endpoint: None,
+        outbound_token_env: None,
+    };
+    remote.cfg.peers.push(source.clone());
+    let app = codifix_agency_runtime::server::App {
+        store: remote.store.clone(),
+        config: Arc::new(remote.cfg.clone()),
+        auth: Auth::from_credentials(vec![(source, TOKEN.into())]).unwrap(),
+    };
+    let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", tcp.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(tcp, codifix_agency_runtime::server::router(app))
+            .await
+            .unwrap();
+    });
+    home.cfg.peers.push(Peer {
+        id: "remote".into(),
+        instance_id: remote.cfg.instance_id,
+        token_env: "UNUSED_HOME_INBOUND".into(),
+        operator: false,
+        mandates: BTreeSet::new(),
+        endpoint: Some(endpoint),
+        outbound_token_env: Some("CODIFIX_INBOX_TEST_PEER_TOKEN".into()),
+    });
+    let human = Uuid::new_v4();
+    let other = Uuid::new_v4();
+    for principal in [human, other] {
+        sqlx::query("INSERT INTO auth_principals(id,kind,display_name,global_role) VALUES($1,'human_oidc','Synthetic human','admin')").bind(principal).execute(&home.db.pool).await.unwrap();
+        sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role,source) SELECT $1,$2,project_id,'reader','direct' FROM agency_mandates WHERE id=$3")
+            .bind(Uuid::new_v4()).bind(principal).bind(home.mandate.id).execute(&home.db.pool).await.unwrap();
+    }
+    let inbox = codifix_inbox::store::Store {
+        pool: home.db.pool.clone(),
+        home_instance_id: home.cfg.instance_id,
+    };
+    let nested = remote.request(home.cfg.instance_id);
+    let routing = nested.payload["routing"].clone();
+    let mut request = home.request(home.cfg.instance_id);
+    request.capability = "delegate".into();
+    request.resource = ResourceScope {
+        kind: "peer".into(),
+        id: "remote".into(),
+    };
+    request.acceptance_criteria = vec!["delegated_result_reported".into()];
+    request.budget = Budget {
+        micro_usd: 200,
+        calls: 8,
+        turns: 8,
+        delegation_depth: 2,
+    };
+    request.payload = json!({"kind":"delegate","peer":"remote","request":nested});
+    let contact = Uuid::new_v4();
+    let grant = codifix_inbox::InvocationGrant {
+        id: Uuid::new_v4(),
+        home_instance_id: home.cfg.instance_id,
+        principal_id: human,
+        contact: codifix_inbox::Specialist {
+            id: contact,
+            instance_id: remote.cfg.instance_id,
+            specialist_id: "planner".into(),
+            display_name: "Remote planner".into(),
+            summary: "Synthetic remote".into(),
+            capabilities: vec!["conversation_turn".into()],
+            enrolled: true,
+            available: true,
+            grant_id: None,
+            mandate_id: Some(remote.mandate.id),
+            remote: true,
+        },
+        request: serde_json::to_value(request).unwrap(),
+        routing,
+        actions: vec![],
+        expires_at: Utc::now() + Duration::minutes(30),
+    };
+    inbox.install_grant(&grant).await.unwrap();
+    let chat = inbox
+        .create(
+            human,
+            &codifix_inbox::CreateConversation {
+                client_request_id: Uuid::new_v4(),
+                title: "Human and remote planner".into(),
+                specialist_id: contact,
+            },
+        )
+        .await
+        .unwrap();
+    let message = codifix_inbox::SendMessage {
+        client_message_id: Uuid::new_v4(),
+        body: "Please discuss the private roadmap".into(),
+        format: "markdown".into(),
+        artifact: None,
+        recipient_member_ids: vec![],
+    };
+    inbox
+        .send(human, chat.conversation.id, &message)
+        .await
+        .unwrap();
+    let store = remote.store.clone();
+    let cfg = remote.cfg.clone();
+    let runner = tokio::spawn(async move {
+        loop {
+            worker::run_once(&store, &cfg).await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    });
+    assert!(
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            worker::run_once(&home.store, &home.cfg)
+        )
+        .await
+        .unwrap()
+        .unwrap()
+    );
+    let first = inbox.detail(human, chat.conversation.id).await.unwrap();
+    assert_eq!(first.messages.len(), 2);
+    assert_eq!(first.messages[0].delivery, "confirmed");
+    assert!(
+        first.messages[1]
+            .body
+            .contains("Which milestone comes first?")
+    );
+    assert_eq!(first.tasks.len(), 1);
+    assert_eq!(first.tasks[0].status, "input_required");
+    assert_eq!(first.tasks[0].root_id, message.client_message_id);
+    assert_eq!(
+        first.tasks[0].result.as_ref().unwrap()["independent_verification"],
+        false
+    );
+    assert!(inbox.detail(other, chat.conversation.id).await.is_err());
+    assert!(
+        inbox
+            .respond(
+                other,
+                chat.conversation.id,
+                first.tasks[0].id,
+                Uuid::new_v4(),
+                "Forged answer".into()
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        inbox
+            .cancel(other, chat.conversation.id, first.tasks[0].id)
+            .await
+            .is_err()
+    );
+    let linked: (Uuid, Uuid, Uuid) = sqlx::query_as(
+        "SELECT principal_id,conversation_id,member_id FROM inbox_task_origins WHERE task_id=$1",
+    )
+    .bind(first.tasks[0].id)
+    .fetch_one(&home.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(linked, (human, chat.conversation.id, chat.members[0].id));
+    remote.provider.lock().unwrap().reply = Some(
+        json!({"version":1,"reply":"Milestone one is the agreed first step.","question":null,"actions":[],"peer_requests":[]}),
+    );
+    inbox
+        .respond(
+            human,
+            chat.conversation.id,
+            first.tasks[0].id,
+            Uuid::new_v4(),
+            "Milestone one comes first".into(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            worker::run_once(&home.store, &home.cfg)
+        )
+        .await
+        .unwrap()
+        .unwrap()
+    );
+    let final_chat = inbox.detail(human, chat.conversation.id).await.unwrap();
+    assert_eq!(final_chat.messages.len(), 4);
+    assert_eq!(final_chat.tasks.len(), 2);
+    assert!(
+        final_chat
+            .tasks
+            .iter()
+            .all(|t| t.root_id == message.client_message_id)
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i32>("SELECT turns FROM inbox_roots WHERE id=$1")
+            .bind(message.client_message_id)
+            .fetch_one(&home.db.pool)
+            .await
+            .unwrap(),
+        2
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM inbox_roots WHERE conversation_id=$1")
+            .bind(chat.conversation.id)
+            .fetch_one(&home.db.pool)
+            .await
+            .unwrap(),
+        1
+    );
+    let calls = remote.provider.lock().unwrap().calls.clone();
+    assert_eq!(calls.len(), 2);
+    assert!(home.provider.lock().unwrap().calls.is_empty());
+    let turn: ConversationTurn =
+        serde_json::from_str(calls[1]["messages"][1]["content"].as_str().unwrap()).unwrap();
+    assert_eq!(turn.home_instance_id, home.cfg.instance_id);
+    assert_eq!(turn.recipient_instance_id, remote.cfg.instance_id);
+    assert_eq!(turn.root_message_id, message.client_message_id);
+    assert!(
+        turn.context
+            .iter()
+            .any(|m| m.body == "Milestone one comes first")
+    );
+    assert!(!serde_json::to_string(&turn).unwrap().contains(TOKEN));
+    runner.abort();
+    server.abort();
+    home.cleanup().await;
+    remote.cleanup().await;
+}
