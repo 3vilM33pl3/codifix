@@ -64,7 +64,7 @@ pub(super) async fn start_oidc_login(
     desktop: Option<DesktopContext>,
 ) -> Result<Response, ApiError> {
     require_multiuser_oidc(state)?;
-    let client = discover_client(&state).await?;
+    let client = discover_client(state).await?;
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let mut authorization = client
         .authorize_url(
