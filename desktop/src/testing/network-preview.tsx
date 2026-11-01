@@ -111,9 +111,10 @@ mockIPC((command, raw) => {
       identity_linking_available: false,
     };
   if (path === "/v1/network/specialists") return [lead, other];
-  if (path === "/v1/inbox/conversations") return [detail.conversation];
+  if (path === "/v1/inbox/conversations")
+    return structuredClone([detail.conversation]);
   if (path === `/v1/inbox/conversations/${id(6)}` || path.endsWith("/read"))
-    return detail;
+    return structuredClone(detail);
   if (path.endsWith("/messages") && body) {
     if (
       !detail.messages.some((message) => message.id === body.client_message_id)
