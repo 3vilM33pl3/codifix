@@ -8,7 +8,18 @@ use url::Url;
 // Keep this finite: neither arbitrary private routes nor operator controls are
 // reachable from the renderer. The service remains the authorization boundary.
 pub(crate) fn allowed(path: &str, method: &str) -> bool {
-    let parts: Vec<_> = path.split('/').collect();
+    let (raw, query) = path
+        .split_once('?')
+        .map_or((path, None), |(p, q)| (p, Some(q)));
+    let parts: Vec<_> = raw.split('/').collect();
+    if let ("GET", ["", "v1", "inbox", "conversations", conversation, "messages"]) =
+        (method, parts.as_slice())
+    {
+        return uuid(conversation) && query.is_some_and(history_query);
+    }
+    if query.is_some() {
+        return false;
+    }
     match (method, parts.as_slice()) {
         ("GET", ["", "v1", "network", "status" | "specialists"])
         | ("POST", ["", "v1", "network", "discover"])
@@ -30,6 +41,31 @@ pub(crate) fn allowed(path: &str, method: &str) -> bool {
         ) => uuid(conversation) && uuid(task),
         _ => false,
     }
+}
+
+fn history_query(query: &str) -> bool {
+    let mut before = None;
+    let mut limit = None;
+    for pair in query.split('&') {
+        let Some((key, value)) = pair.split_once('=') else {
+            return false;
+        };
+        if value.is_empty() || value.len() > 19 || !value.bytes().all(|b| b.is_ascii_digit()) {
+            return false;
+        }
+        let Ok(number) = value.parse::<i64>() else {
+            return false;
+        };
+        if number < 1 || number.to_string() != value {
+            return false;
+        }
+        match key {
+            "before_sequence" if before.is_none() => before = Some(number),
+            "limit" if limit.is_none() && number <= 100 => limit = Some(number),
+            _ => return false,
+        }
+    }
+    before.is_some() && limit.is_some()
 }
 
 fn public_url(value: &str) -> Result<Url, String> {
@@ -152,5 +188,41 @@ mod tests {
             invalid[field] = Value::String(value.into());
             assert!(authorization_url(&invalid, ID).is_err(), "{field}: {value}");
         }
+    }
+
+    #[test]
+    fn history_queries_allow_only_bounded_numeric_cursors() {
+        let path = format!("/v1/inbox/conversations/{ID}/messages");
+        assert!(crate::allowed(
+            &format!("{path}?before_sequence=501&limit=100"),
+            "GET"
+        ));
+        assert!(crate::allowed(
+            &format!("{path}?limit=1&before_sequence=2"),
+            "GET"
+        ));
+        for query in [
+            "",
+            "before_sequence=1",
+            "before_sequence=1&limit=101",
+            "before_sequence=0&limit=10",
+            "before_sequence=-1&limit=10",
+            "before_sequence=1&limit=0",
+            "before_sequence=1&limit=10&limit=20",
+            "before_sequence=1&limit=10&endpoint=https://evil",
+            "before_sequence=9223372036854775808&limit=10",
+            "before_sequence=%31&limit=10",
+            "before_sequence=01&limit=10",
+        ] {
+            assert!(
+                !crate::allowed(&format!("{path}?{query}"), "GET"),
+                "{query}"
+            );
+        }
+        assert!(!crate::allowed(
+            &format!("{path}?before_sequence=1&limit=10"),
+            "POST"
+        ));
+        assert!(!crate::allowed(&path, "GET"));
     }
 }

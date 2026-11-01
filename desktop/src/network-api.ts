@@ -8,13 +8,13 @@ export type LinkedIdentity = {
 };
 export type NetworkStatus = {
   enabled: boolean;
-  home_instance_id: string;
+  home_instance_id: string | null;
   identity: LinkedIdentity | null;
   identity_linking_available: boolean;
 };
 export type IdentityAttempt = {
   attempt_id: string;
-  status: "pending" | "complete" | "expired" | "failed";
+  status: "pending" | "complete" | "expired" | "failed" | "cancelled";
   authorization_url: string | null;
   expires_at: string;
   error?: string | null;
@@ -98,6 +98,28 @@ export const conversations = () =>
   request<Conversation[]>("/v1/inbox/conversations");
 export const conversation = (id: string) =>
   request<ConversationDetail>(inboxPath(id));
+export type MessagePage = { messages: Message[]; has_more: boolean };
+export const conversationHistory = (id: string, beforeSequence: number) =>
+  request<MessagePage>(
+    `${inboxPath(id, "messages")}?before_sequence=${beforeSequence}&limit=100`,
+  );
+
+// Match the service's UTF-8 context bound before fixing a retry ID. Character
+// counts alone miss multibyte text and the serialized plan envelope.
+export function messageValidation(
+  body: string,
+  artifact?: unknown,
+): string | null {
+  const bytes = (text: string) => new TextEncoder().encode(text).byteLength;
+  const serialized = artifact == null ? null : JSON.stringify(artifact);
+  if (bytes(body) > 32_768)
+    return "The message exceeds 32 KiB. Shorten it before sending.";
+  if (serialized && bytes(serialized) > 32_768)
+    return "The structured plan exceeds 32 KiB. Split it into smaller plan revisions before sending.";
+  if (serialized && bytes(`${body}\nPlan artifact:\n${serialized}`) > 32_768)
+    return "The message and plan together exceed 32 KiB. Shorten the message or split the plan before sending.";
+  return null;
+}
 export const openIdentityAttempt = (attemptId: string) =>
   invoke<void>("open_network_identity", { attemptId });
 export const openNetworkLink = (url: string) =>

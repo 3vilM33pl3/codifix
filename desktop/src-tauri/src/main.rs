@@ -75,8 +75,8 @@ fn allowed(path: &str, method: &str) -> bool {
     }
     let raw = path.split('?').next().unwrap_or("");
     let p: Vec<_> = raw.split('/').collect();
-    if network::allowed(raw, method) {
-        return !path.contains('?');
+    if network::allowed(path, method) {
+        return true;
     }
     if method == "GET" && matches!(raw, "/v1/auth/me" | "/v1/agents") {
         return true;
