@@ -1350,6 +1350,8 @@ dependencies = [
  "codifix-federation-runtime",
  "codifix-federation-store",
  "codifix-graph",
+ "codifix-identity",
+ "codifix-inbox",
  "codifix-loops",
  "codifix-mcp",
  "codifix-platform",

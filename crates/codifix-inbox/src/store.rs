@@ -61,10 +61,18 @@ async fn grant_live(
         "specialist unavailable"
     );
     let (mandate_id, capability, resource, _) = template(&grant.request)?;
-    let can_read: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_principals p JOIN agency_mandates m ON m.id=$2 WHERE p.id=$1 AND ((p.global_permissions_json IS NOT NULL AND p.global_permissions_json ? 'memory_read') OR (p.global_permissions_json IS NULL AND p.global_role IS NOT NULL) OR EXISTS(SELECT 1 FROM auth_project_memberships a WHERE a.principal_id=p.id AND a.project_id=m.project_id AND ((a.permissions_json IS NOT NULL AND a.permissions_json ? 'memory_read') OR (a.permissions_json IS NULL AND a.role IS NOT NULL)))))").bind(owner).bind(mandate_id).fetch_one(&mut **tx).await?;
-    ensure!(can_read, "project access revoked");
+    project_access(tx, owner, mandate_id).await?;
     check_mandate(tx, mandate_id, &capability, &resource, home).await?;
     Ok((grant, row.try_get("revision")?))
+}
+async fn project_access(
+    tx: &mut Transaction<'_, Postgres>,
+    owner: Uuid,
+    mandate_id: Uuid,
+) -> Result<()> {
+    let can_read: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_principals p JOIN agency_mandates m ON m.id=$2 WHERE p.id=$1 AND ((p.global_permissions_json IS NOT NULL AND p.global_permissions_json ? 'memory_read') OR (p.global_permissions_json IS NULL AND p.global_role IS NOT NULL) OR EXISTS(SELECT 1 FROM auth_project_memberships a WHERE a.principal_id=p.id AND a.project_id=m.project_id AND ((a.permissions_json IS NOT NULL AND a.permissions_json ? 'memory_read') OR (a.permissions_json IS NULL AND a.role IS NOT NULL)))))").bind(owner).bind(mandate_id).fetch_one(&mut **tx).await?;
+    ensure!(can_read, "project access revoked");
+    Ok(())
 }
 async fn check_mandate(
     tx: &mut Transaction<'_, Postgres>,
@@ -314,7 +322,7 @@ impl Store {
         principal: Uuid,
         id: Uuid,
         req: &SendMessage,
-        resume: Option<Uuid>,
+        resume: Option<(Uuid, Uuid)>,
     ) -> Result<Detail> {
         ensure!(
             !req.client_message_id.is_nil()
@@ -361,7 +369,14 @@ impl Store {
                     .0,
             );
         }
-        let root = resume.unwrap_or(req.client_message_id);
+        let root = resume
+            .map(|(_, root)| root)
+            .unwrap_or(req.client_message_id);
+        if let Some((task, _)) = resume {
+            let question: bool = sqlx::query_scalar("SELECT document->'question' IS NOT NULL AND document->'question'<>'null'::jsonb FROM inbox_task_cards WHERE task_id=$1 AND conversation_id=$2 FOR UPDATE").bind(task).bind(id).fetch_one(&mut *tx).await?;
+            ensure!(question, "question already answered");
+            sqlx::query("UPDATE inbox_task_cards SET document=jsonb_set(jsonb_set(document,'{question}','null'::jsonb),'{status}',to_jsonb('continuing'::text)) WHERE task_id=$1").bind(task).execute(&mut *tx).await?;
+        }
         append(
             &mut tx,
             id,
@@ -653,6 +668,8 @@ async fn enqueue_turn(
     let others=sqlx::query("SELECT g.document,m.id FROM inbox_members m JOIN inbox_grants g ON g.id=m.grant_id WHERE m.conversation_id=$1 AND m.id<>$2 AND m.active AND NOT g.revoked AND g.expires_at>clock_timestamp()").bind(conversation).bind(member).fetch_all(&mut **tx).await?;
     let peers=others.iter().map(|v| {let d:Value=v.try_get("document")?;Ok(json!({"specialist_id":v.try_get::<Uuid,_>("id")?,"display_name":d["contact"]["display_name"]}))}).collect::<Result<Vec<_>>>()?;
     let turn = json!({"version":1,"home_instance_id":home,"conversation_id":conversation,"root_message_id":root,"turn_id":id,"recipient_instance_id":g.contact.instance_id,"recipient_specialist_id":g.contact.specialist_id,"disclosure_digest":disclosure_digest,"context":ctx,"available_actions":actions,"available_peers":peers});
+    serde_json::from_value::<codifix_agency::conversation::ConversationTurn>(turn.clone())?
+        .validate()?;
     let payload = json!({"kind":"conversation_turn","turn":turn,"routing":g.routing});
     let mut request = g.request.clone();
     request["request_id"] = json!(id.to_string());
@@ -815,7 +832,8 @@ pub async fn authorize_task_origin(
     };
     let (ticket, g) = ticket_live(tx, row.try_get("ticket_id")?).await?;
     let req: Value = ticket.try_get("request")?;
-    let (_, cap, res, _) = template(&req)?;
+    let (actual_mandate, cap, res, _) = template(&req)?;
+    project_access(tx, g.principal_id, actual_mandate).await?;
     ensure!(
         cap == capability && res == *resource,
         "task exceeds invocation authority"
@@ -1151,8 +1169,6 @@ impl Store {
         admission(&mut tx).await?;
         owner(&mut tx, self.home_instance_id, principal, conversation).await?;
         let o=sqlx::query("SELECT o.root_message_id,o.member_id,c.document FROM inbox_task_origins o JOIN inbox_task_cards c ON c.task_id=o.task_id WHERE o.task_id=$1 AND o.conversation_id=$2 AND o.principal_id=$3").bind(task).bind(conversation).bind(principal).fetch_one(&mut *tx).await?;
-        let card: TaskCard = serde_json::from_value(o.try_get("document")?)?;
-        ensure!(card.question.is_some(), "task has no question");
         let root = o.try_get("root_message_id")?;
         let member = o.try_get("member_id")?;
         tx.commit().await?;
@@ -1166,7 +1182,7 @@ impl Store {
                 artifact: None,
                 recipient_member_ids: vec![member],
             },
-            Some(root),
+            Some((task, root)),
         )
         .await
     }

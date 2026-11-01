@@ -50,6 +50,24 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route("/v1/network/status", get(crate::network::status).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/specialists", get(crate::network::specialists).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/discover", post(crate::network::discover).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/identity/link", post(crate::network::link).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/identity/link/{attempt_id}", get(crate::network::link_poll).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/identity/unlink", post(crate::network::unlink).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/oauth/client-metadata.json", get(crate::network::metadata).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/network/oauth/callback", get(crate::network::callback).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations", get(crate::network::list).post(crate::network::create).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}", get(crate::network::detail).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/messages", post(crate::network::send).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/members", post(crate::network::join).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/members/{member_id}/remove", post(crate::network::remove).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/lead", post(crate::network::lead).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/read", post(crate::network::read).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/pause", post(crate::network::pause).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/tasks/{task_id}/respond", post(crate::network::respond).layer(axum::extract::DefaultBodyLimit::max(131072)))
+        .route("/v1/inbox/conversations/{conversation_id}/tasks/{task_id}/cancel", post(crate::network::cancel).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/onboarding/cache", get(crate::laptop_cache::list))
         .route(
             "/v1/onboarding/cache/{subscription_id}/search",
@@ -646,7 +664,10 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
             crate::federation::workflow::private_response,
         ))
         .with_state(state.clone())
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<axum::body::Body>| {
+            // OAuth callback queries contain one-use credentials. Never trace query strings.
+            tracing::debug_span!("http_request", method = %request.method(), path = %request.uri().path())
+        }));
 
     if mcp_config.enabled && mcp_config.http_enabled {
         app = app.merge(crate::mcp_http::build_mcp_http_router(state));
