@@ -191,7 +191,7 @@ jobs:
     if: needs.changes.outputs.formal == 'true'
     steps:
       - uses: actions/checkout@v7
-      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee # v1.7.1
         with:
           lake-package-directory: formal/codifix-federation
           build: true
