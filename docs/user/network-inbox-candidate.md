@@ -92,6 +92,24 @@ live Codifix database.
 
 ## 3. Inspect and smoke the desktop package
 
+The separate desktop lifecycle harness uses its own prepared Ubuntu 24.04
+image with GTK and WebKit runtime dependencies. Run it by exact image ID:
+
+```sh
+docker build -f packaging/tests/Dockerfile.desktop-install-test \
+  -t codifix-desktop-install-test:local .
+desktop_test_image=$(docker image inspect --format '{{.Id}}' codifix-desktop-install-test:local)
+bash desktop/tests/test-debian-install-docker.sh "$desktop_test_image" \
+  "$CANDIDATE_DIR/codifix-desktop_0.2.0~rc.1_amd64.deb"
+```
+
+This checks runtime library/symbol resolution, installed payload bytes, fresh
+installation, upgrade from a synthetic `0.1.4` fixture, same-version repair and
+removal. Disposable user XDG configuration/data survive; the package contains
+no maintainer hooks and the harness starts neither the GUI nor a service. The
+fixture is not a historical released desktop package. Never invoke the
+harness's internal `--container` mode on the host.
+
 Select the desktop DEB from the manifest, verify its hash, and inspect its
 Debian metadata and archive without installing it on the build or operator
 host:
