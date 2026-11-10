@@ -47,8 +47,9 @@ desktop session.
 | Extracted desktop candidate startup, isolated Xvfb/D-Bus/XDG paths | Stayed alive for the ten-second timeout; portal warnings remain |
 
 The complete workflow checks that preparation performs **zero Linear writes**.
-Wrong plan UUID, stale digest, removed project access and revoked invocation
-grants deny admission. A lost mutation acknowledgement produces an uncertain,
+Wrong plan UUID and stale digest are rejected before Linear access; removed
+project access and revoked grants prevent queued action admission. A lost
+mutation acknowledgement produces an uncertain,
 blocked effect; automatic worker polling does not repeat it. An explicit
 authorized follow-up reconciles the original effect through readback, with one
 mutation per object and visible task results. Existing two-instance, ownership,
@@ -65,8 +66,8 @@ behavior was weakened to accommodate this fixture.
 ## Broker finding and artifact boundary
 
 JSON complexity checks now cover valid JSON irrespective of MIME type and use
-Fetch-compatible UTF-8/BOM decoding before constructing a `Response`; clones
-cannot expose unchecked bytes. Plain-text handle resolution remains supported.
+Fetch-compatible UTF-8/BOM decoding before constructing a `Response`; response
+clones cannot bypass these JSON checks. Plain-text handle resolution remains supported.
 Astra found the BOM edge case during review and verified its correction.
 
 The optional archive contains immutable tracked source, locked production
