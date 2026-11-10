@@ -12,7 +12,7 @@ npm ci
 npm run desktop:dev
 ```
 
-From this directory, `npm run desktop:build` produces the executable and a `.deb` under `src-tauri/target/release/` (or `$CARGO_TARGET_DIR/release/`). Install the local package with `sudo apt install ./path/to/package.deb`, or run `codifix-desktop` directly from the build output. No backend is bundled or started. The app appears as **Codifix Desktop** in the application menu after installation. Closing the window exits the app.
+From this directory, `npm run desktop:build` produces the executable and a `.deb` under `src-tauri/target/release/bundle/deb/` (or the matching `$CARGO_TARGET_DIR` location). The Debian control version changes Tauri's prerelease hyphen to `~`, so `0.2.0-rc.1` installs as `0.2.0~rc.1` and sorts before stable `0.2.0`. Install the local package with `sudo apt install ./path/to/package.deb`, or run `codifix-desktop` directly from the build output. No backend is bundled or started. The app appears as **Codifix Desktop** in the application menu after installation. Closing the window exits the app.
 
 The desktop crate has its own Cargo workspace/lockfile. It does not add GTK requirements to the service workspace. The renderer imports **types only** from `../web/src`; keep the repository checkout intact for development.
 

@@ -9,7 +9,7 @@
     "test": "vitest run",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build --bundles deb && python3 scripts/normalize-deb-version.py",
+    "desktop:build": "python3 scripts/build-desktop.py",
     "format": "prettier --write src code-connect package.json tsconfig.json vite.config.ts"
   },
   "dependencies": {

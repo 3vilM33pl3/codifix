@@ -66,13 +66,18 @@ def normalize(package):
     return destination
 
 
-def built_package():
+def built_package(target=None):
     root = Path(__file__).resolve().parents[1]
     metadata = json.loads(subprocess.check_output(
         ["cargo", "metadata", "--no-deps", "--format-version", "1",
-         "--manifest-path", str(root / "src-tauri/Cargo.toml")],
+         "--locked", "--manifest-path", str(root / "src-tauri/Cargo.toml")],
         cwd=root, text=True))
-    directory = Path(metadata["target_directory"]) / "release/bundle/deb"
+    target_directory = Path(metadata["target_directory"])
+    if target is not None:
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", target):
+            raise ValueError("invalid Rust target triple")
+        target_directory /= target
+    directory = target_directory / "release/bundle/deb"
     matches = sorted(directory.glob(f"Codifix Desktop_{RAW_VERSION}_*.deb"))
     if len(matches) != 1:
         raise FileNotFoundError(f"expected exactly one raw Tauri Debian package under {directory}")
@@ -82,8 +87,10 @@ def built_package():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("package", type=Path, nargs="?")
+    parser.add_argument("--target", help="Rust target triple used by Tauri")
     args = parser.parse_args()
-    print(normalize(args.package if args.package is not None else built_package()))
+    package = args.package if args.package is not None else built_package(args.target)
+    print(normalize(package))
 
 
 if __name__ == "__main__":
