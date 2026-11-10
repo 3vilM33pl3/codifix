@@ -10,9 +10,9 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use codifix_agency::{
-    Budget, Mandate, MandateStatus, ResourceScope, SpecialistManifest,
+    Budget, Mandate, MandateStatus, ModelDestination, ResourceScope, SpecialistManifest,
     conversation::{ACCEPTANCE, ConversationTurn},
-    routing::{ModelDestination, ModelEvaluation, ModelProfile, RoutingRequest},
+    routing::{ModelEvaluation, ModelProfile, RoutingRequest},
 };
 use codifix_agency_projects::{Authority, Plan, Scope, StepPhase, StepReceipt, stable_id};
 use codifix_agency_runtime::{
@@ -215,7 +215,7 @@ async fn graphql(
 async fn human(pool: &PgPool) -> (Uuid, String) {
     let id = Uuid::new_v4();
     let token = format!("mld_{}", Uuid::new_v4());
-    sqlx::query("INSERT INTO auth_principals(id,kind,display_name,global_permissions_json) VALUES($1,'human_oidc','Synthetic Inbox user','[\"memory_read\"]')")
+    sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Synthetic Inbox user')")
         .bind(id).execute(pool).await.unwrap();
     sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,session_kind,expires_at) VALUES($1,$2,$3,$4,'desktop',now()+interval '1 hour')")
         .bind(Uuid::new_v4()).bind(id).bind(crate::auth::hash_secret(&token)).bind(vec![0_u8; 32]).execute(pool).await.unwrap();
@@ -348,7 +348,7 @@ impl Candidate {
                 cap,
                 acceptance,
                 project_scope.clone(),
-                action_budget.clone()
+                action_budget
             )),
         })
         .collect();
@@ -466,14 +466,14 @@ impl Candidate {
             ),
         };
         config.validate().unwrap();
-        let service_config = serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"unused-fixture-service-token"},
+        let mut service_config: codifix_config::AppConfig = serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:0","api_token":"unused-fixture-service-token"},
             "database":{"url":pool.connect_options().to_url_lossy().as_str()},"offline":{"enabled":false},"cluster":{"enabled":false},
             "reinforcement":{"enabled":false},"consolidation":{"enabled":false},"background_work":{"enabled":false},
             "mcp":{"enabled":false},"embeddings":{"enabled":false,"create_enabled":false},"inbox":{"enabled":true,"home_instance_id":home}})).unwrap();
-        let mut state = crate::runtime::build_state(service_config, Arc::new(Mutex::new(None)))
+        service_config.auth.mode = AuthMode::MultiUser;
+        let state = crate::runtime::build_state(service_config, Arc::new(Mutex::new(None)))
             .await
             .unwrap();
-        state.config.auth.mode = AuthMode::MultiUser;
         let service = Server::start(crate::routes::build_http_app(state)).await;
         Self {
             service,
@@ -595,12 +595,18 @@ async fn workflow(pool: PgPool) {
 
     let mut outside = f.plan.clone();
     outside.id = Uuid::new_v4();
+    // Give the first negative case a matching digest so it reaches the UUID
+    // scope check. The canonical plan scope and invocation grant stay intact.
+    let mut scope_probe = f.config.clone();
+    let mandate = f.grant.contact.mandate_id.unwrap().to_string();
+    scope_probe.linear.as_mut().unwrap()["authorities"][mandate]["plan_digest"] =
+        json!(outside.digest());
     let mut stale = f.plan.clone();
     stale.revision -= 1;
     assert_ne!(stale.digest(), f.plan.digest());
-    for (reason, proposed) in [
-        ("wrong plan scope", outside),
-        ("stale reviewed digest", stale),
+    for (reason, proposed, config) in [
+        ("wrong plan scope", outside, &scope_probe),
+        ("stale reviewed digest", stale, &f.config),
     ] {
         let root = Uuid::new_v4();
         f.send(&path, root, reason, Some(&proposed)).await;
@@ -610,7 +616,7 @@ async fn workflow(pool: PgPool) {
             .propose("prepare", json!({"plan":proposed}));
         assert!(f.run_worker().await, "model proposal for {reason}");
         assert!(
-            f.run_worker().await,
+            worker::run_once(&f.store, config).await.unwrap(),
             "admitted action reaches its {reason} validation boundary"
         );
         let detail = f.request(&path, None).await;
