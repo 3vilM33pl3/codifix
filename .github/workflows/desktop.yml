@@ -25,9 +25,10 @@ jobs:
         working-directory: desktop
       - run: npm test
         working-directory: desktop
+      - run: python3 desktop/tests/test_normalize_deb_version.py
       - run: npm run build
         working-directory: desktop
-      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked
+      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked -- --test-threads=1
       - run: python3 desktop/tests/native_tls.py
       - run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check
       - run: npm run desktop:build
