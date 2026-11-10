@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod area_routing;
 mod browser_auth;
+#[cfg(test)]
+mod inbox_candidate;
 mod legacy_browser_auth;
 mod network;
 use reqwest::{
@@ -310,38 +312,50 @@ async fn api_request(
     body: Option<Value>,
     state: State<'_, Transport>,
 ) -> Result<Value, String> {
-    if !allowed(&path, &method) {
-        return Err("API operation is not allowed".into());
-    }
-    let (generation, session) = {
-        let c = state.0.lock().map_err(|_| "Connection unavailable")?;
-        (
-            c.generation,
-            c.session.clone().ok_or("Connect to a service first")?,
-        )
-    };
-    let result = session
-        .request(
-            &path,
-            if method == "GET" {
-                Method::GET
-            } else {
-                Method::POST
-            },
-            body,
-        )
-        .await;
-    if state
-        .0
-        .lock()
-        .map_err(|_| "Connection unavailable")?
-        .generation
-        != generation
-    {
-        return Err("Connection changed; discard this response".into());
-    }
-    result
+    state.api_request(&path, &method, body).await
 }
+
+impl Transport {
+    async fn api_request(
+        &self,
+        path: &str,
+        method: &str,
+        body: Option<Value>,
+    ) -> Result<Value, String> {
+        if !allowed(path, method) {
+            return Err("API operation is not allowed".into());
+        }
+        let (generation, session) = {
+            let c = self.0.lock().map_err(|_| "Connection unavailable")?;
+            (
+                c.generation,
+                c.session.clone().ok_or("Connect to a service first")?,
+            )
+        };
+        let result = session
+            .request(
+                path,
+                if method == "GET" {
+                    Method::GET
+                } else {
+                    Method::POST
+                },
+                body,
+            )
+            .await;
+        if self
+            .0
+            .lock()
+            .map_err(|_| "Connection unavailable")?
+            .generation
+            != generation
+        {
+            return Err("Connection changed; discard this response".into());
+        }
+        result
+    }
+}
+
 #[derive(Serialize)]
 struct ProjectChoice {
     path: String,
