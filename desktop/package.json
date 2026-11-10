@@ -9,7 +9,7 @@
     "test": "vitest run",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build --bundles deb && python3 scripts/normalize-deb-version.py src-tauri/target/release/bundle/deb/'Codifix Desktop_0.2.0-rc.1_'*.deb",
+    "desktop:build": "tauri build --bundles deb && python3 scripts/normalize-deb-version.py",
     "format": "prettier --write src code-connect package.json tsconfig.json vite.config.ts"
   },
   "dependencies": {

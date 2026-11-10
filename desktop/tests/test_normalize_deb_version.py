@@ -1,6 +1,8 @@
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -62,6 +64,33 @@ class DebianVersionNormalizationTests(unittest.TestCase):
                 TOOL.normalize(source)
             self.assertTrue(source.exists())
             self.assertEqual(destination.read_text(), "preserve")
+
+    def test_discovers_artifact_under_cargo_custom_target_directory_with_spaces(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "custom target directory"
+            package_dir = target / "release/bundle/deb"
+            package_dir.mkdir(parents=True)
+            raw = self.package(package_dir)
+            environment = dict(os.environ, CARGO_TARGET_DIR=str(target))
+            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=SCRIPT.parents[1], env=environment,
+                                    check=True, capture_output=True, text=True)
+            normalized = Path(result.stdout.strip())
+            self.assertEqual(normalized, package_dir / "codifix-desktop_0.2.0~rc.1_amd64.deb")
+            self.assertFalse(raw.exists())
+
+    def test_requires_exactly_one_raw_package_in_cargo_target_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "target"
+            package_dir = target / "release/bundle/deb"
+            package_dir.mkdir(parents=True)
+            self.package(package_dir)
+            second = package_dir / "Codifix Desktop_0.2.0-rc.1_arm64.deb"
+            second.write_bytes((package_dir / "Codifix Desktop_0.2.0-rc.1_amd64.deb").read_bytes())
+            environment = dict(os.environ, CARGO_TARGET_DIR=str(target))
+            result = subprocess.run([sys.executable, str(SCRIPT)], cwd=SCRIPT.parents[1], env=environment,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("expected exactly one raw Tauri Debian package", result.stderr)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Normalize Tauri's SemVer prerelease to Debian package ordering."""
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -65,11 +66,24 @@ def normalize(package):
     return destination
 
 
+def built_package():
+    root = Path(__file__).resolve().parents[1]
+    metadata = json.loads(subprocess.check_output(
+        ["cargo", "metadata", "--no-deps", "--format-version", "1",
+         "--manifest-path", str(root / "src-tauri/Cargo.toml")],
+        cwd=root, text=True))
+    directory = Path(metadata["target_directory"]) / "release/bundle/deb"
+    matches = sorted(directory.glob(f"Codifix Desktop_{RAW_VERSION}_*.deb"))
+    if len(matches) != 1:
+        raise FileNotFoundError(f"expected exactly one raw Tauri Debian package under {directory}")
+    return matches[0]
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("package", type=Path)
+    parser.add_argument("package", type=Path, nargs="?")
     args = parser.parse_args()
-    print(normalize(args.package))
+    print(normalize(args.package if args.package is not None else built_package()))
 
 
 if __name__ == "__main__":
