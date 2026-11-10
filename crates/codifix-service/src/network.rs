@@ -393,6 +393,8 @@ pub(crate) async fn respond(
 }
 
 #[cfg(test)]
+mod candidate;
+#[cfg(test)]
 mod tests;
 
 #[derive(Deserialize)]
