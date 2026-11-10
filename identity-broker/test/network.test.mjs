@@ -20,10 +20,10 @@ test('DNS pinning rejects mixed public/private results without opening a socket'
   const fetch=createPublicFetch({resolve:async()=>[{address:'8.8.8.8',family:4},{address:'127.0.0.1',family:4}],transport:()=>{sent=true;}});
   await assert.rejects(fetch('https://auth.codifix.net'));assert.equal(sent,false);
 });
-function transportResponse(status,body,inspect=()=>{}) {
+function transportResponse(status,body,inspect=()=>{},headers={'content-type':'application/json'}) {
   return (_url,options,callback)=>{
     inspect(options);
-    const outgoing=new EventEmitter();outgoing.end=()=>queueMicrotask(()=>{const response=Readable.from([Buffer.from(body)]);response.statusCode=status;response.headers={'content-type':'application/json'};callback(response);});return outgoing;
+    const outgoing=new EventEmitter();outgoing.end=()=>queueMicrotask(()=>{const response=Readable.from([Buffer.from(body)]);response.statusCode=status;response.headers=headers;callback(response);});return outgoing;
   };
 }
 test('the checked DNS address is used for connection and redirects are never followed',async()=>{
@@ -36,4 +36,31 @@ test('the checked DNS address is used for connection and redirects are never fol
 test('oversized remote bodies are rejected before parsing',async()=>{
   const fetch=createPublicFetch({resolve:async()=>[{address:'8.8.8.8',family:4}],transport:transportResponse(200,'x'.repeat(262145))});
   await assert.rejects(fetch('https://auth.codifix.net'));
+});
+
+test('all JSON bodies are bounded regardless of content type or consumer',async()=>{
+  let deep={};for(let i=0;i<33;i++)deep={next:deep};
+  const oversized=[{items:Array(513).fill(null)},deep,{value:'x'.repeat(32769)},Array(30).fill(Array(400).fill(null))];
+  for(const headers of [{},{'content-type':'text/plain'},{'content-type':'application/octet-stream'},{'content-type':'Application/JSON'}]) {
+    const fetchBody=body=>createPublicFetch({resolve:async()=>[{address:'8.8.8.8',family:4}],transport:transportResponse(200,body,()=>{},headers)})('https://auth.codifix.net');
+    for(const body of oversized) {
+      // Rejected before returning a response: neither json(), text()+parse nor
+      // clone().json() can expose an unchecked valid JSON document.
+      await assert.rejects(async()=>JSON.parse(await (await fetchBody(JSON.stringify(body))).clone().text()),/JSON (complexity|collection) limit/);
+    }
+    const response=await fetchBody('{"did":"did:plc:fixture"}');
+    assert.deepEqual(await response.clone().json(),{did:'did:plc:fixture'});
+    assert.deepEqual(await response.json(),{did:'did:plc:fixture'});
+  }
+});
+
+test('plain text handle responses survive while malformed JSON remains invalid',async()=>{
+  const fetchBody=(body,headers)=>createPublicFetch({resolve:async()=>[{address:'8.8.8.8',family:4}],transport:transportResponse(200,body,()=>{},headers)})('https://auth.codifix.net');
+  for(const headers of [{},{'content-type':'text/plain'}]) {
+    const response=await fetchBody('did:plc:fixture',headers);
+    assert.equal(await response.clone().text(),'did:plc:fixture');
+    await assert.rejects(response.json(),SyntaxError);
+    await assert.rejects((await fetchBody('{"broken":',headers)).json(),SyntaxError);
+  }
+  await assert.rejects(fetchBody('{"broken":',{'content-type':'application/json'}),SyntaxError);
 });

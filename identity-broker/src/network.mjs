@@ -22,6 +22,9 @@ export function publicUrl(value) {
 }
 export function boundedJson(text) {
   const value = JSON.parse(text);
+  return boundJsonValue(value);
+}
+function boundJsonValue(value) {
   const stack = [[value,0]];
   let count = 0;
   while (stack.length) {
@@ -69,8 +72,19 @@ export function createPublicFetch({ resolve = lookup, transport = request } = {}
           response.on('end',() => {
             try {
               const data=Buffer.concat(chunks);
-              const contentType=String(response.headers['content-type'] || '');
-              if(contentType.includes('json') && data.length) boundedJson(data.toString('utf8'));
+              const contentType=String(response.headers['content-type'] || '').toLowerCase();
+              // Consumers (including the SDK) can call json() or parse text()
+              // regardless of MIME type. Validate the bytes before constructing
+              // a Response, so clone() cannot bypass the same boundary.
+              if (data.length) {
+                let parsed;
+                let isJson = false;
+                try { parsed=JSON.parse(data.toString('utf8')); isJson=true; }
+                catch(error) { if (!(error instanceof SyntaxError) || contentType.includes('json')) throw error; }
+                // Keep complexity errors outside the syntax-error catch. Plain
+                // text DID responses remain valid, but valid JSON is always bounded.
+                if (isJson) boundJsonValue(parsed);
+              }
               resolveResponse(new Response([204,205,304].includes(response.statusCode) ? null : data,{status:response.statusCode,headers:response.headers}));
             } catch(error) { reject(error); }
           });
