@@ -25,10 +25,11 @@ def rust_target(arguments):
 
 
 def main():
+    target = rust_target(sys.argv[1:])
     environment = os.environ.copy()
-    target = environment.get("CARGO_TARGET_DIR")
-    if target:
-        target_path = Path(target)
+    cargo_target_dir = environment.get("CARGO_TARGET_DIR")
+    if cargo_target_dir:
+        target_path = Path(cargo_target_dir)
         if not target_path.is_absolute():
             target_path = (DESKTOP_ROOT / target_path).resolve()
         environment["CARGO_TARGET_DIR"] = str(target_path)
@@ -38,7 +39,6 @@ def main():
     if build.returncode:
         return build.returncode
     normalize_command = [sys.executable, "scripts/normalize-deb-version.py"]
-    target = rust_target(sys.argv[1:])
     if target is not None:
         normalize_command.extend(["--target", target])
     normalize = subprocess.run(normalize_command, cwd=DESKTOP_ROOT, env=environment)
