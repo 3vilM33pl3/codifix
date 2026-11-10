@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${CODIFIX_TEST_DATABASE_URL:?Set this to a disposable pgvector PostgreSQL database with CREATEDB access}"
 export CODIFIX_TEST_REQUIRE_DB=1
+export NO_PROXY=127.0.0.1,localhost
+export no_proxy="$NO_PROXY"
 export CODIFIX_INBOX_CANDIDATE_LINEAR_TOKEN=synthetic-inbox-candidate-linear-token
 
 build_messages=$(mktemp)

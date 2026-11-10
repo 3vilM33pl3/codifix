@@ -576,6 +576,18 @@ async fn workflow(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(status["enabled"], true);
+    assert_eq!(status["home_instance_id"], json!(f.config.instance_id));
+    let specialists = native(
+        origin,
+        Some(&f.owner_token),
+        "/v1/network/specialists",
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(specialists.as_array().unwrap().len(), 1);
+    assert_eq!(specialists[0]["id"], json!(f.grant.contact.id));
+    assert_eq!(specialists[0]["grant_id"], json!(f.grant.id));
     let chat = f
         .request(
             CONVERSATIONS,
@@ -771,6 +783,13 @@ async fn workflow(pool: PgPool) {
         "automatic polling must wait for explicit input after an uncertain write"
     );
     assert_eq!(f.linear.lock().unwrap().events.len(), 4);
+    let job_status: String =
+        sqlx::query_scalar("SELECT status FROM background_jobs WHERE operation_id=$1")
+            .bind(uncertain.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(job_status, "blocked");
 
     let answer = Uuid::new_v4();
     f.request(&format!("{path}/tasks/{}/respond",uncertain.id),Some(json!({"client_message_id":answer,
@@ -810,13 +829,14 @@ async fn workflow(pool: PgPool) {
             .iter()
             .all(|s| s.phase == StepPhase::Verified && s.observed.is_some())
     );
-    let settled: Vec<String> = sqlx::query_scalar(
-        "SELECT status FROM external_effects WHERE source='agency-linear' ORDER BY id",
-    )
-    .fetch_all(&pool)
-    .await
-    .unwrap();
-    assert_eq!(settled, ["confirmed", "confirmed"]);
+    let settled: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT id,status FROM external_effects WHERE source='agency-linear'")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(settled.len(), 2);
+    assert!(settled.iter().all(|(_, status)| status == "confirmed"));
+    assert!(settled.iter().any(|(id, _)| *id == effect.0));
     assert_eq!(
         f.linear.lock().unwrap().events,
         [
@@ -857,31 +877,44 @@ async fn workflow(pool: PgPool) {
     assert_eq!(calls, 12);
     assert!(cost > 0 && cost <= i64::try_from(ROOT_BUDGET.micro_usd).unwrap());
 
-    let revoked = Uuid::new_v4();
-    f.send(
-        &path,
-        revoked,
-        "Queue the reviewed apply before grant revocation.",
-        None,
-    )
-    .await;
-    f.model
-        .lock()
-        .unwrap()
-        .propose("apply", json!({"prepared_id":prepared_id}));
-    assert!(f.run_worker().await);
-    let action: Uuid = sqlx::query_scalar("SELECT id FROM inbox_dispatches WHERE root_message_id=$1 AND status='queued' AND request->>'capability'='plan_apply'")
-        .bind(revoked).fetch_one(&pool).await.unwrap();
-    f.inbox.revoke_grant(f.grant.id).await.unwrap();
-    assert!(!f.run_worker().await);
-    let cancelled: (String, Option<Uuid>) =
-        sqlx::query_as("SELECT status,task_id FROM inbox_dispatches WHERE id=$1")
-            .bind(action)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(cancelled, ("cancelled".into(), None));
-    assert_eq!(f.linear.lock().unwrap().events.len(), 8);
+    for revoke_grant in [false, true] {
+        let root = Uuid::new_v4();
+        f.send(
+            &path,
+            root,
+            "Queue the reviewed apply before authority changes.",
+            None,
+        )
+        .await;
+        f.model
+            .lock()
+            .unwrap()
+            .propose("apply", json!({"prepared_id":prepared_id}));
+        assert!(f.run_worker().await);
+        let action: Uuid = sqlx::query_scalar("SELECT id FROM inbox_dispatches WHERE root_message_id=$1 AND status='queued' AND request->>'capability'='plan_apply'")
+            .bind(root).fetch_one(&pool).await.unwrap();
+        let membership: Option<(Uuid, Uuid)> = if revoke_grant {
+            f.inbox.revoke_grant(f.grant.id).await.unwrap();
+            None
+        } else {
+            Some(sqlx::query_as("DELETE FROM auth_project_memberships WHERE principal_id=$1 AND source='direct' RETURNING id,project_id")
+                .bind(f.grant.principal_id).fetch_one(&pool).await.unwrap())
+        };
+        assert!(!f.run_worker().await);
+        let denied: (String, Option<Uuid>) =
+            sqlx::query_as("SELECT status,task_id FROM inbox_dispatches WHERE id=$1")
+                .bind(action)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let status = if revoke_grant { "cancelled" } else { "failed" };
+        assert_eq!(denied, (status.into(), None));
+        assert_eq!(f.linear.lock().unwrap().events.len(), 8);
+        if let Some((id, project)) = membership {
+            sqlx::query("INSERT INTO auth_project_memberships(id,principal_id,project_id,role,source) VALUES($1,$2,$3,'reader','direct')")
+                .bind(id).bind(f.grant.principal_id).bind(project).execute(&pool).await.unwrap();
+        }
+    }
     assert!(f.model.lock().unwrap().replies.is_empty());
-    assert_eq!(f.model.lock().unwrap().turns.len(), 7);
+    assert_eq!(f.model.lock().unwrap().turns.len(), 8);
 }
