@@ -819,7 +819,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "codifix-agency"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "http",
@@ -831,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-agency-openbao"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "axum-server",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-agency-projects"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "reqwest",
@@ -868,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-agency-runtime"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-agenttop"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-analyze"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -926,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area-ops"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "clap",
  "codifix-area",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "codifix-area",
  "codifix-test-support",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-atproto"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "atrium-api",
  "atrium-repo",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-atproto-verify"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "atrium-api",
  "atrium-crypto",
@@ -1015,7 +1015,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-cli"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1056,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-config"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-consolidate"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "serde",
  "uuid",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-curate"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-eval"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1126,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation-runtime"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-federation",
@@ -1176,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-graph"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1193,7 +1193,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-identity"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1207,7 +1207,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-inbox"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1223,7 +1223,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-loops"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -1235,7 +1235,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-mcp"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1255,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "codifix-platform-files",
@@ -1269,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform-files"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "tempfile",
  "windows-sys 0.61.2",
@@ -1277,7 +1277,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-record"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-supervisor",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-reinforce"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1311,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-search"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1335,7 +1335,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-service"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1395,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-skills"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1409,7 +1409,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1426,7 +1426,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-pi"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "codifix-platform",
  "codifix-supervisor",
@@ -1451,7 +1451,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-runtime"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "chrono",
@@ -1479,7 +1479,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1496,7 +1496,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-test-support"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1511,7 +1511,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-watch"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",

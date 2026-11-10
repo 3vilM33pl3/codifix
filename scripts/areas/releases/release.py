@@ -64,17 +64,17 @@ def unique_object(pairs):
 
 
 def version_precedence(value):
-    """Order the supported 3.0.0 candidates before the stable release.
+    """Order the supported 3.0.0 and 3.1.0 releases.
 
     Validation only: the version stored in a signed manifest is never rewritten.
     Keep this finite grammar shared by preparation and live upgrade operators.
     """
-    require(isinstance(value, str), "Expected a supported v3.0.0 version")
-    if value == "3.0.0":
-        return (1, 0)
-    candidate = re.fullmatch(r"3\.0\.0-rc\.([1-9][0-9]{0,5})", value)
-    require(candidate is not None, "Expected 3.0.0 or a supported v3.0.0 release candidate version")
-    return (0, int(candidate.group(1)))
+    require(isinstance(value, str), "Expected a supported v3.0.0 or v3.1.0 version")
+    match = re.fullmatch(r"3\.(0|1)\.0(?:-rc\.([1-9][0-9]{0,5}))?", value)
+    require(match is not None, "Expected a supported 3.0.0 or 3.1.0 release version")
+    minor = int(match.group(1))
+    candidate_number = match.group(2)
+    return (minor, 0, int(candidate_number)) if candidate_number else (minor, 1, 0)
 
 
 def validate(manifest):

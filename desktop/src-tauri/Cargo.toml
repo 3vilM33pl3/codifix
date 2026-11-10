@@ -1,6 +1,6 @@
 [package]
 name = "codifix-desktop"
-version = "0.1.4"
+version = "0.2.0-rc.1"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 authors = ["Olivier Van Acker"]

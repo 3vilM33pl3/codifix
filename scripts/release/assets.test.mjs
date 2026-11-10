@@ -6,6 +6,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { prepareAssets } from './assets.mjs';
+import { releaseIdentity } from './identity.mjs';
+
+assert.deepEqual(releaseIdentity('3.0.0-rc.1'), { debianVersion: '3.0.0~rc.1', windowsBuild: 1 });
+assert.deepEqual(releaseIdentity('3.0.0'), { debianVersion: '3.0.0', windowsBuild: 2 });
+assert.deepEqual(releaseIdentity('3.1.0-rc.1'), { debianVersion: '3.1.0~rc.1', windowsBuild: 3 });
+assert.deepEqual(releaseIdentity('3.1.0'), { debianVersion: '3.1.0', windowsBuild: 4 });
 
 function completeFixture(dir, commit = 'a'.repeat(40), version = '3.0.0') {
   const debianVersion = version.replace('-rc.', '~rc.');

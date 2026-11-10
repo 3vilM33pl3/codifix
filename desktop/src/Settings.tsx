@@ -282,7 +282,7 @@ export function Settings({
           )}
           {section === "About & diagnostics" && (
             <>
-              <h3>Codifix Desktop · 0.1.4</h3>
+              <h3>Codifix Desktop · 0.2.0-rc.1</h3>
               <p className="muted">Shared Tauri 2 desktop · Linux first</p>
               <p>
                 React and TypeScript provide the shared interface. Rust handles

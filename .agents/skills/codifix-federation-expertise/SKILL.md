@@ -1,6 +1,6 @@
 ---
 name: codifix-federation-expertise
-version: 3.0.0
+version: 3.1.0-rc.1
 description: Discover approved expertise in other Codifix areas and ask a bounded, cited question when local evidence is insufficient
 ---
 

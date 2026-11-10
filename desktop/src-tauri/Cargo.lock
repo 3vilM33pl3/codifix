@@ -532,7 +532,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-config"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -548,7 +548,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-desktop"
-version = "0.1.4"
+version = "0.2.0-rc.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "codifix-platform-files",
@@ -589,14 +589,14 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform-files"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "codifix-record"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-supervisor",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "serde",
  "thiserror 2.0.21",

@@ -32,6 +32,15 @@ jobs:
       - run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check
       - run: npm run desktop:build
         working-directory: desktop
+      - name: Verify Debian package version ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t packages < <(find desktop/src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print)
+          test "${#packages[@]}" -eq 1
+          test "$(dpkg-deb -f "${packages[0]}" Version)" = '0.2.0~rc.1'
+          dpkg --compare-versions 0.2.0~rc.1 gt 0.1.4
+          dpkg --compare-versions 0.2.0~rc.1 lt 0.2.0
       - uses: actions/upload-artifact@v4
         with:
           name: codifix-linux-amd64
