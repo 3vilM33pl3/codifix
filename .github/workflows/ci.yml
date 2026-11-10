@@ -597,9 +597,10 @@ jobs:
       - run: ./packaging/build-deb.sh --arch amd64 --target x86_64-unknown-linux-gnu
       - name: Disposable container installation lifecycle
         run: |
-          docker pull ubuntu:24.04
-          package_image=$(docker image inspect --format '{{.Id}}' ubuntu:24.04)
-          bash packaging/tests/test-debian-install-docker.sh "$package_image" target/debian/*_amd64.deb
+          docker build -f packaging/tests/Dockerfile.install-test -t codifix-installer-test .
+          package_image=$(docker image inspect --format '{{.Id}}' codifix-installer-test)
+          package_path=$(realpath target/debian/*_amd64.deb)
+          bash packaging/tests/test-debian-install-docker.sh "$package_image" "$package_path"
       - uses: actions/upload-artifact@v4
         with:
           name: codifix-deb-amd64
