@@ -1,0 +1,21 @@
+[Unit]
+Description=Codifix identity broker (disabled non-production candidate)
+After=network.target
+ConditionPathExists=/etc/codifix/identity-broker.env
+
+[Service]
+Type=simple
+User=codifix-identity
+Group=codifix-identity
+RuntimeDirectory=codifix-identity
+RuntimeDirectoryMode=0750
+EnvironmentFile=/etc/codifix/identity-broker.env
+ExecStart=/usr/bin/node /opt/codifix-identity/launch.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+
+# Deliberately no [Install] section. The archive never installs/enables a unit.
