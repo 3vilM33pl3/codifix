@@ -15,7 +15,8 @@ assert.deepEqual(releaseIdentity('3.1.0'), { debianVersion: '3.1.0', windowsBuil
 
 function completeFixture(dir, commit = 'a'.repeat(40), version = '3.0.0') {
   const debianVersion = version.replace('-rc.', '~rc.');
-  const win = `codifix-${version}-windows-x86_64-build.${version === '3.0.0' ? 2 : 1}`;
+  const { windowsBuild } = releaseIdentity(version);
+  const win = `codifix-${version}-windows-x86_64-build.${windowsBuild}`;
   const artifacts = [`${win}.zip`, `${win}.msi`, `${win}-server-tools.msi`].map(name => ({ name, sha256: createHash('sha256').update(name).digest('hex') }));
   const files = [`codifix_${debianVersion}_amd64.deb`, `codifix_${debianVersion}_arm64.deb`, `codifix-${version}.tar.gz`,
     ...artifacts.map(a => a.name), ...['x86_64', 'aarch64'].flatMap(arch => [`codifix-${version}-macos-${arch}.pkg`, `codifix-${version}-macos-${arch}-application-update.pkg`])];
@@ -78,5 +79,15 @@ test('candidate matrix binds Debian ordering and allocated Windows build', () =>
     assert(inventory.artifacts.some(a => a.name === 'codifix_3.0.0~rc.1_amd64.deb'));
     assert(inventory.artifacts.some(a => a.name === 'codifix-3.0.0-rc.1-windows-x86_64-build.1.msi'));
     assert.throws(() => prepareAssets(dir, '3.0.0-rc.2', 'a'.repeat(40)), /unallocated/);
+  } finally { rmSync(dir, { recursive: true }); }
+});
+
+test('3.1.0 candidate matrix binds Windows build 3', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'codifix-release-next-candidate-'));
+  try {
+    completeFixture(dir, 'b'.repeat(40), '3.1.0-rc.1');
+    const inventory = prepareAssets(dir, '3.1.0-rc.1', 'b'.repeat(40));
+    assert(inventory.artifacts.some(a => a.name === 'codifix_3.1.0~rc.1_amd64.deb'));
+    assert(inventory.artifacts.some(a => a.name === 'codifix-3.1.0-rc.1-windows-x86_64-build.3.msi'));
   } finally { rmSync(dir, { recursive: true }); }
 });
