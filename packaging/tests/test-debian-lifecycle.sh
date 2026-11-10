@@ -156,12 +156,15 @@ fi
 fixture="$test_root/repo"
 mkdir -p "$fixture/packaging" "$fixture/deploy/areas" "$fixture/.agents/skills" \
     "$fixture/crates/codifix-area-ops" "$fixture/scripts/areas/releases" \
+    "$fixture/crates/codifix-agency-runtime/examples" \
     "$fixture/web/dist" "$fixture/target/debian" "$test_root/binaries/x86_64-unknown-linux-gnu/release"
 cp "$repo_root/packaging/build-deb.sh" "$fixture/packaging/"
 cp -R "$repo_root/packaging/debian" "$fixture/packaging/"
 cp "$repo_root/deploy/areas/README.md" "$repo_root/deploy/areas/instance.toml.example" "$fixture/deploy/areas/"
 cp "$repo_root/deploy/areas/ca-preflight.sh" "$repo_root/deploy/areas/CA-CONSOLE-HANDOFF.md" "$fixture/deploy/areas/"
 cp "$repo_root/crates/codifix-area-ops/README.md" "$fixture/crates/codifix-area-ops/"
+cp "$repo_root/crates/codifix-agency-runtime/examples/codifix-agency.service" \
+    "$repo_root/crates/codifix-agency-runtime/examples/config.json" "$fixture/crates/codifix-agency-runtime/examples/"
 cp "$repo_root/scripts/areas/releases/release.py" "$repo_root/scripts/areas/releases/README.md" "$fixture/scripts/areas/releases/"
 cp "$repo_root/scripts/areas/releases/instance.py" "$repo_root/scripts/areas/releases/console.py" \
     "$repo_root/scripts/areas/releases/upgrade.py" "$repo_root/scripts/areas/releases/upgrade-README.md" \
@@ -173,7 +176,7 @@ printf 'Fixture\n' > "$fixture/.agents/skills/SKILL.md"
 printf 'Fixture\n' > "$fixture/web/dist/index.html"
 printf '#!/usr/bin/env bash\nprintf "fixture completion\\n"\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix"
 chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix"
-for operator in codifix-area codifix-area-import codifix-federation-gateway; do
+for operator in codifix-area codifix-area-import codifix-federation-gateway codifix-agency; do
     printf '#!/usr/bin/env bash\nexit 99 # package build must never execute an importer\n' > "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
     chmod +x "$test_root/binaries/x86_64-unknown-linux-gnu/release/$operator"
 done
@@ -196,7 +199,7 @@ dpkg-shlibdeps() {
             executables=$((executables + 1))
         fi
     done
-    [[ "$executables" == 4 ]] || return 1
+    [[ "$executables" == 5 ]] || return 1
     if [[ "${PACKAGING_TEST_SHLIB_INVALID:-0}" == 1 ]]; then
         printf 'shlibs:Depends=libc6 (>= 2.39), libunknown-cross, libstdc++6\n'
     elif [[ "$DEB_HOST_ARCH" == arm64 && "${PACKAGING_TEST_BOOKWORM:-0}" == 1 ]]; then
@@ -246,13 +249,19 @@ dpkg-deb() {
     done
     [[ -f "$staging/usr/share/doc/codifix/areas/console-first-install.md" ]] || return 92
     [[ -f "$staging/usr/share/doc/codifix/areas/instance.toml.example" ]] || return 93
+    [[ -f "$staging/usr/share/doc/codifix/agency/config.json.example" ]] || return 93
+    [[ -f "$staging/usr/share/doc/codifix/agency/codifix-agency.service.example" ]] || return 93
+    grep -Fxq 'ExecStart=/usr/bin/codifix-agency --config /etc/codifix-agency/config.json serve' \
+        "$staging/usr/share/doc/codifix/agency/codifix-agency.service.example" || return 93
+    [[ ! -e "$staging/lib/systemd/system/codifix-agency.service" ]] || return 93
+    grep -Fq 'python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 93
     [[ ! -e "$staging/opt/codifix" ]] || return 94
     [[ ! -e "$staging/etc/codifix/instances" ]] || return 95
     [[ ! -e "$staging/etc/codifix-instances" ]] || return 95
     [[ ! -e "$staging/var/lib/codifix" ]] || return 96
     [[ ! -e "$staging/var/lib/codifix-instances" ]] || return 96
     [[ ! -e "$staging/var/lib/codifix-installations" ]] || return 96
-    for operator in codifix codifix-area codifix-area-import codifix-federation-gateway; do
+    for operator in codifix codifix-area codifix-area-import codifix-federation-gateway codifix-agency; do
         [[ -x "$staging/usr/bin/$operator" ]] || return 97
         cmp "$staging/usr/bin/$operator" "$CARGO_TARGET_DIR/$rust_target/release/$operator" || return 97
     done
@@ -279,6 +288,7 @@ fi
 grep -q '^dpkg-deb ' "$PACKAGING_TEST_LOG" || fail "builder did not assemble the expected package"
 grep -q '^cargo build --release --locked -p codifix-area -p codifix-area-ops .*--target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "operators were not built with locked dependencies and selected architecture"
 grep -q '^cargo build --release --locked -p codifix-federation-runtime .*--bin codifix-federation-gateway --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "gateway was not built with locked dependencies and selected architecture"
+grep -q '^cargo build --release --locked -p codifix-agency-runtime .*--bin codifix-agency --target x86_64-unknown-linux-gnu$' "$PACKAGING_TEST_LOG" || fail "agency executable was not built with locked dependencies and selected architecture"
 if grep -q 'cargo build --locked -p codifix-cli' "$PACKAGING_TEST_LOG"; then
     fail "native packaging unnecessarily rebuilt a lean CLI"
 fi
@@ -294,7 +304,7 @@ fi
 # Only the separately built host CLI may execute. Explicit output stays off root.
 mkdir -p "$test_root/binaries/aarch64-unknown-linux-gnu/release" "$test_root/binaries/x86_64-unknown-linux-gnu/debug"
 cp "$test_root/binaries/x86_64-unknown-linux-gnu/release/codifix" "$test_root/binaries/x86_64-unknown-linux-gnu/debug/codifix"
-for operator in codifix codifix-area codifix-area-import codifix-federation-gateway; do
+for operator in codifix codifix-area codifix-area-import codifix-federation-gateway codifix-agency; do
     printf '#!/usr/bin/env bash\nexit 99 # target binaries must not execute during cross packaging\n' > "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
     chmod +x "$test_root/binaries/aarch64-unknown-linux-gnu/release/$operator"
 done

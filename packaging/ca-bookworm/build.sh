@@ -66,7 +66,8 @@ case "$phase" in
     build_command=(cargo build --release --frozen --target "$rust_target"
       -p codifix-cli --features full --bin codifix -p codifix-area --bin codifix-area
       -p codifix-area-ops --bin codifix-area-import
-      -p codifix-federation-runtime --bin codifix-federation-gateway)
+      -p codifix-federation-runtime --bin codifix-federation-gateway
+      -p codifix-agency-runtime --bin codifix-agency)
     ;;
   pi)
     build_command=(/pi-toolchain/bin/cargo build --release --frozen --bin pi

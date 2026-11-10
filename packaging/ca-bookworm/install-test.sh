@@ -11,7 +11,7 @@ package=$1
 arch=$(dpkg-deb -f "$package" Architecture)
 version=$(dpkg-deb -f "$package" Version)
 [[ $(dpkg --print-architecture) == "$arch" ]]
-[[ $version =~ ^3\.0\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
+[[ $version =~ ^3\.[01]\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
 # Escape the pattern: an unquoted bare tilde expands to HOME in Bash.
 application_version=${version/\~/-}
 [[ ! -e /usr/bin/codifix && ! -e /etc/codifix && ! -e /var/lib/codifix ]]
@@ -26,7 +26,7 @@ export PATH="$work/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export DEBIAN_FRONTEND=noninteractive
 check_binary() {
   [[ $(/usr/bin/codifix --version) == "codifix $application_version" ]]
-  for executable in codifix codifix-area codifix-area-import; do
+  for executable in codifix codifix-area codifix-area-import codifix-agency; do
     "/usr/bin/$executable" --help > /dev/null
   done
   # Gateway has positional private-config arguments, not general --help flags.
@@ -35,6 +35,9 @@ check_binary() {
   [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
   test -s /usr/share/codifix/web/index.html
   test -s /usr/libexec/codifix/releases/release.py
+  test -s /usr/share/doc/codifix/agency/config.json.example
+  test -s /usr/share/doc/codifix/agency/codifix-agency.service.example
+  test ! -e /lib/systemd/system/codifix-agency.service
 }
 # Fresh candidate installation on the native runner, no dependency bypasses.
 dpkg -i "$package"

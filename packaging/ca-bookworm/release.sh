@@ -37,7 +37,7 @@ docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec
   test -n "$package"
   mkdir /candidate/package
   dpkg-deb -x "$package" /candidate/package
-  binaries=(/candidate/package/usr/bin/codifix /candidate/package/usr/bin/codifix-area /candidate/package/usr/bin/codifix-area-import /candidate/package/usr/bin/codifix-federation-gateway)
+  binaries=(/candidate/package/usr/bin/codifix /candidate/package/usr/bin/codifix-area /candidate/package/usr/bin/codifix-area-import /candidate/package/usr/bin/codifix-federation-gateway /candidate/package/usr/bin/codifix-agency)
   if [[ "$arch" == amd64 ]]; then
     mkdir -p /tmp/sysroot/lib/x86_64-linux-gnu /tmp/sysroot/lib64
     for library in libc.so.6 libm.so.6 libgcc_s.so.1 libstdc++.so.6 libpthread.so.0 libdl.so.2 librt.so.1 libresolv.so.2; do
@@ -52,13 +52,16 @@ docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec
   fi
   python3 packaging/ca-bookworm/abi.py --architecture "$arch" --sysroot "$sysroot" "${binaries[@]}" > "/work/output/abi-${arch}.json"
   "${runner[@]}" "${binaries[0]}" --version
-  for executable in "${binaries[@]:0:3}"; do "${runner[@]}" "$executable" --help > /dev/null; done
+  for executable in "${binaries[@]:0:3}" "${binaries[4]}"; do "${runner[@]}" "$executable" --help > /dev/null; done
   # The gateway takes a private config path, not Clap flags. With no arguments
   # it must launch and stop before config access, networking or database work.
   gateway_status=0
   gateway_output=$(timeout 15s "${runner[@]}" "${binaries[3]}" 2>&1) || gateway_status=$?
   [[ $gateway_status == 1 && $gateway_output == "Error: \"expected private gateway configuration file\"" ]]
   test -s /candidate/package/usr/share/codifix/web/index.html
+  test -s /candidate/package/usr/share/doc/codifix/agency/config.json.example
+  test -s /candidate/package/usr/share/doc/codifix/agency/codifix-agency.service.example
+  test ! -e /candidate/package/lib/systemd/system/codifix-agency.service
   test -s /candidate/package/usr/libexec/codifix/releases/release.py
   dpkg-deb -f "$package" Package Version Architecture Depends
   rustc -vV
