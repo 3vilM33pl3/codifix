@@ -86,8 +86,9 @@ otherwise bypass the outer harness.
 
 The package hooks preserve existing configuration and runtime data. Install
 does not enable or start services and does not migrate a database. The optional
-agency service unit is shipped only as an example under the documentation
-directory; no active unit is installed. Never point a candidate service at a
+agency service unit is shipped only as an example under
+`/usr/share/codifix/agency`; no active unit is installed. This application-data
+location preserves the setup examples even when a minimal image excludes docs. Never point a candidate service at a
 live Codifix database.
 
 ## 3. Inspect and smoke the desktop package

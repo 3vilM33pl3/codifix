@@ -35,8 +35,8 @@ check_binary() {
   [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
   test -s /usr/share/codifix/web/index.html
   test -s /usr/libexec/codifix/releases/release.py
-  test -s /usr/share/doc/codifix/agency/config.json.example
-  test -s /usr/share/doc/codifix/agency/codifix-agency.service.example
+  test -s /usr/share/codifix/agency/config.json.example
+  test -s /usr/share/codifix/agency/codifix-agency.service.example
   test ! -e /lib/systemd/system/codifix-agency.service
 }
 # Fresh candidate installation on the native runner, no dependency bypasses.

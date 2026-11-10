@@ -69,7 +69,7 @@ class ReleaseBuildTests(unittest.TestCase):
         self.assertNotIn("--privileged", validation)
         self.assertIn('"${binaries[4]}"', validation[-3])
         self.assertIn("codifix-agency)", validation[-3])
-        self.assertIn("/usr/share/doc/codifix/agency/config.json.example", validation[-3])
+        self.assertIn("/usr/share/codifix/agency/config.json.example", validation[-3])
         self.assertIn("/lib/systemd/system/codifix-agency.service", validation[-3])
         self.assertIn("expected private gateway configuration file", validation[-3])
         self.assertIn('timeout 15s "${runner[@]}" "${binaries[3]}"', validation[-3])

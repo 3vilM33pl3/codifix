@@ -35,12 +35,12 @@ SYSTEMCTL
     /usr/bin/codifix-area-import --help >/dev/null
     /usr/bin/codifix-agency --help >/dev/null
     test ! -e /lib/systemd/system/codifix-agency.service
-    test -s /usr/share/doc/codifix/agency/codifix-agency.service.example
+    test -s /usr/share/codifix/agency/codifix-agency.service.example
   }
 
   dpkg -i "$package"
   check_binary
-  test -s /usr/share/doc/codifix/agency/config.json.example
+  test -s /usr/share/codifix/agency/config.json.example
   dpkg --purge codifix
 
   # Create a synthetic prior package from this candidate's maintainer hooks.

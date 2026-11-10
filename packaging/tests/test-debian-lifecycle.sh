@@ -249,10 +249,10 @@ dpkg-deb() {
     done
     [[ -f "$staging/usr/share/doc/codifix/areas/console-first-install.md" ]] || return 92
     [[ -f "$staging/usr/share/doc/codifix/areas/instance.toml.example" ]] || return 93
-    [[ -f "$staging/usr/share/doc/codifix/agency/config.json.example" ]] || return 93
-    [[ -f "$staging/usr/share/doc/codifix/agency/codifix-agency.service.example" ]] || return 93
+    [[ -f "$staging/usr/share/codifix/agency/config.json.example" ]] || return 93
+    [[ -f "$staging/usr/share/codifix/agency/codifix-agency.service.example" ]] || return 93
     grep -Fxq 'ExecStart=/usr/bin/codifix-agency --config /etc/codifix-agency/config.json serve' \
-        "$staging/usr/share/doc/codifix/agency/codifix-agency.service.example" || return 93
+        "$staging/usr/share/codifix/agency/codifix-agency.service.example" || return 93
     [[ ! -e "$staging/lib/systemd/system/codifix-agency.service" ]] || return 93
     grep -Fq 'python3 (>= 3.11), gpg' "$staging/DEBIAN/control" || return 93
     [[ ! -e "$staging/opt/codifix" ]] || return 94

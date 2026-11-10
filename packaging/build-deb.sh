@@ -109,7 +109,7 @@ mkdir -p \
   "$PKG_ROOT/lib/systemd/system" \
   "$PKG_ROOT/usr/share/doc/codifix" \
   "$PKG_ROOT/usr/share/doc/codifix/areas" \
-  "$PKG_ROOT/usr/share/doc/codifix/agency" \
+  "$PKG_ROOT/usr/share/codifix/agency" \
   "$PKG_ROOT/usr/share/codifix/skill-template" \
   "$PKG_ROOT/usr/share/codifix/web" \
   "$PKG_ROOT/usr/share/bash-completion/completions" \
@@ -162,8 +162,8 @@ install -m 0644 "$ROOT_DIR/crates/codifix-area-ops/README.md" "$PKG_ROOT/usr/sha
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/release-staging.md"
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/console-README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/console-first-install.md"
 install -m 0644 "$ROOT_DIR/scripts/areas/releases/upgrade-README.md" "$PKG_ROOT/usr/share/doc/codifix/areas/instance-upgrade.md"
-install -m 0644 "$ROOT_DIR/crates/codifix-agency-runtime/examples/codifix-agency.service" "$PKG_ROOT/usr/share/doc/codifix/agency/codifix-agency.service.example"
-install -m 0644 "$ROOT_DIR/crates/codifix-agency-runtime/examples/config.json" "$PKG_ROOT/usr/share/doc/codifix/agency/config.json.example"
+install -m 0644 "$ROOT_DIR/crates/codifix-agency-runtime/examples/codifix-agency.service" "$PKG_ROOT/usr/share/codifix/agency/codifix-agency.service.example"
+install -m 0644 "$ROOT_DIR/crates/codifix-agency-runtime/examples/config.json" "$PKG_ROOT/usr/share/codifix/agency/config.json.example"
 cp -R "$ROOT_DIR/.agents/skills/." "$PKG_ROOT/usr/share/codifix/skill-template/"
 find "$PKG_ROOT/usr/share/codifix/skill-template" -type f -name '*.sh' -exec chmod 0755 {} +
 cp -R "$ROOT_DIR/web/dist/." "$PKG_ROOT/usr/share/codifix/web/"

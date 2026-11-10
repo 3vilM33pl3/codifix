@@ -59,8 +59,8 @@ docker run "${common[@]}" --network none --tmpfs /candidate:rw,nosuid,nodev,exec
   gateway_output=$(timeout 15s "${runner[@]}" "${binaries[3]}" 2>&1) || gateway_status=$?
   [[ $gateway_status == 1 && $gateway_output == "Error: \"expected private gateway configuration file\"" ]]
   test -s /candidate/package/usr/share/codifix/web/index.html
-  test -s /candidate/package/usr/share/doc/codifix/agency/config.json.example
-  test -s /candidate/package/usr/share/doc/codifix/agency/codifix-agency.service.example
+  test -s /candidate/package/usr/share/codifix/agency/config.json.example
+  test -s /candidate/package/usr/share/codifix/agency/codifix-agency.service.example
   test ! -e /candidate/package/lib/systemd/system/codifix-agency.service
   test -s /candidate/package/usr/libexec/codifix/releases/release.py
   dpkg-deb -f "$package" Package Version Architecture Depends
