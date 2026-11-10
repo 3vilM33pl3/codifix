@@ -76,6 +76,32 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 npm run desktop:build
 ```
 
+The native bridge accepts only the exact service routes and HTTP methods in its
+allowlist. Ordinary Network and Inbox routes reject query strings. The message
+history route allows only the canonical `before_sequence` and `limit` cursor
+parameters, with a maximum limit of 100. Encoded aliases, malformed
+identifiers, grants, mandates and other unlisted operations are rejected before
+a request is sent. The route checks live in the native test suite. Run native
+tests serially with
+`cargo test --manifest-path src-tauri/Cargo.toml --locked -- --test-threads=1`;
+parallel execution can race an existing ephemeral-port browser-cancellation
+test.
+
+The desktop candidate is `0.2.0-rc.1`. Tauri writes that SemVer prerelease
+literally into Debian metadata, where `-` does not give the required candidate
+ordering. `npm run desktop:build` therefore runs
+`scripts/normalize-deb-version.py` after the Tauri build to change only the DEB
+control version to `0.2.0~rc.1`. The normalizer checks the expected package,
+version and architecture, refuses to overwrite an existing normalized package,
+and removes the original only after the normalized DEB has been built and
+verified. `python3 tests/test_normalize_deb_version.py` checks the transformation
+and Debian version ordering. This packaging step does not install the package
+or start the app.
+
+For the isolated Network/Inbox candidate workflow, package inspection,
+installation and operator exercise boundaries, follow the [candidate rehearsal
+runbook](../docs/user/network-inbox-candidate.md).
+
 `npm run dev` also serves `/review.html`, an explicitly illustrative fixture for comparing the design without accessing real project data. Its IPC mock and sample records are **not included** in the packaged `index.html` entry. Fixture actions that require native integrations report that they are unavailable.
 
 The opt-in Network/Inbox feature requires a compatible service with the feature

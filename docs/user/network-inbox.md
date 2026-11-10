@@ -53,6 +53,11 @@ protected custodian/controller workflow described in [Autonomous specialists](au
 
 ## Operator setup
 
+For the 3.1.0-rc.1 Linux candidate, use the separate
+[isolated candidate rehearsal runbook](network-inbox-candidate.md) to verify
+artifacts and exercise the candidate without a production installation or
+live grants.
+
 This feature is disabled by default in both services. Use a staging environment
 first. The human service and agency companion must use the **same PostgreSQL
 database** and the same durable home UUID. Migrate using the updated service or
