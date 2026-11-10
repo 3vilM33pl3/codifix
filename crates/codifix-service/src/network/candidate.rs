@@ -80,6 +80,8 @@ async fn native(
             "inbox_candidate::native_inbox_request",
             "--nocapture",
         ])
+        .env_remove(LINEAR_TOKEN_ENV)
+        .env_remove("CODIFIX_TEST_DATABASE_URL")
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

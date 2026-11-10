@@ -10,8 +10,12 @@ export CODIFIX_INBOX_CANDIDATE_LINEAR_TOKEN=synthetic-inbox-candidate-linear-tok
 
 build_messages=$(mktemp)
 trap 'rm -f "$build_messages"' EXIT
+desktop_target_args=()
+if [[ -n "${CODIFIX_DESKTOP_TARGET_DIR:-}" ]]; then
+    desktop_target_args=(--target-dir "$CODIFIX_DESKTOP_TARGET_DIR")
+fi
 cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --bin codifix-desktop \
-    --no-run --message-format=json >"$build_messages"
+    "${desktop_target_args[@]}" --no-run --message-format=json >"$build_messages"
 CODIFIX_INBOX_NATIVE_TEST=$(python3 - "$build_messages" <<'PY'
 import json
 import sys

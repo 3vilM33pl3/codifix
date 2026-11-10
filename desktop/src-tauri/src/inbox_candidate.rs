@@ -2,7 +2,7 @@
 use super::{endpoint, is_local, Session, Transport};
 use serde::Deserialize;
 use serde_json::Value;
-use std::io;
+use std::io::{self, IsTerminal};
 
 #[derive(Deserialize)]
 struct Request {
@@ -16,6 +16,10 @@ struct Request {
 #[tokio::test]
 #[ignore = "driven by scripts/test-inbox-candidate.sh"]
 async fn native_inbox_request() {
+    assert!(
+        !io::stdin().is_terminal(),
+        "run via scripts/test-inbox-candidate.sh"
+    );
     let request: Request = serde_json::from_reader(io::stdin().lock()).unwrap();
     let origin = endpoint(&request.origin).unwrap();
     assert_eq!(origin.host_str(), Some("127.0.0.1"));
