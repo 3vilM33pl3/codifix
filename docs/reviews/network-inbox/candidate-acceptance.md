@@ -6,9 +6,10 @@ not replace that historical evidence. Execution is tracked in
 the private project tracker and the
 [approved checklist](candidate-plan.md).
 
-Status: source and focused integration checks passed; final installer lifecycle
-and artifact assembly are in progress. Do not treat this interim report as
-completed package acceptance.
+Status: **build-and-validate acceptance passed** for the AMD64 Linux candidate.
+Source is committed, the complete synthetic workflow passes, and both actual
+Debian packages passed disposable installation lifecycle checks. Astra reviewed
+the work packages, directed corrections and independently checked the evidence.
 
 ## Scope and isolation
 
@@ -45,6 +46,10 @@ desktop session.
 | Release upgrade/signature tests | 18 passed |
 | Real Chromium renderer fixture | Navigation, send/readback, reviewed invitation, pending cancellation and directory passed |
 | Extracted desktop candidate startup, isolated Xvfb/D-Bus/XDG paths | Stayed alive for the ten-second timeout; portal warnings remain |
+| Actual core Debian 12 package and five executable ABI checks | Passed; required GLIBC floor 2.34, native version/help checks passed |
+| Actual core package in prepared Ubuntu 24.04 container | Fresh install, synthetic 3.0.0 upgrade, repair and removal passed; config/data preserved; no service started |
+| Actual desktop package in minimal Ubuntu 24.04 container | Dependency/symbol resolution, payload equality, fresh install, synthetic 0.1.4 upgrade, repair and removal passed; XDG data preserved; no service/GUI started |
+| Desktop package normalizer and target-directory build wrapper | 4 normalizer tests and 1 wrapper test passed; actual normalized artifact passed version ordering |
 
 The complete workflow checks that preparation performs **zero Linear writes**.
 Wrong plan UUID and stale digest are rejected before Linear access; removed
@@ -86,11 +91,34 @@ non-production; no real AT login was performed.
 
 ## Distribution and CI evidence
 
-Candidate artifacts and retained logs will be assembled under
+Candidate artifacts and retained logs are assembled under
 `target/network-inbox-candidate/`, with `candidate-manifest.json` recording each
 artifact's exact source revision, versions and SHA-256, and `SHA256SUMS` covering
 the delivered files. Core and desktop build environments and source revisions
 are recorded separately. The candidate is unsigned and unpublished.
+
+| Artifact | SHA-256 | Source |
+| --- | --- | --- |
+| `codifix_3.1.0~rc.1_amd64.deb` | `84165e2af1687428be1717b37b6c47050a9988d286b0ed977c9429b9667d43b6` | Binary build `a683de10`; packaging correction `23b0f5d4` |
+| `codifix-desktop_0.2.0~rc.1_amd64.deb` | `5abcfbbbdd5383de1ceeebbb0e4d3d4dccae9c48ebce515adf5e0508ce0a66b7` | `15e03ec7` |
+| `codifix-identity-broker_3.1.0-rc.1_16ca37d7.tar.gz` | `1b1006a5accdb9763586e290fd901ae3d2ae22d4beebd583bf45a44e8612ad1e` | `16ca37d7` |
+
+The full core build used the recorded Debian 12 image, Rust 1.98.1 and offline
+compilation after isolated dependency preparation. The first real install caught
+Ubuntu minimal-image documentation exclusion removing the inactive agency
+examples. They now live under `/usr/share/codifix/agency`, outside active unit
+directories. The final DEB was repackaged with the same Bookworm toolchain:
+only those two asset paths moved; all other regular-file hashes and modes,
+including all five executable bytes and maintainer hooks, were unchanged.
+`provenance/core-asset-relocation.json` records the original and final hashes
+and both source revisions. The original ABI report therefore still applies.
+The corrected actual package then passed the complete container lifecycle.
+
+The desktop was built with Node 24.15 and Rust 1.99.1 on the Linux build host.
+Its final executable hash equals the startup-tested executable; only the DEB
+envelope changed during the final packaging run. Runtime libraries and symbols
+resolve in the recorded minimal Ubuntu 24.04 image. Both upgrade tests use
+explicitly synthetic prior packages, not previously released installer bytes.
 
 CI now selects database checks for the agency, Inbox, identity and native
 changes, explicitly runs the broker fixtures/audit/archive checks, exercises the
