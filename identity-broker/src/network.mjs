@@ -79,7 +79,9 @@ export function createPublicFetch({ resolve = lookup, transport = request } = {}
               if (data.length) {
                 let parsed;
                 let isJson = false;
-                try { parsed=JSON.parse(data.toString('utf8')); isJson=true; }
+                // Fetch decodes UTF-8 and strips its BOM before json(). Match
+                // that decoding or a BOM could disguise JSON as plain text.
+                try { parsed=JSON.parse(new TextDecoder().decode(data)); isJson=true; }
                 catch(error) { if (!(error instanceof SyntaxError) || contentType.includes('json')) throw error; }
                 // Keep complexity errors outside the syntax-error catch. Plain
                 // text DID responses remain valid, but valid JSON is always bounded.

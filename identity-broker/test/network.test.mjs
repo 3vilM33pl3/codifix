@@ -47,10 +47,12 @@ test('all JSON bodies are bounded regardless of content type or consumer',async(
       // Rejected before returning a response: neither json(), text()+parse nor
       // clone().json() can expose an unchecked valid JSON document.
       await assert.rejects(async()=>JSON.parse(await (await fetchBody(JSON.stringify(body))).clone().text()),/JSON (complexity|collection) limit/);
+      await assert.rejects(async()=>(await fetchBody('\ufeff'+JSON.stringify(body))).clone().json(),/JSON (complexity|collection) limit/);
     }
     const response=await fetchBody('{"did":"did:plc:fixture"}');
     assert.deepEqual(await response.clone().json(),{did:'did:plc:fixture'});
     assert.deepEqual(await response.json(),{did:'did:plc:fixture'});
+    assert.deepEqual(await (await fetchBody('\ufeff{"did":"did:plc:fixture"}')).clone().json(),{did:'did:plc:fixture'});
   }
 });
 
