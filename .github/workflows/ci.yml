@@ -167,6 +167,7 @@ jobs:
       # All other advisories, malformed reports and audit errors fail the job.
       - run: node identity-broker/scripts/audit.mjs broker-audit.json
       - run: node packaging/build-identity-broker.mjs "$RUNNER_TEMP/broker-candidate"
+      - run: node packaging/tests/test-identity-broker.mjs "$RUNNER_TEMP"/broker-candidate/*.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: disabled-identity-broker-candidate
