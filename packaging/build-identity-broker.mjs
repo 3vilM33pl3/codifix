@@ -26,10 +26,15 @@ const name=`codifix-identity-broker_${version}_${revision.slice(0,8)}`;
 const artifact=join(output,name+'.tar.gz');assert.ok(!existsSync(artifact),'Refusing to overwrite artifact');
 const stage=mkdtempSync(join(tmpdir(),'codifix-broker-package-'));
 try {
+  // Copy only immutable tracked source. Untracked or ignored files (including
+  // credentials) in a developer's source directories must never enter artifacts.
+  const source=join(stage,'source');mkdirSync(source);
+  run('git',['archive',`--output=${join(stage,'source.tar')}`,revision,'identity-broker','packaging/identity-broker','LICENSE']);
+  run('tar',['-xf',join(stage,'source.tar'),'-C',source]);
   const pkg=join(stage,name);mkdirSync(pkg);
-  for(const file of ['package.json','package-lock.json','src','scripts','audit-policy.json','README.md']) cpSync(join(root,'identity-broker',file),join(pkg,file),{recursive:true});
-  for(const file of ['launch.mjs','codifix-identity.service.example','identity-broker.env.example']) cpSync(join(root,'packaging/identity-broker',file),join(pkg,file));
-  cpSync(join(root,'LICENSE'),join(pkg,'LICENSE'));chmodSync(join(pkg,'launch.mjs'),0o755);
+  for(const file of ['package.json','package-lock.json','src','scripts','audit-policy.json','README.md']) cpSync(join(source,'identity-broker',file),join(pkg,file),{recursive:true});
+  for(const file of ['launch.mjs','codifix-identity.service.example','identity-broker.env.example']) cpSync(join(source,'packaging/identity-broker',file),join(pkg,file));
+  cpSync(join(source,'LICENSE'),join(pkg,'LICENSE'));chmodSync(join(pkg,'launch.mjs'),0o755);
   run('npm',['ci','--omit=dev','--ignore-scripts','--no-audit','--no-fund'],pkg);
   run(process.execPath,['scripts/audit.mjs',join(pkg,'audit-report.json')],pkg);
   run(process.execPath,['launch.mjs','--check'],pkg);

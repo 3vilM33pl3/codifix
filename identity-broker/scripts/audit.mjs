@@ -2,6 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -39,7 +40,7 @@ export function checkAudit(report,lock) {
     note:'Known upstream advisory remains unresolved. JSON transport hardening does not fix it.'};
 }
 
-if(process.argv[1] && fileURLToPath(import.meta.url)===fileURLToPath(new URL(`file://${process.argv[1]}`))) {
+if(process.argv[1] && fileURLToPath(import.meta.url)===resolve(process.argv[1])) {
   const result=spawnSync('npm',['audit','--omit=dev','--json'],{cwd:root,encoding:'utf8',maxBuffer:4*1024*1024});
   assert.ok(!result.error && [0,1].includes(result.status),'npm audit failed to run');
   const report=JSON.parse(result.stdout);
