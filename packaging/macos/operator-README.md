@@ -91,7 +91,7 @@ with an existing repository parent and Codifix Application Support directory:
 
 ```bash
 codifix-onboard first-run --company https://YOUR-COMPANY-MEMORY-ORIGIN \
-  --name "Olivier Mac" --workspace-parent "$HOME/Projects" \
+  --name "Example Mac" --workspace-parent "$HOME/Projects" \
   --state "$HOME/Library/Application Support/codifix/onboarding"
 ```
 

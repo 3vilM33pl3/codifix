@@ -82,7 +82,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -93,7 +93,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -109,6 +109,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "arc-swap"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "380962b3d93b99642e50b9febf72c071e97e8b32d86eae9cf4ef582bb960ae6e"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -507,6 +516,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-server"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1ab4a3ec9ea8a657c72d99a03a824af695bd0fb5ec639ccbd9cd3543b41a5f9"
+dependencies = [
+ "arc-swap",
+ "bytes",
+ "fs-err",
+ "http",
+ "http-body",
+ "hyper",
+ "hyper-util",
+ "pin-project-lite",
+ "rustls",
+ "rustls-pemfile",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls",
+ "tower-service",
+]
+
+[[package]]
 name = "base-x"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -787,8 +818,87 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
+name = "codifix-agency"
+version = "3.1.0-rc.1"
+dependencies = [
+ "chrono",
+ "http",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-agency-openbao"
+version = "3.1.0-rc.1"
+dependencies = [
+ "axum",
+ "axum-server",
+ "bytes",
+ "clap",
+ "libc",
+ "rcgen",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "codifix-agency-projects"
+version = "3.1.0-rc.1"
+dependencies = [
+ "axum",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-agency-runtime"
+version = "3.1.0-rc.1"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "clap",
+ "codifix-agency",
+ "codifix-agency-openbao",
+ "codifix-agency-projects",
+ "codifix-inbox",
+ "codifix-record",
+ "codifix-store",
+ "codifix-test-support",
+ "hmac",
+ "http-body-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "tower",
+ "url",
+ "urlencoding",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-agenttop"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -802,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-analyze"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -816,7 +926,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -828,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area-ops"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "clap",
  "codifix-area",
@@ -849,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-area-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "codifix-area",
  "codifix-test-support",
@@ -864,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-atproto"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "atrium-api",
  "atrium-repo",
@@ -883,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-atproto-verify"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "atrium-api",
  "atrium-crypto",
@@ -905,7 +1015,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-cli"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -946,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-config"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -963,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-consolidate"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "serde",
  "uuid",
@@ -971,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-curate"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -987,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-eval"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1001,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1016,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation-runtime"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -1050,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-federation-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-federation",
@@ -1066,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-graph"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1082,8 +1192,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "codifix-identity"
+version = "3.1.0-rc.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-agency",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "codifix-inbox"
+version = "3.1.0-rc.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "codifix-agency",
+ "codifix-test-support",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "codifix-loops"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-platform",
@@ -1095,7 +1235,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-mcp"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1115,7 +1255,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "codifix-platform-files",
@@ -1129,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-platform-files"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "tempfile",
  "windows-sys 0.61.2",
@@ -1137,7 +1277,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-record"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-supervisor",
@@ -1151,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-reinforce"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1171,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-search"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1195,13 +1335,16 @@ dependencies = [
 
 [[package]]
 name = "codifix-service"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",
+ "codifix-agency",
+ "codifix-agency-projects",
+ "codifix-agency-runtime",
  "codifix-agenttop",
  "codifix-atproto-verify",
  "codifix-config",
@@ -1211,6 +1354,8 @@ dependencies = [
  "codifix-federation-runtime",
  "codifix-federation-store",
  "codifix-graph",
+ "codifix-identity",
+ "codifix-inbox",
  "codifix-loops",
  "codifix-mcp",
  "codifix-platform",
@@ -1253,7 +1398,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-skills"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1267,7 +1412,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1284,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1293,7 +1438,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-pi"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "codifix-platform",
  "codifix-supervisor",
@@ -1309,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-runtime"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "axum",
  "chrono",
@@ -1337,7 +1482,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-supervisor-store"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "chrono",
  "codifix-record",
@@ -1354,7 +1499,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-test-support"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1369,7 +1514,7 @@ dependencies = [
 
 [[package]]
 name = "codifix-watch"
-version = "3.0.0"
+version = "3.1.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1748,7 +1893,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -1878,7 +2023,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2014,7 +2159,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2187,6 +2332,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs-err"
+version = "3.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5c95b673b8f6f7235229ae11c5642d81b04c2e64c1e2fb417bc0cf73ca45f29"
+dependencies = [
+ "autocfg",
+ "tokio",
 ]
 
 [[package]]
@@ -2615,7 +2770,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -3429,7 +3584,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3744,6 +3899,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
+name = "pem"
+version = "3.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d30c53c26bc5b31a98cd02d20f25a7c8567146caf63ed593a9d87b2775291be"
+dependencies = [
+ "base64 0.22.1",
+ "serde_core",
+]
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4011,7 +4176,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -4049,7 +4214,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -4268,6 +4433,19 @@ dependencies = [
  "time",
  "unicode-segmentation",
  "unicode-width",
+]
+
+[[package]]
+name = "rcgen"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75e669e5202259b5314d1ea5397316ad400819437857b90861765f24c4cf80a2"
+dependencies = [
+ "pem",
+ "ring",
+ "rustls-pki-types",
+ "time",
+ "yasna",
 ]
 
 [[package]]
@@ -4518,7 +4696,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4546,6 +4724,15 @@ dependencies = [
  "rustls-pki-types",
  "schannel",
  "security-framework",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]
@@ -5031,7 +5218,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5427,10 +5614,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5443,7 +5630,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.4",
  "signal-hook",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6579,7 +6766,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7092,6 +7279,15 @@ checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix 1.1.4",
+]
+
+[[package]]
+name = "yasna"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
+dependencies = [
+ "time",
 ]
 
 [[package]]

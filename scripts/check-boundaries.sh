@@ -134,7 +134,7 @@ for dep in reqwest sqlx axum codifix-service codifix-federation-store; do
   fi
 done
 
-# 4. No monolith re-forms in the new crates.
+# 4. No build-host re-forms in the new crates.
 # The dedicated gateway must not acquire general service routes, local capture,
 # automatic retrieval/curation, or model-provider discovery through dependencies.
 federation_runtime_tree=$(cargo tree -p codifix-federation-runtime -e normal --prefix none | awk '{print $1}' | sort -u)

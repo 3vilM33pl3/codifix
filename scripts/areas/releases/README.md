@@ -1,7 +1,7 @@
 # Local release manifests and authenticated staging
 
 `release.py` creates a deterministic, unsigned `codifix-release-v1` JSON manifest
-for `3.0.0-rc.<positive number>` releases. It can also authenticate a detached GPG
+for supported `3.0.0` and `3.1.0` releases and their `-rc.<positive number>` candidates. It can also authenticate a detached GPG
 signature and stage the selected Linux architecture's local files. It never
 downloads, extracts archives, executes artifacts, installs a package, uses sudo,
 controls a service, reads a live private key, or grants installation permission.
@@ -27,7 +27,7 @@ source path enters the signed manifest. Identical inputs produce identical bytes
 | Field | Meaning |
 | --- | --- |
 | `format` | Exactly `codifix-release-v1` |
-| `release_version` | `3.0.0` or a supported `3.0.0-rc.N` version, without a leading `v`; N is 1–999999 without leading zeroes |
+| `release_version` | `3.0.0`, `3.1.0`, or a supported `3.0.0-rc.N` / `3.1.0-rc.N` candidate, without a leading `v`; N is 1–999999 without leading zeroes |
 | `source_revision` | Full lowercase 40- or 64-digit Git object ID |
 | `platform` | Exactly `linux` |
 | `schema` | Integer `floor` and `head`, defining the supported database interval |
@@ -157,7 +157,7 @@ python3 scripts/areas/releases/release.py verify-stage \
   --staging-parent "$RELEASE_STAGING_PARENT"
 ```
 
-Use `amd64` for Monolith or `arm64` for the CA only after confirming the actual
+Choose `amd64` or `arm64` only after confirming the target
 host architecture. The explicit architecture is checked against the manifest's
 selected entries; another architecture is never a fallback. All manifest entries
 are structurally validated, but only the selected architecture's bytes are hashed

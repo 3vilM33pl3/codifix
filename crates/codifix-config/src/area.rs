@@ -66,8 +66,8 @@ impl AreaIdentityConfig {
 #[serde(deny_unknown_fields)]
 pub struct AreaTarget {
     pub instance_id: Uuid,
-    /// Absolute local config path. Omit for a remote-only area such as Trust
-    /// on Monolith: direct local commands then fail with an actionable message.
+    /// Absolute local config path. Omit for a remote-only area on another
+    /// host: direct local commands then fail with an actionable message.
     pub config: Option<PathBuf>,
 }
 

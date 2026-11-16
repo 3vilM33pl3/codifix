@@ -10,7 +10,7 @@ final class LiveAdministrationReadTests: XCTestCase {
             throw XCTSkip("Enable the existing development service read smoke explicitly.")
         }
         let profile = ConnectionProfile(name: "Live read smoke", baseURL: URL(string: "http://127.0.0.1:4250")!,
-                                        projectSlug: "memory", repositoryRoot: URL(fileURLWithPath: "/Users/olivier/Projects/memory"),
+                                        projectSlug: "memory", repositoryRoot: URL(fileURLWithPath: "/Users/operator/Projects/memory"),
                                         kind: .localSession)
         let client = MemoryServiceClient(profile: profile)
         let auth = try await client.bootstrapLocalSession(context: RequestContext(profile: profile, revision: 1))

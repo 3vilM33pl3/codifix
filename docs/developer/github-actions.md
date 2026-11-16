@@ -2,34 +2,10 @@
 
 Codifix uses GitHub Actions for incremental validation, release publishing, dependency upkeep, and optional Codex-agent workflows.
 
-CI, nightly, and agent workflows run on project-owned self-hosted runners. The
-primary Linux x86_64 runner is `Monolith_Memory`, registered with the labels
-`self-hosted`, `memory`, `Linux`, and `X64`. Those jobs must include the
-`memory` label so they cannot be assigned to unrelated host runners. Release
-jobs use GitHub-hosted platform runners so publishing does not depend on five
-separate machines being online at the same time.
-
-## Self-hosted runner operation
-
-On Monolith, the runner is installed in `~/actions-runner-memory` and managed
-by:
-
-```bash
-systemctl status actions.runner.3vilM33pl3-memory.Monolith_Memory.service
-journalctl -u actions.runner.3vilM33pl3-memory.Monolith_Memory.service -f
-```
-
-Persistent build caches live outside the disposable Actions checkout:
-
-```text
-~/.cache/memory-actions/cargo-target
-~/.cache/memory-actions/npm
-```
-
-The runner exports these paths from `~/actions-runner-memory/.env`.
-The first workflow after provisioning is a cold build; later jobs and runs reuse
-the Cargo target and npm download caches. Do not commit the runner registration
-token, `.credentials`, `.runner`, or host environment file.
+CI, nightly and agent workflows use explicitly labeled self-hosted runners.
+Release jobs use GitHub-hosted platform runners. Operators configure their
+runner installation, service names and private cache paths separately. Never
+commit runner credentials or host environment files.
 
 Use `actionlint` before pushing workflow changes:
 

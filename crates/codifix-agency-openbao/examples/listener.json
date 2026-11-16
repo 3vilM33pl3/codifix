@@ -1,0 +1,6 @@
+{
+  "address": "127.0.0.1:8443",
+  "tls_cert_file": "/etc/codifix-bao/own-role/server.pem",
+  "tls_key_file": "/etc/codifix-bao/own-role/server-key.pem",
+  "fixture_localhost_http": false
+}

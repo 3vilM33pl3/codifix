@@ -82,7 +82,7 @@ test('offline container: boundary, reset, submission transfer, timeout and symli
     const fs=require('fs'),assert=require('assert'),net=require('net');
     assert.equal(process.getuid(),${process.getuid()});
     assert.deepEqual(Object.keys(process.env).sort(),['HOME','LANG','PATH']);
-    for(const p of ['/private','/host','/var/run/docker.sock','/home/olivier/.codex','/other-condition']) assert(!fs.existsSync(p),p);
+    for(const p of ['/private','/host','/var/run/docker.sock','/home/operator/.codex','/other-condition']) assert(!fs.existsSync(p),p);
     assert(!fs.existsSync(${JSON.stringify(hidden)}),'hidden host grader was mounted');
     assert.throws(()=>fs.writeFileSync('/input/files/selected.txt','tampered'));
     assert.throws(()=>fs.writeFileSync('/etc/r3-test','tampered'));

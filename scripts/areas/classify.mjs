@@ -85,7 +85,7 @@ export async function loadBindings(options) {
 // particular, using Memory Layer does not make a different project Workshop.
 const rules = {
   trust: [ ['certificate_authority', /\bcertificate authorit(?:y|ies)\b/i], ['step_ca', /\bstep[- ]ca\b/i], ['ca_signing', /\b(?:root|intermediate) CA\b|\bCA (?:signing|bootstrap|provisioner)\b/], ['pki', /\bPKI\b/] ],
-  homelab: [ ['homelab', /\bhome[ -]?lab\b/i], ['monolith_host', /\bMonolith\b/], ['host_operations', /\b(?:Proxmox|TRMNL|PipeWire|NVIDIA|Authentik)\b/i] ],
+  homelab: [ ['homelab', /\bhome[ -]?lab\b/i], ['host_operations', /\b(?:Proxmox|TRMNL|PipeWire|NVIDIA|Authentik)\b/i] ],
   workshop: [ ['memory_layer', /\bMemory Layer\b|\bmemory-layer\b/i], ['memory_crates', /\bmem-(?:service|cli|record|store|federation|curate|search|eval|supervisor|area)\b|crates\/mem-/i], ['memory_repo', /\/Projects\/memory(?:\/|\b)/] ],
 };
 const evaluationProject = /(?:^|[\s/\\_.:-])(?:eval(?:uation)?|benchmark|mab|smoke|fixtures?|tests?)(?=$|[\s/\\_.:-])/i;

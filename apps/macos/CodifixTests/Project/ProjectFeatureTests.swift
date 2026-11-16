@@ -158,7 +158,7 @@ final class ProjectFeatureTests: XCTestCase {
         let environment = ProcessInfo.processInfo.environment
         let baseURL = URL(string: environment["CODIFIX_LIVE_BASE_URL"] ?? "http://127.0.0.1:4250")!
         let project = environment["CODIFIX_LIVE_PROJECT"] ?? "memory"
-        let repoRoot = URL(fileURLWithPath: environment["CODIFIX_LIVE_REPO_ROOT"] ?? "/Users/olivier/Projects/memory")
+        let repoRoot = URL(fileURLWithPath: environment["CODIFIX_LIVE_REPO_ROOT"] ?? "/Users/operator/Projects/memory")
         let profile = ConnectionProfile(name: "Live project read smoke", baseURL: baseURL,
                                         projectSlug: project, repositoryRoot: repoRoot, kind: .localSession)
         let client = MemoryServiceClient(profile: profile)

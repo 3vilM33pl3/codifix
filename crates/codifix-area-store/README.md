@@ -77,7 +77,7 @@ Real-data classification approval, filesystem/archive durability, actual-host
 writer fencing, a protected operator CLI, release packaging, downstream index
 rebuild, target isolation, enrollment and live cutover are separate gates.
 Synthetic PostgreSQL evidence is not authorization to migrate the running
-Monolith or CA instances.
+build-host or CA instances.
 
 The snapshot collector leaves `memory_relations` without a project owner.
 Manifest v2 can explicitly review an edge whose two canonical endpoints belong

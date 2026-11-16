@@ -23,7 +23,7 @@ These checks do not install packages or activate services; disposable package
 installation and application-level acceptance remain separate release checks.
 
 The release workflow runs the Debian package lifecycle separately on native
-GitHub-hosted AMD64 and ARM64 Linux runners, never the active Monolith or CA:
+GitHub-hosted AMD64 and ARM64 Linux runners, never the active build-host or CA:
 
 ```sh
 sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes \
@@ -49,7 +49,7 @@ and outstanding gates are in the [execution ledger](../../docs/reviews/four-area
 
 ## Inputs and isolation
 
-Build `Dockerfile` on Monolith, then select its **exact local image ID**, not the
+Build `Dockerfile` on build-host, then select its **exact local image ID**, not the
 tag. Both base images are digest pinned. APT uses the signed Debian Bookworm
 repositories; preserve `dpkg-query -W`, compiler versions and the final image ID
 with every build. Re-running APT later can select security updates: the recipe

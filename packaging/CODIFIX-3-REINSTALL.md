@@ -17,11 +17,11 @@ Record which services and watchers were active; inactive ones stay inactive.
 
 Semantic `memory_entries` tables, canonical IDs and area topology are preserved.
 Rename product-owned database and role names only through the exact reviewed
-per-instance inventory, including Monolith and the Mac onboarding names below.
+per-instance inventory, including build-host and the Mac onboarding names below.
 Generic PostgreSQL names and neutral area/runtime roles remain unchanged.
 Existing state is transferred only by the reviewed release cutover and
 reconciliation procedure, never by installer hooks; no database is dropped,
-recreated or renamed by a broad name match. The private Monolith command ledger
+recreated or renamed by a broad name match. The private build-host command ledger
 records proposed mappings and cold preparation steps; its existence does not
 establish a completed rehearsal or authorize copying commands across clusters.
 
@@ -60,7 +60,7 @@ authorization technique described below, rehearsed with that instance's exact
 mapping. Keep disabled restore-check databases disabled. The shared host dev
 cluster requires its own client and privilege inventory and remains separate
 from Workshop; do not stop unrelated PostgreSQL services or change authentication
-rules to make the rename possible. The [four-cluster SQL/authentication rehearsal](../docs/reviews/codifix-rename/evidence/monolith-name-rehearsal.md)
+rules to make the rename possible. The [four-cluster SQL/authentication rehearsal](../docs/reviews/codifix-rename/evidence/build-host-name-rehearsal.md)
 passed 114 recorded checks using synthetic credentials and fixture-bound catalog IDs;
 it does not establish a live cluster match or a populated operational transfer.
 

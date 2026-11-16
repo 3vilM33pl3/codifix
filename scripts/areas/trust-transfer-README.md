@@ -2,7 +2,7 @@
 
 These tools prepare evidence, **not a CA installer or permission to deliver data**.
 They never select a live restore destination. The four-area Rust importer remains
-unchanged: it still requires the complete protected source on Monolith.
+unchanged: it still requires the complete protected source on build-host.
 
 ## 1. Derive private Trust expectations
 

@@ -16,6 +16,7 @@ mod laptop_memories;
 mod laptop_query;
 mod llm;
 mod mcp_http;
+mod network;
 #[cfg(feature = "offline")]
 mod offline;
 #[cfg(not(feature = "offline"))]

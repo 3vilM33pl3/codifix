@@ -1,0 +1,29 @@
+[package]
+name = "codifix-agency-openbao"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+axum-server = { version = "0.7.3", features = ["tls-rustls-no-provider"] }
+clap.workspace = true
+bytes = "1"
+subtle = "2"
+libc = "0.2"
+reqwest.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+zeroize = "1.8"
+
+[dev-dependencies]
+tempfile = "3"
+rcgen = "0.13"
+
+[lints]
+workspace = true

@@ -1,3 +1,3 @@
-# Codifix Architecture
+# Architecture
 
-See the canonical architecture document at [`docs/architecture.md`](/home/olivier/Projects/memory/docs/architecture.md).
+See [Codifix architecture](https://github.com/3vilM33pl3/codifix/blob/main/docs/developer/architecture/overview.md).

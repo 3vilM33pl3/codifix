@@ -29,7 +29,7 @@ test('specific Workshop/Homelab markers and original project boundaries are reta
   const workshop = summarizeLineage(fixture('Change mem-service endpoints and Memory Layer schema checks.', 'memory'));
   assert.equal(workshop.proposal.candidate_area, 'workshop');
   assert.deepEqual(workshop.original_projects, [project('memory')]);
-  assert.equal(summarizeLineage(fixture('PipeWire audio recovery on Monolith.', 'homelab')).proposal.candidate_area, 'homelab');
+  assert.equal(summarizeLineage(fixture('PipeWire audio recovery on build-host.', 'homelab')).proposal.candidate_area, 'homelab');
 });
 
 test('synthetic/evaluation project contamination is a protected unapproved proposal', () => {

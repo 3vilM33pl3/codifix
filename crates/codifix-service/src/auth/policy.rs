@@ -23,10 +23,15 @@ const MAX_AUTH_INSPECTION_BODY: usize = 64 * 1024 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectScope {
     Public,
+    /// Inspect or end the caller's own resolved identity, independent of grants.
+    /// Preserves anonymous single-user introspection; credential resolution still runs.
+    CurrentIdentity,
     /// Valid credential only; the route narrows identity kind (e.g. device logout).
     Authenticated,
     /// Human OIDC browser session, with ordinary mutation Origin/CSRF checks.
     HumanSession,
+    /// Existing browser or native HumanOidc session; no service-token impersonation.
+    HumanClient,
     Unscoped,
     Global,
     PathProject,
@@ -57,6 +62,224 @@ pub(crate) struct RoutePolicy {
 pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>> {
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
+        (
+            "/v1/network/status",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/network/specialists",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/network/discover",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/network/identity/link",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/network/identity/link/{attempt_id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/network/identity/unlink",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/network/oauth/client-metadata.json",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/network/oauth/callback",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: true,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/messages",
+            &[
+                (
+                    Method::GET,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: true,
+                    },
+                ),
+                (
+                    Method::POST,
+                    RoutePolicy {
+                        permission: Permission::MemoryRead,
+                        scope: ProjectScope::HumanClient,
+                        semantic_read: false,
+                    },
+                ),
+            ],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/members",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/members/{member_id}/remove",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/lead",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/read",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/pause",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/tasks/{task_id}/respond",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/inbox/conversations/{conversation_id}/tasks/{task_id}/cancel",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::HumanClient,
+                    semantic_read: false,
+                },
+            )],
+        ),
         (
             "/v1/onboarding/cache",
             &[(
@@ -877,6 +1100,39 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
             )],
         ),
         (
+            "/v1/auth/desktop/login",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/auth/desktop/exchange",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Public,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
+            "/v1/auth/desktop/logout",
+            &[(
+                Method::POST,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::Authenticated,
+                    semantic_read: true,
+                },
+            )],
+        ),
+        (
             "/v1/auth/login",
             &[(
                 Method::GET,
@@ -904,7 +1160,7 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::GET,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
-                    scope: ProjectScope::Unscoped,
+                    scope: ProjectScope::CurrentIdentity,
                     semantic_read: false,
                 },
             )],
@@ -915,7 +1171,7 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
                 Method::POST,
                 RoutePolicy {
                     permission: Permission::MemoryRead,
-                    scope: ProjectScope::Unscoped,
+                    scope: ProjectScope::CurrentIdentity,
                     semantic_read: false,
                 },
             )],
@@ -2134,6 +2390,14 @@ pub(crate) async fn authorization_guard(
     next: Next,
 ) -> Response {
     if !state.is_primary() {
+        if request.uri().path().starts_with("/v1/network/")
+            || request.uri().path().starts_with("/v1/inbox/")
+        {
+            return ApiError::service_unavailable(
+                "private inbox requires the explicitly selected home service",
+            )
+            .into_response();
+        }
         if request.uri().path() == "/ws" {
             return next.run(request).await;
         }
@@ -2151,7 +2415,8 @@ pub(crate) async fn authorization_guard(
             .into_response();
     };
     if policy.scope == ProjectScope::Public {
-        let onboarding = request.uri().path().starts_with("/v1/onboarding/");
+        let onboarding = request.uri().path().starts_with("/v1/onboarding/")
+            || request.uri().path().starts_with("/v1/network/");
         let mut response = next.run(request).await;
         if onboarding {
             response.headers_mut().insert(
@@ -2173,6 +2438,14 @@ pub(crate) async fn authorization_guard(
         && request.uri().path() == "/v1/onboarding/device/logout"
     {
         super::device::logout_proof(&state, request.headers()).await
+    } else {
+        resolved
+    };
+    let resolved = if resolved.is_err()
+        && request.method() == Method::POST
+        && request.uri().path() == "/v1/auth/desktop/logout"
+    {
+        super::desktop_logout_proof(&state, request.headers()).await
     } else {
         resolved
     };
@@ -2245,7 +2518,9 @@ pub(crate) async fn authorization_guard(
     }
 
     request.extensions_mut().insert(principal);
-    let onboarding = request.uri().path().starts_with("/v1/admin/onboarding/")
+    let onboarding = request.uri().path().starts_with("/v1/network/")
+        || request.uri().path().starts_with("/v1/inbox/")
+        || request.uri().path().starts_with("/v1/admin/onboarding/")
         || request.uri().path().starts_with("/v1/onboarding/");
     let mut response = next.run(request).await;
     if onboarding {
@@ -2268,8 +2543,16 @@ fn is_authorized(
 ) -> bool {
     match policy.scope {
         ProjectScope::Public => true,
+        ProjectScope::CurrentIdentity => true,
         ProjectScope::Authenticated => {
             principal.credential_source != CredentialSource::AnonymousSingleUser
+        }
+        ProjectScope::HumanClient => {
+            principal.kind == codifix_record::AuthPrincipalKind::HumanOidc
+                && matches!(
+                    principal.credential_source,
+                    CredentialSource::BrowserSession | CredentialSource::NativeSession
+                )
         }
         ProjectScope::HumanSession => {
             principal.kind == codifix_record::AuthPrincipalKind::HumanOidc
@@ -2390,8 +2673,10 @@ async fn resolve_request_project(
 ) -> Result<Option<String>, ApiError> {
     match scope {
         ProjectScope::Public
+        | ProjectScope::CurrentIdentity
         | ProjectScope::Authenticated
         | ProjectScope::HumanSession
+        | ProjectScope::HumanClient
         | ProjectScope::Unscoped
         | ProjectScope::Global => Ok(None),
         ProjectScope::PathProject => Ok(request

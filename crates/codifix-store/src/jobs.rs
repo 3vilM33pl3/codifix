@@ -217,7 +217,32 @@ pub async fn enqueue(tx: &mut Transaction<'_, Postgres>, job: &NewJob) -> Result
 /// Other writes start at the project slot and never acquire admission. Across
 /// processes, live projects share the configured cap and each has one stage.
 pub async fn claim(pool: &PgPool, policy: JobPolicy) -> Result<Option<JobLease>> {
+    claim_kinds(
+        pool,
+        policy,
+        &[
+            JobKind::Embedding,
+            JobKind::SemanticDedup,
+            JobKind::ValidationDue,
+            JobKind::Consolidation,
+            JobKind::ConsolidationSynthesis,
+        ],
+    )
+    .await
+}
+
+/// A worker must explicitly declare the job kinds it can execute. Ordinary
+/// memory workers never consume specialist jobs, and vice versa.
+pub async fn claim_kinds(
+    pool: &PgPool,
+    policy: JobPolicy,
+    kinds: &[JobKind],
+) -> Result<Option<JobLease>> {
     policy.validate()?;
+    if kinds.is_empty() {
+        return Err(Error::Invalid("empty worker capability set"));
+    }
+    let kinds: Vec<String> = kinds.iter().map(label).collect::<Result<_>>()?;
     let mut tx = pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('background-admission',0))")
         .execute(&mut *tx)
@@ -233,22 +258,22 @@ pub async fn claim(pool: &PgPool, policy: JobPolicy) -> Result<Option<JobLease>>
     let project: Option<Uuid> = sqlx::query_scalar(
         "SELECT s.project_id FROM background_project_slots s
          WHERE (s.lease_until IS NULL OR s.lease_until<=clock_timestamp()) AND EXISTS (
-           SELECT 1 FROM background_jobs j WHERE j.project_id=s.project_id
+           SELECT 1 FROM background_jobs j WHERE j.project_id=s.project_id AND j.kind=ANY($1)
              AND ((j.status IN ('queued','retry_wait') AND j.available_at<=clock_timestamp())
                OR (j.status='running' AND j.lease_until<=clock_timestamp()))
              AND NOT EXISTS (SELECT 1 FROM background_job_dependencies d JOIN background_jobs p ON p.id=d.depends_on WHERE d.job_id=j.id AND p.status NOT IN ('succeeded','skipped')))
          ORDER BY (SELECT min(available_at) FROM background_jobs j WHERE j.project_id=s.project_id AND j.status IN ('queued','retry_wait','running')),s.project_id
          LIMIT 1 FOR UPDATE OF s SKIP LOCKED")
-        .fetch_optional(&mut *tx).await?;
+        .bind(&kinds).fetch_optional(&mut *tx).await?;
     let Some(project) = project else {
         return Ok(None);
     };
     let row = sqlx::query(
-        "SELECT j.* FROM background_jobs j WHERE project_id=$1
+        "SELECT j.* FROM background_jobs j WHERE project_id=$1 AND kind=ANY($2)
          AND ((status IN ('queued','retry_wait') AND available_at<=clock_timestamp()) OR (status='running' AND lease_until<=clock_timestamp()))
          AND NOT EXISTS (SELECT 1 FROM background_job_dependencies d JOIN background_jobs p ON p.id=d.depends_on WHERE d.job_id=j.id AND p.status NOT IN ('succeeded','skipped'))
          ORDER BY created_at,id LIMIT 1 FOR UPDATE OF j")
-        .bind(project).fetch_one(&mut *tx).await?;
+        .bind(project).bind(&kinds).fetch_one(&mut *tx).await?;
     let old = summary(&row)?;
     if old.status == JobStatus::Running {
         sqlx::query("UPDATE background_job_attempts SET finished_at=clock_timestamp(),outcome='lease_lost',failure='lease_lost',uncertain=TRUE WHERE job_id=$1 AND finished_at IS NULL")

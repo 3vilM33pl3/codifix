@@ -1,0 +1,1 @@
+{"$type":"dev.codifix.agency.v1.capability","schemaVersion":1,"instanceId":"d657d88d-af07-4b44-8770-00839695931c","specialistId":"research","displayName":"Research specialist","summary":"Finds and cites public primary evidence.","capabilities":["public.research"],"agentCardUrl":"https://agents.example.com/.well-known/agent-card.json","publishedAt":"2026-10-31T12:00:00Z"}

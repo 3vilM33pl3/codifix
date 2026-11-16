@@ -1,0 +1,13 @@
+{
+  "kind": "standing",
+  "reference": "policy://operator-approved/example-launch",
+  "source_reference": "chat://agency/request-42",
+  "scope": {
+    "plan_id": "ce4aa490-9ec7-4b45-a6bc-da317e9dcf02",
+    "existing_resources": {},
+    "project_keys": ["launch"],
+    "team_ids": ["48821d31-2784-4fe9-a277-35775ac6c750"],
+    "create": true,
+    "update": true
+  }
+}

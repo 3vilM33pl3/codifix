@@ -27,6 +27,310 @@ servers:
 security:
   - bearerToken: []
 paths:
+  /v1/network/status:
+    get:
+      operationId: inboxStatusGet
+      x-stability: internal
+      summary: Private inbox status
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/specialists:
+    get:
+      operationId: inboxSpecialistsGet
+      x-stability: internal
+      summary: Private inbox specialists
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/discover:
+    post:
+      operationId: inboxDiscoverPost
+      x-stability: internal
+      summary: Private inbox discover
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/identity/link:
+    post:
+      operationId: inboxLinkPost
+      x-stability: internal
+      summary: Private inbox link
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/identity/link/{attempt_id}:
+    parameters:
+      - { name: attempt_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inboxLink_PollGet
+      x-stability: internal
+      summary: Private inbox link_poll
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/identity/unlink:
+    post:
+      operationId: inboxUnlinkPost
+      x-stability: internal
+      summary: Private inbox unlink
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/oauth/client-metadata.json:
+    get:
+      operationId: inboxMetadataGet
+      x-stability: internal
+      summary: Private inbox metadata
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      security: []
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/network/oauth/callback:
+    get:
+      operationId: inboxCallbackGet
+      x-stability: internal
+      summary: Private inbox callback
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      security: []
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations:
+    get:
+      operationId: inboxListGet
+      x-stability: internal
+      summary: Private inbox list
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+    post:
+      operationId: inboxListPost
+      x-stability: internal
+      summary: Private inbox list
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: inboxDetailGet
+      x-stability: internal
+      summary: Private inbox detail
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/messages:
+    get:
+      operationId: inboxMessageHistory
+      x-stability: internal
+      summary: Read an older page of this human's conversation
+      parameters:
+        - { name: before_sequence, in: query, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 100 } }
+      responses:
+        '200': { description: Ordered messages and has_more; no-store. }
+        '403': { description: Current human session required. }
+        '409': { description: Conversation unavailable or invalid page bounds. }
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxSendPost
+      x-stability: internal
+      summary: Private inbox send
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/members:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxJoinPost
+      x-stability: internal
+      summary: Private inbox join
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/members/{member_id}/remove:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: member_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxRemovePost
+      x-stability: internal
+      summary: Private inbox remove
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/lead:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxLeadPost
+      x-stability: internal
+      summary: Private inbox lead
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/read:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxReadPost
+      x-stability: internal
+      summary: Private inbox read
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/pause:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxPausePost
+      x-stability: internal
+      summary: Private inbox pause
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/tasks/{task_id}/respond:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: task_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxRespondPost
+      x-stability: internal
+      summary: Private inbox respond
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
+  /v1/inbox/conversations/{conversation_id}/tasks/{task_id}/cancel:
+    parameters:
+      - { name: conversation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: task_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: inboxCancelPost
+      x-stability: internal
+      summary: Private inbox cancel
+      description: Opt-in home-instance feature. Existing human browser or native session required except public OAuth metadata and callback. Owner-scoped history; explicit current invocation grants authorize execution. No-store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Owner-scoped result or verified public OAuth metadata. }
+        '403': { description: Current human authority denied. }
+        '404': { description: Feature unavailable. }
+        '409': { description: Binding, revision, disclosure or budget conflict. }
   /v1/onboarding/areas/{area}/owners/{owner}/projects/{project_id}/subscription:
     get:
       operationId: bootstrapExplicitAreaOwnerProject
@@ -1495,6 +1799,87 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /v1/auth/desktop/login:
+    get:
+      operationId: get_v1_auth_desktop_login
+      summary: Start native human OIDC login with PKCE and prompt=login.
+      tags: ["Authentication"]
+      x-stability: core
+      security: []
+      parameters:
+        - name: redirect_uri
+          in: query
+          required: true
+          schema: { type: string, maxLength: 128 }
+          description: Exact http://127.0.0.1:<nonzero port>/callback without credentials, query or fragment.
+        - name: state
+          in: query
+          required: true
+          schema: { type: string, pattern: '^[0-9a-f]{64}$' }
+        - name: code_challenge
+          in: query
+          required: true
+          schema: { type: string, minLength: 43, maxLength: 43 }
+        - name: code_challenge_method
+          in: query
+          required: true
+          schema: { type: string, enum: [S256] }
+      responses:
+        "307": { description: Redirect to the configured provider; flow expires after ten minutes. }
+        "400": { description: Invalid native callback, state or PKCE challenge. }
+        "429": { description: Pending login capacity reached. }
+  /v1/auth/desktop/exchange:
+    post:
+      operationId: post_v1_auth_desktop_exchange
+      summary: Consume a one-time native PKCE code and create a human bearer session.
+      description: Codes expire after 60 seconds. Exchange is transactional and creates no project grants or device enrollment. Browser cookies are never copied or returned.
+      tags: ["Authentication"]
+      x-stability: core
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code, code_verifier, redirect_uri]
+              properties:
+                code: { type: string, minLength: 43, maxLength: 43 }
+                code_verifier: { type: string, minLength: 43, maxLength: 128 }
+                redirect_uri: { type: string, maxLength: 128 }
+      responses:
+        "200":
+          description: New native session; Cache-Control no-store. Only SHA-256 token hashes are persisted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, principal_id, expires_at]
+                properties:
+                  token: { type: string, description: 'Opaque mld_ Bearer secret; never use as a cookie or x-api-token.' }
+                  principal_id: { type: string, format: uuid }
+                  expires_at: { type: string, format: date-time }
+        "400": { description: Invalid native exchange parameters. }
+        "401": { description: Code expired, consumed, disabled, or did not match the verifier and exact redirect. }
+  /v1/auth/desktop/logout:
+    post:
+      operationId: post_v1_auth_desktop_logout
+      summary: Revoke exactly the presented native bearer session.
+      description: Returns success for an already revoked or expired native credential. Narrow logout proof cannot authorize any other route. No cookies are changed.
+      tags: ["Authentication"]
+      x-stability: core
+      responses:
+        "200":
+          description: Native session revoked or already revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [logged_out]
+                properties:
+                  logged_out: { type: boolean, enum: [true] }
+        "401": { description: An exact native bearer session is required. }
   /v1/auth/login:
     get:
       operationId: get_v1_auth_login
@@ -1514,7 +1899,7 @@ paths:
   /v1/auth/callback:
     get:
       operationId: get_v1_auth_callback
-      summary: "Validate the Authentik callback and create a browser session."
+      summary: "Validate the Authentik callback and complete browser or native login."
       tags: ["Authentication"]
       x-stability: core
       security: []
@@ -1524,13 +1909,14 @@ paths:
         - { name: error, in: query, schema: { type: string } }
         - { name: error_description, in: query, schema: { type: string } }
       responses:
-        "303": { description: Session cookies created; redirect to the validated local return path. }
+        "303": { description: Browser session cookies and local return path, or one-time native PKCE code and original state at the validated loopback URI. }
         "400": { description: Missing, invalid, expired, or provider-rejected callback. }
         "401": { description: ID token signature, issuer, audience, or nonce validation failed. }
   /v1/auth/me:
     get:
       operationId: get_v1_auth_me
       summary: "Return the authenticated principal and effective project access."
+      description: "Identity inspection requires no project grant. Multi-user requests still require a valid credential; single-user installations retain local anonymous identity inspection before bootstrap."
       tags: ["Authentication"]
       x-stability: core
       responses:
@@ -1544,6 +1930,7 @@ paths:
     post:
       operationId: post_v1_auth_logout
       summary: "Revoke the current browser session and expire its cookies."
+      description: "A valid session may sign out even after its project grants are removed. Browser Origin and CSRF checks still apply."
       tags: ["Authentication"]
       x-stability: core
       responses:

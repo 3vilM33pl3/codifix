@@ -514,7 +514,7 @@ fn markdown_local_links_and_images_resolve() {
         // historical review artifacts would make the evidence inaccurate.
         if !file.starts_with(repo_root.join("docs/reviews")) {
             assert!(
-                !content.contains("/home/olivier/"),
+                !content.contains("/home/"),
                 "{} contains a machine-local absolute path",
                 file.display()
             );
@@ -2848,7 +2848,7 @@ fn write_headers_sends_token_for_non_loopback_service() {
         return;
     }
     let mut config = test_app_config();
-    config.service.bind_addr = "10.22.6.42:4140".to_string();
+    config.service.bind_addr = "192.0.2.42:4140".to_string();
     config.service.api_token = "ml_testtoken".to_string();
 
     let headers = write_headers(&config).unwrap();

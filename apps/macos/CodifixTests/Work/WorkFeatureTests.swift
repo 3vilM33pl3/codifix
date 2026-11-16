@@ -147,7 +147,7 @@ final class WorkFeatureTests: XCTestCase {
         let profile = ConnectionProfile(name: "Local development service",
                                         baseURL: URL(string: "http://127.0.0.1:4250")!,
                                         projectSlug: "memory",
-                                        repositoryRoot: URL(fileURLWithPath: "/Users/olivier/Projects/memory"),
+                                        repositoryRoot: URL(fileURLWithPath: "/Users/operator/Projects/memory"),
                                         kind: .localSession)
         let context = FeatureContext(
             client: MemoryServiceClient(profile: profile, transport: URLSessionTransport(), secrets: WorkTestSecrets()),

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Real native dpkg lifecycle on a fresh disposable GitHub-hosted Linux runner.
-# Never invoke on Monolith, the CA, a self-hosted runner or another installation.
+# Never invoke on build-host, the CA, a self-hosted runner or another installation.
 set -euo pipefail
 if [[ $# != 1 || "$1" != /* || ! -f "$1" || -L "$1" || ${GITHUB_ACTIONS:-} != true || ${RUNNER_OS:-} != Linux || ${RUNNER_ENVIRONMENT:-} != github-hosted || ${CODIFIX_HOSTED_INSTALL_TEST:-} != yes || $(id -u) != 0 ]]; then
   echo 'Requires an explicitly disposable GitHub-hosted Linux runner and root.' >&2
@@ -11,7 +11,7 @@ package=$1
 arch=$(dpkg-deb -f "$package" Architecture)
 version=$(dpkg-deb -f "$package" Version)
 [[ $(dpkg --print-architecture) == "$arch" ]]
-[[ $version =~ ^3\.0\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
+[[ $version =~ ^3\.[01]\.0(~rc\.[1-9][0-9]{0,5})?$ ]]
 # Escape the pattern: an unquoted bare tilde expands to HOME in Bash.
 application_version=${version/\~/-}
 [[ ! -e /usr/bin/codifix && ! -e /etc/codifix && ! -e /var/lib/codifix ]]
@@ -26,7 +26,7 @@ export PATH="$work/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export DEBIAN_FRONTEND=noninteractive
 check_binary() {
   [[ $(/usr/bin/codifix --version) == "codifix $application_version" ]]
-  for executable in codifix codifix-area codifix-area-import; do
+  for executable in codifix codifix-area codifix-area-import codifix-agency; do
     "/usr/bin/$executable" --help > /dev/null
   done
   # Gateway has positional private-config arguments, not general --help flags.
@@ -35,6 +35,9 @@ check_binary() {
   [[ $gateway_status == 1 && $gateway_output == 'Error: "expected private gateway configuration file"' ]]
   test -s /usr/share/codifix/web/index.html
   test -s /usr/libexec/codifix/releases/release.py
+  test -s /usr/share/codifix/agency/config.json.example
+  test -s /usr/share/codifix/agency/codifix-agency.service.example
+  test ! -e /lib/systemd/system/codifix-agency.service
 }
 # Fresh candidate installation on the native runner, no dependency bypasses.
 dpkg -i "$package"

@@ -29,7 +29,7 @@ an ARM64 runtime test: actual CA compatibility remains a console gate. Artifact
 filenames retain SemVer (`2.1.0-rc.1`); Debian's internal version is
 `2.1.0~rc.1`, so a later `2.1.0` stable package upgrades the candidate correctly.
 The build also requires `dpkg-shlibdeps` and the selected architecture's runtime
-symbol metadata. It computes versioned libc/C++/GCC dependencies from all four
+symbol metadata. It computes versioned libc/C++/GCC dependencies from all five
 ELFs without executing them; missing or unresolved dependencies fail the build.
 Cross sysroot package names are mapped only to their known target counterparts,
 without reducing their version bounds. Python 3 and GPG support the operator
@@ -40,8 +40,8 @@ satisfy a candidate package; review compatibility before installation.
 ## Files and identities
 
 Use lowercase names of 1–19 characters beginning with a letter, for example
-`trust`, `homelab`, `workshop` and `general`. Trust belongs on the CA host; the
-other three belong on Monolith. Each instance needs a distinct database and role,
+`operations`, `research`, `archive` and `general`. Deploy instances on the
+appropriate compatible hosts. Each instance needs a distinct database and role,
 API identity, Authentik binding, private hostname and verified TLS. Different
 projects in one database do not provide this separation.
 
@@ -250,11 +250,7 @@ Test without inspecting a host or database:
 python3 packaging/tests/test-ca-preflight.py
 ```
 
-The additive `dataset_coverage` report remains unknown for CA-only databases,
-offline captures/activity and external evidence. Trust staged on Monolith is
-not a CA migration. The shared original database remains authoritative while
-writers continue; previews are not implicitly merged into that source. Use the
-[future-cutover runbook](../../docs/reviews/four-area-network/staging-cutover.md)
-for fresh full-history/dependency revalidation and the later writer-fencing,
-activation and forward-recovery gates. Nothing in that runbook authorizes a
-current cutover, CA installation or database downgrade.
+Treat dataset coverage as unknown until independently verified. A staging
+report is not a migration or restore proof. Before a cutover, revalidate full
+history and dependencies, fence writers and establish backup/forward-recovery
+procedures. Installation and activation require explicit operator authority.

@@ -17,10 +17,6 @@ observations, not proof of a clean installation of the final combined package.
 Host reboot, live device revocation and that clean installation remain unverified;
 the observed installation includes repair receipts.
 
-The [execution contract](https://github.com/3vilm33pl3/codifix/blob/main/docs/reviews/mac-onboarding/README.md)
-and [historical deployment ledger](https://github.com/3vilm33pl3/codifix/blob/main/docs/reviews/mac-onboarding/company-deployment-20261015.md)
-retain the original evidence and remaining checks.
-
 ## Using an already configured laptop
 
 From a selected repository run `codifix tui`; operator-owned routing chooses its

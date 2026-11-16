@@ -1,0 +1,9 @@
+{
+  "installation_id": "REPLACE_REVIEWED_INSTALLATION_ID",
+  "key_generation": 1,
+  "seal_type": "shamir",
+  "shares": 3,
+  "threshold": 2,
+  "valid_until": 0,
+  "native_binding": "REPLACE_INSPECT_NATIVE_BINDING_SHA256"
+}

@@ -2511,7 +2511,7 @@ mod tests {
                         "memory_id": "11111111-1111-1111-1111-111111111111",
                         "project": "memory",
                         "project_name": "Codifix",
-                        "repo_root": "/home/olivier/Projects/memory",
+                        "repo_root": "/home/operator/Projects/memory",
                         "summary": "MCP global search",
                         "memory_type": "implementation",
                         "score": 1.0,
@@ -2532,7 +2532,7 @@ mod tests {
                         "memory_id": "11111111-1111-1111-1111-111111111111",
                         "project": "memory",
                         "project_name": "Codifix",
-                        "repo_root": "/home/olivier/Projects/memory",
+                        "repo_root": "/home/operator/Projects/memory",
                         "memory_type": "implementation",
                         "summary": "MCP global search",
                         "snippet": "Global search includes project routing metadata."
@@ -2566,7 +2566,7 @@ mod tests {
                 .any(|content| content.text.contains("project=memory")
                     && content
                         .text
-                        .contains("repo_root=/home/olivier/Projects/memory"))
+                        .contains("repo_root=/home/operator/Projects/memory"))
         );
         assert_eq!(
             result

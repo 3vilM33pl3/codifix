@@ -32,8 +32,6 @@ The TUI and Web UI let you inspect the same cited memory and pending work.
 
 ## Reference
 
-- [Workshop Local Preview (Monolith)](workshop-preview.md)
-- [CA Agent Handoff and Notion Coordination](ca-agent-handoff/README.md)
 - [Federation Runtime (Controlled Integration Environments)](federation-runtime.md)
 - [TUI Guide](tui/README.md)
 - [Web UI](web-ui.md)

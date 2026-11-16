@@ -210,7 +210,7 @@ imports remain supported.
 
 ## 1.0.0 - 2026-07-05
 
-First stable release, cut locally on monolith from the v1.0 stabilization
+First stable release, cut locally on build-host from the v1.0 stabilization
 line plus the memory reinforcement & validation system.
 
 ### Added

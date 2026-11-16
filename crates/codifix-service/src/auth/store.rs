@@ -39,6 +39,7 @@ pub(crate) enum Credential {
     None,
     ApiToken(String),
     BrowserSession(String),
+    NativeSession(String),
 }
 
 /// Whether a transport adapter may read browser-session cookies. HTTP allows
@@ -69,6 +70,14 @@ pub(crate) fn credential_from_headers(
                 .map_err(|_| ApiError::unauthorized("invalid x-api-token header"))
         })
         .transpose()?;
+    if x_api_token
+        .as_deref()
+        .is_some_and(|v| v.starts_with("mld_"))
+    {
+        return Err(ApiError::unauthorized(
+            "native sessions require Bearer authentication",
+        ));
+    }
     let bearer = headers
         .get(header::AUTHORIZATION)
         .map(|value| {
@@ -104,6 +113,7 @@ pub(crate) fn credential_from_headers(
         (Some(_), Some(_)) => Err(ApiError::unauthorized(
             "conflicting api-token and browser-session credentials",
         )),
+        (Some(token), None) if token.starts_with("mld_") => Ok(Credential::NativeSession(token)),
         (Some(token), None) => Ok(Credential::ApiToken(token)),
         (None, Some(session)) => Ok(Credential::BrowserSession(session)),
         (None, None) => Ok(Credential::None),
@@ -121,7 +131,9 @@ pub(crate) async fn resolve_principal(
                 // Single-user browser sessions exist for the bundled web UI;
                 // they resolve exactly like multi-user sessions.
                 let pool = state.pool()?;
-                load_session_principal(&pool, state, &token).await.map(Some)
+                load_session_principal(&pool, state, &token, "browser")
+                    .await
+                    .map(Some)
             }
             Credential::ApiToken(token) if !token.trim().is_empty() && token == state.api_token => {
                 Ok(Some(local_owner_admin()))
@@ -132,6 +144,12 @@ pub(crate) async fn resolve_principal(
                 // token, expiry, revocation and project-membership checks.
                 let pool = state.pool()?;
                 load_service_token_principal(&pool, state, &token)
+                    .await
+                    .map(Some)
+            }
+            Credential::NativeSession(token) => {
+                let pool = state.pool()?;
+                load_session_principal(&pool, state, &token, "desktop")
                     .await
                     .map(Some)
             }
@@ -149,7 +167,15 @@ pub(crate) async fn resolve_principal(
             }
             Credential::BrowserSession(token) => {
                 let pool = state.pool()?;
-                load_session_principal(&pool, state, &token).await.map(Some)
+                load_session_principal(&pool, state, &token, "browser")
+                    .await
+                    .map(Some)
+            }
+            Credential::NativeSession(token) => {
+                let pool = state.pool()?;
+                load_session_principal(&pool, state, &token, "desktop")
+                    .await
+                    .map(Some)
             }
             Credential::None => Ok(None),
         },
@@ -332,6 +358,7 @@ async fn load_session_principal(
     pool: &PgPool,
     state: &AppState,
     token: &str,
+    session_kind: &str,
 ) -> Result<AuthenticatedPrincipal, ApiError> {
     let row = sqlx::query(
         r#"
@@ -339,13 +366,15 @@ async fn load_session_principal(
                s.id AS session_id, s.csrf_hash
         FROM auth_web_sessions s
         JOIN auth_principals p ON p.id = s.principal_id
-        WHERE s.session_hash = $1
+        WHERE s.session_hash = $1 AND s.session_kind = $2
+          AND ($2 != 'desktop' OR p.kind = 'human_oidc')
           AND s.revoked_at IS NULL
           AND s.expires_at > now()
           AND p.disabled_at IS NULL
         "#,
     )
     .bind(hash_secret(token))
+    .bind(session_kind)
     .fetch_optional(pool)
     .await
     .map_err(ApiError::sql)?
@@ -353,9 +382,13 @@ async fn load_session_principal(
     let session_id: Uuid = row.try_get("session_id").map_err(ApiError::sql)?;
     let csrf_hash: Vec<u8> = row.try_get("csrf_hash").map_err(ApiError::sql)?;
     let mut principal = principal_from_row(pool, state, &row).await?;
-    principal.credential_source = CredentialSource::BrowserSession;
+    principal.credential_source = if session_kind == "desktop" {
+        CredentialSource::NativeSession
+    } else {
+        CredentialSource::BrowserSession
+    };
     principal.session_id = Some(session_id);
-    principal.session_csrf_hash = Some(csrf_hash);
+    principal.session_csrf_hash = (session_kind == "browser").then_some(csrf_hash);
     if should_touch_last_used(session_id) {
         if state.config.evaluation.active() {
             sqlx::query("INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json,recorded_at)
@@ -519,7 +552,7 @@ pub(crate) async fn lock_global_administrator(
             sqlx::query_scalar::<_, bool>("SELECT true FROM auth_service_tokens WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>clock_timestamp()) FOR SHARE")
                 .bind(principal.token_id).bind(principal.id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.unwrap_or(false)
         }
-        CredentialSource::BrowserSession => {
+        CredentialSource::BrowserSession | CredentialSource::NativeSession => {
             sqlx::query_scalar::<_, bool>("SELECT true FROM auth_web_sessions WHERE id=$1 AND principal_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE")
                 .bind(principal.session_id).bind(principal.id).fetch_optional(&mut **tx).await.map_err(ApiError::sql)?.unwrap_or(false)
         }

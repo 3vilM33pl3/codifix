@@ -6,7 +6,7 @@ afterEach(cleanup);
 describe("AreaRuntimeStatus", () => {
   const now = Date.parse("2026-09-29T20:00:00Z");
   const status = { generated_at: new Date(now).toISOString(),
-    area: { name: "workshop", instance_id: "72d1a39c-29fe-4f8d-94ee-b3a8dba51f85" },
+    area: { name: "workshop", instance_id: "22222222-2222-4222-8222-222222222222" },
     federation_configured: true };
   it("shows exact identity and opens status without claiming connection health", () => {
     const open = vi.fn();

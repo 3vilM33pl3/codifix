@@ -9,7 +9,7 @@ UUID/integer IDs remain useful for local follow-up; all record keys also have
 SHA-256 bindings to the archive.
 
 This is an agent's preservation-policy review using the already reviewed
-ownership decisions. It does not claim Olivier approved individual items or
+ownership decisions. It does not claim the operator approved individual items or
 that raw content has been read, curated, imported, made searchable or executed.
 Pending proposals remain pending owner decisions, raw captures remain pending
 curation, sessions/tasks remain pending ownership review, protected relations

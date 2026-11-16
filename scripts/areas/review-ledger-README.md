@@ -60,7 +60,7 @@ Old v1 review packs/indexes are not silently reused by this bounded v2 workflow.
 Write a protected `ledger.json` using this structure. Values below are examples,
 not approvals or executable defaults. Copy the actual source bindings and both
 per-history digests from the pack/index. Use a unique nonzero decision UUID for
-each canonical history. Do not rename the agent reviewer to Olivier.
+each canonical history. Do not rename the agent reviewer to the operator.
 
 ```json
 {
@@ -70,7 +70,7 @@ each canonical history. Do not rename the agent reviewer to Olivier.
   "inventory_sha256": "COPY_NORMALIZED_INVENTORY_SHA256",
   "pack_sha256": "COPY_COMPLETE_PACK_SHA256",
   "reviewer": { "kind": "agent", "id": "actual-reviewing-agent" },
-  "authority_basis": "Describe Olivier's delegated redacted-content ownership review authorization.",
+  "authority_basis": "Describe the operator's delegated redacted-content ownership review authorization.",
   "supporting_records": {
     "mode": "protected_archive",
     "reason": "Keep original raw captures, sessions, tasks and supporting records private; their contents were not disclosed or approved for import.",

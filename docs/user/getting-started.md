@@ -525,8 +525,8 @@ If you do nothing, Codifix derives the label automatically from:
 
 That gives stable defaults such as:
 
-- `memory-olivier-monolith`
-- `memory-watcher-olivier-monolith`
+- `memory-user-host`
+- `memory-watcher-user-host`
 
 For most setups, that automatic label is enough.
 

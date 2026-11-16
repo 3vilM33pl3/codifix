@@ -21,7 +21,7 @@ enabled = true
 # optional stable identifier; empty means Codifix derives one from bind_addr
 service_id = ""
 # set this when other machines should reach this service on a LAN address
-# advertise_addr = "10.22.6.42:4040"
+# advertise_addr = "192.0.2.42:4040"
 discovery_multicast_addr = "239.255.42.99:4042"
 announce_interval = "5s"
 peer_ttl = "15s"
