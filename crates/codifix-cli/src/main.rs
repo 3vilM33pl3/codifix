@@ -6,6 +6,8 @@
 mod commands;
 mod commits;
 mod error_hints;
+#[cfg(feature = "tui")]
+mod human_inbox;
 mod plan_execution;
 mod resume;
 mod scan;
