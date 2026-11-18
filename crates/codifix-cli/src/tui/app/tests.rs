@@ -2770,7 +2770,10 @@ async fn conversations_viewer_dispatch_keeps_navigation_and_read_controls_separa
     app.set_active_tab(TabKind::Conversations);
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('/')), &api));
     assert!(app.conversations.editing_peer);
-    assert!(!should_quit(KeyEvent::from(KeyCode::Char('q')), &app));
+    assert!(!super::should_quit(
+        KeyEvent::from(KeyCode::Char('q')),
+        &app
+    ));
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('q')), &api));
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Esc), &api));
     assert!(!app.conversations.editing_peer);

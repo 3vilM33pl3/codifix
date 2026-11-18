@@ -56,6 +56,7 @@ pub(super) struct App {
 
 pub(super) struct ServiceState {
     pub(in crate::tui) health_ok: bool,
+    pub(in crate::tui) inbox_enabled: Option<bool>,
     pub(in crate::tui) backend_connection_state: BackendConnectionState,
     pub(in crate::tui) service_role: Option<String>,
     pub(in crate::tui) service_health_state: Option<String>,

@@ -20,16 +20,20 @@ fn status() -> CompanionStatus {
         last_heartbeat_at: None,
         version: Some("test".into()),
         exchange_access: true,
+        enabled_specialists: vec!["inspector".into()],
+        enrolled_peers: vec![],
+        last_exchange_at: None,
     }
 }
 fn state() -> ConversationsState {
     ConversationsState {
         scope: Some(scope("p")),
+        companion: Some(status()),
         ..Default::default()
     }
 }
 fn detail() -> ExchangeDetail {
-    serde_json::from_value(json!({"exchange":{"task_id":Uuid::from_u128(7),"peer":"peer\u{1b}[31m","direction":"outgoing","specialist_id":"inspector","objective":"untrusted\u{202e} objective","status":"completed","created_at":"2026-11-18T12:00:00Z","updated_at":"2026-11-18T12:01:00Z","journal_available":false},"events":[{"sequence":1,"kind":"snapshot","body":"body\u{1b}]8;;https://evil.test\u{7}link","recorded_at":"2026-11-18T12:01:00Z"}],"events_truncated":false,"independently_verified":false})).unwrap()
+    serde_json::from_value(json!({"exchange":{"task_id":Uuid::from_u128(7),"peer":"peer\u{1b}[31m","direction":"outgoing","specialist_id":"inspector","objective":"untrusted\u{202e} objective","status":"completed","created_at":"2026-11-18T12:00:00Z","updated_at":"2026-11-18T12:01:00Z","journal_available":false},"events":[{"sequence":1,"kind":"snapshot","body":"body\u{1b}]8;;https://evil.test\u{7}link","recorded_at":"2026-11-18T12:01:00Z"}],"events_truncated":false,"independently_verified":false,"remote_task_id":null})).unwrap()
 }
 #[test]
 fn observation_replies_require_scope_and_channel_generation() {
@@ -41,7 +45,8 @@ fn observation_replies_require_scope_and_channel_generation() {
         4,
         Ok(ObservationResult::Companion(status())),
     );
-    assert!(s.companion.is_none());
+    assert_eq!(s.companion_generation, 4);
+    s.companion = None;
     s.receive_observation(scope("p"), 3, Ok(ObservationResult::Companion(status())));
     assert!(s.companion.is_none());
     s.receive_observation(scope("p"), 4, Ok(ObservationResult::Companion(status())));
@@ -136,4 +141,94 @@ fn exchange_renderer_is_safe_in_tiny_and_standard_viewports() {
             })
             .unwrap();
     }
+}
+
+#[test]
+fn revoked_exchange_access_purges_and_fences_private_observations() {
+    for failure in [
+        "Observation returned HTTP 401",
+        "Observation returned HTTP 403",
+    ] {
+        let mut s = state();
+        s.detail = Some(detail());
+        s.page = Some(ExchangePage {
+            exchanges: vec![detail().exchange],
+            next_before: None,
+        });
+        s.receive_observation(scope("p"), 0, Err(failure.into()));
+        assert!(s.page.is_none());
+        assert!(s.detail.is_none());
+        assert!(s.peers().is_empty());
+        s.receive_observation(scope("p"), 0, Ok(ObservationResult::Detail(detail())));
+        assert!(s.detail.is_none());
+        let text = render::exchange_lines(&s)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<String>();
+        assert!(!text.contains("untrusted"));
+    }
+    let mut s = state();
+    s.detail = Some(detail());
+    let mut revoked = status();
+    revoked.exchange_access = false;
+    s.receive_observation(scope("p"), 0, Ok(ObservationResult::Companion(revoked)));
+    assert!(s.detail.is_none());
+    assert!(!s.can_observe());
+    s.receive_observation(scope("p"), 0, Ok(ObservationResult::Detail(detail())));
+    assert!(s.detail.is_none());
+}
+#[test]
+fn identity_mismatch_clears_previously_visible_exchange_bodies() {
+    let mut s = state();
+    s.detail = Some(detail());
+    let mut wrong = status();
+    wrong.instance_id = Some(Uuid::from_u128(42));
+    s.receive_observation(scope("p"), 0, Ok(ObservationResult::Companion(wrong)));
+    assert!(s.detail.is_none());
+    assert!(s.page.is_none());
+    assert!(!s.can_observe());
+}
+#[test]
+fn inbox_access_withdrawal_discards_rendered_private_cache() {
+    for status in [401, 403, 404] {
+        let mut s = state();
+        s.inbox.page = Some(json!([{"title":"private sentinel"}]));
+        s.receive_inbox(scope("p"), 0, Err(format!("Inbox returned HTTP {status}")));
+        assert!(s.inbox.page.is_none());
+        assert!(s.inbox.detail.is_none());
+        s.receive_inbox(
+            scope("p"),
+            0,
+            Ok(InboxResult::Page(json!([{"title":"stale private"}]))),
+        );
+        assert!(s.inbox.page.is_none());
+    }
+}
+
+#[test]
+fn human_detail_shows_participants_disclosures_messages_and_task_cards_as_plain_text() {
+    let detail = json!({
+        "conversation":{"id":"conversation","title":"Human conversation","paused":false},
+        "members":[{"id":"member", "active":true, "specialist":{"display_name":"Inspector", "instance_id":"instance"}, "disclosure_summary":"Reviewed history only"}],
+        "messages":[{"sequence":1,"role":"human","created_at":"today","delivery":"delivered","body":"hello\u{1b}[31m\u{202e}"}],
+        "tasks":[{"id":"task", "status":"awaiting_human", "objective":"Inspect safely", "question":"Which scope?", "result":{"answer":"observed"}, "artifacts":[]}]
+    });
+    let text = render::inbox_detail_lines(&detail)
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for expected in [
+        "Inspector",
+        "Reviewed history only",
+        "#1 human",
+        "hello�[31m�",
+        "awaiting_human",
+        "Which scope?",
+        "observed",
+    ] {
+        assert!(text.contains(expected), "missing {expected}");
+    }
+    assert!(!text.contains('\u{1b}'));
+    assert!(!text.contains('\u{202e}'));
 }

@@ -15,6 +15,8 @@ pub(super) struct InboxState {
     pub(super) error: Option<String>,
     pub(super) message: Option<String>,
     pub(super) page: Option<Value>,
+    pub(super) network: Option<Value>,
+    logout_pending: bool,
     pub(super) detail: Option<Value>,
     pub(super) selected: usize,
     pub(super) scroll: u16,
@@ -22,7 +24,7 @@ pub(super) struct InboxState {
 }
 pub(in crate::tui) enum InboxResult {
     LoginPending(chrono::DateTime<chrono::Utc>),
-    SignedIn,
+    SignedIn(Value),
     SignedOut,
     Page(Value),
     Detail(Value),
@@ -70,6 +72,7 @@ impl InboxState {
     }
     fn clear_private(&mut self) {
         self.page = None;
+        self.network = None;
         self.detail = None;
         self.selected = 0;
         self.scroll = 0;
@@ -80,6 +83,10 @@ impl InboxState {
     }
 }
 impl ConversationsState {
+    pub(in crate::tui) fn disable_inbox(&mut self) {
+        self.inbox.invalidate();
+    }
+
     pub(in crate::tui) fn receive_inbox(
         &mut self,
         scope: ObservationScope,
@@ -97,7 +104,10 @@ impl ConversationsState {
             return;
         }
         state.busy = false;
+        let was_login = state.login_pending;
+        let was_logout = state.logout_pending;
         state.login_pending = false;
+        state.logout_pending = false;
         state.task = None;
         if matches!(
             result,
@@ -110,12 +120,28 @@ impl ConversationsState {
         }
         match result {
             Err(error) => {
+                if denied(&error) || error.contains("HTTP 404") {
+                    state.cancel_read();
+                    state.clear_private();
+                }
+                if was_login {
+                    if let Some(client) = &state.client {
+                        client.cancel_login();
+                    }
+                }
+                if was_logout {
+                    state.message = Some(
+                        "Local session cleared; server revocation not confirmed. Press o to retry."
+                            .into(),
+                    );
+                }
                 if !state.signed_in() {
                     state.clear_private();
                 }
                 state.error = Some(error);
             }
-            Ok(InboxResult::SignedIn) => {
+            Ok(InboxResult::SignedIn(network)) => {
+                state.network = Some(network);
                 state.message =
                     Some("Signed in for My Inbox. Press r to load your conversations.".into())
             }
@@ -203,6 +229,17 @@ impl App {
             return;
         };
         let state = &mut self.conversations.inbox;
+        if !matches!(read, InboxRead::Logout) && self.service.inbox_enabled != Some(true) {
+            state.error = Some(
+                if self.service.inbox_enabled == Some(false) {
+                    "My Inbox is disabled for the selected area."
+                } else {
+                    "My Inbox availability is unknown; press r to refresh service health."
+                }
+                .into(),
+            );
+            return;
+        }
         if state.busy {
             return;
         }
@@ -238,6 +275,7 @@ impl App {
         state.message = None;
         state.busy = true;
         state.login_pending = matches!(read, InboxRead::Login);
+        state.logout_pending = matches!(read, InboxRead::Logout);
         if matches!(read, InboxRead::Logout) {
             client.cancel_login(); // Fence credential use synchronously, before any await.
             state.clear_private();
@@ -260,7 +298,7 @@ impl App {
                             let progress = client.poll_login(login.request_id)?;
                             if progress.status == LoginStatus::Approved {
                                 let _ = progress.auth; // Never include authentication payloads in terminal output.
-                                return Ok(InboxResult::SignedIn);
+                                return client.network_status().await.map(InboxResult::SignedIn);
                             }
                             tokio::time::sleep(Duration::from_millis(400)).await;
                         }
@@ -303,6 +341,27 @@ impl App {
             state.message =
                 Some("Sign-in cancelled. Press o to retry any pending session cleanup.".into());
             return true;
+        }
+        if state.logout_pending {
+            return !matches!(
+                key.code,
+                KeyCode::Tab
+                    | KeyCode::BackTab
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Char('h')
+            );
+        }
+        if state.login_pending && !matches!(key.code, KeyCode::Char('o')) {
+            // Selection and read controls must not abort a callback or revocation.
+            return !matches!(
+                key.code,
+                KeyCode::Tab
+                    | KeyCode::BackTab
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::Char('h')
+            );
         }
         match key.code {
             KeyCode::Char('i') if !state.signed_in() => self.inbox_request(api, InboxRead::Login),
@@ -392,5 +451,75 @@ impl App {
             _ => return false,
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn app() -> App {
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        App::new(
+            "p".into(),
+            "/tmp/test".into(),
+            crate::tui::state::ToolVersions {
+                mem_cli: "test".into(),
+                mem_service: "test".into(),
+                watch_manager: "test".into(),
+                memory_watch: "test".into(),
+            },
+            false,
+            codifix_config::Profile::Prod,
+            tx,
+        )
+    }
+    fn api() -> ApiClient {
+        ApiClient::new(reqwest::Client::new(), serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap())
+    }
+    #[tokio::test]
+    async fn read_controls_do_not_interrupt_login_or_signout_workers() {
+        for logout in [false, true] {
+            let mut app = app();
+            app.conversations.inbox.generation = 7;
+            app.conversations.inbox.busy = true;
+            app.conversations.inbox.login_pending = !logout;
+            app.conversations.inbox.logout_pending = logout;
+            app.conversations.inbox.task = Some(tokio::spawn(std::future::pending()));
+            for code in [
+                KeyCode::Char('j'),
+                KeyCode::Char('k'),
+                KeyCode::Char('r'),
+                KeyCode::Char('n'),
+                KeyCode::PageDown,
+            ] {
+                assert!(app.inbox_key(KeyEvent::from(code), &api()));
+                assert_eq!(app.conversations.inbox.generation, 7);
+                assert!(
+                    app.conversations
+                        .inbox
+                        .task
+                        .as_ref()
+                        .is_some_and(|t| !t.is_finished())
+                );
+            }
+            if logout {
+                assert!(app.inbox_key(KeyEvent::from(KeyCode::Char('o')), &api()));
+                assert_eq!(app.conversations.inbox.generation, 7);
+            }
+            app.conversations.inbox.task.take().unwrap().abort();
+        }
+    }
+    #[tokio::test]
+    async fn disabled_and_unknown_inbox_never_start_browser_login() {
+        for availability in [None, Some(false)] {
+            let mut app = app();
+            app.observation_tick(&api());
+            app.service.inbox_enabled = availability;
+            app.inbox_request(&api(), InboxRead::Login);
+            assert!(app.conversations.inbox.client.is_none());
+            assert!(!app.conversations.inbox.login_pending);
+            assert!(app.conversations.inbox.task.is_none());
+            assert!(app.conversations.inbox.error.is_some());
+        }
     }
 }

@@ -36,6 +36,7 @@ pub(in crate::tui) struct ConversationsState {
     exchange_generation: u64,
     exchange_busy: bool,
     exchange_error: Option<String>,
+    observation_denied: bool,
     exchange_loaded: Option<Instant>,
     exchange_task: Option<tokio::task::JoinHandle<()>>,
     selected: usize,
@@ -63,6 +64,18 @@ enum Read {
 }
 
 impl ConversationsState {
+    pub(in crate::tui) fn my_inbox_selected(&self) -> bool {
+        self.my_inbox
+    }
+    fn can_observe(&self) -> bool {
+        !self.observation_denied && self.companion.as_ref().is_some_and(|s| s.exchange_access)
+    }
+    fn deny_exchanges(&mut self) {
+        self.exchange_invalidate();
+        self.observation_denied = true;
+        self.peer_selected = 0;
+    }
+
     fn invalidate(&mut self, scope: ObservationScope) {
         let companion_generation = self.companion_generation.wrapping_add(1);
         let exchange_generation = self.exchange_generation.wrapping_add(1);
@@ -106,16 +119,26 @@ impl ConversationsState {
                     if let Some((_, expected)) = &scope.area
                         && status.instance_id.is_some_and(|actual| actual != *expected)
                     {
+                        self.deny_exchanges();
                         self.companion = None;
                         self.companion_error =
                             Some("Companion identity does not match the selected area.".into());
                         return;
                     }
+                    if !status.exchange_access {
+                        self.deny_exchanges();
+                    }
+                    self.observation_denied = !status.exchange_access;
                     self.companion = Some(status);
                     self.companion_error = None;
                     self.companion_loaded = Some(Instant::now());
                 }
-                Ok(ObservationResult::CompanionError(e)) => self.companion_error = Some(e),
+                Ok(ObservationResult::CompanionError(e)) => {
+                    if denied(&e) {
+                        self.deny_exchanges();
+                    }
+                    self.companion_error = Some(e);
+                }
                 _ => unreachable!(),
             }
             return;
@@ -125,6 +148,9 @@ impl ConversationsState {
         }
         self.exchange_busy = false;
         self.exchange_task = None;
+        if !self.can_observe() {
+            return;
+        }
         match result {
             Ok(ObservationResult::Page(page)) => {
                 self.page = Some(page);
@@ -140,11 +166,19 @@ impl ConversationsState {
                 self.exchange_loaded = Some(Instant::now());
                 self.exchange_error = None;
             }
-            Err(error) => self.exchange_error = Some(error),
+            Err(error) => {
+                if denied(&error) {
+                    self.deny_exchanges();
+                }
+                self.exchange_error = Some(error);
+            }
             _ => unreachable!(),
         }
     }
     fn peers(&self) -> Vec<String> {
+        if !self.can_observe() {
+            return Vec::new();
+        }
         let mut peers = self
             .page
             .as_ref()
@@ -155,6 +189,9 @@ impl ConversationsState {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        if let Some(status) = &self.companion {
+            peers.extend(status.enrolled_peers.iter().cloned());
+        }
         peers.sort();
         peers.dedup();
         peers
@@ -181,6 +218,9 @@ impl ConversationsState {
         self.selected = 0;
         self.scroll = 0;
     }
+}
+fn denied(error: &str) -> bool {
+    error.contains("HTTP 401") || error.contains("HTTP 403")
 }
 impl App {
     /// Called by the event loop, never by refresh or rendering. Inactive tabs do no polling.
@@ -231,6 +271,13 @@ impl App {
         let Some(scope) = state.scope.clone() else {
             return;
         };
+        if !matches!(read, Read::Companion) && !state.can_observe() {
+            state.exchange_error = Some(
+                "Exchange inspection is disabled, denied or not yet available for this project."
+                    .into(),
+            );
+            return;
+        }
         let generation = if matches!(read, Read::Companion) {
             if let Some(task) = state.companion_task.take() {
                 task.abort();

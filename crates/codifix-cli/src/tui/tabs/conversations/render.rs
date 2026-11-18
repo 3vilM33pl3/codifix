@@ -39,7 +39,9 @@ fn companion_lines(state: &ConversationsState) -> Vec<Line<'static>> {
     if let Some(status) = &state.companion {
         lines.push(line(format!(
             "Companion: {} | enabled={} | exchange access={}",
-            status.state, status.enabled, status.exchange_access
+            status.state,
+            status.enabled,
+            state.can_observe()
         )));
         lines.push(line(format!(
             "Observed heartbeat: {} | version {}",
@@ -48,6 +50,15 @@ fn companion_lines(state: &ConversationsState) -> Vec<Line<'static>> {
                 .map(|t| t.to_rfc3339())
                 .unwrap_or_else(|| "unknown".into()),
             status.version.as_deref().unwrap_or("unknown")
+        )));
+        lines.push(line(format!(
+            "Enabled specialists: {} | enrolled peers: {} | last exchange {}",
+            status.enabled_specialists.join(", "),
+            status.enrolled_peers.len(),
+            status
+                .last_exchange_at
+                .map(|t| t.to_rfc3339())
+                .unwrap_or_else(|| "unknown".into())
         )));
         lines.push(line(
             "Reported heartbeat is observation, not proof of peer reachability or task success.",
@@ -73,7 +84,7 @@ pub(in crate::tui) fn draw_companions(frame: &mut ratatui::Frame<'_>, app: &App,
         ));
     } else {
         lines.push(line(
-            "Observed peers on this page (j/k select, Enter inspect exchanges):",
+            "Enrolled / observed peers (j/k select, Enter inspect exchanges):",
         ));
         for (i, peer) in peers
             .iter()
@@ -122,7 +133,19 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
         chunks[0],
     );
     let (lines, scroll, title) = if state.my_inbox {
-        (inbox_lines(state), state.inbox.scroll, "My Inbox")
+        (
+            if app.service.inbox_enabled == Some(true) {
+                inbox_lines(state)
+            } else {
+                vec![line(if app.service.inbox_enabled == Some(false) {
+                    "My Inbox is disabled for the selected area. Press r to refresh service health."
+                } else {
+                    "My Inbox unavailable: service availability metadata is unknown. Press r to retry health."
+                })]
+            },
+            state.inbox.scroll,
+            "My Inbox",
+        )
     } else {
         (exchange_lines(state), state.scroll, "Agent exchanges")
     };
@@ -161,6 +184,15 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
             "Unavailable / denied; previous observations are stale: {error}"
         )));
     }
+    if !state.can_observe() {
+        lines.extend(companion_lines(state));
+        return lines;
+    }
+    if state.companion_error.is_some() {
+        lines.push(line(
+            "Companion status unavailable; retained exchange observations may be stale.",
+        ));
+    }
     if let Some(detail) = &state.detail {
         let exchange = &detail.exchange;
         lines.push(line(format!(
@@ -171,6 +203,9 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
             "Specialist {} | created {} | updated {}",
             exchange.specialist_id, exchange.created_at, exchange.updated_at
         )));
+        if let Some(id) = &detail.remote_task_id {
+            lines.push(line(format!("Remote task: {id}")));
+        }
         lines.push(line(format!("Objective: {}", exchange.objective)));
         lines.push(line(if detail.independently_verified {
             "Service reports independently verified evidence."
@@ -275,77 +310,20 @@ pub(super) fn inbox_lines(state: &ConversationsState) -> Vec<Line<'static>> {
     if !inbox.signed_in() {
         return lines;
     }
+    if let Some(network) = &inbox.network {
+        lines.push(line(format!(
+            "Inbox enabled={} | home instance {} | identity {}",
+            value(network, "enabled"),
+            value(network, "home_instance_id"),
+            network
+                .get("identity")
+                .filter(|v| !v.is_null())
+                .map(|i| value(i, "handle"))
+                .unwrap_or_else(|| "not linked".into())
+        )));
+    }
     if let Some(detail) = &inbox.detail {
-        if let Some(conversation) = detail.get("conversation") {
-            lines.push(line(format!(
-                "{} | {} | paused={}",
-                value(conversation, "id"),
-                value(conversation, "title"),
-                value(conversation, "paused")
-            )));
-        }
-        lines.push(line(
-            "Esc list | j/k PgUp/PgDn scroll | n load older messages",
-        ));
-        lines.push(line("Participants:"));
-        if let Some(members) = detail.get("members").and_then(Value::as_array) {
-            for member in members {
-                let specialist = member.get("specialist").unwrap_or(&Value::Null);
-                lines.push(line(format!(
-                    "  {} | {} | active={} | member {}",
-                    value(specialist, "display_name"),
-                    value(specialist, "instance_id"),
-                    value(member, "active"),
-                    value(member, "id")
-                )));
-                lines.push(line(format!(
-                    "  Disclosure: {}",
-                    value(member, "disclosure_summary")
-                )));
-            }
-        }
-        lines.push(line("Messages (untrusted plain text):"));
-        if let Some(messages) = detail.get("messages").and_then(Value::as_array) {
-            if messages.is_empty() {
-                lines.push(line("No messages returned."));
-            }
-            for message in messages {
-                lines.push(line(format!(
-                    "#{} {} | {} | delivery {}",
-                    value(message, "sequence"),
-                    value(message, "role"),
-                    value(message, "created_at"),
-                    value(message, "delivery")
-                )));
-                for body in value(message, "body").lines() {
-                    lines.push(line(body));
-                }
-            }
-        }
-        lines.push(line("Task cards:"));
-        if let Some(tasks) = detail.get("tasks").and_then(Value::as_array) {
-            if tasks.is_empty() {
-                lines.push(line("No task cards returned."));
-            }
-            for task in tasks {
-                lines.push(line(format!(
-                    "{} | {} | {}",
-                    value(task, "id"),
-                    value(task, "status"),
-                    value(task, "objective")
-                )));
-                for field in ["question", "result", "artifacts"] {
-                    if let Some(v) = task.get(field).filter(|v| !v.is_null()) {
-                        lines.push(line(format!(
-                            "{field}: {}",
-                            v.as_str()
-                                .map(str::to_owned)
-                                .unwrap_or_else(|| v.to_string())
-                        )));
-                    }
-                }
-            }
-        }
+        lines.extend(inbox_detail_lines(detail));
     } else if let Some(page) = inbox.page.as_ref().and_then(Value::as_array) {
         if page.is_empty() {
             lines.push(line(
@@ -369,6 +347,81 @@ pub(super) fn inbox_lines(state: &ConversationsState) -> Vec<Line<'static>> {
         }
     } else {
         lines.push(line("Press r to load conversations."));
+    }
+    lines
+}
+
+pub(super) fn inbox_detail_lines(detail: &Value) -> Vec<Line<'static>> {
+    let mut lines = vec![];
+    if let Some(conversation) = detail.get("conversation") {
+        lines.push(line(format!(
+            "{} | {} | paused={}",
+            value(conversation, "id"),
+            value(conversation, "title"),
+            value(conversation, "paused")
+        )));
+    }
+    lines.push(line(
+        "Esc list | j/k PgUp/PgDn scroll | n load older messages",
+    ));
+    lines.push(line("Participants:"));
+    if let Some(members) = detail.get("members").and_then(Value::as_array) {
+        for member in members {
+            let specialist = member.get("specialist").unwrap_or(&Value::Null);
+            lines.push(line(format!(
+                "  {} | {} | active={} | member {}",
+                value(specialist, "display_name"),
+                value(specialist, "instance_id"),
+                value(member, "active"),
+                value(member, "id")
+            )));
+            lines.push(line(format!(
+                "  Disclosure: {}",
+                value(member, "disclosure_summary")
+            )));
+        }
+    }
+    lines.push(line("Messages (untrusted plain text):"));
+    if let Some(messages) = detail.get("messages").and_then(Value::as_array) {
+        if messages.is_empty() {
+            lines.push(line("No messages returned."));
+        }
+        for message in messages {
+            lines.push(line(format!(
+                "#{} {} | {} | delivery {}",
+                value(message, "sequence"),
+                value(message, "role"),
+                value(message, "created_at"),
+                value(message, "delivery")
+            )));
+            for body in value(message, "body").lines() {
+                lines.push(line(body));
+            }
+        }
+    }
+    lines.push(line("Task cards:"));
+    if let Some(tasks) = detail.get("tasks").and_then(Value::as_array) {
+        if tasks.is_empty() {
+            lines.push(line("No task cards returned."));
+        }
+        for task in tasks {
+            lines.push(line(format!(
+                "{} | {} | {}",
+                value(task, "id"),
+                value(task, "status"),
+                value(task, "objective")
+            )));
+            for field in ["question", "result", "artifacts"] {
+                if let Some(v) = task.get(field).filter(|v| !v.is_null()) {
+                    lines.push(line(format!(
+                        "{field}: {}",
+                        v.as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| v.to_string())
+                    )));
+                }
+            }
+        }
     }
     lines
 }
