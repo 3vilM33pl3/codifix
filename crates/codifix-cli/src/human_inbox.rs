@@ -44,17 +44,75 @@ impl InboxTarget {
             area_instance_id,
         })
     }
+    /// Bind only public metadata from the protected selected config. Environment
+    /// overlays cannot silently redirect a human browser or alter its area.
     pub(crate) fn from_config(config: &codifix_config::AppConfig) -> Result<Self, String> {
+        #[derive(Deserialize)]
+        struct PublicConfig {
+            area: Option<codifix_config::AreaIdentityConfig>,
+            auth: Option<PublicAuth>,
+        }
+        #[derive(Deserialize)]
+        struct PublicAuth {
+            public_base_url: Option<String>,
+        }
+        let path = config
+            .resolved_config_path
+            .as_deref()
+            .ok_or("Inbox requires a selected area config file")?;
+        #[cfg(not(windows))]
+        let text = {
+            let metadata =
+                std::fs::metadata(path).map_err(|_| "Selected area config unavailable")?;
+            if !metadata.is_file() || metadata.len() > 1024 * 1024 {
+                return Err("Selected area config must be a bounded regular file".into());
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{MetadataExt, PermissionsExt};
+                let owner = std::process::Command::new("id")
+                    .arg("-u")
+                    .output()
+                    .map_err(|_| "Cannot verify selected area config owner")?;
+                let uid = std::str::from_utf8(&owner.stdout)
+                    .ok()
+                    .and_then(|s| s.trim().parse::<u32>().ok())
+                    .ok_or("Cannot verify selected area config owner")?;
+                if !owner.status.success()
+                    || metadata.permissions().mode() & 0o022 != 0
+                    || (metadata.uid() != 0 && metadata.uid() != uid)
+                {
+                    return Err("Inbox config must belong to this user or root and must not be group/world writable".into());
+                }
+            }
+            std::fs::read_to_string(path).map_err(|_| "Selected area config unavailable")?
+        };
+        #[cfg(windows)]
+        let text = String::from_utf8(
+            codifix_platform::private_windows::Input::open(path, 1024 * 1024)
+                .and_then(|input| input.read(1024 * 1024))
+                .map_err(|_| "Inbox config requires protected Windows ACLs")?,
+        )
+        .map_err(|_| "Invalid Inbox public config")?;
+        let public: PublicConfig =
+            toml::from_str(&text).map_err(|_| "Invalid Inbox public config")?;
+        if public.area.is_none() || public.area != config.area {
+            return Err(
+                "Selected area config identity changed or differs from effective config".into(),
+            );
+        }
+        let origin = public
+            .auth
+            .and_then(|a| a.public_base_url)
+            .ok_or("Selected area config requires auth.public_base_url for Inbox")?;
+        if config.auth.public_base_url.as_deref() != Some(origin.as_str()) {
+            return Err("Effective Inbox origin differs from selected area config".into());
+        }
         Self::new(
-            config
-                .auth
-                .public_base_url
-                .as_deref()
-                .ok_or("Selected area requires auth.public_base_url for Inbox")?,
-            config
+            &origin,
+            public
                 .area
-                .as_ref()
-                .ok_or("Inbox requires a selected area identity")?
+                .ok_or("Inbox requires a selected area")?
                 .instance_id,
         )
     }
@@ -259,14 +317,26 @@ impl HumanInbox {
                 _cancel: cancel,
             });
         }
-        let this = self.clone();
+        let weak_state = Arc::downgrade(&self.state);
+        let target = self.target.clone();
+        let client = self.client.clone();
+        let operation = self.operation.clone();
         tokio::spawn(async move {
-            let result = match tokio::time::timeout(
+            let received = tokio::time::timeout(
                 Duration::from_secs(600),
                 receive_callback(listener, &redirect, &nonce, receiver),
             )
-            .await
-            {
+            .await;
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
+            let this = Self {
+                target,
+                client,
+                state,
+                operation,
+            };
+            let result = match received {
                 Ok(Ok((code, mut socket))) => {
                     let result = this.complete(generation, code, verifier, redirect).await;
                     respond(
@@ -311,7 +381,12 @@ impl HumanInbox {
             (p.url.clone(), s.generation)
         };
         self.verify().await?;
-        self.current(generation)?;
+        // Keep the generation locked through browser launch, so a concurrent
+        // cancellation cannot open an obsolete authorization request.
+        let state = self.state.lock().map_err(|_| "Inbox state unavailable")?;
+        if state.generation != generation {
+            return Err("Inbox sign-in cancelled".into());
+        }
         open_browser(url.as_str())
     }
     pub(crate) fn poll_login(&self, request_id: Uuid) -> Result<LoginProgress, String> {
@@ -437,7 +512,12 @@ impl HumanInbox {
                     .ok_or("Sign in to My Inbox first")?,
             )
         };
-        self.verify().await?;
+        if let Err(error) = self.verify().await {
+            if self.current(generation).is_ok() {
+                self.cancel_login();
+            }
+            return Err(error);
+        }
         self.current(generation)?;
         let result = self.raw(path, Method::GET, Some(&credential), None).await;
         if result
@@ -453,7 +533,12 @@ impl HumanInbox {
             }
         }
         self.current(generation)?;
-        self.verify().await?;
+        if let Err(error) = self.verify().await {
+            if self.current(generation).is_ok() {
+                self.cancel_login();
+            }
+            return Err(error);
+        }
         self.current(generation)?;
         result
     }
@@ -635,3 +720,6 @@ async fn respond(socket: &mut TcpStream, status: &str, message: &str) {
     )
     .await;
 }
+
+#[cfg(test)]
+mod tests;

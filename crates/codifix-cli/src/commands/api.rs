@@ -27,6 +27,8 @@ use uuid::Uuid;
 
 use crate::commands::output::{service_url, write_headers};
 
+#[cfg(feature = "tui")]
+mod agency_observation;
 mod laptop_cache;
 mod laptop_corrections;
 mod local_session;
