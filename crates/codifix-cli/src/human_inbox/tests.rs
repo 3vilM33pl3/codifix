@@ -15,6 +15,7 @@ struct Mock {
     human: AtomicBool,
     unauthorized: AtomicBool,
     logout_fails: AtomicBool,
+    redirect_reads: AtomicBool,
     exchange_wait: AtomicBool,
     read_wait: AtomicBool,
     exchange_arrived: Notify,
@@ -40,6 +41,7 @@ async fn fixture() -> (HumanInbox, Arc<Mock>, tokio::task::JoinHandle<()>) {
         human: AtomicBool::new(true),
         unauthorized: AtomicBool::new(false),
         logout_fails: AtomicBool::new(false),
+        redirect_reads: AtomicBool::new(false),
         exchange_wait: AtomicBool::new(false),
         read_wait: AtomicBool::new(false),
         exchange_arrived: Notify::new(),
@@ -144,7 +146,9 @@ async fn fixture() -> (HumanInbox, Arc<Mock>, tokio::task::JoinHandle<()>) {
                     if m.read_wait.load(Ordering::SeqCst) {
                         m.read_release.notified().await;
                     }
-                    if m.unauthorized.load(Ordering::SeqCst) {
+                    if m.redirect_reads.load(Ordering::SeqCst) {
+                        (302, json!({"secret":"must not be displayed"}))
+                    } else if m.unauthorized.load(Ordering::SeqCst) {
                         (401, json!({"secret":"must not be displayed"}))
                     } else if path == "/v1/network/status" {
                         (200, json!({"enabled":true,"identity":null}))
@@ -153,7 +157,7 @@ async fn fixture() -> (HumanInbox, Arc<Mock>, tokio::task::JoinHandle<()>) {
                     }
                 };
                 let body = serde_json::to_string(&value).unwrap();
-                socket.write_all(format!("HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).as_bytes()).await.unwrap();
+                socket.write_all(format!("HTTP/1.1 {status} OK\r\nLocation: http://127.0.0.1:1/never-follow\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).as_bytes()).await.unwrap();
             });
         }
     });
@@ -448,7 +452,11 @@ fn trusted_public_metadata_must_match_effective_config() {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     }
-    let mut config = codifix_config::AppConfig::default();
+    let mut config: codifix_config::AppConfig = serde_json::from_value(json!({
+        "service": {"bind_addr":"127.0.0.1:4040","api_token":"ml_synthetic_only"},
+        "database": {"url":"postgresql://invalid/synthetic"}
+    }))
+    .unwrap();
     config.resolved_config_path = Some(path.clone());
     config.area = Some(area);
     config.auth.public_base_url = Some("https://inbox.example/".into());
@@ -459,4 +467,16 @@ fn trusted_public_metadata_must_match_effective_config() {
     config.area.as_mut().unwrap().instance_id = Uuid::new_v4();
     assert!(InboxTarget::from_config(&config).is_err());
     std::fs::remove_file(path).unwrap();
+}
+
+#[tokio::test]
+async fn redirects_are_rejected_without_rendering_location_or_body() {
+    let (inbox, m, server) = fixture().await;
+    login(&inbox, &m).await;
+    m.redirect_reads.store(true, Ordering::SeqCst);
+    let error = inbox.list().await.unwrap_err();
+    assert_eq!(error, "Inbox returned HTTP 302");
+    assert!(!error.contains("127.0.0.1"));
+    assert!(!error.contains("secret"));
+    server.abort();
 }
