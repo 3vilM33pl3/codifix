@@ -33,6 +33,7 @@ pub(in crate::tui) struct ConversationsState {
     companion_task: Option<tokio::task::JoinHandle<()>>,
     page: Option<ExchangePage>,
     detail: Option<ExchangeDetail>,
+    exchange_metadata: bool,
     exchange_generation: u64,
     exchange_busy: bool,
     exchange_error: Option<String>,
@@ -66,6 +67,9 @@ enum Read {
 impl ConversationsState {
     pub(in crate::tui) fn my_inbox_selected(&self) -> bool {
         self.my_inbox
+    }
+    pub(in crate::tui) fn exchange_open(&self) -> bool {
+        self.detail.is_some()
     }
     fn can_observe(&self) -> bool {
         !self.observation_denied && self.companion.as_ref().is_some_and(|s| s.exchange_access)
@@ -160,6 +164,7 @@ impl ConversationsState {
             Ok(ObservationResult::Page(page)) => {
                 self.page = Some(page);
                 self.detail = None;
+                self.exchange_metadata = false;
                 self.selected = 0;
                 self.scroll = 0;
                 self.exchange_loaded = Some(Instant::now());
@@ -220,6 +225,7 @@ impl ConversationsState {
         self.exchange_busy = false;
         self.exchange_error = None;
         self.detail = None;
+        self.exchange_metadata = false;
         self.page = None;
         self.exchange_loaded = None;
         self.before = None;
@@ -424,6 +430,10 @@ impl App {
             return handled;
         }
         match key.code {
+            KeyCode::Char('m') if self.conversations.detail.is_some() => {
+                self.conversations.exchange_metadata = !self.conversations.exchange_metadata;
+                self.conversations.scroll = 0;
+            }
             KeyCode::Char('/') => {
                 self.conversations.editing_peer = true;
                 self.conversations.peer_draft = self.conversations.peer.clone().unwrap_or_default();
@@ -443,6 +453,7 @@ impl App {
             {
                 self.conversations.cancel_exchange_read();
                 self.conversations.detail = None;
+                self.conversations.exchange_metadata = false;
                 self.conversations.scroll = 0;
             }
             KeyCode::Down | KeyCode::Char('j') if self.conversations.detail.is_none() => {
@@ -461,7 +472,7 @@ impl App {
                 self.conversations.scroll = 0;
                 self.conversations.selected = self.conversations.selected.saturating_sub(1)
             }
-            KeyCode::Enter => {
+            KeyCode::Enter if self.conversations.detail.is_none() => {
                 if let Some(id) = self
                     .conversations
                     .page

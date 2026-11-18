@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
 use crate::tui::theme::{Theme, themed_block, themed_focus_block};
+use codifix_record::agency_observation::ExchangeSummary;
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::Style,
-    text::Line,
+    text::{Line, Span},
     widgets::{Paragraph, Wrap},
 };
 use serde_json::Value;
@@ -125,8 +126,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
         .meta
         .area
         .as_ref()
-        .map(|a| format!("{} / {}", a.name, a.instance_id))
-        .unwrap_or_else(|| "custom / no area identity".into());
+        .map_or("custom service", |a| a.name.as_str());
     let scope = vec![
         line(format!("Area {area_name} | project {}", app.project)),
         line(if state.my_inbox {
@@ -154,27 +154,41 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
             "My Inbox",
         )
     } else {
-        (exchange_lines(state), state.scroll, "Agent exchanges")
+        let title = match (state.detail.is_some(), state.exchange_metadata) {
+            (true, true) => "Exchange details",
+            (true, false) => "Transcript",
+            (false, _) => "Agent exchanges",
+        };
+        (exchange_lines(state), state.scroll, title)
     };
     // Clamp to the rendered wrapped height: very long content remains reachable,
     // but repeated page keys never strand the viewport beyond the final line.
     let block = themed_block(title);
     let inner = block.inner(chunks[1]);
-    let max = scroll_limit(&lines, inner);
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+    let max = scroll_limit(&paragraph, inner);
     frame.render_widget(
-        Paragraph::new(lines)
+        paragraph
             .scroll((scroll.min(max), 0))
-            .wrap(Wrap { trim: false })
             .style(Style::default().fg(Theme::TEXT))
             .block(block),
         chunks[1],
     );
 }
 pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
-    let mut lines = vec![line(format!(
-        "Peer: {} | / exact peer filter (empty = all) | Home first page",
-        state.peer.as_deref().unwrap_or("all")
-    ))];
+    let mut lines = vec![if state.detail.is_some() {
+        line(if state.exchange_metadata {
+            "m transcript · Esc back"
+        } else {
+            "m details · Esc back"
+        })
+        .style(Style::default().fg(Theme::MUTED))
+    } else {
+        line(format!(
+            "Peer: {} · / filter · Enter open",
+            state.peer.as_deref().unwrap_or("all")
+        ))
+    }];
     if state.editing_peer {
         lines.push(line(format!(
             "Peer filter: {}█ (Enter apply / Esc cancel)",
@@ -199,46 +213,10 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
         ));
     }
     if let Some(detail) = &state.detail {
-        let exchange = &detail.exchange;
-        lines.push(line(format!(
-            "{} | {} | {} | {}",
-            exchange.task_id, exchange.peer, exchange.direction, exchange.status
-        )));
-        lines.push(line(format!(
-            "Specialist {} | created {} | updated {}",
-            exchange.specialist_id, exchange.created_at, exchange.updated_at
-        )));
-        if let Some(id) = &detail.remote_task_id {
-            lines.push(line(format!("Remote task: {id}")));
-        }
-        lines.push(line(format!("Objective: {}", exchange.objective)));
-        lines.push(line(if detail.independently_verified {
-            "Service reports independently verified evidence."
+        if state.exchange_metadata {
+            exchange_metadata(&mut lines, state, detail);
         } else {
-            "Observed journal / legacy snapshot; independently verified: false."
-        }));
-        if !exchange.journal_available {
-            lines.push(line(
-                "No event journal is available; this may be a legacy task snapshot.",
-            ));
-        }
-        if detail.events_truncated {
-            lines.push(line(
-                "Journal truncated by the service's bounded detail limit.",
-            ));
-        }
-        lines.push(line("Esc list | j/k or PgUp/PgDn scroll | r refresh"));
-        for event in &detail.events {
-            lines.push(line(format!(
-                "\n#{} {} {}",
-                event.sequence, event.kind, event.recorded_at
-            )));
-            for body in event.body.lines() {
-                lines.push(line(body));
-            }
-        }
-        if detail.events.is_empty() {
-            lines.push(line("No journal events were returned."));
+            exchange_transcript(&mut lines, state, detail);
         }
     } else if let Some(page) = &state.page {
         lines.push(line(format!(
@@ -260,18 +238,19 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
             .skip(state.selected)
             .take(5)
         {
+            let (from, to) = participants(state, exchange);
             lines.push(line(format!(
-                "{} {} | {} | {} | {}",
+                "{} {}",
                 if i == state.selected { ">" } else { " " },
-                exchange.task_id,
-                exchange.peer,
-                exchange.direction,
-                exchange.status
+                exchange.objective
             )));
-            lines.push(line(format!(
-                "  {} | {} | {}",
-                exchange.updated_at, exchange.specialist_id, exchange.objective
-            )));
+            lines.push(
+                line(format!(
+                    "  {from} → {to} · {}",
+                    exchange.status.replace('_', " ")
+                ))
+                .style(Style::default().fg(Theme::MUTED)),
+            );
         }
     } else {
         lines.extend(companion_lines(state));
@@ -284,6 +263,193 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
     }
     lines
 }
+fn participants<'a>(
+    state: &'a ConversationsState,
+    exchange: &'a ExchangeSummary,
+) -> (&'a str, &'a str) {
+    let local = state
+        .scope
+        .as_ref()
+        .and_then(|scope| scope.area.as_ref())
+        .map(|(name, _)| name.as_str())
+        .or_else(|| {
+            state
+                .companion
+                .as_ref()
+                .and_then(|status| status.area.as_deref())
+        })
+        .unwrap_or("local");
+    if exchange.direction == "incoming" {
+        (&exchange.peer, local)
+    } else {
+        (local, &exchange.peer)
+    }
+}
+
+fn exchange_transcript(
+    lines: &mut Vec<Line<'static>>,
+    state: &ConversationsState,
+    detail: &ExchangeDetail,
+) {
+    let exchange = &detail.exchange;
+    let (initiator, responder) = participants(state, exchange);
+    let incoming = exchange.direction == "incoming";
+    if !exchange.journal_available {
+        lines.push(
+            line("Earlier exchange · retained messages only")
+                .style(Style::default().fg(Theme::MUTED)),
+        );
+    }
+    let mut messages = false;
+    for event in &detail.events {
+        // Schema 99 returns retained fields with a fixed role prefix. Their
+        // timestamps describe the snapshot, so use the service's supplied order.
+        let (kind, body) = if event.kind == "snapshot" && !exchange.journal_available {
+            event
+                .body
+                .split_once(": ")
+                .unwrap_or(("snapshot", event.body.as_str()))
+        } else {
+            (event.kind.as_str(), event.body.as_str())
+        };
+        if body.trim().is_empty() {
+            continue;
+        }
+        let (speaker, from_peer) = match kind {
+            "request" | "answer" => (initiator, incoming),
+            "clarification" | "result" => (responder, !incoming),
+            "snapshot" => {
+                lines.push(line(body));
+                messages = true;
+                continue;
+            }
+            _ => continue,
+        };
+        if let Some(note) = recorded_notice(kind, body) {
+            lines.push(line(note).style(Style::default().fg(Theme::MUTED)));
+        } else {
+            transcript_message(lines, speaker, from_peer, body);
+        }
+        messages = true;
+    }
+    if !messages {
+        lines.push(line("No messages were retained."));
+    }
+    if detail.events_truncated {
+        lines.push(line("More events were recorded than this view can show."));
+    }
+}
+
+fn recorded_notice(kind: &str, body: &str) -> Option<&'static str> {
+    match (kind, body) {
+        ("result", "Verified delegated_result_reported") => Some("Peer reported completion."),
+        ("result", "Verified status_observed") => Some("Companion recorded the status check."),
+        ("result", "Verified plan_valid") => {
+            Some("Companion recorded that the plan passed validation.")
+        }
+        ("result", "Verified linear_readback_verified") => {
+            Some("Companion recorded the Linear readback.")
+        }
+        ("result", "Verified linear_state_observed") => {
+            Some("Companion recorded the Linear state.")
+        }
+        ("result", "Verified model_output_valid_json") => {
+            Some("Companion recorded that the output passed JSON validation.")
+        }
+        (
+            "clarification",
+            "Execution stopped at an authorization, validation, or uncertain-effect boundary. Inspect the private effect ledger before resuming.",
+        ) => Some("Execution stopped. See details for the recorded reason."),
+        ("clarification", "The peer requires input through its authorized channel.") => {
+            Some("The peer requires input through its authorized channel.")
+        }
+        ("clarification", reason)
+            if reason.starts_with("This operation can verify the criterion '")
+                && reason.ends_with("arbitrary outcome claims cannot be certified.") =>
+        {
+            Some("The companion could not verify the requested acceptance criterion. See details.")
+        }
+        _ => None,
+    }
+}
+
+fn transcript_message(lines: &mut Vec<Line<'static>>, speaker: &str, from_peer: bool, body: &str) {
+    let speaker_style = Style::default().fg(if from_peer {
+        Theme::ACCENT
+    } else {
+        Theme::ACCENT_STRONG
+    });
+    let speaker = plain(speaker).replace('\n', " ");
+    let mut rows = body.trim_end().split('\n').peekable();
+    let mut first = true;
+    while let Some(row) = rows.next() {
+        let mut spans = Vec::new();
+        if first && !from_peer {
+            spans.push(Span::styled(format!("{speaker} > "), speaker_style));
+        }
+        spans.push(Span::raw(plain(row)));
+        if from_peer && rows.peek().is_none() {
+            spans.push(Span::styled(format!(" < {speaker}"), speaker_style));
+        }
+        lines.push(Line::from(spans).alignment(if from_peer {
+            Alignment::Right
+        } else {
+            Alignment::Left
+        }));
+        first = false;
+    }
+}
+
+fn exchange_metadata(
+    lines: &mut Vec<Line<'static>>,
+    state: &ConversationsState,
+    detail: &ExchangeDetail,
+) {
+    let exchange = &detail.exchange;
+    if let Some((_, id)) = state.scope.as_ref().and_then(|scope| scope.area.as_ref()) {
+        lines.push(line(format!("Area instance: {id}")));
+    }
+    lines.push(line(format!(
+        "{} | {} | {} | {}",
+        exchange.task_id, exchange.peer, exchange.direction, exchange.status
+    )));
+    lines.push(line(format!(
+        "Specialist {} | created {} | updated {}",
+        exchange.specialist_id, exchange.created_at, exchange.updated_at
+    )));
+    if let Some(id) = &detail.remote_task_id {
+        lines.push(line(format!("Remote task: {id}")));
+    }
+    lines.push(line(format!("Objective: {}", exchange.objective)));
+    lines.push(line(if detail.independently_verified {
+        "Service reports independently verified evidence."
+    } else {
+        "Observed journal / legacy snapshot; independently verified: false."
+    }));
+    if !exchange.journal_available {
+        lines.push(line(
+            "No event journal is available; this may be a legacy task snapshot.",
+        ));
+    }
+    if detail.events_truncated {
+        lines.push(line(
+            "Journal truncated by the service's bounded detail limit.",
+        ));
+    }
+    for event in &detail.events {
+        lines.push(line(format!(
+            "\n#{} {} {}",
+            event.sequence, event.kind, event.recorded_at
+        )));
+        for body in event.body.lines() {
+            lines.push(line(body));
+        }
+    }
+    if detail.events.is_empty() {
+        lines.push(line("No journal events were returned."));
+    }
+}
+
 pub(super) fn inbox_lines(state: &ConversationsState) -> Vec<Line<'static>> {
     let inbox = &state.inbox;
     let mut lines = vec![
@@ -438,10 +604,12 @@ pub(super) fn content_scroll_limit(state: &ConversationsState, content: Rect) ->
     } else {
         exchange_lines(state)
     };
-    scroll_limit(&lines, inner)
+    scroll_limit(&Paragraph::new(lines).wrap(Wrap { trim: false }), inner)
 }
-fn scroll_limit(lines: &[Line<'_>], inner: Rect) -> u16 {
-    crate::tui::render::wrapped_line_count(lines, inner.width)
+
+pub(super) fn scroll_limit(paragraph: &Paragraph<'_>, inner: Rect) -> u16 {
+    paragraph
+        .line_count(inner.width)
         .saturating_sub(inner.height as usize)
         .min(u16::MAX as usize) as u16
 }

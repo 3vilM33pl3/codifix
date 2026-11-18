@@ -103,9 +103,13 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
     } else {
         let mut spans = match app.active_tab {
-            TabKind::Conversations => vec![Span::raw(
-                "v view  r refresh  j/k select  Enter inspect  / peer  PgDn next/scroll  i sign in  o sign out",
-            )],
+            TabKind::Conversations => vec![Span::raw(if app.conversations.my_inbox_selected() {
+                "v view  r refresh  Enter open  i sign in  o sign out"
+            } else if app.conversations.exchange_open() {
+                "j/k scroll  PgUp/PgDn page  m transcript/details  Esc back  r refresh"
+            } else {
+                "j/k select  Enter open  / peer  PgDn older  v Inbox  r refresh"
+            })],
             TabKind::Offline => vec![Span::raw(
                 "r refresh  j/k subscription  / question  Enter search  d/u scroll",
             )],

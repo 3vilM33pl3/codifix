@@ -76,6 +76,7 @@ fn status_identity_mismatch_cannot_become_fresh() {
 #[test]
 fn exchange_detail_renders_observed_limits_and_escapes_controls() {
     let mut s = state();
+    s.exchange_metadata = true;
     s.detail = Some(detail());
     let text = render::exchange_lines(&s)
         .iter()
@@ -89,6 +90,103 @@ fn exchange_detail_renders_observed_limits_and_escapes_controls() {
     assert!(!text.contains('\u{202e}'));
     assert!(text.contains("body�]8"));
 }
+#[test]
+fn transcript_keeps_message_order_and_uses_the_actual_initiating_side() {
+    use ratatui::layout::Alignment;
+
+    let mut s = state();
+    let mut d = detail();
+    d.exchange.peer = "homelab".into();
+    d.exchange.journal_available = true;
+    d.events = [
+        ("request", "Renew the certificates"),
+        ("status", "working"),
+        ("clarification", "Which namespace?"),
+        ("answer", "Staging.\nUse the regular rollout."),
+        ("result", "Job done"),
+        ("status", "completed"),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(
+        |(sequence, (kind, body))| codifix_record::agency_observation::ExchangeEvent {
+            sequence: sequence as i64,
+            kind: kind.into(),
+            body: body.into(),
+            recorded_at: d.exchange.updated_at,
+        },
+    )
+    .collect();
+    s.detail = Some(d.clone());
+    let lines = render::exchange_lines(&s);
+    assert_eq!(lines[1].to_string(), "workshop > Renew the certificates");
+    assert_eq!(lines[2].to_string(), "Which namespace? < homelab");
+    assert_eq!(lines[2].alignment, Some(Alignment::Right));
+    assert_eq!(lines[3].to_string(), "workshop > Staging.");
+    assert_eq!(lines[4].to_string(), "Use the regular rollout.");
+    assert_eq!(lines[5].to_string(), "Job done < homelab");
+    assert_eq!(lines.len(), 6);
+
+    d.exchange.direction = "incoming".into();
+    s.detail = Some(d);
+    let lines = render::exchange_lines(&s);
+    assert_eq!(lines[1].to_string(), "Renew the certificates < homelab");
+    assert_eq!(lines[2].to_string(), "workshop > Which namespace?");
+    assert_eq!(lines[5].to_string(), "workshop > Job done");
+}
+
+#[test]
+fn transcript_labels_retained_snapshots_and_keeps_machine_receipts_neutral() {
+    let mut s = state();
+    let mut d = detail();
+    d.exchange.peer = "homelab".into();
+    let mut result = d.events[0].clone();
+    d.events[0].body = "request: Check the \u{1b}service".into();
+    result.body = "result: Verified delegated_result_reported".into();
+    d.events.push(result);
+    s.detail = Some(d);
+    let lines = render::exchange_lines(&s);
+    assert_eq!(
+        lines[1].to_string(),
+        "Earlier exchange · retained messages only"
+    );
+    assert_eq!(lines[2].to_string(), "workshop > Check the �service");
+    assert_eq!(lines[3].to_string(), "Peer reported completion.");
+}
+
+#[test]
+fn narrow_transcript_can_scroll_to_the_final_reply() {
+    use ratatui::widgets::{Paragraph, Wrap};
+
+    let mut s = state();
+    let mut d = detail();
+    d.exchange.peer = "lab".into();
+    d.exchange.journal_available = true;
+    d.events[0].kind = "request".into();
+    d.events[0].body = "abcdef abcdef abcdef\n".repeat(12);
+    let mut result = d.events[0].clone();
+    result.kind = "result".into();
+    result.body = "Done".into();
+    d.events.push(result);
+    s.detail = Some(d);
+    let mut terminal = Terminal::new(TestBackend::new(11, 4)).unwrap();
+    let paragraph = Paragraph::new(render::exchange_lines(&s)).wrap(Wrap { trim: false });
+    terminal
+        .draw(|f| {
+            let end = render::scroll_limit(&paragraph, f.area());
+            f.render_widget(paragraph.scroll((end, 0)), f.area());
+        })
+        .unwrap();
+    let rendered: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(rendered.contains("Done < lab"));
+}
+
 #[test]
 fn human_replies_from_previous_scope_or_generation_are_discarded() {
     let mut s = state();
@@ -273,6 +371,11 @@ async fn repeated_detail_scrolling_stops_at_the_end_and_can_move_back() {
     assert!(end > 0 && end < 200);
     app.conversations_key(KeyEvent::from(KeyCode::PageUp), &api);
     assert_eq!(app.conversations.scroll, end.saturating_sub(8));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('m')), &api));
+    assert!(app.conversations.exchange_metadata);
+    assert_eq!(app.conversations.scroll, 0);
+    app.conversations_key(KeyEvent::from(KeyCode::Char('m')), &api);
+    assert!(!app.conversations.exchange_metadata);
 }
 
 #[test]

@@ -26,7 +26,7 @@ codifix-platform = { path = "../codifix-platform" }
 codifix-service = { path = "../codifix-service", optional = true, default-features = false }
 codifix-skills = { path = "../codifix-skills" }
 codifix-watch = { path = "../codifix-watch" }
-ratatui = { workspace = true, optional = true }
+ratatui = { workspace = true, features = ["unstable-rendered-line-info"], optional = true }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
