@@ -64,6 +64,9 @@ enum Behavior {
     PollWrongContext,
     AnswerWrongId,
     AnswerWrongContext,
+    LeaseCompleted,
+    LeaseDeniedActive,
+    LeaseCompletedWrongContext,
 }
 struct Remote {
     behavior: Behavior,
@@ -72,6 +75,7 @@ struct Remote {
     polls: Vec<String>,
     cancellations: Vec<String>,
     denied: usize,
+    renewals: usize,
 }
 impl Default for Remote {
     fn default() -> Self {
@@ -82,6 +86,7 @@ impl Default for Remote {
             polls: vec![],
             cancellations: vec![],
             denied: 0,
+            renewals: 0,
         }
     }
 }
@@ -191,14 +196,23 @@ async fn poll(
     } else {
         REMOTE
     };
-    let context = if state.behavior == Behavior::PollWrongContext {
+    let context = if state.behavior == Behavior::PollWrongContext
+        || (state.behavior == Behavior::LeaseCompletedWrongContext && state.polls.len() > 1)
+    {
         "unrelated-context"
     } else {
         CONTEXT
     };
+    let phase = state.phase;
+    if matches!(
+        state.behavior,
+        Behavior::LeaseCompleted | Behavior::LeaseCompletedWrongContext
+    ) {
+        state.phase = a2a::TaskState::Completed;
+    }
     (
         StatusCode::OK,
-        Json(serde_json::to_value(remote_task(id, context, state.phase)).unwrap()),
+        Json(serde_json::to_value(remote_task(id, context, phase)).unwrap()),
     )
 }
 async fn cancel(
@@ -227,7 +241,20 @@ async fn renew(
     State(state): State<Arc<Mutex<Remote>>>,
     headers: HeaderMap,
 ) -> (StatusCode, Json<Value>) {
-    if authenticate(&mut state.lock().unwrap(), &headers) {
+    let mut state = state.lock().unwrap();
+    if authenticate(&mut state, &headers) {
+        state.renewals += 1;
+        if matches!(
+            state.behavior,
+            Behavior::LeaseCompleted
+                | Behavior::LeaseCompletedWrongContext
+                | Behavior::LeaseDeniedActive
+        ) {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error":"task_closed_or_revoked"})),
+            );
+        }
         (StatusCode::OK, Json(json!({"renewed":true})))
     } else {
         (
@@ -808,6 +835,43 @@ async fn revocation_and_local_cancellation_cancel_the_active_remote_task() {
             let remote = f.remote.lock().unwrap();
             assert_eq!(remote.sends.len(), 1);
             assert_eq!(remote.cancellations, vec![REMOTE]);
+        }
+        f.cleanup().await;
+    }
+}
+
+#[tokio::test]
+async fn lease_completion_race_reconciles_once_without_ignoring_revocation_or_binding() {
+    if !child("lease_completion_race_reconciles_once_without_ignoring_revocation_or_binding") {
+        return;
+    }
+    for behavior in [
+        Behavior::LeaseCompleted,
+        Behavior::LeaseDeniedActive,
+        Behavior::LeaseCompletedWrongContext,
+    ] {
+        let Some(f) = Fixture::new().await else {
+            return;
+        };
+        f.remote.lock().unwrap().behavior = behavior;
+        let task = f.store.submit(&f.request(), &f.operator).await.unwrap();
+        let done = f.settle(task.contract.id).await;
+        assert_eq!(
+            done.contract.status,
+            if behavior == Behavior::LeaseCompleted {
+                TaskStatus::Completed
+            } else {
+                TaskStatus::InputRequired
+            }
+        );
+        {
+            let state = f.remote.lock().unwrap();
+            assert_eq!(state.sends.len(), 1);
+            assert_eq!(state.renewals, 1);
+            assert_eq!(state.polls.len(), 2);
+        }
+        if behavior != Behavior::LeaseCompleted {
+            f.no_outcome(task.contract.id).await;
         }
         f.cleanup().await;
     }

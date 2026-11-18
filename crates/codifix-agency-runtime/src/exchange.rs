@@ -262,6 +262,7 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             .execute(&store.pool)
             .await?;
     }
+    let mut lease_conflict_recheck = false;
     loop {
         if let Err(error) = store
             .authorize(task.contract.id, task.revision, Usage::default())
@@ -290,6 +291,19 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         ensure!(
             remote.id == remote_id && remote.context_id == context,
             "remote task identity mismatch"
+        );
+        // A renewal can race a completed task. One fresh authenticated read may
+        // resolve that conflict; nonterminal/revoked work remains a hard denial.
+        ensure!(
+            !lease_conflict_recheck
+                || matches!(
+                    remote.status.state,
+                    a2a::TaskState::Completed
+                        | a2a::TaskState::Failed
+                        | a2a::TaskState::Canceled
+                        | a2a::TaskState::Rejected
+                ),
+            "remote lease renewal rejected while task remained nonterminal"
         );
         sqlx::query("UPDATE agency_remote_tasks SET last_response=$2 WHERE task_id=$1")
             .bind(task.contract.id)
@@ -341,21 +355,23 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                     let _ = cancel_remote(store, cfg, task.contract.id).await;
                     return Err(error);
                 }
-                bounded(
-                    client
-                        .post(format!(
-                            "{}/v1/tasks/{}/lease",
-                            endpoint.trim_end_matches('/'),
-                            urlencoding::encode(&remote_id)
-                        ))
-                        .header("A2A-Version", "1.0")
-                        .header("Content-Type", "application/a2a+json")
-                        .bearer_auth(&token)
-                        .json(&json!({}))
-                        .send()
-                        .await?,
-                )
-                .await?;
+                let renewal = client
+                    .post(format!(
+                        "{}/v1/tasks/{}/lease",
+                        endpoint.trim_end_matches('/'),
+                        urlencoding::encode(&remote_id)
+                    ))
+                    .header("A2A-Version", "1.0")
+                    .header("Content-Type", "application/a2a+json")
+                    .bearer_auth(&token)
+                    .json(&json!({}))
+                    .send()
+                    .await?;
+                if renewal.status() == reqwest::StatusCode::CONFLICT {
+                    lease_conflict_recheck = true;
+                    continue;
+                }
+                bounded(renewal).await?;
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         }
