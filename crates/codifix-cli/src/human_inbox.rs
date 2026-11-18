@@ -60,7 +60,7 @@ impl InboxTarget {
             .resolved_config_path
             .as_deref()
             .ok_or("Inbox requires a selected area config file")?;
-        const MAX_CONFIG_BYTES: usize = 1024 * 1024;
+        const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
         #[cfg(unix)]
         let text = {
             use std::io::Read;
@@ -79,7 +79,7 @@ impl InboxTarget {
             let metadata = file
                 .metadata()
                 .map_err(|_| "Selected area config unavailable")?;
-            if !metadata.is_file() || metadata.len() > MAX_CONFIG_BYTES as u64 {
+            if !metadata.is_file() || metadata.len() > MAX_CONFIG_BYTES {
                 return Err("Selected area config must be a bounded regular file".into());
             }
             if metadata.permissions().mode() & 0o022 != 0
@@ -89,10 +89,10 @@ impl InboxTarget {
             }
             let mut text = String::new();
             let read = file
-                .take(MAX_CONFIG_BYTES as u64 + 1)
+                .take(MAX_CONFIG_BYTES + 1)
                 .read_to_string(&mut text)
                 .map_err(|_| "Selected area config unavailable")?;
-            if read > MAX_CONFIG_BYTES {
+            if read as u64 > MAX_CONFIG_BYTES {
                 return Err("Selected area config must be a bounded regular file".into());
             }
             text
