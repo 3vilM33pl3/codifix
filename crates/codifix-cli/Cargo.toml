@@ -52,7 +52,7 @@ rustix = { version = "=1.1.4", features = ["fs", "process"], optional = true }
 
 [features]
 default = ["full"]
-tui = ["dep:ratatui", "dep:crossterm"]
+tui = ["dep:ratatui", "dep:crossterm", "dep:rustix"]
 project-sync = ["dep:codifix-federation-runtime", "dep:rustix"]
 embedded-service-postgres = ["dep:codifix-service", "project-sync"]
 embedded-service = ["embedded-service-postgres", "codifix-service/offline"]

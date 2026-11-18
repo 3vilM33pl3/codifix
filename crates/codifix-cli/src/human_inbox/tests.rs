@@ -345,6 +345,25 @@ async fn unauthorized_clears_session_and_hides_error_body() {
     let error = inbox.list().await.unwrap_err();
     assert!(!error.contains("secret"));
     assert!(!inbox.logged_in());
+    assert_eq!(inbox.state.lock().unwrap().cleanup.len(), 1);
+    inbox.sign_out().await.unwrap();
+    assert!(inbox.state.lock().unwrap().cleanup.is_empty());
+    server.abort();
+}
+
+#[tokio::test]
+async fn expired_native_session_allows_fresh_login_and_fences_old_results() {
+    let (inbox, mock, server) = fixture().await;
+    login(&inbox, &mock).await;
+    let generation = {
+        let mut state = inbox.state.lock().unwrap();
+        state.session.as_mut().unwrap().expires_at = Utc::now() - chrono::Duration::seconds(1);
+        state.generation
+    };
+    assert!(!inbox.logged_in());
+    assert!(inbox.current(generation).is_err());
+    assert!(inbox.begin_login().await.is_ok());
+    inbox.cancel_login();
     server.abort();
 }
 #[tokio::test]

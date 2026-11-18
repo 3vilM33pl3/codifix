@@ -60,37 +60,47 @@ impl InboxTarget {
             .resolved_config_path
             .as_deref()
             .ok_or("Inbox requires a selected area config file")?;
-        #[cfg(not(windows))]
+        const MAX_CONFIG_BYTES: usize = 1024 * 1024;
+        #[cfg(unix)]
         let text = {
-            let metadata =
-                std::fs::metadata(path).map_err(|_| "Selected area config unavailable")?;
-            if !metadata.is_file() || metadata.len() > 1024 * 1024 {
+            use std::io::Read;
+            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+            let descriptor = rustix::fs::open(
+                path,
+                rustix::fs::OFlags::RDONLY
+                    | rustix::fs::OFlags::NOFOLLOW
+                    | rustix::fs::OFlags::CLOEXEC
+                    | rustix::fs::OFlags::NONBLOCK,
+                rustix::fs::Mode::empty(),
+            )
+            .map_err(|_| "Selected area config unavailable")?;
+            let file = std::fs::File::from(descriptor);
+            let metadata = file
+                .metadata()
+                .map_err(|_| "Selected area config unavailable")?;
+            if !metadata.is_file() || metadata.len() > MAX_CONFIG_BYTES as u64 {
                 return Err("Selected area config must be a bounded regular file".into());
             }
-            #[cfg(unix)]
+            if metadata.permissions().mode() & 0o022 != 0
+                || (metadata.uid() != 0 && metadata.uid() != rustix::process::geteuid().as_raw())
             {
-                use std::os::unix::fs::{MetadataExt, PermissionsExt};
-                let owner = std::process::Command::new("id")
-                    .arg("-u")
-                    .output()
-                    .map_err(|_| "Cannot verify selected area config owner")?;
-                let uid = std::str::from_utf8(&owner.stdout)
-                    .ok()
-                    .and_then(|s| s.trim().parse::<u32>().ok())
-                    .ok_or("Cannot verify selected area config owner")?;
-                if !owner.status.success()
-                    || metadata.permissions().mode() & 0o022 != 0
-                    || (metadata.uid() != 0 && metadata.uid() != uid)
-                {
-                    return Err("Inbox config must belong to this user or root and must not be group/world writable".into());
-                }
+                return Err("Inbox config must belong to this user or root and must not be group/world writable".into());
             }
-            std::fs::read_to_string(path).map_err(|_| "Selected area config unavailable")?
+            let mut text = String::new();
+            let read = file
+                .take(MAX_CONFIG_BYTES as u64 + 1)
+                .read_to_string(&mut text)
+                .map_err(|_| "Selected area config unavailable")?;
+            if read > MAX_CONFIG_BYTES {
+                return Err("Selected area config must be a bounded regular file".into());
+            }
+            text
         };
         #[cfg(windows)]
         let text = String::from_utf8(
-            codifix_platform::private_windows::Input::open(path, 1024 * 1024)
-                .and_then(|input| input.read(1024 * 1024))
+            codifix_platform::private_windows::Input::open(path, MAX_CONFIG_BYTES)
+                .and_then(|input| input.read(MAX_CONFIG_BYTES))
                 .map_err(|_| "Inbox config requires protected Windows ACLs")?,
         )
         .map_err(|_| "Invalid Inbox public config")?;
@@ -536,7 +546,9 @@ impl HumanInbox {
         {
             if let Ok(mut s) = self.state.lock() {
                 if s.generation == generation {
-                    s.session = None;
+                    if let Some(credential) = s.session.take() {
+                        s.cleanup.push(credential);
+                    }
                     s.pending = None;
                     s.generation = s.generation.wrapping_add(1);
                 }
