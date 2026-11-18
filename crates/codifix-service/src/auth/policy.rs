@@ -63,6 +63,39 @@ pub(crate) fn build_policy_table() -> matchit::Router<Vec<(Method, RoutePolicy)>
     let mut table = matchit::Router::new();
     let entries: &[(&str, &[(Method, RoutePolicy)])] = &[
         (
+            "/v1/projects/{p}/agency/companion",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryRead,
+                    scope: ProjectScope::PathProject,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/projects/{p}/agency/exchanges",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryCurate,
+                    scope: ProjectScope::PathProject,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
+            "/v1/projects/{p}/agency/exchanges/{id}",
+            &[(
+                Method::GET,
+                RoutePolicy {
+                    permission: Permission::MemoryCurate,
+                    scope: ProjectScope::PathProject,
+                    semantic_read: false,
+                },
+            )],
+        ),
+        (
             "/v1/network/status",
             &[(
                 Method::GET,

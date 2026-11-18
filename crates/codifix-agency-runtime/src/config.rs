@@ -8,6 +8,9 @@ use uuid::Uuid;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Metadata-only process heartbeat. Requires separately applied observation migration.
+    #[serde(default)]
+    pub observation_enabled: bool,
     /// Redeem same-database human inbox tickets. No HTTP peer receives this identity.
     #[serde(default)]
     pub inbox_enabled: bool,

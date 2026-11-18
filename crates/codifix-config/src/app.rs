@@ -40,6 +40,9 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Opt-in metadata and bounded peer exchange reads; no runtime activation.
+    #[serde(default)]
+    pub agency_observation: Option<crate::agency_observation::AgencyObservationConfig>,
     /// Opt-in private human inbox; must share the companion agency database.
     #[serde(default)]
     pub inbox: Option<InboxConfig>,

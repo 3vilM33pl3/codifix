@@ -417,6 +417,7 @@ impl Candidate {
             },
         };
         let config = Config {
+            observation_enabled: false,
             inbox_enabled: true,
             instance_id: home,
             listen: "127.0.0.1:0".parse().unwrap(),
