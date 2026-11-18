@@ -10,20 +10,21 @@ This view uses your existing project service credential. The service must
 explicitly grant that credential exchange observation access. A project read
 credential alone does not grant access to private exchanges.
 
-Use `/` to enter an exact peer filter, or clear it to see all peers. Select an
-exchange with `j/k` or the arrow keys and press `Enter` to open its transcript.
+The default view combines both directions across the selected project's peer
+exchanges into one transcript. It checks for new messages every two seconds
+while the view is open. Earlier pages load in the background. Use `/` to
+filter by an exact peer, or clear the filter to see all enrolled peers.
+
 Local messages start with the area name and `>`. Peer messages are aligned
-right and end with `<` and the peer name. The transcript shows requests,
-clarifications, answers and results in their recorded order. Automatic receipts
-appear as notices. Older exchanges show the messages retained in their snapshot.
+right and end with `<` and the peer name. Automatic receipts appear as notices.
+Older exchanges show the messages retained in their snapshot. The service may
+truncate an individual exchange's recorded detail.
 
-Press `m` to switch between the transcript and technical details, including task
-IDs, timestamps, status changes and verification. `Esc` returns to the list.
-`PgDn` reads an older list page and `Home` returns to the first page. In an open
-exchange, `j/k`, `d/u` and `PgUp/PgDn` scroll. Press `r` to refresh.
-
-Disabled, unavailable, denied and stale reads are shown explicitly. A recorded
-result does not establish independent verification or current peer reachability.
+The view follows the latest message. `PgUp`, `k` or `Home` pauses it while
+you read earlier messages. `End` resumes following. `r` refreshes the view.
+Press `m` for the task list and Enter on a task for its individual transcript.
+There, `m` toggles task IDs, timestamps and status history, and `Esc` returns
+to the task list. Press `m` from the list to return to live messages.
 
 ## My Inbox
 

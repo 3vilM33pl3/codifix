@@ -14,14 +14,13 @@ loading, unavailable, disabled and stale state. Details replace the list.
 
 ### Agent exchanges
 
-Exchange observations use the selected project's existing service credential.
-They require the dedicated observation grant. `/` edits an exact peer filter;
-empty input means all peers. `j/k` or arrows select an exchange, `Enter` opens
-its transcript, and `Esc` returns to the list. `m` switches between messages
-and technical details. `PgDn` loads an older list page and `Home` loads the
-first page. Inside an exchange, `j/k`, `d/u` and `PgUp/PgDn` scroll.
-`r` refreshes. Disabled, denied, unavailable and stale observations are explicit.
-A reported result or legacy snapshot is not independent proof of success.
+The live transcript combines both directions across the project's exchanges.
+New messages appear automatically. Use `/` to choose a peer or clear the
+filter. `PgUp` or `k` scrolls back and pauses following. `End` follows the
+latest messages again. Press `m` for the task list and Enter to inspect one
+exchange. There, `m` toggles technical details and `Esc` returns to the
+task list. From the list, `m` returns to the live transcript.
+The project credential needs the companion observation grant.
 
 ### My Inbox
 
