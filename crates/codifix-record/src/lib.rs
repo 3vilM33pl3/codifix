@@ -4,6 +4,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod admin;
+pub mod agency_observation;
 pub mod bundle;
 pub mod capture;
 pub mod company_agents;
