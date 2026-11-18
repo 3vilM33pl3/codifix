@@ -13,5 +13,3 @@ Models: Luna for bounded packaging/metadata/docs; Sol for transport/integration;
 - [x] Delivery: Astra review corrections resolved; committed source; core/desktop/broker candidate artifacts with hashes/source revision; runbooks and new acceptance evidence distinguish native transport, renderer, startup/package tests from live accounts. Notion statuses updated, plan verified complete.
 
 Another operator must be able to install and exercise the candidate in an isolated environment using the delivered artifacts/instructions.
-
-
