@@ -43,6 +43,7 @@ pub(super) struct App {
     pub(in crate::tui) project_tab: ProjectTabState,
     pub(in crate::tui) review: ReviewTabState,
     pub(in crate::tui) watchers: WatchersTabState,
+    pub(in crate::tui) conversations: super::tabs::conversations::ConversationsState,
     pub(in crate::tui) skills: SkillsTabState,
     pub(in crate::tui) automations: AutomationsTabState,
     pub(in crate::tui) embeddings: EmbeddingsTabState,
@@ -181,6 +182,7 @@ pub(super) struct ProjectTabState {
 
 pub(super) struct WatchersTabState {
     pub(in crate::tui) watcher_scroll: u16,
+    pub(in crate::tui) companion_focus: bool,
 }
 
 pub(super) struct SkillsTabState {
@@ -410,6 +412,16 @@ pub(super) struct ProjectRefreshResult {
 }
 
 pub(super) enum BackgroundEvent {
+    Observation {
+        scope: super::tabs::conversations::ObservationScope,
+        generation: u64,
+        result: Result<super::tabs::conversations::ObservationResult, String>,
+    },
+    HumanInbox {
+        scope: super::tabs::conversations::ObservationScope,
+        generation: u64,
+        result: Result<super::tabs::conversations::InboxResult, String>,
+    },
     Offline {
         generation: u64,
         result: Result<super::tabs::offline::OfflineResult, String>,
@@ -536,9 +548,10 @@ pub(super) enum TabKind {
     Jobs,
     Supervisor,
     Offline,
+    Conversations,
 }
 
-pub(super) const VISIBLE_TABS: [TabKind; 15] = [
+pub(super) const VISIBLE_TABS: [TabKind; 16] = [
     TabKind::Memories,
     TabKind::Agents,
     TabKind::Query,
@@ -554,6 +567,7 @@ pub(super) const VISIBLE_TABS: [TabKind; 15] = [
     TabKind::Jobs,
     TabKind::Supervisor,
     TabKind::Offline,
+    TabKind::Conversations,
 ];
 
 impl TabKind {
@@ -566,7 +580,7 @@ impl TabKind {
             Self::Errors => "Errors",
             Self::Project => "Project",
             Self::Review => "Review",
-            Self::Watchers => "Watchers",
+            Self::Watchers => "Watchers & Companions",
             Self::Skills => "Skills",
             Self::Automations => "Automations",
             Self::Embeddings => "Embeddings",
@@ -574,6 +588,7 @@ impl TabKind {
             Self::Jobs => "Jobs",
             Self::Supervisor => "Supervisor",
             Self::Offline => "Offline",
+            Self::Conversations => "Conversations",
         }
     }
 
@@ -593,13 +608,14 @@ impl TabKind {
             Self::Resume => Self::Jobs,
             Self::Jobs => Self::Supervisor,
             Self::Supervisor => Self::Offline,
-            Self::Offline => Self::Memories,
+            Self::Offline => Self::Conversations,
+            Self::Conversations => Self::Memories,
         }
     }
 
     pub(in crate::tui) fn prev(self) -> Self {
         match self {
-            Self::Memories => Self::Offline,
+            Self::Memories => Self::Conversations,
             Self::Agents => Self::Memories,
             Self::Query => Self::Agents,
             Self::Activity => Self::Query,
@@ -614,6 +630,7 @@ impl TabKind {
             Self::Jobs => Self::Resume,
             Self::Supervisor => Self::Jobs,
             Self::Offline => Self::Supervisor,
+            Self::Conversations => Self::Offline,
         }
     }
 
@@ -634,6 +651,7 @@ impl TabKind {
             Self::Jobs => 12,
             Self::Supervisor => 13,
             Self::Offline => 14,
+            Self::Conversations => 15,
         }
     }
 }

@@ -25,6 +25,7 @@ pub(super) fn should_quit(key: KeyEvent, app: &App) -> bool {
         && !(app.active_tab == TabKind::Supervisor
             && app.supervisor.private.consumes_quit(&app.project))
         && !(app.active_tab == TabKind::Offline && app.offline.editing)
+        && !(app.active_tab == TabKind::Conversations && app.conversations.editing_peer)
 }
 
 pub(super) fn should_attempt_stream_reconnect(

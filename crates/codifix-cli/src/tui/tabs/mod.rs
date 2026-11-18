@@ -3,6 +3,7 @@
 pub(super) mod activity;
 pub(super) mod agents;
 pub(super) mod automations;
+pub(in crate::tui) mod conversations;
 pub(super) mod embeddings;
 pub(super) mod errors;
 pub(in crate::tui) mod jobs;
@@ -76,6 +77,6 @@ pub(in crate::tui) fn dispatch_update(
         TabKind::Resume => resume::update(event, &mut app.resume, &mut ctx),
         TabKind::Jobs => TabAction::None,
         TabKind::Supervisor => TabAction::None,
-        TabKind::Offline => TabAction::None,
+        TabKind::Offline | TabKind::Conversations => TabAction::None,
     }
 }

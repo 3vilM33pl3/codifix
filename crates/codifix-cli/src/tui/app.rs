@@ -169,6 +169,7 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
                 other => app.apply_background_event(other),
             }
         }
+        app.observation_tick(&api);
         if should_attempt_stream_reconnect(
             stream.is_some(),
             app.service.stream_connecting,
@@ -199,7 +200,9 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
         }
     }
 
-    restore_terminal(terminal)
+    let restored = restore_terminal(terminal);
+    app.shutdown_inbox().await;
+    restored
 }
 
 /// Fast cadence used while the Agents tab is visible.
@@ -552,7 +555,11 @@ impl App {
                 replacement_selected_index: 0,
                 review_table_state,
             },
-            watchers: WatchersTabState { watcher_scroll: 0 },
+            watchers: WatchersTabState {
+                watcher_scroll: 0,
+                companion_focus: false,
+            },
+            conversations: Default::default(),
             skills: SkillsTabState {
                 filter: SkillsFilter::Codifix,
                 selected_index: 0,
@@ -1077,6 +1084,21 @@ impl App {
     fn apply_background_event(&mut self, event: BackgroundEvent) {
         self.chrome.needs_redraw = true;
         match event {
+            BackgroundEvent::Observation {
+                scope,
+                generation,
+                result,
+            } => {
+                self.conversations
+                    .receive_observation(scope, generation, result);
+            }
+            BackgroundEvent::HumanInbox {
+                scope,
+                generation,
+                result,
+            } => {
+                self.conversations.receive_inbox(scope, generation, result);
+            }
             BackgroundEvent::Offline { generation, result } => {
                 self.offline.receive(generation, result)
             }
@@ -1608,6 +1630,12 @@ impl App {
             return Ok(false);
         }
 
+        if matches!(self.active_tab, TabKind::Conversations | TabKind::Watchers)
+            && self.conversations_key(key, api)
+        {
+            self.chrome.needs_redraw = true;
+            return Ok(false);
+        }
         if self.active_tab == TabKind::Offline {
             if key.code == KeyCode::Char('r') && !self.offline.editing && !self.service.health_ok {
                 self.request_refresh(api, RefreshMode::Full);
