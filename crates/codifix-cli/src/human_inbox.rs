@@ -153,6 +153,16 @@ struct State {
     cleanup: Vec<Credential>,
     pending: Option<Pending>,
 }
+impl State {
+    fn expire_credentials(&mut self) {
+        let now = Utc::now();
+        if self.session.as_ref().is_some_and(|c| c.expires_at <= now) {
+            self.session = None;
+            self.generation = self.generation.wrapping_add(1);
+        }
+        self.cleanup.retain(|c| c.expires_at > now);
+    }
+}
 #[derive(Clone)]
 pub(crate) struct HumanInbox {
     target: InboxTarget,
@@ -176,10 +186,9 @@ impl HumanInbox {
         })
     }
     pub(crate) fn logged_in(&self) -> bool {
-        self.state.lock().is_ok_and(|s| {
-            s.session
-                .as_ref()
-                .is_some_and(|c| c.expires_at > Utc::now())
+        self.state.lock().is_ok_and(|mut s| {
+            s.expire_credentials();
+            s.session.is_some()
         })
     }
     /// Immediately fence all old work; retain credentials solely for revocation.
@@ -263,6 +272,7 @@ impl HumanInbox {
         let _operation = self.operation.lock().await;
         let generation = {
             let mut s = self.state.lock().map_err(|_| "Inbox state unavailable")?;
+            s.expire_credentials();
             if s.session.is_some() || !s.cleanup.is_empty() {
                 return Err("Sign out before starting another Inbox login".into());
             }
