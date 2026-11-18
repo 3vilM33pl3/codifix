@@ -139,6 +139,8 @@ impl ConversationsState {
                 Ok(ObservationResult::CompanionError(e)) => {
                     if denied(&e) {
                         self.deny_exchanges();
+                        self.companion = None;
+                        self.companion_loaded = None;
                     }
                     self.companion_error = Some(e);
                 }
@@ -172,6 +174,9 @@ impl ConversationsState {
             Err(error) => {
                 if denied(&error) {
                     self.deny_exchanges();
+                    if let Some(status) = &mut self.companion {
+                        status.last_exchange_at = None;
+                    }
                 }
                 self.exchange_error = Some(error);
             }
@@ -234,7 +239,9 @@ fn viewer_fallback(key: KeyEvent) -> bool {
     )
 }
 fn denied(error: &str) -> bool {
-    error.contains("HTTP 401") || error.contains("HTTP 403")
+    ["HTTP 401", "HTTP 403", "HTTP 404"]
+        .into_iter()
+        .any(|status| error.contains(status))
 }
 impl App {
     /// Called by the event loop, never by refresh or rendering. Inactive tabs do no polling.

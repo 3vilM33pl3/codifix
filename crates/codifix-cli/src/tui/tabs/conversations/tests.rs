@@ -148,6 +148,7 @@ fn revoked_exchange_access_purges_and_fences_private_observations() {
     for failure in [
         "Observation returned HTTP 401",
         "Observation returned HTTP 403",
+        "Observation returned HTTP 404",
     ] {
         let mut s = state();
         s.detail = Some(detail());
@@ -272,4 +273,20 @@ async fn repeated_detail_scrolling_stops_at_the_end_and_can_move_back() {
     assert!(end > 0 && end < 200);
     app.conversations_key(KeyEvent::from(KeyCode::PageUp), &api);
     assert_eq!(app.conversations.scroll, end.saturating_sub(8));
+}
+
+#[test]
+fn missing_companion_route_clears_cached_heartbeat_and_exchange_detail() {
+    let mut s = state();
+    s.detail = Some(detail());
+    s.receive_observation(
+        scope("p"),
+        0,
+        Ok(ObservationResult::CompanionError(
+            "Observation returned HTTP 404".into(),
+        )),
+    );
+    assert!(s.companion.is_none());
+    assert!(s.detail.is_none());
+    assert!(!s.can_observe());
 }

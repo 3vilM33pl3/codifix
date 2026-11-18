@@ -54,6 +54,7 @@ impl InboxState {
         self.clear_private();
         self.busy = false;
         self.login_pending = false;
+        self.logout_pending = false;
         self.error = None;
         self.message = None;
     }
