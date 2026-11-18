@@ -73,6 +73,9 @@ impl ConversationsState {
     fn deny_exchanges(&mut self) {
         self.exchange_invalidate();
         self.observation_denied = true;
+        self.peer = None;
+        self.peer_draft.clear();
+        self.editing_peer = false;
         self.peer_selected = 0;
     }
 
@@ -218,6 +221,17 @@ impl ConversationsState {
         self.selected = 0;
         self.scroll = 0;
     }
+}
+/// Viewer tabs own all keys except the shell's explicit navigation/help actions.
+fn viewer_fallback(key: KeyEvent) -> bool {
+    !matches!(
+        key.code,
+        KeyCode::Tab
+            | KeyCode::BackTab
+            | KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Char('l' | 'h' | '?')
+    )
 }
 fn denied(error: &str) -> bool {
     error.contains("HTTP 401") || error.contains("HTTP 403")
@@ -366,7 +380,7 @@ impl App {
                     self.active_tab = TabKind::Conversations;
                     self.observation_request(api, Read::Page(None));
                 }
-                _ => return false,
+                _ => return self.watchers.companion_focus && viewer_fallback(key),
             }
             return true;
         }
@@ -398,7 +412,9 @@ impl App {
             return true;
         }
         if self.conversations.my_inbox {
-            return self.inbox_key(key, api);
+            let handled = self.inbox_key(key, api);
+            self.clamp_conversation_scroll();
+            return handled;
         }
         match key.code {
             KeyCode::Char('/') => {
@@ -424,6 +440,7 @@ impl App {
             }
             KeyCode::Down | KeyCode::Char('j') if self.conversations.detail.is_none() => {
                 self.conversations.cancel_exchange_read();
+                self.conversations.scroll = 0;
                 self.conversations.selected = (self.conversations.selected + 1).min(
                     self.conversations
                         .page
@@ -434,6 +451,7 @@ impl App {
             }
             KeyCode::Up | KeyCode::Char('k') if self.conversations.detail.is_none() => {
                 self.conversations.cancel_exchange_read();
+                self.conversations.scroll = 0;
                 self.conversations.selected = self.conversations.selected.saturating_sub(1)
             }
             KeyCode::Enter => {
@@ -473,8 +491,27 @@ impl App {
                 self.conversations.scroll = self.conversations.scroll.saturating_sub(8)
             }
             KeyCode::Home => self.conversations.scroll = 0,
-            _ => return false,
+            _ => return viewer_fallback(key),
         }
+        self.clamp_conversation_scroll();
         true
+    }
+    fn clamp_conversation_scroll(&mut self) {
+        use ratatui::layout::{Constraint, Layout};
+        let area = crate::tui::render::current_frame_area()
+            .unwrap_or_else(crate::tui::render::default_frame_area);
+        let root = Layout::vertical([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(10),
+            Constraint::Length(crate::tui::render::footer_height(self.meta.profile)),
+        ])
+        .split(area);
+        let max = render::content_scroll_limit(&self.conversations, root[2]);
+        if self.conversations.my_inbox {
+            self.conversations.inbox.scroll = self.conversations.inbox.scroll.min(max);
+        } else {
+            self.conversations.scroll = self.conversations.scroll.min(max);
+        }
     }
 }

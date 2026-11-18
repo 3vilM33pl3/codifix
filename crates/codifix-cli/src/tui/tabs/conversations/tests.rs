@@ -151,6 +151,8 @@ fn revoked_exchange_access_purges_and_fences_private_observations() {
     ] {
         let mut s = state();
         s.detail = Some(detail());
+        s.peer = Some("private-peer".into());
+        s.peer_draft = "private-peer".into();
         s.page = Some(ExchangePage {
             exchanges: vec![detail().exchange],
             next_before: None,
@@ -159,6 +161,8 @@ fn revoked_exchange_access_purges_and_fences_private_observations() {
         assert!(s.page.is_none());
         assert!(s.detail.is_none());
         assert!(s.peers().is_empty());
+        assert!(s.peer.is_none());
+        assert!(s.peer_draft.is_empty());
         s.receive_observation(scope("p"), 0, Ok(ObservationResult::Detail(detail())));
         assert!(s.detail.is_none());
         let text = render::exchange_lines(&s)
@@ -231,4 +235,41 @@ fn human_detail_shows_participants_disclosures_messages_and_task_cards_as_plain_
     }
     assert!(!text.contains('\u{1b}'));
     assert!(!text.contains('\u{202e}'));
+}
+
+#[tokio::test]
+async fn repeated_detail_scrolling_stops_at_the_end_and_can_move_back() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = App::new(
+        "p".into(),
+        "/tmp/test".into(),
+        crate::tui::state::ToolVersions {
+            mem_cli: "test".into(),
+            mem_service: "test".into(),
+            watch_manager: "test".into(),
+            memory_watch: "test".into(),
+        },
+        false,
+        codifix_config::Profile::Prod,
+        tx,
+    );
+    let api = ApiClient::new(reqwest::Client::new(), serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
+    app.observation_tick(&api);
+    app.active_tab = TabKind::Conversations;
+    app.conversations.companion = Some(status());
+    app.conversations.companion_loaded = Some(Instant::now());
+    app.conversations.page = Some(ExchangePage {
+        exchanges: vec![],
+        next_before: None,
+    });
+    let mut d = detail();
+    d.events[0].body = (0..150).map(|i| format!("line {i}\n")).collect();
+    app.conversations.detail = Some(d);
+    for _ in 0..100 {
+        app.conversations_key(KeyEvent::from(KeyCode::PageDown), &api);
+    }
+    let end = app.conversations.scroll;
+    assert!(end > 0 && end < 200);
+    app.conversations_key(KeyEvent::from(KeyCode::PageUp), &api);
+    assert_eq!(app.conversations.scroll, end.saturating_sub(8));
 }

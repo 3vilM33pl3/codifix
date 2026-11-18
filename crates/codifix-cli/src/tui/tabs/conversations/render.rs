@@ -76,28 +76,35 @@ fn companion_lines(state: &ConversationsState) -> Vec<Line<'static>> {
 }
 pub(in crate::tui) fn draw_companions(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect) {
     let state = &app.conversations;
-    let mut lines = companion_lines(state);
+    let mut lines = if app.watchers.companion_focus {
+        vec![]
+    } else {
+        companion_lines(state)
+    };
     let peers = state.peers();
     if peers.is_empty() {
         lines.push(line(
             "No peers on the observed exchange page. Enter opens Agent exchanges.",
         ));
     } else {
-        lines.push(line(
-            "Enrolled / observed peers (j/k select, Enter inspect exchanges):",
-        ));
+        lines.push(line("Peers: j/k select | Enter exchanges"));
         for (i, peer) in peers
             .iter()
             .enumerate()
-            .skip(state.peer_selected.saturating_sub(2))
-            .take(5)
+            .skip(state.peer_selected)
+            .take(usize::from(area.height.saturating_sub(4)).min(5))
         {
             lines.push(line(format!(
                 "{} {}",
                 if i == state.peer_selected { ">" } else { " " },
-                peer
+                peer.chars()
+                    .take(usize::from(area.width.saturating_sub(5)))
+                    .collect::<String>()
             )));
         }
+    }
+    if app.watchers.companion_focus {
+        lines.extend(companion_lines(state));
     }
     frame.render_widget(
         Paragraph::new(lines)
@@ -153,9 +160,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
     // but repeated page keys never strand the viewport beyond the final line.
     let block = themed_block(title);
     let inner = block.inner(chunks[1]);
-    let max = crate::tui::render::wrapped_line_count(&lines, inner.width)
-        .saturating_sub(inner.height as usize)
-        .min(u16::MAX as usize) as u16;
+    let max = scroll_limit(&lines, inner);
     frame.render_widget(
         Paragraph::new(lines)
             .scroll((scroll.min(max), 0))
@@ -252,8 +257,8 @@ pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
             .exchanges
             .iter()
             .enumerate()
-            .skip(state.selected.saturating_sub(3))
-            .take(10)
+            .skip(state.selected)
+            .take(5)
         {
             lines.push(line(format!(
                 "{} {} | {} | {} | {}",
@@ -330,12 +335,7 @@ pub(super) fn inbox_lines(state: &ConversationsState) -> Vec<Line<'static>> {
                 "No conversations in this area for the signed-in human.",
             ));
         }
-        for (i, conversation) in page
-            .iter()
-            .enumerate()
-            .skip(inbox.selected.saturating_sub(4))
-            .take(12)
-        {
+        for (i, conversation) in page.iter().enumerate().skip(inbox.selected).take(8) {
             lines.push(line(format!(
                 "{} {} | {} | unread {} | {}",
                 if i == inbox.selected { ">" } else { " " },
@@ -424,4 +424,24 @@ pub(super) fn inbox_detail_lines(detail: &Value) -> Vec<Line<'static>> {
         }
     }
     lines
+}
+
+pub(super) fn content_scroll_limit(state: &ConversationsState, content: Rect) -> u16 {
+    let chunks = Layout::vertical([
+        Constraint::Length(4.min(content.height)),
+        Constraint::Min(0),
+    ])
+    .split(content);
+    let inner = themed_block("detail").inner(chunks[1]);
+    let lines = if state.my_inbox {
+        inbox_lines(state)
+    } else {
+        exchange_lines(state)
+    };
+    scroll_limit(&lines, inner)
+}
+fn scroll_limit(lines: &[Line<'_>], inner: Rect) -> u16 {
+    crate::tui::render::wrapped_line_count(lines, inner.width)
+        .saturating_sub(inner.height as usize)
+        .min(u16::MAX as usize) as u16
 }

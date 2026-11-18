@@ -120,6 +120,7 @@ impl ConversationsState {
         }
         match result {
             Err(error) => {
+                state.message = None;
                 if denied(&error) || error.contains("HTTP 404") {
                     state.cancel_read();
                     state.clear_private();
@@ -243,7 +244,19 @@ impl App {
         if state.busy {
             return;
         }
-        if state.client.is_none() {
+        let cleanup_client = if matches!(read, InboxRead::Logout) && state.client.is_none() {
+            if let Some(client) = state.cleanup.last() {
+                Some(client.clone())
+            } else {
+                state.clear_private();
+                state.error = None;
+                state.message = Some("No native session remains in this TUI.".into());
+                return;
+            }
+        } else {
+            None
+        };
+        if state.client.is_none() && cleanup_client.is_none() {
             // A metadata/config mismatch is not authority to use another area's identity.
             if api
                 .config
@@ -263,7 +276,9 @@ impl App {
                 }
             }
         }
-        let client = state.client.as_ref().expect("created client").clone();
+        let client = cleanup_client
+            .or_else(|| state.client.clone())
+            .expect("current or revoke-only client");
         if !matches!(read, InboxRead::Login | InboxRead::Logout) && !client.logged_in() {
             state.clear_private();
             state.error = Some("Sign in as a human to read My Inbox (i).".into());
@@ -342,26 +357,10 @@ impl App {
                 Some("Sign-in cancelled. Press o to retry any pending session cleanup.".into());
             return true;
         }
-        if state.logout_pending {
-            return !matches!(
-                key.code,
-                KeyCode::Tab
-                    | KeyCode::BackTab
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::Char('h')
-            );
-        }
-        if state.login_pending && !matches!(key.code, KeyCode::Char('o')) {
-            // Selection and read controls must not abort a callback or revocation.
-            return !matches!(
-                key.code,
-                KeyCode::Tab
-                    | KeyCode::BackTab
-                    | KeyCode::Left
-                    | KeyCode::Right
-                    | KeyCode::Char('h')
-            );
+        if state.logout_pending || (state.login_pending && !matches!(key.code, KeyCode::Char('o')))
+        {
+            // Selection/read controls cannot abort a callback or revocation.
+            return viewer_fallback(key);
         }
         match key.code {
             KeyCode::Char('i') if !state.signed_in() => self.inbox_request(api, InboxRead::Login),
@@ -394,6 +393,7 @@ impl App {
             }
             KeyCode::Down | KeyCode::Char('j') if state.detail.is_none() => {
                 state.cancel_read();
+                state.scroll = 0;
                 state.selected = (state.selected + 1).min(
                     state
                         .page
@@ -405,6 +405,7 @@ impl App {
             }
             KeyCode::Up | KeyCode::Char('k') if state.detail.is_none() => {
                 state.cancel_read();
+                state.scroll = 0;
                 state.selected = state.selected.saturating_sub(1)
             }
             KeyCode::Enter if state.detail.is_none() => {
@@ -448,7 +449,7 @@ impl App {
             KeyCode::PageDown => state.scroll = state.scroll.saturating_add(8),
             KeyCode::PageUp => state.scroll = state.scroll.saturating_sub(8),
             KeyCode::Home => state.scroll = 0,
-            _ => return false,
+            _ => return viewer_fallback(key),
         }
         true
     }
@@ -521,5 +522,22 @@ mod tests {
             assert!(app.conversations.inbox.task.is_none());
             assert!(app.conversations.inbox.error.is_some());
         }
+    }
+
+    #[tokio::test]
+    async fn old_target_cleanup_does_not_require_a_new_target_login_client() {
+        let mut app = app();
+        let api = api();
+        app.observation_tick(&api);
+        let old = HumanInbox::new(
+            InboxTarget::new("https://old.example.test", Uuid::from_u128(1)).unwrap(),
+        )
+        .unwrap();
+        app.conversations.inbox.cleanup.push(old);
+        app.inbox_request(&api, InboxRead::Logout);
+        assert!(app.conversations.inbox.client.is_none());
+        assert!(app.conversations.inbox.error.is_none());
+        assert!(app.conversations.inbox.task.is_some());
+        app.conversations.inbox.task.take().unwrap().await.unwrap();
     }
 }

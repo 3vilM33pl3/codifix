@@ -2780,7 +2780,7 @@ async fn conversations_viewer_dispatch_keeps_navigation_and_read_controls_separa
     // Human Inbox dispatch never falls through to project operations.
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('v')), &api));
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('r')), &api));
-    assert!(!app.conversations_key(KeyEvent::from(KeyCode::Char('R')), &api));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('R')), &api));
     assert!(!app.conversations_key(KeyEvent::from(KeyCode::Right), &api));
     app.set_active_tab(TabKind::Watchers);
     assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('c')), &api));
@@ -2812,5 +2812,39 @@ fn conversations_and_companions_draw_in_narrow_terminals() {
                 "Watchers"
             }));
         }
+    }
+}
+
+#[tokio::test]
+async fn read_only_viewer_blocks_legacy_global_project_mutations() {
+    let mut app = new_test_app();
+    app.service.health_ok = true;
+    app.service.inbox_enabled = Some(false);
+    let api = super::ApiClient::new(reqwest::Client::new(), serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
+    app.set_active_tab(TabKind::Conversations);
+    for inbox in [false, true] {
+        if inbox {
+            app.handle_key(KeyEvent::from(KeyCode::Char('v')), &api, None)
+                .await
+                .unwrap();
+        }
+        for shortcut in ['c', 'i', 'e', 'a', 'R'] {
+            // Any legacy curation/reindex/reembed/archive request would fail against
+            // this unreachable endpoint, rather than returning a handled UI event.
+            app.handle_key(KeyEvent::from(KeyCode::Char(shortcut)), &api, None)
+                .await
+                .unwrap();
+            assert_eq!(app.active_tab, TabKind::Conversations);
+        }
+    }
+    app.set_active_tab(TabKind::Watchers);
+    app.handle_key(KeyEvent::from(KeyCode::Char('c')), &api, None)
+        .await
+        .unwrap();
+    assert!(app.watchers.companion_focus);
+    for shortcut in ['i', 'e', 'a'] {
+        app.handle_key(KeyEvent::from(KeyCode::Char(shortcut)), &api, None)
+            .await
+            .unwrap();
     }
 }
