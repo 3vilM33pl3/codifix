@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 use super::*;
 use crate::tui::theme::{Theme, themed_block, themed_focus_block};
-use codifix_record::agency_observation::ExchangeSummary;
+use codifix_record::agency_observation::{ExchangeEvent, ExchangeSummary};
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::Style,
@@ -127,18 +127,40 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
         .area
         .as_ref()
         .map_or("custom service", |a| a.name.as_str());
+    let navigation = if state.my_inbox {
+        "Agent exchanges  |  [My Inbox] (human identity, area-wide) | v switch | read only"
+    } else if state.live_selected() {
+        if state.live.paused() {
+            "Paused · End to follow · m tasks · v Inbox"
+        } else {
+            "Live · / choose peer · m tasks · v Inbox"
+        }
+    } else {
+        "[Agent exchanges] · m live transcript · v Inbox"
+    };
+    let status = if state.live_selected() && state.editing_peer {
+        format!("Peer: {}█ · Enter apply · Esc cancel", state.peer_draft)
+    } else if state.live_selected() && state.exchange_error.is_some() {
+        state
+            .exchange_error
+            .as_deref()
+            .unwrap_or_default()
+            .to_owned()
+    } else {
+        navigation.to_owned()
+    };
     let scope = vec![
         line(format!("Area {area_name} | project {}", app.project)),
-        line(if state.my_inbox {
-            "Agent exchanges  |  [My Inbox] (human identity, area-wide) | v switch | read only"
-        } else {
-            "[Agent exchanges] (project scoped)  |  My Inbox | v switch | read only"
-        }),
+        line(status),
     ];
     frame.render_widget(
         Paragraph::new(scope).block(themed_block("Conversations")),
         chunks[0],
     );
+    if state.live_selected() {
+        draw_live(frame, state, chunks[1]);
+        return;
+    }
     let (lines, scroll, title) = if state.my_inbox {
         (
             if app.service.inbox_enabled == Some(true) {
@@ -175,6 +197,130 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect
         chunks[1],
     );
 }
+fn draw_live(frame: &mut ratatui::Frame<'_>, state: &ConversationsState, area: Rect) {
+    let block = themed_block("Agent conversation");
+    let inner = block.inner(area);
+    let lines = live_lines(state);
+    let limit = live_scroll_limit(&lines, inner);
+    let offset = if state.live.paused() {
+        state.live.scroll.min(limit)
+    } else {
+        limit
+    };
+    let (lines, offset) = live_window(lines, inner.width, offset);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .scroll((offset, 0))
+            .wrap(Wrap { trim: false })
+            .style(Style::default().fg(Theme::TEXT))
+            .block(block),
+        area,
+    );
+}
+
+fn live_scroll_limit(lines: &[Line<'static>], inner: Rect) -> usize {
+    Paragraph::new(lines.to_vec())
+        .wrap(Wrap { trim: false })
+        .line_count(inner.width)
+        .saturating_sub(usize::from(inner.height))
+}
+
+// Ratatui's scroll offset is u16. Skip complete logical lines first when a
+// long transcript exceeds that range, then scroll the remaining wrapped text.
+pub(super) fn live_window(
+    mut lines: Vec<Line<'static>>,
+    width: u16,
+    mut offset: usize,
+) -> (Vec<Line<'static>>, u16) {
+    if offset > usize::from(u16::MAX) {
+        let mut skip = 0;
+        while offset > usize::from(u16::MAX) && skip < lines.len() {
+            let height = Paragraph::new(lines[skip].clone())
+                .wrap(Wrap { trim: false })
+                .line_count(width);
+            offset = offset.saturating_sub(height);
+            skip += 1;
+        }
+        lines.drain(..skip);
+    }
+    (lines, offset.min(usize::from(u16::MAX)) as u16)
+}
+
+pub(super) fn live_content_scroll_limit(state: &ConversationsState, content: Rect) -> usize {
+    let body = Layout::vertical([
+        Constraint::Length(4.min(content.height)),
+        Constraint::Min(0),
+    ])
+    .split(content)[1];
+    live_scroll_limit(
+        &live_lines(state),
+        themed_block("Agent conversation").inner(body),
+    )
+}
+
+pub(super) fn live_lines(state: &ConversationsState) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    if let Some(peer) = &state.peer {
+        lines.push(line(format!("Peer: {peer}")));
+    }
+    if !state.can_observe() {
+        lines.extend(companion_lines(state));
+        return lines;
+    }
+    if !state.live.loaded {
+        lines.push(line("Loading the conversation…"));
+        return lines;
+    }
+
+    let mut events = Vec::new();
+    let mut retained = false;
+    let mut truncated = false;
+    for detail in state.live.visible() {
+        retained |= !detail.exchange.journal_available;
+        truncated |= detail.events_truncated;
+        for event in &detail.events {
+            let (kind, body) = transcript_event(detail, event);
+            if !visible_event(kind, body) {
+                continue;
+            }
+            let at = if kind == "request" && !detail.exchange.journal_available {
+                detail.exchange.created_at
+            } else {
+                event.recorded_at
+            };
+            events.push((
+                (at, event.sequence, detail.exchange.task_id),
+                detail,
+                kind,
+                body,
+            ));
+        }
+    }
+    events.sort_unstable_by_key(|(order, _, _, _)| *order);
+    if retained {
+        lines.push(
+            line("Earlier exchanges contain retained messages.")
+                .style(Style::default().fg(Theme::MUTED)),
+        );
+    }
+    if truncated {
+        lines.push(
+            line("Some exchanges exceed the service's retained detail limit.")
+                .style(Style::default().fg(Theme::MUTED)),
+        );
+    }
+    if state.live.archive_before().is_some() && !state.live.paused() {
+        lines.push(line("Loading earlier exchanges…").style(Style::default().fg(Theme::MUTED)));
+    }
+    if events.is_empty() {
+        lines.push(line("No messages recorded for this project and peer."));
+    }
+    for (_, detail, kind, body) in events {
+        append_transcript_event(&mut lines, state, detail, kind, body);
+    }
+    lines
+}
+
 pub(super) fn exchange_lines(state: &ConversationsState) -> Vec<Line<'static>> {
     let mut lines = vec![if state.detail.is_some() {
         line(if state.exchange_metadata {
@@ -291,52 +437,65 @@ fn exchange_transcript(
     state: &ConversationsState,
     detail: &ExchangeDetail,
 ) {
-    let exchange = &detail.exchange;
-    let (initiator, responder) = participants(state, exchange);
-    let incoming = exchange.direction == "incoming";
-    if !exchange.journal_available {
+    if !detail.exchange.journal_available {
         lines.push(
             line("Earlier exchange · retained messages only")
                 .style(Style::default().fg(Theme::MUTED)),
         );
     }
-    let mut messages = false;
+    let start = lines.len();
     for event in &detail.events {
-        // Schema 99 returns retained fields with a fixed role prefix. Their
-        // timestamps describe the snapshot, so use the service's supplied order.
-        let (kind, body) = if event.kind == "snapshot" && !exchange.journal_available {
-            event
-                .body
-                .split_once(": ")
-                .unwrap_or(("snapshot", event.body.as_str()))
-        } else {
-            (event.kind.as_str(), event.body.as_str())
-        };
-        if body.trim().is_empty() {
-            continue;
+        let (kind, body) = transcript_event(detail, event);
+        if visible_event(kind, body) {
+            append_transcript_event(lines, state, detail, kind, body);
         }
-        let (speaker, from_peer) = match kind {
-            "request" | "answer" => (initiator, incoming),
-            "clarification" | "result" => (responder, !incoming),
-            "snapshot" => {
-                lines.push(line(body));
-                messages = true;
-                continue;
-            }
-            _ => continue,
-        };
-        if let Some(note) = recorded_notice(kind, body) {
-            lines.push(line(note).style(Style::default().fg(Theme::MUTED)));
-        } else {
-            transcript_message(lines, speaker, from_peer, body);
-        }
-        messages = true;
     }
-    if !messages {
+    if lines.len() == start {
         lines.push(line("No messages were retained."));
     }
     if detail.events_truncated {
         lines.push(line("More events were recorded than this view can show."));
+    }
+}
+
+fn transcript_event<'a>(detail: &ExchangeDetail, event: &'a ExchangeEvent) -> (&'a str, &'a str) {
+    if event.kind == "snapshot" && !detail.exchange.journal_available {
+        // Legacy timestamps apply to the snapshot, not to individual turns.
+        event
+            .body
+            .split_once(": ")
+            .unwrap_or(("snapshot", event.body.as_str()))
+    } else {
+        (event.kind.as_str(), event.body.as_str())
+    }
+}
+
+fn visible_event(kind: &str, body: &str) -> bool {
+    !body.trim().is_empty()
+        && matches!(
+            kind,
+            "request" | "clarification" | "answer" | "result" | "snapshot"
+        )
+}
+
+fn append_transcript_event(
+    lines: &mut Vec<Line<'static>>,
+    state: &ConversationsState,
+    detail: &ExchangeDetail,
+    kind: &str,
+    body: &str,
+) {
+    let (initiator, responder) = participants(state, &detail.exchange);
+    let incoming = detail.exchange.direction == "incoming";
+    if let Some(note) = recorded_notice(kind, body) {
+        lines.push(line(note).style(Style::default().fg(Theme::MUTED)));
+        return;
+    }
+    match kind {
+        "request" | "answer" => transcript_message(lines, initiator, incoming, body),
+        "clarification" | "result" => transcript_message(lines, responder, !incoming, body),
+        "snapshot" => lines.push(line(body)),
+        _ => {}
     }
 }
 

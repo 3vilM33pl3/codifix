@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Read-only companion observation. Requests carry exact target and generation bindings.
 use crate::{
-    commands::{api::ApiClient, output::service_url},
+    commands::{
+        api::{ApiClient, TranscriptBatch},
+        output::service_url,
+    },
     tui::app::{App, BackgroundEvent, TabKind},
 };
 use codifix_record::agency_observation::{CompanionStatus, ExchangeDetail, ExchangePage};
@@ -10,6 +13,7 @@ use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 mod inbox;
+mod live;
 mod render;
 #[cfg(test)]
 mod tests;
@@ -34,6 +38,8 @@ pub(in crate::tui) struct ConversationsState {
     page: Option<ExchangePage>,
     detail: Option<ExchangeDetail>,
     exchange_metadata: bool,
+    tasks_view: bool,
+    live: live::LiveTranscript,
     exchange_generation: u64,
     exchange_busy: bool,
     exchange_error: Option<String>,
@@ -54,6 +60,11 @@ pub(in crate::tui) enum ObservationResult {
     Companion(CompanionStatus),
     Page(ExchangePage),
     Detail(ExchangeDetail),
+    Live {
+        latest: TranscriptBatch,
+        archive: Option<TranscriptBatch>,
+        archive_error: Option<String>,
+    },
     // Errors retain the channel so simultaneous reads cannot clear each other's status.
     CompanionError(String),
 }
@@ -62,6 +73,7 @@ enum Read {
     Companion,
     Page(Option<String>),
     Detail(Uuid),
+    Live,
 }
 
 impl ConversationsState {
@@ -70,6 +82,9 @@ impl ConversationsState {
     }
     pub(in crate::tui) fn exchange_open(&self) -> bool {
         self.detail.is_some()
+    }
+    pub(in crate::tui) fn live_selected(&self) -> bool {
+        !self.tasks_view && !self.my_inbox
     }
     fn can_observe(&self) -> bool {
         !self.observation_denied && self.companion.as_ref().is_some_and(|s| s.exchange_access)
@@ -123,6 +138,13 @@ impl ConversationsState {
             self.companion_task = None;
             match result {
                 Ok(ObservationResult::Companion(status)) => {
+                    if self
+                        .companion
+                        .as_ref()
+                        .is_some_and(|old| old.enrolled_peers != status.enrolled_peers)
+                    {
+                        self.exchange_invalidate();
+                    }
                     if let Some((_, expected)) = &scope.area
                         && status.instance_id.is_some_and(|actual| actual != *expected)
                     {
@@ -169,6 +191,15 @@ impl ConversationsState {
                 self.scroll = 0;
                 self.exchange_loaded = Some(Instant::now());
                 self.exchange_error = None;
+            }
+            Ok(ObservationResult::Live {
+                latest,
+                archive,
+                archive_error,
+            }) => {
+                self.live.accept(latest, archive);
+                self.exchange_loaded = Some(Instant::now());
+                self.exchange_error = archive_error;
             }
             Ok(ObservationResult::Detail(detail)) => {
                 self.detail = Some(detail);
@@ -226,6 +257,7 @@ impl ConversationsState {
         self.exchange_error = None;
         self.detail = None;
         self.exchange_metadata = false;
+        self.live = live::LiveTranscript::default();
         self.page = None;
         self.exchange_loaded = None;
         self.before = None;
@@ -284,6 +316,12 @@ impl App {
             self.observation_request(api, Read::Companion);
         }
         let state = &self.conversations;
+        if self.active_tab == TabKind::Conversations && state.live_selected() {
+            if !state.exchange_busy && state.can_observe() && state.live.due() {
+                self.observation_request(api, Read::Live);
+            }
+            return;
+        }
         if !state.my_inbox
             && !state.exchange_busy
             && state.page.is_none()
@@ -320,8 +358,10 @@ impl App {
             state.exchange_generation = state.exchange_generation.wrapping_add(1);
             state.exchange_busy = true;
             state.exchange_error = None;
-            state.detail = None;
-            state.scroll = 0;
+            if !matches!(read, Read::Live) {
+                state.detail = None;
+                state.scroll = 0;
+            }
             if let Read::Page(before) = &read {
                 state.before = before.clone();
             }
@@ -331,6 +371,13 @@ impl App {
         let tx = self.background_tx.clone();
         let peer = state.peer.clone();
         let is_companion = matches!(read, Read::Companion);
+        let live_poll = matches!(read, Read::Live).then(|| {
+            state.live.begin_poll();
+            (
+                state.live.known(),
+                state.live.archive_before().map(str::to_owned),
+            )
+        });
         let task = tokio::spawn(async move {
             let result = match read {
                 Read::Companion => Ok(match api.companion_status(&scope.project).await {
@@ -342,6 +389,53 @@ impl App {
                     .await
                     .map(ObservationResult::Page)
                     .map_err(|e| e.to_string()),
+                Read::Live => {
+                    let Some((known, before)) = live_poll else {
+                        return;
+                    };
+                    let latest =
+                        api.agent_transcript_page(&scope.project, peer.as_deref(), None, &known);
+                    let archive = async {
+                        match before.as_deref() {
+                            Some(before) => tokio::time::timeout(
+                                Duration::from_secs(2),
+                                api.agent_transcript_page(
+                                    &scope.project,
+                                    peer.as_deref(),
+                                    Some(before),
+                                    &known,
+                                ),
+                            )
+                            .await
+                            .map_err(|_| anyhow::anyhow!("Earlier messages request timed out"))?
+                            .map(Some),
+                            None => Ok(None),
+                        }
+                    };
+                    let (latest, archive) = tokio::join!(latest, archive);
+                    match (latest, archive) {
+                        (Err(error), _) => Err(error.to_string()),
+                        (Ok(latest), Ok(archive)) => Ok(ObservationResult::Live {
+                            latest,
+                            archive,
+                            archive_error: None,
+                        }),
+                        (Ok(latest), Err(error)) => {
+                            let error = error.to_string();
+                            if denied(&error) {
+                                Err(error)
+                            } else {
+                                Ok(ObservationResult::Live {
+                                    latest,
+                                    archive: None,
+                                    archive_error: Some(format!(
+                                        "Earlier messages could not refresh · {error}"
+                                    )),
+                                })
+                            }
+                        }
+                    }
+                }
                 Read::Detail(id) => api
                     .agent_exchange(&scope.project, id)
                     .await
@@ -360,6 +454,55 @@ impl App {
             state.exchange_task = Some(task);
         }
     }
+    fn live_key(&mut self, key: KeyEvent, api: &ApiClient) -> bool {
+        match key.code {
+            KeyCode::Char('m') => {
+                self.conversations.cancel_exchange_read();
+                self.conversations.tasks_view = true;
+                if self.conversations.can_observe() {
+                    self.observation_request(api, Read::Page(None));
+                }
+            }
+            KeyCode::Char('r') => {
+                self.observation_request(api, Read::Companion);
+                if self.conversations.can_observe() {
+                    self.observation_request(api, Read::Live);
+                }
+            }
+            KeyCode::End => self.conversations.live.resume(),
+            KeyCode::Up | KeyCode::Char('k' | 'u') | KeyCode::PageUp | KeyCode::Home => {
+                let end = render::live_content_scroll_limit(
+                    &self.conversations,
+                    self.conversation_content_area(),
+                );
+                let live = &mut self.conversations.live;
+                live.pause(end);
+                live.scroll = match key.code {
+                    KeyCode::Home => 0,
+                    KeyCode::PageUp => live.scroll.saturating_sub(8),
+                    _ => live.scroll.saturating_sub(1),
+                };
+            }
+            KeyCode::Down | KeyCode::Char('j' | 'd') | KeyCode::PageDown => {
+                if self.conversations.live.paused() {
+                    let end = render::live_content_scroll_limit(
+                        &self.conversations,
+                        self.conversation_content_area(),
+                    );
+                    let live = &mut self.conversations.live;
+                    live.scroll = live
+                        .scroll
+                        .saturating_add(if key.code == KeyCode::PageDown { 8 } else { 1 });
+                    if live.scroll >= end {
+                        live.resume();
+                    }
+                }
+            }
+            _ => return viewer_fallback(key),
+        }
+        true
+    }
+
     pub(in crate::tui) fn conversations_key(&mut self, key: KeyEvent, api: &ApiClient) -> bool {
         // Ensure a freshly changed area cannot dispatch against the previous native session.
         self.observation_tick(api);
@@ -390,8 +533,11 @@ impl App {
                     self.conversations.exchange_invalidate();
                     self.conversations.peer = peer;
                     self.conversations.my_inbox = false;
+                    self.conversations.tasks_view = false;
                     self.active_tab = TabKind::Conversations;
-                    self.observation_request(api, Read::Page(None));
+                    if self.conversations.can_observe() {
+                        self.observation_request(api, Read::Live);
+                    }
                 }
                 _ => return self.watchers.companion_focus && viewer_fallback(key),
             }
@@ -404,7 +550,12 @@ impl App {
                         .then(|| self.conversations.peer_draft.trim().to_owned());
                     self.conversations.editing_peer = false;
                     self.conversations.exchange_invalidate();
-                    self.observation_request(api, Read::Page(None));
+                    let read = if self.conversations.live_selected() {
+                        Read::Live
+                    } else {
+                        Read::Page(None)
+                    };
+                    self.observation_request(api, read);
                 }
                 KeyCode::Esc => self.conversations.editing_peer = false,
                 KeyCode::Backspace => {
@@ -429,7 +580,17 @@ impl App {
             self.clamp_conversation_scroll();
             return handled;
         }
+        if self.conversations.live_selected() && !matches!(key.code, KeyCode::Char('/')) {
+            return self.live_key(key, api);
+        }
         match key.code {
+            KeyCode::Char('m') if self.conversations.detail.is_none() => {
+                self.conversations.cancel_exchange_read();
+                self.conversations.tasks_view = false;
+                if self.conversations.can_observe() {
+                    self.observation_request(api, Read::Live);
+                }
+            }
             KeyCode::Char('m') if self.conversations.detail.is_some() => {
                 self.conversations.exchange_metadata = !self.conversations.exchange_metadata;
                 self.conversations.scroll = 0;
@@ -514,7 +675,7 @@ impl App {
         self.clamp_conversation_scroll();
         true
     }
-    fn clamp_conversation_scroll(&mut self) {
+    fn conversation_content_area(&self) -> ratatui::layout::Rect {
         use ratatui::layout::{Constraint, Layout};
         let area = crate::tui::render::current_frame_area()
             .unwrap_or_else(crate::tui::render::default_frame_area);
@@ -525,7 +686,11 @@ impl App {
             Constraint::Length(crate::tui::render::footer_height(self.meta.profile)),
         ])
         .split(area);
-        let max = render::content_scroll_limit(&self.conversations, root[2]);
+        root[2]
+    }
+    fn clamp_conversation_scroll(&mut self) {
+        let max =
+            render::content_scroll_limit(&self.conversations, self.conversation_content_area());
         if self.conversations.my_inbox {
             self.conversations.inbox.scroll = self.conversations.inbox.scroll.min(max);
         } else {

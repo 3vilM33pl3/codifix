@@ -105,6 +105,8 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         let mut spans = match app.active_tab {
             TabKind::Conversations => vec![Span::raw(if app.conversations.my_inbox_selected() {
                 "v view  r refresh  Enter open  i sign in  o sign out"
+            } else if app.conversations.live_selected() {
+                "PgUp scroll back  End follow live  / peer  m tasks  r refresh"
             } else if app.conversations.exchange_open() {
                 "j/k scroll  PgUp/PgDn page  m transcript/details  Esc back  r refresh"
             } else {

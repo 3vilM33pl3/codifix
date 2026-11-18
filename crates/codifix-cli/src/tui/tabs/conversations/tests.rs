@@ -187,6 +187,115 @@ fn narrow_transcript_can_scroll_to_the_final_reply() {
     assert!(rendered.contains("Done < lab"));
 }
 
+fn live_item(id: u128, direction: &str, events: &[(i64, &str, &str)]) -> ExchangeDetail {
+    let mut d = detail();
+    d.exchange.task_id = Uuid::from_u128(id);
+    d.exchange.peer = "homelab".into();
+    d.exchange.direction = direction.into();
+    d.exchange.journal_available = true;
+    d.events = events
+        .iter()
+        .map(
+            |(at, kind, body)| codifix_record::agency_observation::ExchangeEvent {
+                sequence: *at,
+                kind: (*kind).into(),
+                body: (*body).into(),
+                recorded_at: chrono::DateTime::from_timestamp(*at, 0).unwrap(),
+            },
+        )
+        .collect();
+    d
+}
+
+fn batch(details: Vec<ExchangeDetail>, next_before: Option<&str>) -> TranscriptBatch {
+    TranscriptBatch {
+        page: ExchangePage {
+            exchanges: details
+                .iter()
+                .map(|detail| detail.exchange.clone())
+                .collect(),
+            next_before: next_before.map(str::to_owned),
+        },
+        details,
+    }
+}
+
+fn transcript(s: &ConversationsState) -> String {
+    render::live_lines(s)
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn live_view_interleaves_directions_and_freezes_scrolled_history_until_resume() {
+    let mut s = state();
+    let request = live_item(
+        1,
+        "outgoing",
+        &[
+            (1, "request", "Check the certificates"),
+            (3, "answer", "Staging"),
+        ],
+    );
+    let response = live_item(2, "incoming", &[(2, "request", "Which environment?")]);
+    s.live
+        .accept(batch(vec![response.clone(), request.clone()], None), None);
+    let first = transcript(&s);
+    let a = first.find("workshop > Check the certificates").unwrap();
+    let b = first.find("Which environment? < homelab").unwrap();
+    let c = first.find("workshop > Staging").unwrap();
+    assert!(a < b && b < c);
+
+    s.live.pause(12);
+    let mut complete = request;
+    complete.events.push(
+        live_item(1, "outgoing", &[(4, "result", "Job done")])
+            .events
+            .remove(0),
+    );
+    s.live
+        .accept(batch(vec![complete.clone(), response.clone()], None), None);
+    assert_eq!(transcript(&s), first);
+    assert_eq!(s.live.scroll, 12);
+    s.live.resume();
+    assert!(transcript(&s).contains("Job done < homelab"));
+    s.live.accept(batch(vec![complete, response], None), None);
+    assert_eq!(transcript(&s).matches("Job done").count(), 1);
+}
+
+#[test]
+fn live_window_reaches_the_tail_past_ratatuis_scroll_range() {
+    use ratatui::text::Line;
+    let mut lines = vec![Line::from("earlier"); usize::from(u16::MAX) + 5];
+    lines.push(Line::from("Latest reply"));
+    let offset = lines.len() - 1;
+    let (window, offset) = render::live_window(lines, 20, offset);
+    assert_eq!(window[usize::from(offset)].to_string(), "Latest reply");
+}
+
+#[test]
+fn live_view_includes_older_pages_and_clears_history_on_access_loss() {
+    let mut s = state();
+    let newest = live_item(2, "outgoing", &[(2, "request", "New request")]);
+    let older = live_item(1, "incoming", &[(1, "request", "Earlier reply")]);
+    s.live
+        .accept(batch(vec![newest.clone()], Some("older-page")), None);
+    assert_eq!(s.live.archive_before(), Some("older-page"));
+    s.live.accept(
+        batch(vec![newest], Some("older-page")),
+        Some(batch(vec![older], None)),
+    );
+    let text = transcript(&s);
+    assert!(text.find("Earlier reply").unwrap() < text.find("New request").unwrap());
+    s.live.pause(4);
+    s.receive_observation(scope("p"), 0, Err("Observation returned HTTP 403".into()));
+    assert!(!transcript(&s).contains("Earlier reply"));
+    assert!(s.live.visible().next().is_none());
+    assert!(!s.live.paused());
+}
+
 #[test]
 fn human_replies_from_previous_scope_or_generation_are_discarded() {
     let mut s = state();
@@ -355,6 +464,7 @@ async fn repeated_detail_scrolling_stops_at_the_end_and_can_move_back() {
     let api = ApiClient::new(reqwest::Client::new(), serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
     app.observation_tick(&api);
     app.active_tab = TabKind::Conversations;
+    app.conversations.tasks_view = true;
     app.conversations.companion = Some(status());
     app.conversations.companion_loaded = Some(Instant::now());
     app.conversations.page = Some(ExchangePage {
