@@ -8,12 +8,9 @@ checks below are not a production acceptance result. Follow this page and the
 [Network and Inbox operator setup](network-inbox.md#operator-setup) from the
 source revision named by the candidate manifest.
 
-The candidate artifacts are staged under
-`/absolute/path/to/network-inbox-candidate` on the
-build host. For portable commands below, set `CANDIDATE_DIR` to that directory
-or to the directory containing the candidate's delivered manifest, provenance,
-checksums, and artifacts. The manifest is the authority for filenames and
-build/provenance paths; do not infer a package from its name alone.
+Set `CANDIDATE_DIR` to the directory containing the delivered manifest,
+provenance, checksums and artifacts. Use the filenames and provenance paths
+recorded in that manifest.
 
 ## 1. Verify candidate bytes and provenance
 
