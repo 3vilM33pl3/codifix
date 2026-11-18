@@ -104,17 +104,17 @@ pub(crate) async fn companion(
             .map_err(database_error)?
             .iter()
             .take(100)
-            .map(|s| safe(s, 128))
+            .map(|s| label(s, 128))
             .collect();
         response.enrolled_peers = r
             .try_get::<Vec<String>, _>("enrolled_peers")
             .map_err(database_error)?
             .iter()
             .take(100)
-            .map(|s| safe(s, 128))
+            .map(|s| label(s, 128))
             .collect();
         response.last_heartbeat_at = Some(r.try_get("observed_at").map_err(database_error)?);
-        response.version = Some(safe(
+        response.version = Some(label(
             &r.try_get::<String, _>("version").map_err(database_error)?,
             128,
         ));
@@ -172,7 +172,7 @@ const SELECT: &str = r#"SELECT t.id,t.created_at,GREATEST(t.updated_at,(SELECT m
  CASE WHEN t.payload->>'capability'='delegate' THEN t.payload#>>'{payload,peer}' ELSE t.requester END AS peer,
  CASE WHEN t.payload->>'capability'='delegate' THEN 'outgoing' ELSE 'incoming' END AS direction,
  left(r.remote_id,256) AS remote_task_id,
- EXISTS(SELECT 1 FROM agency_observation_events e WHERE e.task_id=t.id AND e.kind='request') AS journal_available,
+ (o.task_id IS NOT NULL AND EXISTS(SELECT 1 FROM agency_observation_events e WHERE e.task_id=t.id AND e.kind='request')) AS journal_available,
  left(t.contract#>>'{clarification,question}',4096) AS question,
  left(t.contract#>>'{clarification,answer}',4096) AS answer,
  left(t.contract#>>'{outcome,summary}',4096) AS result
@@ -189,6 +189,8 @@ const SELECT: &str = r#"SELECT t.id,t.created_at,GREATEST(t.updated_at,(SELECT m
  AND NOT EXISTS(SELECT 1 FROM inbox_task_origins i WHERE i.task_id=t.id)
  AND NOT EXISTS(SELECT 1 FROM inbox_dispatches d WHERE d.task_id=t.id)
  AND ((t.payload->>'capability'='delegate' AND t.payload#>>'{payload,kind}'='delegate'
+       AND t.payload#>>'{payload,request,capability}' IN ('inspect','plan_prepare','plan_apply','plan_inspect','model_draft')
+       AND t.payload#>>'{payload,request,capability}'=t.payload#>>'{payload,request,payload,kind}'
        AND t.payload#>>'{resource,kind}'='peer'
        AND t.payload#>>'{resource,id}'=t.payload#>>'{payload,peer}'
        AND r.peer_id=t.payload#>>'{payload,peer}' AND r.peer_id=ANY($2))
@@ -198,25 +200,28 @@ const SELECT: &str = r#"SELECT t.id,t.created_at,GREATEST(t.updated_at,(SELECT m
        AND ((o.direction='outgoing' AND o.peer=r.peer_id AND o.requester_operator AND o.requester_instance_id=o.home_instance_id)
          OR (o.direction='incoming' AND o.peer=t.requester AND NOT o.requester_operator AND o.requester_instance_id<>o.home_instance_id)))
  OR (o.task_id IS NULL AND EXISTS(SELECT 1 FROM area_import_receipts a WHERE a.singleton=true AND a.target_instance::text=$4::text)
-   AND EXISTS(SELECT 1 FROM jsonb_to_recordset($3::jsonb) AS l(task_id uuid,peer text,direction text,requester text,remote_task_id text)
+   AND EXISTS(SELECT 1 FROM jsonb_to_recordset($3::jsonb) AS l(task_id uuid,peer text,direction text,requester text,remote_task_id text,source_task_id uuid)
     WHERE l.task_id=t.id AND l.requester=t.requester
       AND ((l.direction='outgoing' AND l.peer=r.peer_id AND l.remote_task_id=r.remote_id AND t.payload->>'capability'='delegate')
-        OR (l.direction='incoming' AND l.peer=t.requester AND l.remote_task_id IS NULL AND t.payload->>'capability'<>'delegate')))))"#;
+        OR (l.direction='incoming' AND l.peer=t.requester AND l.remote_task_id IS NULL AND l.source_task_id::text=t.request_id AND t.payload->>'capability'<>'delegate')))))"#;
 fn safe(text: &str, limit: usize) -> String {
     text.chars()
-        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
+        .filter(|c| (!c.is_control() || *c == '\n' || *c == '\t') && !matches!(*c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{200e}' | '\u{200f}' | '\u{061c}'))
         .take(limit)
         .collect()
+}
+fn label(text: &str, limit: usize) -> String {
+    safe(text, limit).replace(['\n', '\t'], " ")
 }
 fn summary(r: &PgRow) -> Result<ExchangeSummary, ApiError> {
     Ok(ExchangeSummary {
         task_id: r.try_get("id").map_err(database_error)?,
-        peer: safe(
+        peer: label(
             &r.try_get::<String, _>("peer").map_err(database_error)?,
             128,
         ),
         direction: r.try_get("direction").map_err(database_error)?,
-        specialist_id: safe(
+        specialist_id: label(
             &r.try_get::<Option<String>, _>("specialist_id")
                 .map_err(database_error)?
                 .unwrap_or_default(),
@@ -227,7 +232,7 @@ fn summary(r: &PgRow) -> Result<ExchangeSummary, ApiError> {
                 .map_err(database_error)?,
             4096,
         ),
-        status: safe(
+        status: label(
             &r.try_get::<Option<String>, _>("status")
                 .map_err(database_error)?
                 .unwrap_or_else(|| "unknown".into()),
@@ -357,7 +362,7 @@ pub(crate) async fn detail(
         remote_task_id: r
             .try_get::<Option<String>, _>("remote_task_id")
             .map_err(database_error)?
-            .map(|s| safe(&s, 256)),
+            .map(|s| label(&s, 256)),
         exchange,
         events,
         events_truncated: truncated,

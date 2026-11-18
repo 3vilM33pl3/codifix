@@ -2425,6 +2425,8 @@ pub(crate) async fn authorization_guard(
     if !state.is_primary() {
         if request.uri().path().starts_with("/v1/network/")
             || request.uri().path().starts_with("/v1/inbox/")
+            || (request.uri().path().starts_with("/v1/projects/")
+                && request.uri().path().split('/').nth(4) == Some("agency"))
         {
             return ApiError::service_unavailable(
                 "private inbox requires the explicitly selected home service",

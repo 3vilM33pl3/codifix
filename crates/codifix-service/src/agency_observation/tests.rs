@@ -62,6 +62,7 @@ fn cursor_and_terminal_controls_are_bounded() {
         (at, id)
     );
     assert_eq!(safe("a\x1b[31m\rb\n", 6), "a[31mb");
+    assert_eq!(label("peer\n\t\u{202e}name", 128), "peer  name");
 }
 
 async fn task(
@@ -159,6 +160,24 @@ async fn database_projection_denies_wrong_scope_and_excludes_human_and_ambiguous
     )
     .await;
     let incoming = task(&db.pool, instance, project, "homelab", "inspect", None).await;
+    let protected_delegate = task(
+        &db.pool,
+        instance,
+        project,
+        "operator",
+        "openbao_recover",
+        Some("homelab"),
+    )
+    .await;
+    let nested_delegate = task(
+        &db.pool,
+        instance,
+        project,
+        "operator",
+        "delegate",
+        Some("homelab"),
+    )
+    .await;
     let human = task(
         &db.pool,
         instance,
@@ -232,7 +251,13 @@ async fn database_projection_denies_wrong_scope_and_excludes_human_and_ambiguous
     assert_ne!(first.exchanges[0].task_id, second.exchanges[0].task_id);
     assert!(page.exchanges.iter().any(|e| e.task_id == outgoing));
     assert!(page.exchanges.iter().any(|e| e.task_id == incoming));
-    for excluded in [human, forwarded, ambiguous] {
+    for excluded in [
+        human,
+        forwarded,
+        ambiguous,
+        protected_delegate,
+        nested_delegate,
+    ] {
         assert_eq!(
             detail(
                 State(state.clone()),
@@ -295,6 +320,7 @@ async fn database_projection_denies_wrong_scope_and_excludes_human_and_ambiguous
             direction: "outgoing".into(),
             requester: "operator".into(),
             remote_task_id: remote,
+            source_task_id: None,
         });
     // Legacy rows have no original journal; show only fields of the surviving snapshot.
     sqlx::query("DELETE FROM agency_observation_events WHERE task_id=$1")
@@ -329,6 +355,52 @@ async fn database_projection_denies_wrong_scope_and_excludes_human_and_ambiguous
         .is_err()
     );
     assert!(d.events.iter().all(|e| e.kind == "snapshot"));
+    // Historical incoming requests must match their reviewed exact source UUID.
+    sqlx::query("DELETE FROM agency_task_observation_origins WHERE task_id=$1")
+        .bind(incoming)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    state
+        .config
+        .agency_observation
+        .as_mut()
+        .unwrap()
+        .legacy_exchanges
+        .push(codifix_config::agency_observation::LegacyExchangeReceipt {
+            task_id: incoming,
+            peer: "homelab".into(),
+            direction: "incoming".into(),
+            requester: "homelab".into(),
+            remote_task_id: None,
+            source_task_id: Some(Uuid::new_v4()),
+        });
+    assert!(
+        detail(
+            State(state.clone()),
+            Extension(p.clone()),
+            Path(("codifix".into(), incoming))
+        )
+        .await
+        .is_err()
+    );
+    state
+        .config
+        .agency_observation
+        .as_mut()
+        .unwrap()
+        .legacy_exchanges[1]
+        .source_task_id = Some(incoming);
+    let snapshot = detail(
+        State(state.clone()),
+        Extension(p.clone()),
+        Path(("codifix".into(), incoming)),
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(!snapshot.exchange.journal_available);
+    assert!(snapshot.events.iter().all(|e| e.kind == "snapshot"));
     // Heartbeat reports presence, does not imply peer reachability or recent work.
     let status = companion(
         State(state.clone()),
@@ -371,6 +443,76 @@ async fn database_projection_denies_wrong_scope_and_excludes_human_and_ambiguous
         .state,
         "stale"
     );
+    // The outside response layer marks success, disabled and early denials private.
+    let mut disabled = state.clone();
+    disabled.config.agency_observation = None;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let server =
+        tokio::spawn(axum::serve(listener, crate::routes::build_http_app(disabled)).into_future());
+    let client = reqwest::Client::new();
+    let response = client
+        .get(format!("{origin}/v1/projects/codifix/agency/companion"))
+        .header("x-api-token", "synthetic-unused")
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    server.abort();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(
+        axum::serve(listener, crate::routes::build_http_app(state.clone())).into_future(),
+    );
+    for suffix in [
+        "companion",
+        "exchanges",
+        "exchanges/00000000-0000-0000-0000-000000000001",
+    ] {
+        let response = client
+            .get(format!("{origin}/v1/projects/codifix/agency/{suffix}"))
+            .bearer_auth("synthetic-invalid")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), axum::http::StatusCode::UNAUTHORIZED);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+    let response = client
+        .get(format!("{origin}/v1/projects/codifix/agency/exchanges"))
+        .header("x-api-token", "synthetic-unused")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    server.abort();
+    let mut relay = state.clone();
+    relay.role = crate::ServiceRole::Relay;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let server =
+        tokio::spawn(axum::serve(listener, crate::routes::build_http_app(relay)).into_future());
+    let response = client
+        .get(format!("{origin}/v1/projects/codifix/agency/companion"))
+        .header("x-api-token", "synthetic-unused")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    );
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    assert!(
+        response
+            .text()
+            .await
+            .unwrap()
+            .contains("explicitly selected home service")
+    );
+    server.abort();
     // Missing provenance schema is a hard read failure, never an empty success.
     sqlx::query("DROP TABLE inbox_task_origins")
         .execute(&db.pool)

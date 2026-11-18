@@ -542,7 +542,9 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
         }
         // Every due slot advances even if permission or budget is unavailable;
         // an orphan cannot starve other schedules. No failed slot is replayed.
-        let _ = store.submit(&req, peer).await;
+        let _ = store
+            .submit_observed(&req, peer, cfg.observation_enabled)
+            .await;
         {
             sqlx::query("UPDATE agency_schedules SET next_at=GREATEST(next_at+make_interval(secs=>$2),clock_timestamp()+make_interval(secs=>$2)) WHERE id=$1 AND next_at=$3")
                 .bind(id).bind(f64::from(interval)).bind(due).execute(&store.pool).await?;

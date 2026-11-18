@@ -206,7 +206,17 @@ impl Store {
         Ok(())
     }
     pub async fn submit(&self, req: &Submit, peer: &Peer) -> Result<StoredTask> {
-        self.submit_inner(req, peer, None).await
+        self.submit_inner(req, peer, None, false).await
+    }
+
+    /// Only trusted host configuration can opt authenticated peer work into capture.
+    pub async fn submit_observed(
+        &self,
+        req: &Submit,
+        peer: &Peer,
+        capture: bool,
+    ) -> Result<StoredTask> {
+        self.submit_inner(req, peer, None, capture).await
     }
 
     /// A same-database dispatch ticket is the only way to obtain this internal
@@ -221,7 +231,8 @@ impl Store {
             endpoint: None,
             outbound_token_env: None,
         };
-        self.submit_inner(req, &peer, Some((ticket, home))).await
+        self.submit_inner(req, &peer, Some((ticket, home)), false)
+            .await
     }
 
     async fn submit_inner(
@@ -229,6 +240,7 @@ impl Store {
         req: &Submit,
         peer: &Peer,
         inbox: Option<(Uuid, Uuid)>,
+        capture: bool,
     ) -> Result<StoredTask> {
         ensure!(
             peer.operator || peer.mandates.contains(&req.mandate_id),
@@ -388,8 +400,11 @@ impl Store {
         }
         // Preserve authenticated admission, never infer identity from a later payload.
         // Inbox and child tasks deliberately have no public peer observation origin.
-        if inbox.is_none()
+        if capture
+            && inbox.is_none()
             && req.parent_id.is_none()
+            && peer.id.len() <= 128
+            && req.resource.id.len() <= 128
             && !peer.id.starts_with("inbox-gateway:")
             && [
                 "delegate",
@@ -408,7 +423,17 @@ impl Store {
                 && req.capability == "delegate"
                 && req.resource.kind == "peer"
                 && req.payload["kind"] == "delegate"
-                && req.payload["peer"].as_str() == Some(req.resource.id.as_str());
+                && req.payload["peer"].as_str() == Some(req.resource.id.as_str())
+                && [
+                    "inspect",
+                    "plan_prepare",
+                    "plan_apply",
+                    "plan_inspect",
+                    "model_draft",
+                ]
+                .contains(&req.payload["request"]["capability"].as_str().unwrap_or(""))
+                && req.payload["request"]["capability"].as_str()
+                    == req.payload["request"]["payload"]["kind"].as_str();
             let incoming = !peer.operator
                 && peer.instance_id != m.subject_instance_id
                 && req.capability != "delegate"

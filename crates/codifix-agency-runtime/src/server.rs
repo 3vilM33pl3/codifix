@@ -166,7 +166,10 @@ async fn submit(
     let peer = peer(&app, &headers)?;
     check_specialist(&app, &req)?;
     Ok(Json(
-        app.store.submit(&req, &peer).await.map_err(safe_error)?,
+        app.store
+            .submit_observed(&req, &peer, app.config.observation_enabled)
+            .await
+            .map_err(safe_error)?,
     ))
 }
 async fn list(State(app): State<App>, headers: HeaderMap) -> ApiResult<Vec<StoredTask>> {
@@ -477,7 +480,10 @@ async fn send_message(
             .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_task_contract"))?;
         submit.request_id = req.message.message_id.clone();
         check_specialist(&app, &submit)?;
-        app.store.submit(&submit, &p).await.map_err(safe_error)?
+        app.store
+            .submit_observed(&submit, &p, app.config.observation_enabled)
+            .await
+            .map_err(safe_error)?
     };
     let mut task = task;
     if !configuration.return_immediately {

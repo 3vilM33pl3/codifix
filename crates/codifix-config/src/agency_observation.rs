@@ -34,4 +34,5 @@ pub struct LegacyExchangeReceipt {
     pub direction: String,
     pub requester: String,
     pub remote_task_id: Option<String>,
+    pub source_task_id: Option<Uuid>,
 }

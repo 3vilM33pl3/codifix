@@ -30,17 +30,23 @@ DELETE FROM agency_observation_events WHERE NOT EXISTS
 DROP TRIGGER agency_observation_journal ON agency_tasks;
 CREATE OR REPLACE FUNCTION agency_record_observation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+ -- Existing runtime roles keep working without any observation grants. Capture is
+ -- optional and must never widen ordinary writer access to private Inbox tables.
+ IF NOT has_table_privilege(current_user,'agency_task_observation_origins','SELECT')
+ OR NOT has_table_privilege(current_user,'agency_observation_events','INSERT')
+ OR NOT has_sequence_privilege(current_user,pg_get_serial_sequence('agency_observation_events','sequence'),'USAGE') THEN RETURN NEW; END IF;
  IF NOT EXISTS(SELECT 1 FROM agency_tasks WHERE id=NEW.id) THEN RETURN NEW; END IF;
  IF NEW.parent_id IS NOT NULL OR NEW.requester LIKE 'inbox-gateway:%'
  OR NEW.payload::text LIKE '%"conversation_turn"%' OR NEW.payload::text LIKE '%inbox-gateway:%'
  OR coalesce(NEW.payload->>'capability','') NOT IN ('delegate','inspect','plan_prepare','plan_apply','plan_inspect','model_draft')
- OR EXISTS(SELECT 1 FROM inbox_task_origins WHERE task_id=NEW.id)
- OR EXISTS(SELECT 1 FROM inbox_dispatches WHERE task_id=NEW.id)
+
  OR NOT EXISTS(SELECT 1 FROM agency_task_observation_origins o JOIN agency_mandates m ON m.id=NEW.mandate_id
      WHERE o.task_id=NEW.id AND o.requester=NEW.requester
        AND m.project_id=NEW.project_id AND m.document->>'subject_instance_id'=o.home_instance_id::text
        AND ((o.direction='incoming' AND NEW.payload->>'capability'<>'delegate')
          OR (o.direction='outgoing' AND NEW.payload->>'capability'='delegate'
+           AND NEW.payload#>>'{payload,request,capability}' IN ('inspect','plan_prepare','plan_apply','plan_inspect','model_draft')
+           AND NEW.payload#>>'{payload,request,capability}'=NEW.payload#>>'{payload,request,payload,kind}'
            AND NEW.payload#>>'{resource,kind}'='peer' AND NEW.payload#>>'{resource,id}'=o.peer
            AND NEW.payload#>>'{payload,peer}'=o.peer))) THEN RETURN NEW; END IF;
  IF TG_OP='INSERT' THEN
