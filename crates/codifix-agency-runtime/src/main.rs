@@ -268,13 +268,9 @@ async fn run() -> Result<()> {
                     );
                 }
                 Command::Serve => {
-                    // No schema changes in serve: provisioning remains an explicit operation.
-                    if cfg.observation_enabled {
-                        sqlx::query("INSERT INTO agency_runtime_heartbeats(instance_id,version) VALUES($1,$2) ON CONFLICT(instance_id) DO UPDATE SET version=excluded.version,observed_at=clock_timestamp()")
-                        .bind(cfg.instance_id).bind(env!("CARGO_PKG_VERSION")).execute(&store.pool).await?;
-                    }
                     let auth = Auth::from_config(&cfg)?;
                     let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
+                    store.heartbeat(&cfg).await?;
                     let cfg = Arc::new(cfg);
                     let app = App {
                         store: store.clone(),
@@ -298,8 +294,7 @@ async fn run() -> Result<()> {
                     }
                     workers.spawn(async move {
                         loop {
-                            if cfg.observation_enabled { let _ = sqlx::query("INSERT INTO agency_runtime_heartbeats(instance_id,version) VALUES($1,$2) ON CONFLICT(instance_id) DO UPDATE SET version=excluded.version,observed_at=clock_timestamp()")
-                                .bind(cfg.instance_id).bind(env!("CARGO_PKG_VERSION")).execute(&store.pool).await; }
+                            let _ = store.heartbeat(&cfg).await;
                             let _ = codifix_agency_runtime::worker::schedules(&store, &cfg).await;
                             let _ = codifix_agency_runtime::exchange::reconcile_cancellations(
                                 &store, &cfg,

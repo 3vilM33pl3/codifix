@@ -14,6 +14,9 @@ pub struct CompanionStatus {
     pub last_heartbeat_at: Option<DateTime<Utc>>,
     pub version: Option<String>,
     pub exchange_access: bool,
+    pub enabled_specialists: Vec<String>,
+    pub enrolled_peers: Vec<String>,
+    pub last_exchange_at: Option<DateTime<Utc>>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExchangeSummary {
@@ -45,6 +48,7 @@ pub struct ExchangeEvent {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExchangeDetail {
+    pub remote_task_id: Option<String>,
     pub exchange: ExchangeSummary,
     pub events: Vec<ExchangeEvent>,
     pub events_truncated: bool,

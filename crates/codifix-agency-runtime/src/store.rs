@@ -43,6 +43,31 @@ pub struct Store {
     pub pool: PgPool,
 }
 
+impl Store {
+    /// Metadata-only opt-in. Schema provisioning remains a separate operator action.
+    pub async fn heartbeat(&self, cfg: &crate::config::Config) -> Result<()> {
+        if !cfg.observation_enabled {
+            return Ok(());
+        }
+        let specialists = cfg
+            .specialists
+            .iter()
+            .map(|s| s.specialist_id.clone())
+            .take(100)
+            .collect::<Vec<_>>();
+        let peers = cfg
+            .peers
+            .iter()
+            .filter(|p| !p.operator && p.instance_id != cfg.instance_id)
+            .map(|p| p.id.clone())
+            .take(100)
+            .collect::<Vec<_>>();
+        sqlx::query("INSERT INTO agency_runtime_heartbeats(instance_id,version,enabled_specialists,enrolled_peers) VALUES($1,$2,$3,$4) ON CONFLICT(instance_id) DO UPDATE SET version=excluded.version,enabled_specialists=excluded.enabled_specialists,enrolled_peers=excluded.enrolled_peers,observed_at=clock_timestamp()")
+            .bind(cfg.instance_id).bind(env!("CARGO_PKG_VERSION")).bind(specialists).bind(peers).execute(&self.pool).await?;
+        Ok(())
+    }
+}
+
 pub struct PlanAdmission<'a> {
     pub task_id: Uuid,
     pub revision: i64,
@@ -360,6 +385,40 @@ impl Store {
             .await?;
         } else if let Some(parent) = req.parent_id {
             codifix_inbox::store::inherit_task_origin(&mut tx, parent, id).await?;
+        }
+        // Preserve authenticated admission, never infer identity from a later payload.
+        // Inbox and child tasks deliberately have no public peer observation origin.
+        if inbox.is_none()
+            && req.parent_id.is_none()
+            && !peer.id.starts_with("inbox-gateway:")
+            && [
+                "delegate",
+                "inspect",
+                "plan_prepare",
+                "plan_apply",
+                "plan_inspect",
+                "model_draft",
+            ]
+            .contains(&req.capability.as_str())
+            && !serde_json::to_string(&req.payload)?.contains("conversation_turn")
+            && !serde_json::to_string(&req.payload)?.contains("inbox-gateway:")
+        {
+            let outgoing = peer.operator
+                && peer.instance_id == m.subject_instance_id
+                && req.capability == "delegate"
+                && req.resource.kind == "peer"
+                && req.payload["kind"] == "delegate"
+                && req.payload["peer"].as_str() == Some(req.resource.id.as_str());
+            let incoming = !peer.operator
+                && peer.instance_id != m.subject_instance_id
+                && req.capability != "delegate"
+                && req.payload["kind"].as_str() == Some(req.capability.as_str());
+            if outgoing || incoming {
+                sqlx::query("INSERT INTO agency_task_observation_origins(task_id,home_instance_id,requester,requester_instance_id,requester_operator,peer,direction) VALUES($1,$2,$3,$4,$5,$6,$7)")
+                    .bind(id).bind(m.subject_instance_id).bind(&peer.id).bind(peer.instance_id).bind(peer.operator)
+                    .bind(if outgoing { &req.resource.id } else { &peer.id }).bind(if outgoing { "outgoing" } else { "incoming" })
+                    .execute(&mut *tx).await?;
+            }
         }
         enqueue(&mut tx, project, id, 1).await?;
         tx.commit().await?;

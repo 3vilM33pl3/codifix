@@ -14,6 +14,8 @@ pub struct AgencyObservationConfig {
     #[serde(default)]
     pub peer_ids: Vec<String>,
     #[serde(default)]
+    pub legacy_exchanges: Vec<LegacyExchangeReceipt>,
+    #[serde(default)]
     pub exchange_projects: Vec<AgencyExchangeProject>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -21,4 +23,15 @@ pub struct AgencyObservationConfig {
 pub struct AgencyExchangeProject {
     pub project: String,
     pub principal_ids: Vec<Uuid>,
+}
+
+/// Operator-reviewed exact historical correlation. Never inferred from requester labels.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LegacyExchangeReceipt {
+    pub task_id: Uuid,
+    pub peer: String,
+    pub direction: String,
+    pub requester: String,
+    pub remote_task_id: Option<String>,
 }

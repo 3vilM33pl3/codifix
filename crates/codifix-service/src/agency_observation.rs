@@ -81,6 +81,9 @@ pub(crate) async fn companion(
         last_heartbeat_at: None,
         version: None,
         exchange_access: false,
+        enabled_specialists: vec![],
+        enrolled_peers: vec![],
+        last_exchange_at: None,
     };
     let Some(_) = s.config.agency_observation.as_ref().filter(|c| c.enabled) else {
         return Ok(Json(response));
@@ -92,10 +95,24 @@ pub(crate) async fn companion(
     response.area = Some(c.area.clone());
     response.instance_id = Some(c.instance_id);
     response.exchange_access = exchange_access(c, &p, &project);
-    let heartbeat = sqlx::query("SELECT observed_at,version,observed_at BETWEEN clock_timestamp()-interval '90 seconds' AND clock_timestamp()+interval '5 seconds' AS fresh FROM agency_runtime_heartbeats WHERE instance_id=$1")
+    let heartbeat = sqlx::query("SELECT observed_at,version,enabled_specialists,enrolled_peers,observed_at BETWEEN clock_timestamp()-interval '90 seconds' AND clock_timestamp()+interval '5 seconds' AS fresh FROM agency_runtime_heartbeats WHERE instance_id=$1")
         .bind(c.instance_id).fetch_optional(&pool).await.map_err(database_error)?;
     response.state = "unknown".into();
     if let Some(r) = heartbeat {
+        response.enabled_specialists = r
+            .try_get::<Vec<String>, _>("enabled_specialists")
+            .map_err(database_error)?
+            .iter()
+            .take(100)
+            .map(|s| safe(s, 128))
+            .collect();
+        response.enrolled_peers = r
+            .try_get::<Vec<String>, _>("enrolled_peers")
+            .map_err(database_error)?
+            .iter()
+            .take(100)
+            .map(|s| safe(s, 128))
+            .collect();
         response.last_heartbeat_at = Some(r.try_get("observed_at").map_err(database_error)?);
         response.version = Some(safe(
             &r.try_get::<String, _>("version").map_err(database_error)?,
@@ -107,6 +124,17 @@ pub(crate) async fn companion(
             "stale"
         }
         .into();
+    }
+    if response.exchange_access {
+        response.last_exchange_at =
+            sqlx::query_scalar(&format!("SELECT max(updated_at) FROM ({SELECT}) eligible"))
+                .bind(&project)
+                .bind(&c.peer_ids)
+                .bind(serde_json::to_value(&c.legacy_exchanges).map_err(|_| unavailable())?)
+                .bind(c.instance_id.to_string())
+                .fetch_one(&pool)
+                .await
+                .map_err(database_error)?;
     }
     Ok(Json(response))
 }
@@ -138,29 +166,42 @@ fn cursor(before: Option<&str>) -> Result<(DateTime<Utc>, Uuid), ApiError> {
 }
 // Exact project, root-only and provenance exclusions are applied before pagination.
 // Never deserialize a whole payload into an API record.
-const SELECT: &str = r#"SELECT t.id,t.created_at,t.updated_at,t.contract->>'specialist_id' AS specialist_id,
+const SELECT: &str = r#"SELECT t.id,t.created_at,GREATEST(t.updated_at,(SELECT max(e.recorded_at) FROM agency_observation_events e WHERE e.task_id=t.id)) AS updated_at,t.contract->>'specialist_id' AS specialist_id,
  t.contract->>'status' AS status,
  left(coalesce(t.payload#>>'{payload,request,objective}',t.contract->>'objective',''),4096) AS objective,
  CASE WHEN t.payload->>'capability'='delegate' THEN t.payload#>>'{payload,peer}' ELSE t.requester END AS peer,
  CASE WHEN t.payload->>'capability'='delegate' THEN 'outgoing' ELSE 'incoming' END AS direction,
+ left(r.remote_id,256) AS remote_task_id,
  EXISTS(SELECT 1 FROM agency_observation_events e WHERE e.task_id=t.id AND e.kind='request') AS journal_available,
  left(t.contract#>>'{clarification,question}',4096) AS question,
  left(t.contract#>>'{clarification,answer}',4096) AS answer,
  left(t.contract#>>'{outcome,summary}',4096) AS result
  FROM agency_tasks t JOIN projects p ON p.id=t.project_id
+ JOIN agency_mandates m ON m.id=t.mandate_id AND m.project_id=t.project_id
  LEFT JOIN agency_remote_tasks r ON r.task_id=t.id
+ LEFT JOIN agency_task_observation_origins o ON o.task_id=t.id
  WHERE p.slug=$1 AND t.parent_id IS NULL
+ AND m.document->>'subject_instance_id'=$4::text
+ AND t.payload->>'capability' IN ('delegate','inspect','plan_prepare','plan_apply','plan_inspect','model_draft')
  AND t.requester NOT LIKE 'inbox-gateway:%'
  AND t.payload::text NOT LIKE '%"conversation_turn"%'
  AND t.payload::text NOT LIKE '%inbox-gateway:%'
- AND NOT EXISTS(SELECT 1 FROM inbox_task_origins o WHERE o.task_id=t.id)
+ AND NOT EXISTS(SELECT 1 FROM inbox_task_origins i WHERE i.task_id=t.id)
  AND NOT EXISTS(SELECT 1 FROM inbox_dispatches d WHERE d.task_id=t.id)
  AND ((t.payload->>'capability'='delegate' AND t.payload#>>'{payload,kind}'='delegate'
        AND t.payload#>>'{resource,kind}'='peer'
        AND t.payload#>>'{resource,id}'=t.payload#>>'{payload,peer}'
        AND r.peer_id=t.payload#>>'{payload,peer}' AND r.peer_id=ANY($2))
  OR (t.payload->>'capability'<>'delegate' AND t.payload->>'capability'=t.payload#>>'{payload,kind}'
-       AND t.requester=ANY($2) AND r.task_id IS NULL))"#;
+       AND t.requester=ANY($2) AND r.task_id IS NULL))
+ AND ((o.task_id IS NOT NULL AND o.home_instance_id::text=$4::text AND o.requester=t.requester
+       AND ((o.direction='outgoing' AND o.peer=r.peer_id AND o.requester_operator AND o.requester_instance_id=o.home_instance_id)
+         OR (o.direction='incoming' AND o.peer=t.requester AND NOT o.requester_operator AND o.requester_instance_id<>o.home_instance_id)))
+ OR (o.task_id IS NULL AND EXISTS(SELECT 1 FROM area_import_receipts a WHERE a.singleton=true AND a.target_instance::text=$4::text)
+   AND EXISTS(SELECT 1 FROM jsonb_to_recordset($3::jsonb) AS l(task_id uuid,peer text,direction text,requester text,remote_task_id text)
+    WHERE l.task_id=t.id AND l.requester=t.requester
+      AND ((l.direction='outgoing' AND l.peer=r.peer_id AND l.remote_task_id=r.remote_id AND t.payload->>'capability'='delegate')
+        OR (l.direction='incoming' AND l.peer=t.requester AND l.remote_task_id IS NULL AND t.payload->>'capability'<>'delegate')))))"#;
 fn safe(text: &str, limit: usize) -> String {
     text.chars()
         .filter(|c| !c.is_control() || *c == '\n' || *c == '\t')
@@ -228,8 +269,8 @@ pub(crate) async fn exchanges(
         ));
     }
     let (at, id) = cursor(q.before.as_deref())?;
-    let rows=sqlx::query(&format!("{SELECT} AND ($3::text IS NULL OR CASE WHEN t.payload->>'capability'='delegate' THEN r.peer_id ELSE t.requester END=$3) AND (t.created_at,t.id)<($4,$5) ORDER BY t.created_at DESC,t.id DESC LIMIT $6"))
-        .bind(&project).bind(&c.peer_ids).bind(q.peer).bind(at).bind(id).bind(limit+1).fetch_all(&pool).await.map_err(database_error)?;
+    let rows=sqlx::query(&format!("{SELECT} AND ($5::text IS NULL OR CASE WHEN t.payload->>'capability'='delegate' THEN r.peer_id ELSE t.requester END=$5) AND (t.created_at,t.id)<($6,$7) ORDER BY t.created_at DESC,t.id DESC LIMIT $8"))
+        .bind(&project).bind(&c.peer_ids).bind(serde_json::to_value(&c.legacy_exchanges).map_err(|_|unavailable())?).bind(c.instance_id.to_string()).bind(q.peer).bind(at).bind(id).bind(limit+1).fetch_all(&pool).await.map_err(database_error)?;
     let more = rows.len() > limit as usize;
     let exchanges = rows
         .iter()
@@ -255,9 +296,11 @@ pub(crate) async fn detail(
 ) -> Result<Json<ExchangeDetail>, ApiError> {
     let pool = authorized(&s, &p, &project).await?;
     let c = config(&s)?;
-    let r = sqlx::query(&format!("{SELECT} AND t.id=$3"))
+    let r = sqlx::query(&format!("{SELECT} AND t.id=$5"))
         .bind(&project)
         .bind(&c.peer_ids)
+        .bind(serde_json::to_value(&c.legacy_exchanges).map_err(|_| unavailable())?)
+        .bind(c.instance_id.to_string())
         .bind(id)
         .fetch_optional(&pool)
         .await
@@ -311,6 +354,10 @@ pub(crate) async fn detail(
         }
     }
     Ok(Json(ExchangeDetail {
+        remote_task_id: r
+            .try_get::<Option<String>, _>("remote_task_id")
+            .map_err(database_error)?
+            .map(|s| safe(&s, 256)),
         exchange,
         events,
         events_truncated: truncated,
