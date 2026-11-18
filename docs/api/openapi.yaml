@@ -3966,6 +3966,81 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
+  /v1/projects/{project}/agency/companion:
+    get:
+      operationId: getProjectAgencyCompanion
+      summary: "Read the area's companion heartbeat and enrolled peers."
+      tags: ["Agency"]
+      x-stability: internal
+      parameters:
+        - name: project
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Companion observation for an authorized project reader
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403":
+          description: Project read permission required
+  /v1/projects/{project}/agency/exchanges:
+    get:
+      operationId: listProjectAgencyExchanges
+      summary: "Page through the project's observed peer task exchanges."
+      tags: ["Agency"]
+      x-stability: internal
+      parameters:
+        - name: project
+          in: path
+          required: true
+          schema: { type: string }
+        - name: peer
+          in: query
+          schema: { type: string }
+        - name: before
+          in: query
+          description: Opaque cursor returned by the previous page
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Exchange summaries with an optional cursor
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403":
+          description: Project operator permission and observer enrollment required
+        "404":
+          description: Exchange observation unavailable
+  /v1/projects/{project}/agency/exchanges/{task_id}:
+    get:
+      operationId: getProjectAgencyExchange
+      summary: "Read the bounded project timeline for one peer task."
+      tags: ["Agency"]
+      x-stability: internal
+      parameters:
+        - name: project
+          in: path
+          required: true
+          schema: { type: string }
+        - name: task_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Exchange summary and recorded display events
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403":
+          description: Project operator permission and observer enrollment required
+        "404":
+          description: Exchange unavailable in this project
   /v1/watchers/heartbeat:
     post:
       operationId: post_v1_watchers_heartbeat
