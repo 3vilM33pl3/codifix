@@ -3,7 +3,7 @@
 ## Purpose
 
 `v` switches between **Agent exchanges** and **My Inbox**. Both are read only.
-The header identifies the selected area, instance and project.
+The header identifies the selected area and project.
 
 ## Layout
 
@@ -17,8 +17,9 @@ loading, unavailable, disabled and stale state. Details replace the list.
 Exchange observations use the selected project's existing service credential.
 They require the dedicated observation grant. `/` edits an exact peer filter;
 empty input means all peers. `j/k` or arrows select an exchange, `Enter` opens
-its journal, and `Esc` returns to the list. `PgDn` loads an older list page;
-`Home` loads the first page. Inside detail, `j/k`, `d/u` and `PgUp/PgDn` scroll.
+its transcript, and `Esc` returns to the list. `m` switches between messages
+and technical details. `PgDn` loads an older list page and `Home` loads the
+first page. Inside an exchange, `j/k`, `d/u` and `PgUp/PgDn` scroll.
 `r` refreshes. Disabled, denied, unavailable and stale observations are explicit.
 A reported result or legacy snapshot is not independent proof of success.
 
