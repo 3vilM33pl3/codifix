@@ -37,7 +37,8 @@ packaged installation. See [Areas and projects](https://codifix.dev/docs/areas).
 | Ask a cited project question | [Query](https://codifix.dev/docs/tui/query) |
 | Review replacement proposals | [Review](https://codifix.dev/docs/tui/review) |
 | See active coding sessions | [Agents](https://codifix.dev/docs/tui/agents) |
-| Check watcher liveness | [Watchers](https://codifix.dev/docs/tui/watchers) |
+| Check watchers and companion observations | [Watchers & Companions](https://codifix.dev/docs/tui/watchers) |
+| Inspect agent exchanges or your personal Inbox | [Conversations](https://codifix.dev/docs/tui/conversations) |
 | Inspect the managed skill bundle | [Skills](https://codifix.dev/docs/tui/skills) |
 | See loop state | [Automations](https://codifix.dev/docs/tui/automations) |
 | Generate a handoff briefing | [Activity](https://codifix.dev/docs/tui/activity) or [Resume](https://codifix.dev/docs/tui/resume) |
