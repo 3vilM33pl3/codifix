@@ -2952,6 +2952,7 @@ fn test_app_config() -> AppConfig {
         area: None,
         resolved_area_routing_path: None,
         supervisor: None,
+        agency_observation: None,
         evaluation: Default::default(),
         background_work: Default::default(),
         service: codifix_config::ServiceConfig {
