@@ -1,13 +1,10 @@
 #![allow(clippy::unwrap_used)]
 //! Synthetic, read-only GraphQL fixtures against isolated PostgreSQL schemas.
-//! The module is mounted here until the integrating runtime exports it.
-use codifix_agency_runtime::{config, store};
-#[path = "../src/inspection.rs"]
-mod inspection;
 use axum::{Json, Router, extract::State, routing::post};
 use chrono::{Duration, Utc};
 use codifix_agency::*;
 use codifix_agency_projects::{Authority, Plan, Scope, stable_id};
+use codifix_agency_runtime::{config, inspection, store};
 use config::{Config, Peer};
 use inspection::{InspectionBlocker, ObservationStatus, PlanInspection};
 use serde_json::{Value, json};

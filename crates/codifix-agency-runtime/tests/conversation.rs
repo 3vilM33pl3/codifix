@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used)]
 //! Synthetic model and authenticated A2A regression tests; no live provider.
+#[path = "social/roundtrip.rs"]
+mod social_roundtrip;
 use axum::{Json, Router, extract::State, routing::post};
 use chrono::{Duration, Utc};
 use codifix_agency::{conversation::*, routing::*, *};
@@ -114,6 +116,7 @@ impl Fixture {
             axum::serve(tcp, app).await.unwrap();
         });
         let cfg = Config {
+            observation_enabled: false,
             inbox_enabled: false,
             instance_id: instance,
             listen: "127.0.0.1:0".parse().unwrap(),
@@ -160,6 +163,7 @@ impl Fixture {
             public_profile: None,
             private_repository_dids: vec![],
             linear: None,
+            social: None,
             openbao_controllers: BTreeMap::new(),
         };
         Some(Self {
@@ -727,15 +731,26 @@ async fn human_gateway_executes_granted_actions_and_revocation_stops_queued_disp
 
 #[tokio::test]
 async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget() {
+    human_remote_roundtrip(
+        "human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget",
+        false,
+    )
+    .await
+}
+#[tokio::test]
+async fn signed_xrpc_workers_reply_to_direct_and_group_messages() {
+    human_remote_roundtrip(
+        "signed_xrpc_workers_reply_to_direct_and_group_messages",
+        true,
+    )
+    .await
+}
+async fn human_remote_roundtrip(test_name: &str, social: bool) {
     const CHILD: &str = "CODIFIX_HUMAN_REMOTE_INBOX_CHILD";
     const TOKEN: &str = "synthetic-human-remote-inbox-peer-only-token";
     if std::env::var_os(CHILD).is_none() {
         let out = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget",
-                "--nocapture",
-            ])
+            .args(["--exact", test_name, "--nocapture"])
             .env(CHILD, "yes")
             .env("CODIFIX_INBOX_TEST_PEER_TOKEN", TOKEN)
             .output()
@@ -748,6 +763,19 @@ async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget
         );
         return;
     }
+    human_remote_inbox(None, social).await;
+}
+
+#[tokio::test]
+#[ignore = "requires tests/federation-pds/run.mjs --agency"]
+async fn pds_social_group_chat_delivers_scoped_turns_and_replies() {
+    let fixture =
+        std::fs::read(std::env::var_os("CODIFIX_FEDERATION_PDS_FIXTURE").unwrap()).unwrap();
+    human_remote_inbox(Some(serde_json::from_slice(&fixture).unwrap()), false).await;
+}
+
+async fn human_remote_inbox(pds: Option<Value>, social: bool) {
+    const TOKEN: &str = "synthetic-human-remote-inbox-peer-only-token";
     let Some(mut home) = Fixture::new().await else {
         return;
     };
@@ -764,7 +792,78 @@ async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget
         endpoint: None,
         outbound_token_env: None,
     };
+    let synthetic_pds = if social {
+        Some(social_roundtrip::install(&mut home.cfg, &mut remote.cfg).await)
+    } else {
+        None
+    };
     remote.cfg.peers.push(source.clone());
+    let notice_chat = Uuid::new_v4();
+    let notice_owner = Uuid::new_v4();
+    if let Some(pds) = &pds {
+        use codifix_agency_runtime::social::{SocialConfig, SocialPeer};
+        let audience = pds["recipient_did"].as_str().unwrap();
+        let sender = pds["repository"].as_str().unwrap();
+        let social = |did: &str, peer: &str, peer_did: &str, key: &str| SocialConfig {
+            did: did.into(),
+            pds: pds["base"].as_str().unwrap().into(),
+            access_token_env: "AGENCY_FIXTURE_ACCESS_TOKEN".into(),
+            peers: BTreeMap::from([(
+                peer.into(),
+                SocialPeer {
+                    incident_conversation: None,
+                    notice_inbox: None,
+                    did: peer_did.into(),
+                    signing_key: key.into(),
+                },
+            )]),
+        };
+        remote.cfg.social = Some(social(
+            audience,
+            "human-home",
+            sender,
+            pds["signing_key"].as_str().unwrap(),
+        ));
+        remote.cfg.inbox_enabled = true;
+        remote
+            .cfg
+            .social
+            .as_mut()
+            .unwrap()
+            .peers
+            .get_mut("human-home")
+            .unwrap()
+            .notice_inbox = Some(codifix_agency_runtime::social::NoticeInbox {
+            conversation_id: notice_chat,
+            unseal_url: Some("https://ca.example.test/unseal".into()),
+        });
+        sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Synthetic custodian')")
+            .bind(notice_owner).execute(&remote.db.pool).await.unwrap();
+        sqlx::query("INSERT INTO inbox_conversations(id,home_instance_id,principal_id,request_digest,title) VALUES($1,$2,$3,'fixture','Custodian notices')")
+            .bind(notice_chat).bind(remote.cfg.instance_id).bind(notice_owner).execute(&remote.db.pool).await.unwrap();
+        home.cfg.social = Some(social(
+            sender,
+            "remote",
+            audience,
+            pds["recipient_key"].as_str().unwrap(),
+        ));
+    }
+    if social || pds.is_some() {
+        remote.cfg.inbox_enabled = true;
+        remote
+            .cfg
+            .social
+            .as_mut()
+            .unwrap()
+            .peers
+            .get_mut("human-home")
+            .unwrap()
+            .incident_conversation = Some(notice_chat);
+        if pds.is_none() {
+            sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Incident recipient')").bind(notice_owner).execute(&remote.db.pool).await.unwrap();
+            sqlx::query("INSERT INTO inbox_conversations(id,home_instance_id,principal_id,request_digest,title) VALUES($1,$2,$3,'fixture','Incident updates')").bind(notice_chat).bind(remote.cfg.instance_id).bind(notice_owner).execute(&remote.db.pool).await.unwrap();
+        }
+    }
     let app = codifix_agency_runtime::server::App {
         store: remote.store.clone(),
         config: Arc::new(remote.cfg.clone()),
@@ -786,6 +885,65 @@ async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget
         endpoint: Some(endpoint),
         outbound_token_env: Some("CODIFIX_INBOX_TEST_PEER_TOKEN".into()),
     });
+    if pds.is_some() {
+        use codifix_agency_runtime::notice::{NoticeEvent, ScenarioNotice};
+        let mut notice = ScenarioNotice {
+            task_id: Uuid::new_v4(),
+            attempt: Uuid::new_v4(),
+            subject: "disposable-openbao".into(),
+            participant: Some("Olivier".into()),
+            event: NoticeEvent::AwaitingOperator,
+        };
+        for event in [
+            NoticeEvent::AwaitingOperator,
+            NoticeEvent::AwaitingOperator,
+            NoticeEvent::UnsealedReady,
+        ] {
+            notice.event = event;
+            notice.send(&home.store, &home.cfg, "remote").await.unwrap();
+        }
+        let inbox = codifix_inbox::store::Store {
+            pool: remote.db.pool.clone(),
+            home_instance_id: remote.cfg.instance_id,
+        };
+        let detail = inbox.detail(notice_owner, notice_chat).await.unwrap();
+        assert_eq!(detail.messages.len(), 2, "same notice delivered only once");
+        assert!(detail.messages[0].body.contains("Waiting for the operator"));
+        assert_eq!(
+            detail.messages[0].artifact.as_ref().unwrap()["protected_unseal_url"],
+            "https://ca.example.test/unseal"
+        );
+        assert!(detail.messages[1].body.contains("unsealed and ready"));
+        assert!(detail.messages[1].artifact.is_none());
+    }
+    if social || pds.is_some() {
+        let notice = codifix_agency_runtime::notice::IncidentNotice {
+            incident_id: Uuid::new_v4(),
+            event_id: 1,
+            service: "catalogue".into(),
+            state: "recovered".into(),
+            summary: "Health and catalogue item request passed".into(),
+        };
+        for _ in 0..2 {
+            notice.send(&home.store, &home.cfg, "remote").await.unwrap();
+        }
+        let inbox = codifix_inbox::store::Store {
+            pool: remote.db.pool.clone(),
+            home_instance_id: remote.cfg.instance_id,
+        };
+        let messages = inbox
+            .detail(notice_owner, notice_chat)
+            .await
+            .unwrap()
+            .messages;
+        assert_eq!(
+            messages
+                .iter()
+                .filter(|m| m.body.contains("Health and catalogue item request passed"))
+                .count(),
+            1
+        );
+    }
     let human = Uuid::new_v4();
     let other = Uuid::new_v4();
     for principal in [human, other] {
@@ -979,6 +1137,85 @@ async fn human_remote_inbox_roundtrip_preserves_owner_disclosure_and_root_budget
             .any(|m| m.body == "Milestone one comes first")
     );
     assert!(!serde_json::to_string(&turn).unwrap().contains(TOKEN));
+    if pds.is_some() {
+        let mut local = grant.clone();
+        local.id = Uuid::new_v4();
+        local.contact.id = Uuid::new_v4();
+        local.contact.instance_id = home.cfg.instance_id;
+        local.contact.remote = false;
+        local.contact.mandate_id = Some(home.mandate.id);
+        local.request = serde_json::to_value(home.request(home.cfg.instance_id)).unwrap();
+        inbox.install_grant(&local).await.unwrap();
+        let local_member = Uuid::new_v4();
+        inbox
+            .add_member(
+                human,
+                chat.conversation.id,
+                &codifix_inbox::AddMember {
+                    client_request_id: local_member,
+                    specialist_id: local.contact.id,
+                    confirmed: true,
+                    selected_message_ids: vec![],
+                    summary: "Group review".into(),
+                },
+            )
+            .await
+            .unwrap();
+        let mut group = message.clone();
+        group.client_message_id = Uuid::new_v4();
+        group.body = "PRIVATE_SOCIAL_SENTINEL please review the group milestone".into();
+        group.recipient_member_ids = vec![chat.members[0].id, local_member];
+        inbox
+            .send(human, chat.conversation.id, &group)
+            .await
+            .unwrap();
+        inbox
+            .send(human, chat.conversation.id, &group)
+            .await
+            .unwrap();
+        let detail = tokio::time::timeout(std::time::Duration::from_secs(15), async {
+            loop {
+                worker::run_once(&home.store, &home.cfg).await.unwrap();
+                let detail = inbox.detail(human, chat.conversation.id).await.unwrap();
+                if detail
+                    .messages
+                    .iter()
+                    .filter(|m| m.root_id == group.client_message_id && m.member_id.is_some())
+                    .count()
+                    >= 2
+                {
+                    break detail;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            }
+        })
+        .await
+        .expect("both asynchronous group replies");
+        let replies: BTreeSet<_> = detail
+            .messages
+            .iter()
+            .filter(|m| m.root_id == group.client_message_id)
+            .filter_map(|m| m.member_id)
+            .collect();
+        assert_eq!(
+            replies,
+            group.recipient_member_ids.iter().copied().collect()
+        );
+        assert_eq!(home.provider.lock().unwrap().calls.len(), 1);
+        assert_eq!(remote.provider.lock().unwrap().calls.len(), 3);
+        assert!(
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM agency_social_used_tokens")
+                .fetch_one(&remote.db.pool)
+                .await
+                .unwrap()
+                > 0,
+            "peer messages must arrive over private XRPC"
+        );
+    }
+    if let Some(pds) = synthetic_pds {
+        social_roundtrip::group(&inbox, human, chat.conversation.id, &grant, &home, &remote).await;
+        pds.abort();
+    }
     runner.abort();
     server.abort();
     home.cleanup().await;

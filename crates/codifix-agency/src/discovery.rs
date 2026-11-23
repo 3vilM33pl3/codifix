@@ -20,9 +20,18 @@ pub struct PublicCapabilityProfile {
     pub display_name: String,
     pub summary: String,
     pub capabilities: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expirations: Vec<CapabilityExpiry>,
     pub agent_card_url: String,
     pub published_at: DateTime<Utc>,
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CapabilityExpiry {
+    pub capability: String,
+    pub expires_at: DateTime<Utc>,
+}
+
 /// Supply separately approved public copy, never raw private manifest text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -52,9 +61,21 @@ impl PublicCapabilityProfile {
             capabilities: approval.capabilities,
             agent_card_url: approval.agent_card_url,
             published_at: now,
+            expirations: Vec::new(),
         };
         profile.validate()?;
         Ok(profile)
+    }
+    /// Apply expiry when reading. The publishing companion can be offline.
+    pub fn retain_available(&mut self, now: DateTime<Utc>) {
+        self.expirations.retain(|entry| {
+            if entry.expires_at <= now {
+                self.capabilities.remove(&entry.capability);
+                false
+            } else {
+                true
+            }
+        });
     }
     pub fn validate(&self) -> Result<(), PolicyError> {
         if self.record_type != CAPABILITY_COLLECTION
@@ -65,11 +86,16 @@ impl PublicCapabilityProfile {
             || self.display_name.len() > 200
             || self.summary.trim().is_empty()
             || self.summary.len() > 1000
-            || self.capabilities.is_empty()
             || self.capabilities.len() > 100
             || self.capabilities.iter().any(|c| !valid_identifier(c))
         {
             return Err(PolicyError::Invalid("public capability profile"));
+        }
+        let mut seen = BTreeSet::new();
+        for entry in &self.expirations {
+            if !self.capabilities.contains(&entry.capability) || !seen.insert(&entry.capability) {
+                return Err(PolicyError::Invalid("capability expiry"));
+            }
         }
         validate_public_url(&self.agent_card_url)
     }

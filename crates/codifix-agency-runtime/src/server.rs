@@ -1,3 +1,6 @@
+mod incidents;
+mod social;
+
 use crate::{
     config::{Auth, Config, Peer},
     store::{Store, StoredTask, Submit},
@@ -50,6 +53,12 @@ fn peer(app: &App, headers: &HeaderMap) -> Result<Peer, (StatusCode, Json<Value>
         .ok_or_else(|| failure(StatusCode::UNAUTHORIZED, "unauthorized"))?;
     app.auth
         .authenticate(token)
+        .filter(|p| {
+            !app.config
+                .social
+                .as_ref()
+                .is_some_and(|social| social.peers.contains_key(&p.id))
+        })
         .ok_or_else(|| failure(StatusCode::UNAUTHORIZED, "unauthorized"))
 }
 fn version(headers: &HeaderMap) -> Result<(), (StatusCode, Json<Value>)> {
@@ -63,7 +72,12 @@ fn safe_error(_: anyhow::Error) -> (StatusCode, Json<Value>) {
 }
 pub fn router(app: App) -> Router {
     Router::new()
-        .route("/health", get(|| async { Json(json!({"status":"ok"})) }))
+        .merge(social::routes())
+        .merge(incidents::routes())
+        .route(
+            "/health",
+            get(|| async { Json(json!({"status":"ok","version":env!("CARGO_PKG_VERSION")})) }),
+        )
         .route("/operator", get(crate::operator::shell))
         .route("/.well-known/agent-card.json", get(card))
         .route("/message:send", post(send_message))
@@ -166,7 +180,10 @@ async fn submit(
     let peer = peer(&app, &headers)?;
     check_specialist(&app, &req)?;
     Ok(Json(
-        app.store.submit(&req, &peer).await.map_err(safe_error)?,
+        app.store
+            .submit_observed(&req, &peer, app.config.observation_enabled)
+            .await
+            .map_err(safe_error)?,
     ))
 }
 async fn list(State(app): State<App>, headers: HeaderMap) -> ApiResult<Vec<StoredTask>> {
@@ -182,6 +199,9 @@ async fn request_lookup(
     Path(request_id): Path<String>,
 ) -> ApiResult<StoredTask> {
     let p = peer(&app, &headers)?;
+    lookup_for(&app, &p, &request_id).await
+}
+async fn lookup_for(app: &App, p: &Peer, request_id: &str) -> ApiResult<StoredTask> {
     if request_id.is_empty() || request_id.len() > 128 {
         return Err(failure(StatusCode::BAD_REQUEST, "invalid_request_id"));
     }
@@ -193,7 +213,7 @@ async fn request_lookup(
             .await
             .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "storage_unavailable"))?;
     let id = id.ok_or_else(|| failure(StatusCode::NOT_FOUND, "task_unavailable"))?;
-    Ok(Json(app.store.get(id, &p).await.map_err(safe_error)?))
+    Ok(Json(app.store.get(id, p).await.map_err(safe_error)?))
 }
 async fn detail(
     State(app): State<App>,
@@ -404,6 +424,13 @@ async fn send_message(
 ) -> ApiResult<a2a::SendMessageResponse> {
     version(&headers)?;
     let p = peer(&app, &headers)?;
+    receive(&app, p, req).await
+}
+async fn receive(
+    app: &App,
+    p: Peer,
+    req: a2a::SendMessageRequest,
+) -> ApiResult<a2a::SendMessageResponse> {
     let configuration = req.configuration.clone().unwrap_or_default();
     if configuration.task_push_notification_config.is_some() {
         return Err(failure(
@@ -444,7 +471,7 @@ async fn send_message(
         let id =
             Uuid::parse_str(id).map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_task_id"))?;
         let current = app.store.get(id, &p).await.map_err(safe_error)?;
-        let wire = project_task(&app, current).await?;
+        let wire = project_task(app, current).await?;
         req.validate(&interface, Some(&wire))
             .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_context"))?;
         let answer = data[0]["answer"]
@@ -476,8 +503,11 @@ async fn send_message(
         let mut submit: Submit = serde_json::from_value(data[0].clone())
             .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_task_contract"))?;
         submit.request_id = req.message.message_id.clone();
-        check_specialist(&app, &submit)?;
-        app.store.submit(&submit, &p).await.map_err(safe_error)?
+        check_specialist(app, &submit)?;
+        app.store
+            .submit_observed(&submit, &p, app.config.observation_enabled)
+            .await
+            .map_err(safe_error)?
     };
     let mut task = task;
     if !configuration.return_immediately {
@@ -502,7 +532,7 @@ async fn send_message(
         }
     }
     Ok(Json(a2a::SendMessageResponse::Task(
-        project_task(&app, task).await?,
+        project_task(app, task).await?,
     )))
 }
 #[derive(Deserialize)]

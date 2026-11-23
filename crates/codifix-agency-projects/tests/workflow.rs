@@ -167,15 +167,13 @@ async fn handle(
         if create && state.objects.contains_key(&id) {
             return Json(json!({"errors":[{"extensions":{"code":"DUPLICATE"}}]})).into_response();
         }
-        let kind = if query.contains("ProjectMilestone") {
-            EntityKind::Milestone
-        } else if query.contains("IssueRelation") {
-            EntityKind::Dependency
-        } else if query.contains("Project") {
-            EntityKind::Project
-        } else {
-            EntityKind::Issue
-        };
+        let payload = query
+            .split("success ")
+            .nth(1)
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap();
         let mut object = state
             .objects
             .get(&id)
@@ -184,6 +182,13 @@ async fn handle(
         object["updatedAt"] = json!(format!("2026-10-31T12:00:{number:02}Z"));
         for (key, value) in input.as_object().unwrap() {
             let relation = match key.as_str() {
+                "relatedProjectId" => Some("relatedProject"),
+                "initiativeId" => Some("initiative"),
+                "ownerId" => Some("owner"),
+                "cycleId" => Some("cycle"),
+                "parentId" => Some("parent"),
+                "stateId" => Some("state"),
+                "statusId" => Some("status"),
                 "projectId" => Some("project"),
                 "projectMilestoneId" => Some("projectMilestone"),
                 "teamId" => Some("team"),
@@ -212,12 +217,6 @@ async fn handle(
         if state.timeout_after_at == Some(number) {
             delay = true;
         }
-        let payload = match kind {
-            EntityKind::Project => "project",
-            EntityKind::Milestone => "projectMilestone",
-            EntityKind::Issue => "issue",
-            EntityKind::Dependency => "issueRelation",
-        };
         Json(json!({"data":{"effect":{"success":true,payload:{"id":id}}}})).into_response()
     };
     if delay {
@@ -730,6 +729,7 @@ fn standing_scope_rejects_substituted_plan_uuid_and_arbitrary_remote_adoption() 
             EntityKind::Milestone => &mut attack.milestones[0].identity,
             EntityKind::Issue => &mut attack.issues[0].identity,
             EntityKind::Dependency => &mut attack.dependencies[0].identity,
+            _ => unreachable!(),
         };
         let unrelated_id = Uuid::new_v4();
         identity.remote_id = Some(unrelated_id);
@@ -1012,5 +1012,59 @@ async fn each_prewrite_and_readback_has_exact_resource_read_admission() {
     assert_eq!(
         mock.state.lock().unwrap().reads,
         journal.reads.iter().map(|(_, id)| *id).collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn roadmap_metadata_and_progress_updates_are_verified_by_readback() {
+    let mock = Mock::start().await;
+    let mut draft = serde_json::to_value(plan()).unwrap();
+    let team = draft["projects"][0]["team_ids"][0].clone();
+    let status = Uuid::new_v4();
+    draft["projects"][0]["target_date"] = json!("2027-01-20");
+    draft["projects"][0]["start_date"] = json!("2026-11-20");
+    draft["projects"][0]["status_id"] = json!(status);
+    draft["projects"].as_array_mut().unwrap().push(json!({
+        "identity":{"key":"successor"},"team_ids":[team],"name":"Follow-on",
+        "description":"Second project","acceptance_criteria":["Completed"]
+    }));
+    draft["milestones"][0]["target_date"] = json!("2026-12-01");
+    draft["issues"][1]["parent_key"] = json!("build");
+    draft["issues"][1]["label_ids"] = json!([Uuid::new_v4()]);
+    draft["issues"][1]["cycle_id"] = json!(Uuid::new_v4());
+    draft["issues"][1]["priority"] = json!(2);
+    draft["issues"][1]["state_id"] = json!(Uuid::new_v4());
+    draft["issues"][1]["due_date"] = json!("2026-12-02");
+    draft["roadmap"] = json!([
+       {"identity":{"key":"direction"},"project_key":"launch","change":{"kind":"initiative","name":"Recovery","description":"Service health","status":"Active","target_date":"2027-02-01","owner_id":Uuid::new_v4()}},
+       {"identity":{"key":"link"},"project_key":"launch","change":{"kind":"initiative_project","initiative_key":"direction"}},
+       {"identity":{"key":"after-launch"},"project_key":"launch","change":{"kind":"project_dependency","blocked_project_key":"successor"}},
+       {"identity":{"key":"project-week"},"project_key":"launch","change":{"kind":"project_update","body":"One service remains blocked.","health":"atRisk"}},
+       {"identity":{"key":"initiative-week"},"project_key":"launch","change":{"kind":"initiative_update","initiative_key":"direction","body":"New target February 1.","health":"onTrack"}}
+    ]);
+    let plan: Plan = serde_json::from_value(draft).unwrap();
+    let authority = authority(&plan);
+    let changes = prepare(&plan, &Baseline::new(), &authority).unwrap();
+    let mut journal = Journal::default();
+    let client = mock.client();
+    let verified = client
+        .execute(&plan, &authority, &changes, &mut journal)
+        .await
+        .unwrap();
+    assert_eq!(verified.len(), 11);
+    let baseline = client.retrieve_plan(&plan).await.unwrap();
+    assert!(
+        prepare(&plan, &baseline, &authority)
+            .unwrap()
+            .steps
+            .is_empty()
+    );
+    assert_eq!(
+        baseline[&stable_id(plan.id, "review")].fields["parentId"],
+        json!(stable_id(plan.id, "build"))
+    );
+    assert_eq!(
+        baseline[&stable_id(plan.id, "initiative-week")].fields["health"],
+        "onTrack"
     );
 }

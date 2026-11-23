@@ -22,6 +22,38 @@ enum Command {
     Migrate,
     Serve,
     WorkerOnce,
+    /// Run separately from the companion being upgraded.
+    UpgradeOnce {
+        #[arg(long)]
+        profile: PathBuf,
+    },
+    Task {
+        #[arg(long)]
+        peer: String,
+        #[arg(long)]
+        id: uuid::Uuid,
+    },
+    /// Approve and sign one pending renewal at the CA console, or reject it with a reason.
+    SshDecision {
+        #[arg(long)]
+        peer: String,
+        #[arg(long)]
+        task: uuid::Uuid,
+        #[arg(long, conflicts_with = "reject", required_unless_present = "reject")]
+        approve: bool,
+        #[arg(long)]
+        reject: Option<String>,
+        /// Read the Step provisioner password from an operator-provided file for this approval.
+        #[arg(long, requires = "approve")]
+        step_password_file: Option<PathBuf>,
+    },
+    /// Advance one expiry alert; reuse its event ID until installation is verified.
+    SshRenew {
+        #[arg(long)]
+        host: String,
+        #[arg(long)]
+        event: uuid::Uuid,
+    },
     Tasks {
         #[arg(long)]
         peer: String,
@@ -83,6 +115,25 @@ enum Command {
         did: String,
         #[arg(long)]
         token_env: String,
+        #[arg(long)]
+        confirm_public_disclosure: bool,
+    },
+    /// Change one approved public capability on the PDS.
+    Availability {
+        #[arg(long)]
+        pds: String,
+        #[arg(long)]
+        did: String,
+        #[arg(long)]
+        token_env: String,
+        #[arg(long)]
+        capability: String,
+        #[arg(long, conflicts_with = "off", required_unless_present = "off")]
+        on: bool,
+        #[arg(long, conflicts_with = "on")]
+        off: bool,
+        #[arg(long, requires = "on")]
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
         #[arg(long)]
         confirm_public_disclosure: bool,
     },
@@ -199,6 +250,23 @@ async fn run() -> Result<()> {
             store.revoke_grant(id).await?;
             println!("{}", json!({"revoked":true,"grant_id":id}));
         }
+        Command::SshDecision {
+            peer,
+            task,
+            reject,
+            step_password_file,
+            ..
+        } => println!(
+            "{}",
+            codifix_agency_runtime::ssh_renewal::operator::decide(
+                &cfg,
+                &peer,
+                task,
+                reject.as_deref(),
+                step_password_file.as_deref()
+            )
+            .await?
+        ),
         Command::Check => println!(
             "{}",
             json!({"valid":true,"instance_id":cfg.instance_id,"specialists":cfg.specialists.len(),"peers":cfg.peers.len()})
@@ -218,6 +286,36 @@ async fn run() -> Result<()> {
                 "{}",
                 codifix_agency_runtime::discovery::publish(&cfg, &pds, &did, &token).await?
             );
+        }
+        Command::Availability {
+            pds,
+            did,
+            token_env,
+            capability,
+            on,
+            expires_at,
+            confirm_public_disclosure,
+            ..
+        } => {
+            ensure!(
+                confirm_public_disclosure,
+                "explicit public disclosure confirmation required"
+            );
+            let token = std::env::var(token_env)?;
+            let receipt = codifix_agency_runtime::discovery::availability(
+                &cfg,
+                &pds,
+                &did,
+                &token,
+                &capability,
+                on,
+                expires_at,
+            )
+            .await?;
+            println!("{}", receipt);
+        }
+        Command::Task { peer, id } => {
+            request(&cfg, &peer, &format!("/v1/tasks/{id}"), None).await?
         }
         Command::Tasks { peer } => request(&cfg, &peer, "/v1/tasks", None).await?,
         Command::Submit { peer, file } => {
@@ -261,6 +359,18 @@ async fn run() -> Result<()> {
                     sqlx::migrate!("../../migrations").run(&store.pool).await?;
                     println!("{}", json!({"migrated":true}));
                 }
+                Command::UpgradeOnce { profile } => {
+                    let handled =
+                        codifix_agency_runtime::upgrade::supervise(&store, &cfg, &profile).await?;
+                    println!("{}", json!({"handled": handled}));
+                }
+                Command::SshRenew { host, event } => println!(
+                    "{}",
+                    codifix_agency_runtime::ssh_renewal::coordinator::advance(
+                        &store, &cfg, &host, event
+                    )
+                    .await?
+                ),
                 Command::WorkerOnce => {
                     println!(
                         "{}",
@@ -270,6 +380,7 @@ async fn run() -> Result<()> {
                 Command::Serve => {
                     let auth = Auth::from_config(&cfg)?;
                     let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
+                    store.heartbeat(&cfg).await?;
                     let cfg = Arc::new(cfg);
                     let app = App {
                         store: store.clone(),
@@ -293,6 +404,7 @@ async fn run() -> Result<()> {
                     }
                     workers.spawn(async move {
                         loop {
+                            let _ = store.heartbeat(&cfg).await;
                             let _ = codifix_agency_runtime::worker::schedules(&store, &cfg).await;
                             let _ = codifix_agency_runtime::exchange::reconcile_cancellations(
                                 &store, &cfg,

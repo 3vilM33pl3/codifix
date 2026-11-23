@@ -13,7 +13,7 @@ function fixture(options={}) {
   const doc={id:did,service:[{id:'#atproto_pds',type:'AtprotoPersonalDataServer',serviceEndpoint:'https://pds.codifix.net'}]};
   const client={
     clientMetadata:metadata('https://codifix.net'),
-    identityResolver:{async resolve(){return {did,handle:'user.example.com',didDoc:options.doc||doc};}},
+    identityResolver:{async resolve(){return {did,handle:'olivier.codifix.net',didDoc:options.doc||doc};}},
     async authorize(_,{state:appState,scope}) {assert.equal(scope,'atproto');state=randomUUID();await stateStore.set(state,{appState});return new URL('https://auth.codifix.net/authorize');},
     async callback(){callbackCount++;const saved=await stateStore.get(state);await sessionStore.set(options.did||did,{tokenSet:{access_token:'synthetic-token'}});return {state:saved.appState,session:{did:options.did||did,server:{async request(){revoked++;if(options.revokeFails)throw new Error('revocation failed');}},serverMetadata:{issuer:'https://auth.codifix.net'},async getTokenInfo(){return {sub:did,scope:options.scope||'atproto',aud:options.aud||'https://pds.codifix.net',iss:options.issuer||'https://auth.codifix.net'};},async signOut(){}}};},
   };
@@ -28,8 +28,8 @@ test('official SDK accepts identity-only public client configuration',()=>{
 });
 test('bound completion is retryable until acknowledged and SDK sessions are discarded',async()=>{
   const f=fixture(),b=binding();
-  const start=await f.broker.begin(b,'user.example.com'); assert.match(start.authorization_url,/https:/);
-  assert.deepEqual(await f.broker.begin(b,'user.example.com'),start);
+  const start=await f.broker.begin(b,'olivier.codifix.net'); assert.match(start.authorization_url,/https:/);
+  assert.deepEqual(await f.broker.begin(b,'olivier.codifix.net'),start);
   assert.deepEqual(await f.broker.poll(b),{status:'pending'});
   await assert.rejects(f.broker.poll({...b,principal_id:randomUUID()}));
   await f.broker.callback(f.params());
@@ -40,30 +40,30 @@ test('bound completion is retryable until acknowledged and SDK sessions are disc
   await f.broker.acknowledge(b);await assert.rejects(f.broker.poll(b));
 });
 test('owner, home and session binding cannot change an existing attempt',async()=>{
-  const f=fixture(),b=binding();await f.broker.begin(b,'user.example.com');
+  const f=fixture(),b=binding();await f.broker.begin(b,'olivier.codifix.net');
   for(const patch of [{principal_id:randomUUID()},{home_instance_id:randomUUID()},{session_binding:'b'.repeat(64)}]) {
-    await assert.rejects(f.broker.begin({...b,...patch},'user.example.com'));
+    await assert.rejects(f.broker.begin({...b,...patch},'olivier.codifix.net'));
     await assert.rejects(f.broker.poll({...b,...patch}));
   }
 });
 test('forged, replayed and expired callbacks fail before exchanging a token',async()=>{
-  const f=fixture(),b=binding();await f.broker.begin(b,'user.example.com');
+  const f=fixture(),b=binding();await f.broker.begin(b,'olivier.codifix.net');
   await assert.rejects(f.broker.callback(new URLSearchParams({state:'forged',code:'test'})));
   f.advance();await assert.rejects(f.broker.callback(f.params()));assert.equal(f.counts().callbackCount,0);
 });
 for(const options of [{did:'did:plc:bcdefghijklmnopqrstuvwxy2'},{issuer:'https://evil.codifix.net'},{aud:'https://other.codifix.net'},{scope:'atproto transition:generic'}]) test(`rejects callback identity mismatch ${JSON.stringify(options)}`,async()=>{
-  const f=fixture(options),b=binding();await f.broker.begin(b,'user.example.com');
+  const f=fixture(options),b=binding();await f.broker.begin(b,'olivier.codifix.net');
   await assert.rejects(f.broker.callback(f.params()));assert.equal((await f.broker.poll(b)).status,'failed');assert.equal(await f.sessionStore.get(did),undefined);
 });
 test('failed revocation still discards all local tokens and exposes cleanup truthfully',async()=>{
-  const f=fixture({revokeFails:true}),b=binding();await f.broker.begin(b,'user.example.com');await f.broker.callback(f.params());
+  const f=fixture({revokeFails:true}),b=binding();await f.broker.begin(b,'olivier.codifix.net');await f.broker.callback(f.params());
   assert.equal((await f.broker.poll(b)).cleanup,'discarded_revocation_failed');assert.equal(await f.sessionStore.get(did),undefined);
 });
 test('discovery reads only authoritative PDS with URI binding and no agent request',async()=>{
   const profile={$type:COLLECTION,agentCardUrl:'https://agents.codifix.net/agent-card.json'};
   const record={uri:`at://${did}/${COLLECTION}/linear`,cid:'bafyfixture12345',value:profile};
   const f=fixture({record});
-  const result=await f.broker.discover(`at://user.example.com/${COLLECTION}/linear`);
+  const result=await f.broker.discover(`at://olivier.codifix.net/${COLLECTION}/linear`);
   assert.equal(result[0].did,did);assert.equal(result[0].uri,record.uri);assert.equal(f.requests.length,1);
   assert.match(f.requests[0],/^https:\/\/pds.codifix.net\/xrpc\/com.atproto.repo.getRecord\?/);
 });

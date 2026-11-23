@@ -2,7 +2,9 @@
 
 An independent deterministic controller observes an enrolled OpenBao target and
 asks a standing quorum of independently configured custodians to unseal it. Each
-custodian reads only its own private share and sends it directly to OpenBao. The
+custodian submits its assigned share directly to OpenBao. Automated custodians
+read their own protected file. A phone custodian takes the share from its
+authenticated operator for that attempt. The
 controller, attestor, Codifix database, Workshop, model provider and cloud are
 absent from the share path. This pilot has no LLM or arbitrary command runner.
 
@@ -201,13 +203,56 @@ only observes. Library callers must authenticate access before directly exposing
 `custodian_submit`; `custodian_router` already enforces the scoped token.
 
 A ceremony has a fresh random challenge, monotonically increasing sequence and
-maximum 120-second lifetime. The controller fsyncs active state before contacting
+120-second lifetime for automatic ceremonies or 15 minutes when an interactive peer is enrolled. The controller fsyncs active state before contacting
 custodians. Each custodian fsyncs replay consumption before reading its share,
 checks selected membership, expected native progress/nonce, fresh attestation and
 its own fingerprint, then submits once. File locks serialize local instances.
 Responses contain only safe acknowledgement fields. A lost response or crash can
 leave consumed state without a successful unseal; this intentionally requires
 human recovery instead of risking an autonomous replay.
+
+## CA, Homelab and phone enrollment
+
+For an instance already initialized with a threshold of three, enroll each
+participant's identity, distinct share fingerprint and target binding. Put the
+CA, Homelab and operator in that order in the controller roster. The CA and
+Homelab services retain their own shares under their own OS accounts. The
+operator keeps the third share personally.
+
+1. Configure the first two custodians from `examples/custodian.json`. For the
+   operator's separate custodian service, omit `share_file` and set
+   `phone_token_file` to a protected file containing the operator's independent
+   authentication token. Give its controller and attestor separate credentials.
+   Start it with the normal `custodian-serve` command and a TLS listener.
+2. In `examples/controller.json` add the third roster/peer, set the target's
+   enrolled threshold, and set `interactive: true` on the phone peer. The
+   controller requests each contribution after checking the target. It waits
+   for the phone while the first two shares have been accepted by OpenBao.
+3. For private AT status messages, set `notice_peers` in the controller profile
+   to the enrolled Homelab and operator-home agency peer IDs. On each recipient,
+   set `social.peers.<ca-peer>.notice_inbox.conversation_id` to an existing
+   human-owned Inbox conversation and enable Inbox. The operator-home binding
+   also sets `unseal_url` to the phone custodian's fixed HTTPS URL ending in
+   `/unseal`. Keep its TLS trust, PDS access, authentication token, network
+   path and native attestation available when OpenBao is sealed.
+4. Schedule the CA specialist's `openbao_recover` operation with its enrolled
+   profile. Allow the operation time for the operator to respond. The CA sends
+   secret-free progress to the enrolled peers and records each custodian
+   acknowledgement. A healthy instance returns without opening a new ceremony.
+5. On the phone, open the protected handoff from the Inbox waiting notice.
+   Enter the custodian access token, choose **Review request**, and check the
+   installation, participant, threshold and attempt. Enter your share and
+   choose **Approve and contribute**, or **Decline**. The protected service
+   checks the enrolled share fingerprint and native nonce/progress. A rejected
+   share can be corrected during the same attempt. Repeated decisions and stale
+   attempts are refused. On a decline, expiry or uncertain submission, inspect
+   native status before deciding how to finish recovery.
+
+The result requires an active HTTP 200 from the enrolled `/v1/sys/health`
+endpoint together with initialized and unsealed state. Private notices carry
+only the task and attempt IDs, enrolled installation/participant, and a fixed
+status. The receiver adds its configured protected link. Tokens and shares
+belong only in the protected custodian page.
 
 ## Validation
 
@@ -216,7 +261,12 @@ cargo fmt -p codifix-agency-openbao --check
 cargo test -p codifix-agency-openbao --all-targets --locked
 cargo clippy -p codifix-agency-openbao --all-targets --locked -- -D warnings
 # Explicit opt-in; requires `bao` on PATH, creates only a disposable local vault:
-cargo test -p codifix-agency-openbao --test ceremony actual_openbao_shamir_two_of_three --locked -- --ignored
+cargo test -p codifix-agency-openbao --test ceremony actual_openbao_shamir --locked -- --ignored
+# Synthetic phone approval and decline on separately restarted 3-of-3 vaults:
+npm --prefix web ci
+CHROMIUM_EXECUTABLE=/usr/bin/chromium cargo test -p codifix-agency-openbao --test ceremony mobile_three_of_three --locked -- --ignored
+# Private operator notices on disposable PDS and PostgreSQL:
+node tests/federation-pds/run.mjs --agency
 ```
 
 Tests exercise actual HTTP custodian and attestor routers, native nonce/progress,

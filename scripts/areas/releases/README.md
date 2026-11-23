@@ -157,7 +157,7 @@ python3 scripts/areas/releases/release.py verify-stage \
   --staging-parent "$RELEASE_STAGING_PARENT"
 ```
 
-Choose `amd64` or `arm64` only after confirming the target
+Use `amd64` for example-host or `arm64` for the CA only after confirming the actual
 host architecture. The explicit architecture is checked against the manifest's
 selected entries; another architecture is never a fallback. All manifest entries
 are structurally validated, but only the selected architecture's bytes are hashed

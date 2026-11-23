@@ -71,9 +71,16 @@ fn native_fixture(
 struct Mock {
     status: Arc<Mutex<SealStatus>>,
     submitted: Arc<Mutex<Vec<String>>>,
+    health_status: Arc<Mutex<StatusCode>>,
 }
 async fn status(State(m): State<Mock>) -> Json<SealStatus> {
     Json(m.status.lock().unwrap().clone())
+}
+async fn health(State(m): State<Mock>) -> (StatusCode, Json<SealStatus>) {
+    (
+        *m.health_status.lock().unwrap(),
+        Json(m.status.lock().unwrap().clone()),
+    )
 }
 #[derive(serde::Deserialize)]
 struct Unseal {
@@ -131,10 +138,12 @@ impl Fixture {
         let mock = Mock {
             status: Arc::new(Mutex::new(initial_status())),
             submitted: Arc::new(Mutex::new(vec![])),
+            health_status: Arc::new(Mutex::new(StatusCode::OK)),
         };
         let (ep, task) = spawn(
             Router::new()
                 .route("/v1/sys/seal-status", get(status))
+                .route("/v1/sys/health", get(health))
                 .route("/v1/sys/unseal", post(unseal))
                 .with_state(mock.clone()),
         )
@@ -168,7 +177,7 @@ impl Fixture {
             native_binding: native.binding().unwrap(),
             seal_type: "shamir".into(),
             shares: 3,
-            threshold: 2,
+            threshold: shares.len().try_into().unwrap(),
             valid_until: now() + 600,
         };
         protected::save(
@@ -229,7 +238,8 @@ impl Fixture {
                 target: own_target,
                 roster: roster.clone(),
                 custodian_id: format!("custodian-{i}"),
-                share_file,
+                share_file: Some(share_file),
+                phone_token_file: None,
                 controller_token_file: own_token,
                 state_file: dir.join("state.json"),
             };
@@ -244,6 +254,7 @@ impl Fixture {
             let (endpoint, t) = spawn(service::custodian_router(c.clone()).unwrap()).await;
             tasks.push(t);
             peers.push(Peer {
+                interactive: false,
                 custodian_id: c.custodian_id.clone(),
                 endpoint,
                 controller_token_file: ctrl_token,
@@ -251,6 +262,7 @@ impl Fixture {
             custodians.push(c);
         }
         let controller = ControllerConfig {
+            notice_peers: vec![],
             target,
             roster,
             peers,
@@ -325,6 +337,23 @@ async fn quorum_direct_submission_and_safe_observation() {
             .unwrap()
             .sequence,
         2
+    );
+}
+#[tokio::test]
+async fn unsealed_but_unready_is_reported_as_blocked() {
+    let f = Fixture::new().await;
+    *f.mock.health_status.lock().unwrap() = StatusCode::SERVICE_UNAVAILABLE;
+    let mut events = vec![];
+    assert!(matches!(
+        transport::controller_tick(&f.controller, |e| events.push(e)).await,
+        Err(Error::NotReady)
+    ));
+    assert!(!f.mock.status.lock().unwrap().sealed);
+    assert!(!events.iter().any(|e| matches!(e, Observation::Unsealed)));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e,Observation::Escalation{code} if code=="not_ready"))
     );
 }
 #[tokio::test]
@@ -425,7 +454,7 @@ async fn endpoint_authentication_and_scoped_tokens() {
 #[tokio::test]
 async fn interrupted_partial_native_ceremony_and_missing_share_stop_without_retry() {
     let f = Fixture::new().await;
-    fs::remove_file(&f.custodians[1].share_file).unwrap();
+    fs::remove_file(f.custodians[1].share_file.as_ref().unwrap()).unwrap();
     assert!(
         transport::controller_tick(&f.controller, |_| {})
             .await
@@ -460,10 +489,10 @@ async fn duplicate_roster_and_share_mismatch_rejected_independently() {
         assert!(c.validate(now()).is_err());
         c = f.custodians[0].clone();
     }
-    write(&c.share_file, SHARE_B.as_bytes());
+    write(c.share_file.as_ref().unwrap(), SHARE_B.as_bytes());
     assert!(matches!(
         transport::custodian_submit(&c, &f.request(1)).await,
-        Err(Error::Configuration)
+        Err(Error::InvalidShare)
     ));
     assert!(f.mock.submitted.lock().unwrap().is_empty());
 }
@@ -556,6 +585,24 @@ async fn attestor_detects_real_process_restart_or_exit() {
 #[tokio::test]
 #[ignore = "requires local bao executable; creates isolated synthetic vault"]
 async fn actual_openbao_shamir_two_of_three() {
+    native_restart(2, None).await;
+}
+
+#[tokio::test]
+#[ignore = "requires local bao executable; creates isolated three-share vault"]
+async fn actual_openbao_shamir_three_of_three() {
+    native_restart(3, None).await;
+}
+
+#[tokio::test]
+#[ignore = "requires bao, Chromium, and web npm dependencies"]
+async fn mobile_three_of_three_approve_and_decline() {
+    for decision in ["approve", "decline"] {
+        native_restart(3, Some(decision)).await;
+    }
+}
+
+async fn native_restart(threshold: usize, phone_decision: Option<&str>) {
     let dir = TempDir::new().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -599,7 +646,7 @@ async fn actual_openbao_shamir_two_of_three() {
     assert!(ready);
     let mut init: serde_json::Value = http
         .post(format!("{base}/v1/sys/init"))
-        .json(&serde_json::json!({"secret_shares":3,"secret_threshold":2}))
+        .json(&serde_json::json!({"secret_shares":3,"secret_threshold":threshold}))
         .send()
         .await
         .unwrap()
@@ -611,15 +658,16 @@ async fn actual_openbao_shamir_two_of_three() {
     let shares: Vec<String> = init["keys_base64"]
         .as_array_mut()
         .unwrap()
-        .drain(..2)
+        .drain(..threshold)
         .map(|v| v.as_str().unwrap().to_owned())
         .collect();
-    // Bootstrap root token and unused synthetic share are discarded; no later role uses them.
+    // Bootstrap root token and any unused synthetic shares are discarded; no later role uses them.
     init = serde_json::Value::Null;
     assert!(init.is_null());
     let mock = Mock {
         status: Arc::new(Mutex::new(initial_status())),
         submitted: Arc::new(Mutex::new(vec![])),
+        health_status: Arc::new(Mutex::new(StatusCode::OK)),
     };
     let mut f = Fixture::with_target(
         endpoint(address),
@@ -713,7 +761,7 @@ async fn actual_openbao_shamir_two_of_three() {
             .iter()
             .filter(|e| matches!(e, Observation::CustodianSubmitted { .. }))
             .count(),
-        2
+        threshold
     );
     assert!(
         !transport::verified_status(&f.controller.target)
@@ -777,13 +825,108 @@ async fn actual_openbao_shamir_two_of_three() {
             .unwrap()
             .sealed
     );
-    let result = tokio::process::Command::new(env!("CARGO_BIN_EXE_codifix-agency-openbao"))
-        .arg("controller-once")
+    let phone = if let Some(decision) = phone_decision {
+        let index = f.custodians.len() - 1;
+        let mut c = f.custodians[index].clone();
+        let share_path = c.share_file.take().unwrap();
+        let share = std::fs::read_to_string(&share_path).unwrap();
+        std::fs::remove_file(share_path).unwrap();
+        let access = format!("phone-{}", uuid::Uuid::new_v4());
+        let credential = c.state_file.with_file_name("phone-token");
+        write(&credential, access.as_bytes());
+        c.phone_token_file = Some(credential);
+        let (endpoint, server) = spawn(service::custodian_router(c.clone()).unwrap()).await;
+        f.controller.peers[index].endpoint = endpoint.clone();
+        f.controller.peers[index].interactive = true;
+        f.tasks.push(server);
+        protected::save(&config_file, &f.controller).unwrap();
+        Some((endpoint, access, share, c, decision))
+    } else {
+        None
+    };
+    let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_codifix-agency-openbao"));
+    command
+        .args(["controller-once"])
         .arg(&config_file)
         .env_clear()
-        .output()
+        .kill_on_drop(true);
+    let controller = tokio::spawn(async move { command.output().await.unwrap() });
+    if let Some((endpoint, access, share, custodian, decision)) = &phone {
+        let address = format!("{}/unseal/status", endpoint.url.trim_end_matches('/'));
+        let mut reached = false;
+        for _ in 0..150 {
+            if http
+                .get(&address)
+                .bearer_auth(access)
+                .send()
+                .await
+                .unwrap()
+                .status()
+                .is_success()
+            {
+                reached = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        assert!(reached, "phone did not receive the request");
+        let partial = transport::verified_status(&f.controller.target)
+            .await
+            .unwrap();
+        assert!(partial.sealed);
+        assert_eq!(partial.progress, 2);
+        let web = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web");
+        let mut browser = tokio::process::Command::new("node")
+            .arg("tests/openbao-phone-live.mjs")
+            .current_dir(web)
+            .stdin(std::process::Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        use tokio::io::AsyncWriteExt;
+        let input = serde_json::json!({"origin":endpoint.url,"token":access,"share":share,"decision":decision});
+        browser
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&serde_json::to_vec(&input).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_secs(35), browser.wait())
+                .await
+                .unwrap()
+                .unwrap()
+                .success()
+        );
+        let state = std::fs::read_to_string(&custodian.state_file).unwrap();
+        assert!(!state.contains(share) && !state.contains(access));
+    }
+    let result = tokio::time::timeout(std::time::Duration::from_secs(20), controller)
         .await
+        .unwrap()
         .unwrap();
+    if let Some((_, access, share, _, decision)) = &phone {
+        for output in [&result.stdout, &result.stderr] {
+            let output = std::str::from_utf8(output).unwrap();
+            assert!(!output.contains(share) && !output.contains(access));
+        }
+        if *decision == "decline" {
+            assert!(!result.status.success());
+            assert!(
+                std::str::from_utf8(&result.stdout)
+                    .unwrap()
+                    .contains("participant_declined")
+            );
+            assert!(
+                transport::verified_status(&f.controller.target)
+                    .await
+                    .unwrap()
+                    .sealed
+            );
+            return;
+        }
+    }
     assert!(
         result.status.success(),
         "controller restart recovery failed: {}",
@@ -795,6 +938,18 @@ async fn actual_openbao_shamir_two_of_three() {
             .unwrap()
             .sealed
     );
+    let health = http
+        .get(format!("{base}/v1/sys/health"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<serde_json::Value>()
+        .await
+        .unwrap();
+    assert_eq!(health["initialized"], true);
+    assert_eq!(health["sealed"], false);
     assert_eq!(f.controller.target.binding().unwrap(), original_binding);
     assert_eq!(
         protected::load::<ControllerState>(&f.controller.state_file)
@@ -857,6 +1012,7 @@ async fn https_server_requires_enrolled_ca_and_does_not_follow_redirects() {
     let mock = Mock {
         status: Arc::new(Mutex::new(initial_status())),
         submitted: Arc::new(Mutex::new(vec![])),
+        health_status: Arc::new(Mutex::new(StatusCode::OK)),
     };
     let router = service::attestor_router(config).unwrap().merge(
         Router::new()

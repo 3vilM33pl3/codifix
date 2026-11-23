@@ -187,7 +187,7 @@ impl LinearClient {
         let extra = match kind {
             EntityKind::Project => "url status { id name type }",
             EntityKind::Issue => "url state { id name type }",
-            EntityKind::Milestone | EntityKind::Dependency => "",
+            _ => "",
         };
         let query = format!(
             "query AgencyInspect($id: String!) {{ object: {}(id: $id) {{ {} {} }} }}",
@@ -265,21 +265,7 @@ impl LinearClient {
     /// Retrieve only explicitly selected plan IDs, including deterministic new IDs.
     pub async fn retrieve_plan(&self, plan: &Plan) -> Result<Baseline> {
         plan.validate()?;
-        let entities = plan
-            .projects
-            .iter()
-            .map(|p| (&p.identity, EntityKind::Project))
-            .chain(
-                plan.milestones
-                    .iter()
-                    .map(|m| (&m.identity, EntityKind::Milestone)),
-            )
-            .chain(plan.issues.iter().map(|i| (&i.identity, EntityKind::Issue)))
-            .chain(
-                plan.dependencies
-                    .iter()
-                    .map(|d| (&d.identity, EntityKind::Dependency)),
-            );
+        let entities = plan.resources();
         let mut baseline = Baseline::new();
         for (identity, kind) in entities {
             let id = identity
@@ -405,21 +391,121 @@ impl LinearClient {
         }
         Ok(results)
     }
+    /// A scoped lookup never searches the whole workspace. Callers must clarify
+    /// duplicate titles instead of choosing the first issue from the connection.
+    pub async fn find_issue_ids(
+        &self,
+        project: Uuid,
+        team: Uuid,
+        title: &str,
+    ) -> Result<Vec<Uuid>> {
+        if title.trim().is_empty() {
+            return Err(Error::Validation("issue title required".into()));
+        }
+        let query = "query AgencyFindIssue($filter: IssueFilter!) { issues(first: 2, filter: $filter) { nodes { id project { id } team { id } } } }";
+        let data = self.graphql(query, json!({"filter":{"project":{"id":{"eq":project}},"team":{"id":{"eq":team}},"title":{"eqIgnoreCase":title}}}), false).await?
+            .ok_or_else(|| Error::Provider("missing issue search".into()))?;
+        let rows = data
+            .pointer("/issues/nodes")
+            .and_then(Value::as_array)
+            .filter(|rows| rows.len() <= 2)
+            .ok_or_else(|| Error::Provider("invalid issue search".into()))?;
+        rows.iter()
+            .map(|row| {
+                if row["project"]["id"] != json!(project) || row["team"]["id"] != json!(team) {
+                    return Err(Error::Provider(
+                        "issue search returned a different scope".into(),
+                    ));
+                }
+                serde_json::from_value(row["id"].clone())
+                    .map_err(|_| Error::Provider("invalid issue search identity".into()))
+            })
+            .collect()
+    }
+
+    pub async fn scoped_issue(
+        &self,
+        project: Uuid,
+        team: Uuid,
+        id: Uuid,
+    ) -> Result<Option<RemoteEntity>> {
+        let query = format!(
+            "query AgencyScopedIssue($filter: IssueFilter!) {{ issues(first: 1, filter: $filter) {{ nodes {{ {} }} }} }}",
+            selection(EntityKind::Issue)
+        );
+        let data = self.graphql(&query, json!({"filter":{"project":{"id":{"eq":project}},"team":{"id":{"eq":team}},"id":{"eq":id}}}),false).await?
+            .ok_or_else(|| Error::Provider("missing issue connection".into()))?;
+        let nodes = data
+            .pointer("/issues/nodes")
+            .and_then(Value::as_array)
+            .ok_or_else(|| Error::Provider("invalid scoped issue response".into()))?;
+        match nodes.as_slice() {
+            [] => Ok(None),
+            [node]
+                if node["id"] == json!(id)
+                    && node["team"]["id"] == json!(team)
+                    && node["project"]["id"] == json!(project) =>
+            {
+                Ok(Some(normalize(EntityKind::Issue, node)?))
+            }
+            _ => Err(Error::Provider("inconsistent scoped issue response".into())),
+        }
+    }
+
+    pub async fn write_issue_text(
+        &self,
+        id: Uuid,
+        existing: bool,
+        project: Uuid,
+        team: Uuid,
+        title: &str,
+        description: &str,
+    ) -> Result<()> {
+        let mut fields = json!({"title":title,"description":description});
+        if !existing {
+            fields["projectId"] = json!(project);
+            fields["teamId"] = json!(team);
+        }
+        self.write_fields(EntityKind::Issue, id, !existing, fields)
+            .await
+    }
+
     async fn mutate(&self, step: &Step) -> Result<()> {
-        let (prefix, input_type, payload) = match step.kind {
-            EntityKind::Project => ("project", "Project", "project"),
-            EntityKind::Milestone => ("projectMilestone", "ProjectMilestone", "projectMilestone"),
-            EntityKind::Issue => ("issue", "Issue", "issue"),
-            EntityKind::Dependency => ("issueRelation", "IssueRelation", "issueRelation"),
+        self.write_fields(
+            step.kind,
+            step.entity_id,
+            step.action == ChangeAction::Create,
+            serde_json::to_value(&step.patch).expect("JSON map"),
+        )
+        .await
+    }
+
+    async fn write_fields(
+        &self,
+        kind: EntityKind,
+        id: Uuid,
+        create: bool,
+        mut input: Value,
+    ) -> Result<()> {
+        let prefix = query_name(kind);
+        let payload = prefix;
+        let input_type = match kind {
+            EntityKind::Project => "Project",
+            EntityKind::Milestone => "ProjectMilestone",
+            EntityKind::Issue => "Issue",
+            EntityKind::Dependency => "IssueRelation",
+            EntityKind::Initiative => "Initiative",
+            EntityKind::InitiativeProject => "InitiativeToProject",
+            EntityKind::ProjectDependency => "ProjectRelation",
+            EntityKind::ProjectUpdate => "ProjectUpdate",
+            EntityKind::InitiativeUpdate => "InitiativeUpdate",
         };
-        let create = step.action == ChangeAction::Create;
         let action = if create { "Create" } else { "Update" };
-        let mut input = serde_json::to_value(&step.patch).expect("JSON map");
         if create {
-            input["id"] = json!(step.entity_id);
+            input["id"] = json!(id);
         }
         // Templates could modify fields and create auxiliary effects; disable them.
-        if create && matches!(step.kind, EntityKind::Project | EntityKind::Issue) {
+        if create && matches!(kind, EntityKind::Project | EntityKind::Issue) {
             input["useDefaultTemplate"] = json!(false);
         }
         let (declaration, arguments) = if create {
@@ -431,14 +517,14 @@ impl LinearClient {
             "mutation AgencyWrite($input: {input_type}{action}Input!{declaration}) {{ effect: {prefix}{action}(input: $input{arguments}) {{ success {payload} {{ id }} }} }}"
         );
         let data = self
-            .graphql(&query, json!({"input":input,"id":step.entity_id}), false)
+            .graphql(&query, json!({"input":input,"id":id}), false)
             .await?
             .ok_or_else(|| Error::Provider("mutation response missing".into()))?;
         if data.pointer("/effect/success").and_then(Value::as_bool) != Some(true)
             || data
                 .pointer(&format!("/effect/{payload}/id"))
                 .and_then(Value::as_str)
-                != Some(&step.entity_id.to_string())
+                != Some(&id.to_string())
         {
             return Err(Error::Provider(
                 "mutation not confirmed; reconcile before retry".into(),
@@ -456,18 +542,30 @@ fn query_name(kind: EntityKind) -> &'static str {
         EntityKind::Milestone => "projectMilestone",
         EntityKind::Issue => "issue",
         EntityKind::Dependency => "issueRelation",
+        EntityKind::Initiative => "initiative",
+        EntityKind::InitiativeProject => "initiativeToProject",
+        EntityKind::ProjectDependency => "projectRelation",
+        EntityKind::ProjectUpdate => "projectUpdate",
+        EntityKind::InitiativeUpdate => "initiativeUpdate",
     }
 }
 fn selection(kind: EntityKind) -> &'static str {
     match kind {
         EntityKind::Project => {
-            "id updatedAt name description content lead { id } teams(first: 100) { nodes { id } pageInfo { hasNextPage } }"
+            "id updatedAt name description content startDate targetDate status { id } lead { id } teams(first: 100) { nodes { id } pageInfo { hasNextPage } }"
         }
-        EntityKind::Milestone => "id updatedAt name description project { id }",
+        EntityKind::Milestone => "id updatedAt name description targetDate project { id }",
         EntityKind::Issue => {
-            "id updatedAt title description project { id } projectMilestone { id } team { id } assignee { id }"
+            "id updatedAt title description url priority labelIds dueDate state { id } cycle { id } parent { id } project { id } projectMilestone { id } team { id } assignee { id }"
         }
         EntityKind::Dependency => "id updatedAt type issue { id } relatedIssue { id }",
+        EntityKind::Initiative => "id updatedAt name description owner { id } status targetDate",
+        EntityKind::InitiativeProject => "id updatedAt initiative { id } project { id }",
+        EntityKind::ProjectDependency => {
+            "id updatedAt type anchorType relatedAnchorType project { id } relatedProject { id }"
+        }
+        EntityKind::ProjectUpdate => "id updatedAt body health project { id }",
+        EntityKind::InitiativeUpdate => "id updatedAt body health initiative { id }",
     }
 }
 fn normalize(kind: EntityKind, object: &Value) -> Result<RemoteEntity> {
@@ -504,8 +602,20 @@ fn normalize(kind: EntityKind, object: &Value) -> Result<RemoteEntity> {
             copy("title")?;
             copy("description")?;
         }
-        EntityKind::Dependency => {
+        EntityKind::Dependency => copy("type")?,
+        EntityKind::Initiative => {
+            copy("name")?;
+            copy("description")?;
+        }
+        EntityKind::InitiativeProject => {}
+        EntityKind::ProjectDependency => {
             copy("type")?;
+            copy("anchorType")?;
+            copy("relatedAnchorType")?;
+        }
+        EntityKind::ProjectUpdate | EntityKind::InitiativeUpdate => {
+            copy("body")?;
+            copy("health")?;
         }
     }
     let relations: &[(&str, &str)] = match kind {
@@ -518,6 +628,16 @@ fn normalize(kind: EntityKind, object: &Value) -> Result<RemoteEntity> {
             ("assignee", "assigneeId"),
         ],
         EntityKind::Dependency => &[("issue", "issueId"), ("relatedIssue", "relatedIssueId")],
+        EntityKind::Initiative => &[],
+        EntityKind::InitiativeProject => {
+            &[("initiative", "initiativeId"), ("project", "projectId")]
+        }
+        EntityKind::ProjectDependency => &[
+            ("project", "projectId"),
+            ("relatedProject", "relatedProjectId"),
+        ],
+        EntityKind::ProjectUpdate => &[("project", "projectId")],
+        EntityKind::InitiativeUpdate => &[("initiative", "initiativeId")],
     };
     for (key, field) in relations {
         let relation = object
@@ -534,6 +654,66 @@ fn normalize(kind: EntityKind, object: &Value) -> Result<RemoteEntity> {
             json!(id)
         };
         fields.insert((*field).into(), value);
+    }
+    let metadata: &[&str] = match kind {
+        EntityKind::Project => &["startDate", "targetDate"],
+        EntityKind::Milestone => &["targetDate"],
+        EntityKind::Issue => &["dueDate"],
+        EntityKind::Initiative => &["status", "targetDate"],
+        _ => &[],
+    };
+    for &name in metadata {
+        if let Some(value) = object.get(name) {
+            fields.insert(name.into(), value.clone());
+        }
+    }
+    let optional_relations: &[(&str, &str)] = match kind {
+        EntityKind::Project => &[("status", "statusId")],
+        EntityKind::Issue => &[
+            ("parent", "parentId"),
+            ("cycle", "cycleId"),
+            ("state", "stateId"),
+        ],
+        EntityKind::Initiative => &[("owner", "ownerId")],
+        _ => &[],
+    };
+    for &(key, field) in optional_relations {
+        if let Some(value) = object.get(key) {
+            let id: Option<Uuid> = if value.is_null() {
+                None
+            } else {
+                Some(
+                    serde_json::from_value(value["id"].clone())
+                        .map_err(|_| Error::Provider("invalid metadata relation ID".into()))?,
+                )
+            };
+            fields.insert(field.into(), json!(id));
+        }
+    }
+    if kind == EntityKind::Issue {
+        if let Some(priority) = object.get("priority") {
+            let n = priority
+                .as_f64()
+                .filter(|n| n.fract() == 0.0 && (0.0..=4.0).contains(n))
+                .ok_or_else(|| Error::Provider("invalid issue priority".into()))?;
+            fields.insert("priority".into(), json!(n as u8));
+        }
+        if let Some(labels) = object.get("labelIds") {
+            let ids: std::collections::BTreeSet<Uuid> = serde_json::from_value(labels.clone())
+                .map_err(|_| Error::Provider("invalid label IDs".into()))?;
+            fields.insert("labelIds".into(), json!(ids));
+        }
+        if let Some(link) = object.get("url").and_then(Value::as_str) {
+            let parsed = reqwest::Url::parse(link)
+                .map_err(|_| Error::Provider("invalid issue link".into()))?;
+            if parsed.scheme() != "https"
+                || !parsed.username().is_empty()
+                || parsed.password().is_some()
+            {
+                return Err(Error::Provider("invalid issue link".into()));
+            }
+            fields.insert("url".into(), json!(link));
+        }
     }
     if kind == EntityKind::Project {
         if object

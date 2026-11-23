@@ -35,6 +35,9 @@ async fn submit(
 }
 pub fn custodian_router(config: CustodianConfig) -> Result<Router> {
     config.validate(now())?;
+    if config.phone_token_file.is_some() {
+        return crate::phone::router(config);
+    }
     Ok(Router::new()
         .route("/v1/ceremony", post(submit))
         .layer(DefaultBodyLimit::max(8192))

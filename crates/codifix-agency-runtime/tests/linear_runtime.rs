@@ -27,6 +27,30 @@ async fn graphql(State(state): State<Arc<Mutex<Graphql>>>, Json(body): Json<Valu
     let query = body["query"].as_str().unwrap();
     if query.starts_with("query") {
         state.reads += 1;
+        if query.contains("AgencyScopedIssue") || query.contains("AgencyFindIssue") {
+            let filter = &body["variables"]["filter"];
+            let rows: Vec<_> = state
+                .objects
+                .values()
+                .filter(|object| {
+                    object["team"]["id"] == filter["team"]["id"]["eq"]
+                        && object["project"]["id"] == filter["project"]["id"]["eq"]
+                })
+                .filter(|object| {
+                    if query.contains("AgencyScopedIssue") {
+                        object["id"] == filter["id"]["eq"]
+                    } else {
+                        object["title"].as_str().is_some_and(|v| {
+                            v.eq_ignore_ascii_case(
+                                filter["title"]["eqIgnoreCase"].as_str().unwrap(),
+                            )
+                        })
+                    }
+                })
+                .take(2)
+                .collect();
+            return Json(json!({"data":{"issues":{"nodes":rows}}}));
+        }
         let id = body["variables"]["id"].as_str().unwrap();
         return Json(match state.objects.get(id) {
             Some(object) => json!({"data":{"object":object}}),
@@ -73,6 +97,15 @@ async fn graphql(State(state): State<Arc<Mutex<Graphql>>>, Json(body): Json<Valu
         } else {
             object[key] = value.clone();
         }
+    }
+    if query.contains("issueCreate(") {
+        let fields = object.as_object_mut().unwrap();
+        fields.entry("projectMilestone").or_insert(Value::Null);
+        fields.entry("assignee").or_insert(Value::Null);
+        fields.insert(
+            "url".into(),
+            json!(format!("https://linear.app/fixture/issue/{id}")),
+        );
     }
     state.objects.insert(id.into(), object);
     let field = if query.contains("ProjectMilestone") {
@@ -227,6 +260,7 @@ async fn linear_prepare_apply_preserves_reviewed_baseline_and_durable_step_recei
         },
     };
     let cfg = Config {
+        observation_enabled: false,
         inbox_enabled: false,
         instance_id: instance,
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -247,6 +281,7 @@ async fn linear_prepare_apply_preserves_reviewed_baseline_and_durable_step_recei
         linear: Some(
             json!({"endpoint":endpoint,"token_env":"CODIFIX_LINEAR_RUNTIME_TEST_TOKEN","authorities":{grant.id.to_string():auth}}),
         ),
+        social: None,
         openbao_controllers: BTreeMap::new(),
     };
     let prepared = execute(
@@ -409,6 +444,212 @@ async fn linear_prepare_apply_preserves_reviewed_baseline_and_durable_step_recei
         state.lock().unwrap().objects[&remote_id]["name"],
         "Human reviewed rename"
     );
+    roadmap_confirmation(&store, &cfg, &revised, &grant, &peer).await;
+    tracking_round_trip(&store, &cfg, &plan, &grant, &peer, &state, project).await;
     server.abort();
     db.cleanup().await.unwrap();
 }
+
+async fn tracking_round_trip(
+    store: &Store,
+    cfg: &Config,
+    plan: &Plan,
+    prior: &Mandate,
+    operator: &Peer,
+    provider: &Arc<Mutex<Graphql>>,
+    local_project: Uuid,
+) {
+    let mut grant = prior.clone();
+    grant.id = Uuid::new_v4();
+    let linear_project = codifix_agency_projects::stable_id(plan.id, "launch");
+    let scope = ResourceScope {
+        kind: "linear_project".into(),
+        id: linear_project.to_string(),
+    };
+    grant.capabilities.insert("linear_track".into());
+    grant.resources.insert(scope.clone());
+    store
+        .install_mandate(local_project, &grant, operator, cfg.instance_id)
+        .await
+        .unwrap();
+    let mut origin = operator.clone();
+    origin.operator = false;
+    origin.id = "homelab".into();
+    origin.instance_id = Uuid::new_v4();
+    origin.mandates.insert(grant.id);
+    let mut cfg = cfg.clone();
+    cfg.peers.push(origin.clone());
+    cfg.specialists[0]
+        .capabilities
+        .insert("linear_track".into());
+    let settings = cfg.linear.as_mut().unwrap();
+    settings["tracking"] = json!({grant.id.to_string():{"project_id":linear_project,"team_id":plan.issues[0].team_id}});
+    let mut req = request(
+        &grant,
+        plan,
+        "linear_track",
+        json!({"kind":"linear_track","lookup_title":"Review recovery checks"}),
+    );
+    req.acceptance_criteria = vec!["linear_issue_readback_verified".into()];
+    req.resource = scope;
+    let writes = || provider.lock().unwrap().writes.len();
+    let before = writes();
+    let waiting = execute(store, &cfg, &origin, &req).await;
+    let id = waiting.contract.id;
+    assert_eq!(waiting.contract.status, TaskStatus::InputRequired);
+    let mut draft = req.payload.clone();
+    draft["title"] = json!("Review recovery checks");
+    draft["description"] = json!("Draft wording");
+    store
+        .respond(
+            id,
+            "details",
+            "Here is the context",
+            Some(draft.clone()),
+            &origin,
+        )
+        .await
+        .unwrap();
+    assert!(worker::run_once(store, &cfg).await.unwrap());
+    let proposal = store
+        .get_internal(id)
+        .await
+        .unwrap()
+        .contract
+        .clarification
+        .unwrap()
+        .question;
+    let first = proposal.split('`').nth(1).unwrap();
+    assert_eq!(writes(), before);
+    assert!(
+        store
+            .respond(id, "forged", first, None, operator)
+            .await
+            .is_err()
+    );
+    draft["description"] = json!("Verify health with a representative request.");
+    store
+        .respond(
+            id,
+            "revision",
+            "Please correct the check",
+            Some(draft.clone()),
+            &origin,
+        )
+        .await
+        .unwrap();
+    assert!(worker::run_once(store, &cfg).await.unwrap());
+    let revised = store
+        .get_internal(id)
+        .await
+        .unwrap()
+        .contract
+        .clarification
+        .unwrap()
+        .question;
+    let confirmation = revised.split('`').nth(1).unwrap();
+    assert_ne!(confirmation, first);
+    assert!(revised.contains(draft["description"].as_str().unwrap()));
+    store
+        .respond(id, "stale", first, None, &origin)
+        .await
+        .unwrap();
+    assert!(worker::run_once(store, &cfg).await.unwrap());
+    assert_eq!(writes(), before);
+    store
+        .respond(id, "approve", confirmation, None, &origin)
+        .await
+        .unwrap();
+    assert!(worker::run_once(store, &cfg).await.unwrap());
+    let current = store.get_internal(id).await.unwrap();
+    assert_eq!(
+        current.contract.status,
+        TaskStatus::Completed,
+        "{:?}",
+        current.contract.clarification
+    );
+    let evidence: Value =
+        sqlx::query_scalar("SELECT evidence FROM agency_outcomes WHERE task_id=$1")
+            .bind(id)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+    assert_eq!(evidence["readback_verified"], true);
+    assert!(
+        evidence["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("https://linear.app/")
+    );
+    assert_eq!(writes(), before + 1);
+    // A different request for the same wording finds the existing issue.
+    req.request_id = Uuid::new_v4().to_string();
+    req.payload = draft;
+    assert_eq!(
+        execute(store, &cfg, &origin, &req).await.contract.status,
+        TaskStatus::Completed
+    );
+    assert_eq!(writes(), before + 1);
+}
+
+async fn roadmap_confirmation(
+    store: &Store,
+    cfg: &Config,
+    prior: &Plan,
+    grant: &Mandate,
+    operator: &Peer,
+) {
+    let mut cfg = cfg.clone();
+    cfg.linear.as_mut().unwrap()["require_origin_confirmation"] = json!(true);
+    let mut plan = prior.clone();
+    plan.revision += 3;
+    plan.issues[0].description = "Check the worker and run a fresh end-user request.".into();
+    let mut source = operator.clone();
+    source.id = "originating-agent".into();
+    source.operator = false;
+    source.instance_id = Uuid::new_v4();
+    let prep = request(
+        grant,
+        &plan,
+        "plan_prepare",
+        json!({"kind":"plan_prepare","plan":plan}),
+    );
+    let waiting = execute(store, &cfg, &source, &prep).await;
+    assert_eq!(waiting.contract.status, TaskStatus::InputRequired);
+    let question = &waiting.contract.clarification.unwrap().question;
+    assert!(question.contains(&plan.issues[0].description));
+    let approval = question.split('`').nth(1).unwrap();
+    store
+        .respond(waiting.contract.id, "approve", approval, None, &source)
+        .await
+        .unwrap();
+    assert!(worker::run_once(store, &cfg).await.unwrap());
+    let receipt: Value =
+        sqlx::query_scalar("SELECT evidence FROM agency_outcomes WHERE task_id=$1")
+            .bind(waiting.contract.id)
+            .fetch_one(&store.pool)
+            .await
+            .unwrap();
+    assert_eq!(receipt["origin_confirmation"], approval);
+    let apply = request(
+        grant,
+        &plan,
+        "plan_apply",
+        json!({"kind":"plan_apply","prepared_id":receipt["prepared_id"]}),
+    );
+    assert_eq!(
+        execute(store, &cfg, operator, &apply).await.contract.status,
+        TaskStatus::InputRequired
+    );
+    let task = execute(store, &cfg, &source, &apply).await;
+    assert_eq!(
+        task.contract.status,
+        TaskStatus::Completed,
+        "{:?}",
+        task.contract.clarification
+    );
+}
+
+#[cfg(unix)]
+#[path = "incidents/response.rs"]
+mod incidents;

@@ -193,6 +193,22 @@ async fn owner_home_and_idempotent_message_isolation() {
         .await
         .unwrap();
     assert!(f.store.detail(f.human, c.conversation.id).await.is_err());
+    assert!(
+        f.store
+            .send(f.human, c.conversation.id, &msg)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM inbox_dispatches WHERE conversation_id=$1"
+        )
+        .bind(c.conversation.id)
+        .fetch_one(&f.db.pool)
+        .await
+        .unwrap(),
+        1
+    );
     f.db.cleanup().await.unwrap();
 }
 #[tokio::test]
@@ -516,5 +532,51 @@ async fn eight_participant_turns_are_shared_across_response_tree() {
             .iter()
             .any(|m| m.role == "system")
     );
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
+async fn group_root_budget_is_independent_of_grant_order() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let mut second = f.grant.clone();
+    second.id = Uuid::new_v4();
+    second.contact.id = Uuid::new_v4();
+    second.request["budget"] = json!({"micro_usd":1500,"calls":3,"turns":4,"delegation_depth":2});
+    f.store.install_grant(&second).await.unwrap();
+    for second_id in [Uuid::from_u128(1), Uuid::from_u128(u128::MAX - 1)] {
+        let chat = f.conversation().await;
+        f.store
+            .add_member(
+                f.human,
+                chat.conversation.id,
+                &AddMember {
+                    client_request_id: second_id,
+                    specialist_id: second.contact.id,
+                    summary: "Review the current question".into(),
+                    selected_message_ids: vec![],
+                    confirmed: true,
+                },
+            )
+            .await
+            .unwrap();
+        let mut message = f.msg("Review together");
+        message.recipient_member_ids = vec![chat.members[0].id, second_id];
+        f.store
+            .send(f.human, chat.conversation.id, &message)
+            .await
+            .unwrap();
+        let budget: serde_json::Value =
+            sqlx::query_scalar("SELECT budget FROM inbox_roots WHERE id=$1")
+                .bind(message.client_message_id)
+                .fetch_one(&f.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            budget,
+            json!({"micro_usd":1500,"calls":16,"turns":8,"delegation_depth":2})
+        );
+    }
     f.db.cleanup().await.unwrap();
 }

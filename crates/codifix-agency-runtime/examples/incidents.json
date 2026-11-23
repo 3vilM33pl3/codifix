@@ -1,0 +1,64 @@
+{
+  "alert_peer": "alertmanager",
+  "specialist": "homelab",
+  "mandate_id": "479863ea-343a-414c-a2eb-e1f8ed38aad4",
+  "linear": {
+    "peer": "linear",
+    "specialist": "linear",
+    "mandate_id": "a0345d28-0363-4511-b9d9-6b00ae1e1550",
+    "project_id": "ed52e5a9-32de-48ba-a615-281edc65b03e"
+  },
+  "services": {
+    "catalogue": {
+      "inspect": [
+        "/usr/bin/python3",
+        "/usr/local/libexec/inspect-systemd.py",
+        "catalogue.service",
+        "/srv/catalogue"
+      ],
+      "health": [
+        "/usr/bin/systemctl",
+        "is-active",
+        "--quiet",
+        "catalogue.service"
+      ],
+      "user_request": [
+        "/usr/bin/curl",
+        "--fail",
+        "--silent",
+        "--max-time",
+        "10",
+        "--output",
+        "/dev/null",
+        "http://127.0.0.1:8080/catalogue/items/example"
+      ],
+      "runbook": "/var/lib/codifix/runbooks/catalogue.md",
+      "postmortem_directory": "/var/lib/codifix/incidents",
+      "repairs": {
+        "restart_failed_unit": {
+          "condition": [
+            "/usr/bin/systemctl",
+            "is-failed",
+            "--quiet",
+            "catalogue.service"
+          ],
+          "command": [
+            "/usr/bin/systemctl",
+            "restart",
+            "catalogue.service"
+          ],
+          "autonomous": false,
+          "action": "Restart the failed catalogue process.",
+          "risks": "A restart interrupts requests and can repeat a startup failure.",
+          "recovery_options": "Keep the service stopped while inspecting startup logs."
+        }
+      }
+    }
+  },
+  "inbox": {
+    "operator_conversation": "c6bffb90-cb3b-48e9-8f17-2cd1317be57b",
+    "reporting_peers": [
+      "catalogue-agent"
+    ]
+  }
+}

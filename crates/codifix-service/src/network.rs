@@ -46,6 +46,10 @@ fn config(state: &AppState) -> Result<&codifix_config::InboxConfig, ApiError> {
     }
     Ok(c)
 }
+/// Credential-free feature metadata for native clients selecting a service.
+pub(crate) fn inbox_enabled(state: &AppState) -> bool {
+    config(state).is_ok() && state.pool().is_ok()
+}
 fn store(state: &AppState) -> Result<Store, ApiError> {
     Ok(Store {
         pool: state.pool()?,

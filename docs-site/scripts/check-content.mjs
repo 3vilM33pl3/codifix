@@ -16,6 +16,7 @@ const sharedGuidePairs = [
     'activity',
     'agents',
     'automations',
+    'conversations',
     'embeddings',
     'errors',
     'memories',

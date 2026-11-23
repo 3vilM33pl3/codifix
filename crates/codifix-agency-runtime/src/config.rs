@@ -8,9 +8,14 @@ use uuid::Uuid;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Metadata-only process heartbeat. Requires separately applied observation migration.
+    #[serde(default)]
+    pub observation_enabled: bool,
     /// Redeem same-database human inbox tickets. No HTTP peer receives this identity.
     #[serde(default)]
     pub inbox_enabled: bool,
+    #[serde(default)]
+    pub social: Option<crate::social::SocialConfig>,
     pub instance_id: Uuid,
     pub listen: SocketAddr,
     pub public_url: String,
@@ -35,6 +40,7 @@ pub struct Config {
 pub struct Peer {
     pub id: String,
     pub instance_id: Uuid,
+    #[serde(default)]
     pub token_env: String,
     #[serde(default)]
     pub operator: bool,
@@ -94,6 +100,9 @@ impl Config {
             if let Some(url) = &p.endpoint {
                 validate_endpoint(url, false)?;
             }
+        }
+        if let Some(social) = &self.social {
+            social.validate(self)?;
         }
         let mut models = BTreeSet::new();
         for m in &self.models {
@@ -163,6 +172,11 @@ impl Auth {
         let pairs = cfg
             .peers
             .iter()
+            .filter(|peer| {
+                !cfg.social
+                    .as_ref()
+                    .is_some_and(|social| social.peers.contains_key(&peer.id))
+            })
             .map(|peer| {
                 let token = std::env::var(&peer.token_env)
                     .map_err(|_| anyhow::anyhow!("required peer credential unavailable"))?;

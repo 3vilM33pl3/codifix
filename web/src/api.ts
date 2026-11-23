@@ -1116,3 +1116,16 @@ export async function rejectProposal(
     ),
   );
 }
+
+/** Human-owned Inbox. A browser always uses its current same-origin session. */
+export async function inboxRequest<T>(suffix: string, signal?: AbortSignal, body?: unknown): Promise<T> {
+  const response = await apiFetch(`/v1/inbox/conversations${suffix}`, {
+    signal, cache: "no-store", ...(body ? {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    } : {}),
+  });
+  if (response.status === 401 || response.status === 403) throw new AuthIdentityError(response.status);
+  if (response.status === 404) throw new Error("Inbox or conversation unavailable on this service.");
+  if (!response.ok) throw new Error(body ? "Reply not confirmed. Refresh or retry the same reply." : "Could not load the Inbox.");
+  return response.json();
+}

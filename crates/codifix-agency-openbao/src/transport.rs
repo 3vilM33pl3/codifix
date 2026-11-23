@@ -125,6 +125,9 @@ pub async fn controller_tick(
     let result = controller_inner(config, &mut observe).await;
     if let Err(e) = &result {
         let code = match e {
+            Error::Declined => "participant_declined",
+            Error::InvalidShare => "invalid_share",
+            Error::NotReady => "not_ready",
             Error::TargetChanged => "target_changed",
             Error::Incomplete => "incomplete_ceremony",
             Error::Ceremony => "invalid_ceremony",
@@ -176,6 +179,7 @@ async fn controller_inner(
     }
     let mut status = verified_status(&config.target).await?;
     if !status.sealed {
+        native_health(&config.target).await?;
         state.active = None;
         protected::save(&config.state_file, &state)?;
         observe(Observation::Unsealed);
@@ -192,7 +196,12 @@ async fn controller_inner(
         challenge: uuid::Uuid::new_v4().to_string(),
         sequence: state.sequence,
         issued_at: issued,
-        expires_at: issued + 120,
+        expires_at: issued
+            + if config.peers.iter().any(|p| p.interactive) {
+                900
+            } else {
+                120
+            },
         target_binding: binding,
         selected: config
             .roster
@@ -218,17 +227,63 @@ async fn controller_inner(
             .find(|p| &p.custodian_id == id)
             .ok_or(Error::Configuration)?;
         let secret = token(&p.controller_token_file)?;
-        let response = client(&p.endpoint)?
-            .post(url(&p.endpoint, "/v1/ceremony")?)
-            .bearer_auth(&*secret)
-            .json(&Submission {
-                ceremony: ceremony.clone(),
-                expected_progress: status.progress,
-                expected_nonce: status.nonce.clone(),
-            })
-            .send()
-            .await
-            .map_err(|_| Error::Transport)?;
+        observe(Observation::ContributionRequested {
+            custodian_id: id.clone(),
+            sequence: ceremony.sequence,
+        });
+        let submission = Submission {
+            ceremony: ceremony.clone(),
+            expected_progress: status.progress,
+            expected_nonce: status.nonce.clone(),
+        };
+        let http = client(&p.endpoint)?;
+        let address = url(&p.endpoint, "/v1/ceremony")?;
+        let mut previous_stage = None;
+        let response = loop {
+            if now() >= ceremony.expires_at {
+                return Err(Error::Incomplete);
+            }
+            let response = http
+                .post(address.clone())
+                .bearer_auth(&*secret)
+                .json(&submission)
+                .send()
+                .await
+                .map_err(|_| Error::Transport)?;
+            if p.interactive {
+                if response.status() == reqwest::StatusCode::GONE {
+                    return Err(Error::Declined);
+                }
+                if response.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
+                    return Err(Error::InvalidShare);
+                }
+                if response.status() == reqwest::StatusCode::ACCEPTED {
+                    let stage: crate::phone::Stage = decode(response).await?;
+                    if previous_stage != Some(stage) {
+                        match stage {
+                            crate::phone::Stage::InvalidShare => {
+                                observe(Observation::ShareRejected {
+                                    custodian_id: id.clone(),
+                                    sequence: ceremony.sequence,
+                                })
+                            }
+                            crate::phone::Stage::Waiting => {
+                                observe(Observation::AwaitingOperator {
+                                    custodian_id: id.clone(),
+                                    sequence: ceremony.sequence,
+                                })
+                            }
+                            crate::phone::Stage::Submitting => (),
+                            _ => return Err(Error::Ceremony),
+                        }
+                        previous_stage = Some(stage);
+                    }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            }
+            break response;
+        };
         let ack: crate::service::Acknowledgement = decode(response).await?;
         if ack.custodian_id != *id
             || ack.sequence != ceremony.sequence
@@ -242,6 +297,10 @@ async fn controller_inner(
         });
         status = verified_status(&config.target).await?;
         if !status.sealed {
+            if submission.expected_progress + 1 != status.t {
+                return Err(Error::Incomplete);
+            }
+            native_health(&config.target).await?;
             state.active = None;
             protected::save(&config.state_file, &state)?;
             observe(Observation::Unsealed);
@@ -280,17 +339,26 @@ pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission)
     state.last_sequence = ceremony.sequence;
     state.last_challenge = Some(ceremony.challenge.clone());
     protected::save(&config.state_file, &state)?;
-    let raw = protected::read(&config.share_file)?;
+    let raw = protected::read(config.share_file.as_ref().ok_or(Error::Configuration)?)?;
     let share = std::str::from_utf8(&raw)
         .map_err(|_| Error::ProtectedFile)?
         .trim();
+    submit_share(config, submission, share).await
+}
+
+pub(crate) async fn submit_share(
+    config: &CustodianConfig,
+    submission: &Submission,
+    share: &str,
+) -> Result<()> {
+    let ceremony = &submission.ceremony;
     if share.len() < 16
         || share.len() > 4096
         || !share
             .bytes()
             .all(|c| c.is_ascii_alphanumeric() || b"+/=_-".contains(&c))
     {
-        return Err(Error::ProtectedFile);
+        return Err(Error::InvalidShare);
     }
     let enrolled = config
         .roster
@@ -298,7 +366,7 @@ pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission)
         .find(|m| m.custodian_id == config.custodian_id)
         .ok_or(Error::Configuration)?;
     if enrolled.share_id != format!("{:x}", Sha256::digest(share.as_bytes())) {
-        return Err(Error::Configuration);
+        return Err(Error::InvalidShare);
     }
     // Recheck after disk I/O. TLS and attestor bind this enrolled target; the
     // operator must fence rekey/reset and installation changes during a ceremony.
@@ -320,10 +388,42 @@ pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission)
         .map_err(|_| Error::Transport)?;
     let result: SealStatus = decode(response).await?;
     result.check(&config.target)?;
+    if !result.sealed && submission.expected_progress + 1 != result.t {
+        return Err(Error::Incomplete);
+    }
     if result.sealed
         && (result.progress != submission.expected_progress + 1 || result.nonce.is_empty())
     {
         return Err(Error::Incomplete);
+    }
+    Ok(())
+}
+
+/// Check the active OpenBao node, retaining the same enrolled TLS and target binding.
+pub async fn verified_ready(target: &Target) -> Result<()> {
+    if verified_status(target).await?.sealed {
+        return Err(Error::NotReady);
+    }
+    native_health(target).await
+}
+
+async fn native_health(target: &Target) -> Result<()> {
+    let response = client(&target.endpoint)?
+        .get(url(&target.endpoint, "/v1/sys/health")?)
+        .send()
+        .await
+        .map_err(|_| Error::Transport)?;
+    if response.status() != reqwest::StatusCode::OK {
+        return Err(Error::NotReady);
+    }
+    #[derive(Deserialize)]
+    struct Health {
+        initialized: bool,
+        sealed: bool,
+    }
+    let health: Health = decode(response).await?;
+    if !health.initialized || health.sealed {
+        return Err(Error::NotReady);
     }
     Ok(())
 }

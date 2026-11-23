@@ -93,6 +93,32 @@ entry points.
 
 ## Plan, discuss and apply in Linear
 
+The [Linear Agent configuration](../../crates/codifix-agency-runtime/examples/linear-agent.json)
+exposes Linear as its only external tool. Replace the sample actor, project,
+team and mandate identifiers. Install the corresponding mandate with the
+`linear_project` resource and give each originating companion a peer binding
+to this specialist. The optional local model endpoint is a template. Record a
+current workload evaluation for the installed model revision, enable its
+`accepted_locally` flag, and permit that destination on its mandate before
+using it to classify requests, draft text or summarize project progress.
+The router selects the lowest measured cost among eligible models.
+
+For an issue request, delegate `linear_track` with criterion
+`linear_issue_readback_verified` and resource
+`{"kind":"linear_project","id":"<configured project UUID>"}`. Its payload is
+
+```json
+{"kind":"linear_track","lookup_title":"Review recovery checks","title":"Verify service recovery","description":"Check health and exercise a representative request."}
+```
+
+The agent searches that team and project for the original title. It asks for
+missing wording or an issue ID when there are multiple matches. The
+originating peer can correct the complete payload or answer the returned
+`confirm <digest>` challenge in the same task. Only the reviewed wording is
+written. The result includes the verified issue ID and Linear URL. Pass this
+`issue_id` on later updates, including after a rename. A repeated request for
+the same saved wording returns the link.
+
 Start with a designated test team/project and a restricted test credential.
 `Config.linear` contains `endpoint`, `token_env` and an `authorities` map keyed by
 mandate UUID. The endpoint is normally `https://api.linear.app/graphql`. A raw
@@ -120,13 +146,18 @@ Use the provider-neutral [plan example](../../crates/codifix-agency-projects/exa
    `{ "kind": "plan_inspect", "plan": PLAN }`. It reports current state, links,
    missing resources and unresolved questions. It does not invent forecasts.
 
-Projects represent roadmap units; milestones, issues and blocking dependencies
-are separate records. Dates, initiatives and automatic issue status changes are
-outside this initial adapter. Keep plan UUIDs/item keys stable to avoid creating
-new identities. A newer accepted revision invalidates earlier preparations.
-Manual edits made before a write are detected; Linear's lack of conditional
-updates leaves a narrow concurrent same-field edit race. See
-[reconciliation limits](../../crates/codifix-agency-projects/README.md).
+A plan can set project start and target dates, lead and status, milestone
+target dates, and issue assignees, states, priorities, labels, due dates,
+cycles and parent issues. Put a parent before its child. Use the `roadmap`
+list for initiatives, initiative/project associations, project dependencies
+and project or initiative updates. Updates carry Markdown progress, risks and
+date changes together with `onTrack`, `atRisk` or `offTrack` health. These
+dates and associations feed Linear's existing timeline and roadmap views.
+The Linear Agent example requires the originating peer's exact wording
+confirmation for plan operations that change issue text. Keep stable plan
+UUIDs and item keys between revisions. The originating agent can relay each
+verified outcome from the private task, and use `plan_inspect` to report
+relevant subsequent changes. [Reconciliation details](../../crates/codifix-agency-projects/README.md)
 
 A2A calls use `A2A-Version: 1.0`, bearer authentication and an object data part.
 Use `configuration.returnImmediately: true` for asynchronous work and poll the
@@ -135,6 +166,10 @@ same task/context IDs and `{ "answer": "...", "replacement_payload": {...} }`
 in its data part. A remote `delegate` task supplies an enrolled `peer` and a
 nested `request`. Both instances must implement Codifix's execution-lease and
 source-policy extension; generic A2A alone is insufficient for delegated authority.
+
+See [SSH host certificate renewal](ssh-host-renewal.md) for the operator-approved Step CA and OpenBao handoff.
+
+For authenticated service alerts, runbooks and incident tracking, see [Respond to a service outage](incident-response.md).
 
 ## Recover OpenBao without an LLM or database
 
@@ -146,8 +181,9 @@ when OpenBao, Workshop, discovery and cloud models are offline.
 
 The controller requests a fresh ceremony. Each independently enrolled custodian
 validates it and sends only its own share directly to the pinned OpenBao target.
-Routine recovery can succeed without a person. A share must never pass through
-Codifix chat, agent messages, memory, a model, an ordinary log or a browser form.
+Automated custodians use protected local files. An interactive custodian accepts
+its enrolled operator's share through the dedicated HTTPS handoff. Codifix chat,
+agent messages, memory and ordinary logs carry only request and status metadata.
 Separate roles and processes in tests are not proof of separate production
 custody: provision independent host/account/failure domains so no automation
 principal can retrieve a quorum.
@@ -155,8 +191,10 @@ principal can retrieve a quorum.
 Use `codifix-agency-openbao controller-watch CONTROLLER_CONFIG` for independent
 native monitoring. A failure stops and emits a secret-free escalation; connect
 its service failure/journal signal to the chosen human alert channel during
-installation. Human recovery uses the verified native protected client directly,
-not a response containing a share. The general runtime may coordinate a
+installation. The independent watcher emits local observations. For social coordination,
+schedule the CA specialist's `openbao_recover` operation and configure its
+notice recipients. Run one controller for the instance. The phone opens the
+receiver-configured protected handoff from the waiting notice in Inbox. The general runtime may coordinate a
 configured profile using `openbao_recover`, criterion `openbao_unsealed`, resource
 `{ "kind": "openbao", "id": PROFILE }`, payload
 `{ "kind": "openbao_recover", "controller": PROFILE }`. Its API cannot supply

@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Pure portable checks: never starts a guest, SCM service or database.
+$ErrorActionPreference='Stop'
+$scriptPath=Join-Path $PSScriptRoot 'guest-core-install.ps1'
+$tokens=$null;$errors=$null
+$null=[Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
+if($errors.Count){throw ($errors | Out-String)}
+. $scriptPath -FunctionsOnly
+. (Join-Path $PSScriptRoot '../../packaging/windows/native-instance-functions.ps1')
+. (Join-Path $PSScriptRoot '../../packaging/windows/release-identity.ps1')
+function Reject-CoreInstall([scriptblock]$Action){$failed=$false;try{$null=&$Action}catch{$failed=$true};if(-not $failed){throw 'Unsafe core installation input accepted'}}
+$operation=[guid]'399bb47c-2931-46e5-967f-e5c88625eb26';$instance=[guid]'a4444444-4444-4444-8444-444444444444'
+$config=@'
+[area]
+name = 'workshop'
+instance_id = 'a4444444-4444-4444-8444-444444444444'
+[service]
+bind_addr = '127.0.0.1:54321'
+api_token = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+web_root = 'C:\MemoryLab\source\native-stack-v6\web\dist'
+[database]
+url = 'postgresql://memorylab_test:fake%21password@127.0.0.1:55471/lab_core_399bb47c293146e5967fe5c88625eb26'
+[features]
+llm_curation = false
+[embeddings]
+enabled = false
+create_enabled = false
+[background_work]
+enabled = false
+[cluster]
+enabled = false
+[automation]
+enabled = false
+[offline]
+enabled = false
+[reinforcement]
+enabled = false
+[provenance]
+reverify_enabled = false
+[consolidation]
+enabled = false
+[procedural]
+enabled = false
+[mcp]
+enabled = false
+http_enabled = false
+[telemetry]
+enabled = false
+'@
+$binding=Get-CoreInstallBinding $config $operation $instance
+if($binding.port -ne 54321 -or $binding.password -cne 'fake!password'){throw 'Exact private binding was not preserved'}
+$crlf=$config.Replace("`r`n","`n").Replace("`n","`r`n")
+$null=Get-CoreInstallBinding $crlf $operation $instance
+Reject-CoreInstall {Get-CoreInstallBinding $config ([guid]::NewGuid()) $instance}
+Reject-CoreInstall {Get-CoreInstallBinding $config $operation ([guid]::NewGuid())}
+Reject-CoreInstall {Get-CoreInstallBinding ($config.Replace('127.0.0.1:54321','0.0.0.0:54321')) $operation $instance}
+Reject-CoreInstall {Get-CoreInstallBinding ($config.Replace('llm_curation = false','llm_curation = true')) $operation $instance}
+Reject-CoreInstall {Get-CoreInstallBinding ($config+"`n[provider]`napi_key = 'fake'") $operation $instance}
+Reject-CoreInstall {Get-CoreInstallBinding ($config+"`nweb_root = 'extra'") $operation $instance}
+$web='C:\Program Files\Codifix\releases\windows-v2.1.0-rc.5-build.60000\web'
+$changed=Set-CoreInstalledWeb $config $web
+$null=Get-CoreInstallBinding $changed $operation $instance
+if(-not $changed.Contains("web_root = '"+$web+"'")){throw 'Installed Web path was not used literally'}
+if((Set-CoreInstalledWeb $changed 'C:\MemoryLab\source\native-stack-v6\web\dist') -cne $config){throw 'Config fields beyond Web path changed'}
+Reject-CoreInstall {Set-CoreInstalledWeb $config "bad'path"}
+$root=Join-Path ([IO.Path]::GetTempPath()) ('memory-core-install-test-'+[guid]::NewGuid())
+$null=New-Item -ItemType Directory -Path $root
+try{
+    $source=Join-Path $root 'source.bin';$copy=Join-Path $root 'copy.bin'
+    Write-CoreInstallNew $source ([Text.UTF8Encoding]::new($false).GetBytes('pinned lab bytes'))
+    $hash=Get-CoreInstallHash $source;Copy-CoreInstallFile $source $copy $hash
+    if((Get-CoreInstallHash $copy) -cne $hash){throw 'Pinned copy changed'}
+    Reject-CoreInstall {Copy-CoreInstallFile $source $copy $hash}
+    Reject-CoreInstall {Copy-CoreInstallFile $source (Join-Path $root 'wrong.bin') ('0'*64)}
+    if(Test-Path (Join-Path $root 'wrong.bin')){throw 'Changed source was copied'}
+    Reject-CoreInstall {Write-CoreInstallNew $source ([byte[]]@(0))}
+    $core=Join-Path $root 'completed-core';$debug=Join-Path $root 'mutable-cache';$payload=Join-Path $root 'payload'
+    $null=New-Item -ItemType Directory -Path (Join-Path $core 'code'),$debug,$payload
+    $privateMemory=Join-Path $core 'code/codifix.exe';$cachedMemory=Join-Path $debug 'codifix.exe'
+    $cachedWrapper=Join-Path $debug 'codifix-windows-service.exe'
+    Write-CoreInstallNew $privateMemory ([Text.Encoding]::UTF8.GetBytes('original pinned Memory'))
+    Write-CoreInstallNew $cachedMemory ([Text.Encoding]::UTF8.GetBytes('cargo test changed Memory'))
+    Write-CoreInstallNew $cachedWrapper ([Text.Encoding]::UTF8.GetBytes('original pinned wrapper'))
+    $memoryPin=Get-CoreInstallHash $privateMemory;$wrapperPin=Get-CoreInstallHash $cachedWrapper
+    $selected=Get-CoreInstallExecutableSource 'codifix.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'codifix.exe') $memoryPin 'codifix.exe'
+    if((Get-CoreInstallHash (Join-Path $payload 'codifix.exe')) -cne $memoryPin){throw 'Mutable cargo binary replaced completed core proof'}
+    $selected=Get-CoreInstallExecutableSource 'codifix-windows-service.exe' $core $debug
+    Copy-CoreInstallFile $selected (Join-Path $payload 'codifix-windows-service.exe') $wrapperPin 'codifix-windows-service.exe'
+    [IO.File]::AppendAllText($cachedWrapper,'changed')
+    $failure=$null
+    try{Copy-CoreInstallFile $selected (Join-Path $payload 'changed-wrapper.exe') $wrapperPin 'codifix-windows-service.exe'}catch{$failure=$_.Exception.Message}
+    if($failure -cne 'Pinned core installation input unavailable or changed: codifix-windows-service.exe'){throw 'Component mismatch was not opaque and exact'}
+    if(Test-Path (Join-Path $payload 'changed-wrapper.exe')){throw 'Changed wrapper was copied'}
+    $webAssets=Join-Path $payload 'web/assets';$null=New-Item -ItemType Directory -Path $webAssets
+    Write-CoreInstallNew (Join-Path $webAssets 'app.js') ([Text.Encoding]::UTF8.GetBytes('synthetic nested asset'))
+    $inventory=@(Get-ChildItem -LiteralPath $payload -Recurse -File | ForEach-Object {
+        @{name=$_.FullName.Substring($payload.Length+1).Replace('\','/');sha256=(Get-CoreInstallHash $_.FullName)}})
+    $zip=Join-Path $root 'canonical.zip';New-CoreInstallArchive $payload $zip $inventory
+    $zipHash=Get-CoreInstallHash $zip
+    $readStream=[IO.File]::OpenRead($zip);$archive=[IO.Compression.ZipArchive]::new($readStream,[IO.Compression.ZipArchiveMode]::Read)
+    try{
+        if($archive.Entries.Count -ne $inventory.Count){throw 'ZIP inventory count changed'}
+        foreach($entry in $archive.Entries){
+            Assert-NativeArchiveName $entry.FullName
+            if($entry.FullName.Contains('\') -or $entry.FullName.EndsWith('/')){throw 'ZIP did not use canonical file-only entries'}
+            $pin=@($inventory | Where-Object {$_.name -ceq $entry.FullName})
+            if($pin.Count -ne 1){throw 'ZIP entry differs from locked inventory'}
+            $inputStream=$entry.Open();$sha=[Security.Cryptography.SHA256]::Create()
+            try{$hash=([BitConverter]::ToString($sha.ComputeHash($inputStream))).Replace('-','').ToLowerInvariant()}finally{$sha.Dispose();$inputStream.Dispose()}
+            if($hash -cne $pin[0].sha256){throw 'ZIP bytes changed'}
+        }
+    }finally{$archive.Dispose();$readStream.Dispose()}
+    Reject-CoreInstall {Assert-NativeArchiveName 'bin\codifix.exe'}
+    Reject-CoreInstall {New-CoreInstallArchive $payload $zip $inventory}
+    if((Get-CoreInstallHash $zip) -cne $zipHash){throw 'Existing ZIP evidence was changed'}
+    Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'unsafe.zip') @(@{name='../outside';sha256=$memoryPin})}
+    Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'noncanonical.zip') @(@{name='web\assets\app.js';sha256=$memoryPin})}
+    Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'duplicate.zip') @($inventory[0],$inventory[0])}
+    [IO.File]::AppendAllText((Join-Path $webAssets 'app.js'),'changed')
+    Reject-CoreInstall {New-CoreInstallArchive $payload (Join-Path $root 'changed.zip') $inventory}
+    $oldIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' 60000;$newIdentity=Get-WindowsReleaseIdentity '2.1.0-rc.5' 60001
+    if($oldIdentity.release_identity -ceq $newIdentity.release_identity){throw 'Fresh lab build did not separate corrected package identity'}
+    Reject-CoreInstall {. $scriptPath -FunctionsOnly -InstallerBuild 59999}
+    Reject-CoreInstall {. $scriptPath -FunctionsOnly -InstallerBuild 61000}
+    $fakeOperator=Join-Path $root "fake'operator.ps1";$diagnostic=Join-Path $root 'private.failure.log'
+    Write-CoreInstallNew $fakeOperator ([Text.Encoding]::UTF8.GetBytes("throw 'synthetic installer failure'"))
+    $command=New-CoreInstallerDiagnosticCommand @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$fakeOperator) $diagnostic
+    $commandTokens=$null;$commandErrors=$null
+    $null=[Management.Automation.Language.Parser]::ParseInput($command,[ref]$commandTokens,[ref]$commandErrors)
+    if($commandErrors.Count){throw 'Diagnostic invocation has parser errors'}
+    Reject-CoreInstall {& ([scriptblock]::Create($command))}
+    if(-not [IO.File]::ReadAllText($diagnostic).Contains('fake')){throw 'Private child stack/source position was not retained'}
+    Reject-CoreInstall {New-CoreInstallerDiagnosticCommand @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$fakeOperator,'-Unknown','value') $diagnostic}
+    if($env:OS -eq 'Windows_NT'){
+        $folders=Get-CoreInstallKnownFolderEnvironment
+        if($folders.ProgramData -cne [Environment]::GetFolderPath('CommonApplicationData') -or
+            $folders.ALLUSERSPROFILE -cne $folders.ProgramData){throw 'Known CommonApplicationData was not bound explicitly'}
+        if($folders.SystemDrive -cne [IO.Path]::GetPathRoot([Environment]::GetFolderPath('Windows')).TrimEnd('\')){throw 'Known Windows system drive was not bound explicitly'}
+    }
+}finally{Remove-Item -LiteralPath $root -Recurse -Force}
+Write-Output 'Core installation parser and pure helpers passed; SCM/native execution was not attempted.'

@@ -1,6 +1,7 @@
 use crate::{
     config::Config,
     discovery::bounded,
+    social_transport::{Call, Transport},
     store::{Store, StoredTask, Submit, fingerprint},
 };
 use anyhow::{Result, ensure};
@@ -33,20 +34,7 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         peer.instance_id != cfg.instance_id,
         "self delegation would deadlock a project slot"
     );
-    let endpoint = peer
-        .endpoint
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("peer has no task endpoint"))?;
-    let token = std::env::var(
-        peer.outbound_token_env
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("peer outbound credential absent"))?,
-    )
-    .map_err(|_| anyhow::anyhow!("peer credential unavailable"))?;
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(30))
-        .build()?;
+    let transport = Transport::new(store, cfg, peer)?;
     let mut stored = sqlx::query("SELECT * FROM agency_remote_tasks WHERE task_id=$1")
         .bind(task.contract.id)
         .fetch_optional(&store.pool)
@@ -131,13 +119,8 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             .execute(&store.pool)
             .await?;
         let result = bounded(
-            client
-                .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
-                .header("A2A-Version", "1.0")
-                .header("Content-Type", "application/a2a+json")
-                .bearer_auth(&token)
-                .json(&body)
-                .send()
+            transport
+                .call(Call::Send(&serde_json::to_value(&body)?))
                 .await?,
         )
         .await?;
@@ -229,13 +212,8 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             )
             .await?;
         let response = bounded(
-            client
-                .post(format!("{}/message:send", endpoint.trim_end_matches('/')))
-                .header("A2A-Version", "1.0")
-                .header("Content-Type", "application/a2a+json")
-                .bearer_auth(&token)
-                .json(&body)
-                .send()
+            transport
+                .call(Call::Send(&serde_json::to_value(&body)?))
                 .await?,
         )
         .await?;
@@ -262,6 +240,9 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             .execute(&store.pool)
             .await?;
     }
+    let mut lease_conflict_recheck = false;
+    let expects_restart = task.request.payload["request"]["capability"] == "upgrade_candidate";
+    let mut unavailable_since = None;
     loop {
         if let Err(error) = store
             .authorize(task.contract.id, task.revision, Usage::default())
@@ -270,26 +251,37 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             let _ = cancel_remote(store, cfg, task.contract.id).await;
             return Err(error);
         }
-        let remote: a2a::Task = serde_json::from_value(
-            bounded(
-                client
-                    .get(format!(
-                        "{}/tasks/{}",
-                        endpoint.trim_end_matches('/'),
-                        urlencoding::encode(&remote_id)
-                    ))
-                    .header("A2A-Version", "1.0")
-                    .header("Content-Type", "application/a2a+json")
-                    .bearer_auth(&token)
-                    .send()
-                    .await?,
-            )
-            .await?,
-        )?;
+        let status = transport.call(Call::Status(&remote_id)).await;
+        if expects_restart && temporary_unavailability(&status) {
+            let start = unavailable_since.get_or_insert_with(tokio::time::Instant::now);
+            ensure!(
+                start.elapsed() < std::time::Duration::from_secs(45),
+                "upgraded peer did not return"
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            continue;
+        }
+        let remote: a2a::Task = serde_json::from_value(bounded(status?).await?)?;
+        unavailable_since = None;
         remote.validate()?;
         ensure!(
             remote.id == remote_id && remote.context_id == context,
             "remote task identity mismatch"
+        );
+        // A renewal can race a completed task. One fresh authenticated read may
+        // resolve that conflict; nonterminal/revoked work remains a hard denial.
+        ensure!(
+            !lease_conflict_recheck
+                || matches!(
+                    remote.status.state,
+                    a2a::TaskState::Completed
+                        | a2a::TaskState::InputRequired
+                        | a2a::TaskState::AuthRequired
+                        | a2a::TaskState::Failed
+                        | a2a::TaskState::Canceled
+                        | a2a::TaskState::Rejected
+                ),
+            "remote lease renewal rejected while task remained nonterminal"
         );
         sqlx::query("UPDATE agency_remote_tasks SET last_response=$2 WHERE task_id=$1")
             .bind(task.contract.id)
@@ -341,26 +333,33 @@ pub async fn delegate(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
                     let _ = cancel_remote(store, cfg, task.contract.id).await;
                     return Err(error);
                 }
-                bounded(
-                    client
-                        .post(format!(
-                            "{}/v1/tasks/{}/lease",
-                            endpoint.trim_end_matches('/'),
-                            urlencoding::encode(&remote_id)
-                        ))
-                        .header("A2A-Version", "1.0")
-                        .header("Content-Type", "application/a2a+json")
-                        .bearer_auth(&token)
-                        .json(&json!({}))
-                        .send()
-                        .await?,
-                )
-                .await?;
+                let renewal = transport.call(Call::Renew(&remote_id)).await;
+                if expects_restart && temporary_unavailability(&renewal) {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    continue;
+                }
+                let renewal = renewal?;
+                if renewal.status() == reqwest::StatusCode::CONFLICT {
+                    lease_conflict_recheck = true;
+                    continue;
+                }
+                bounded(renewal).await?;
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }
         }
     }
 }
+/// Retrying status/lease reads across the one expected restart does not submit
+/// the installation again. Authorization errors still terminate the exchange.
+fn temporary_unavailability(result: &Result<reqwest::Response>) -> bool {
+    match result {
+        Ok(response) => response.status().is_server_error(),
+        Err(error) => error
+            .downcast_ref::<reqwest::Error>()
+            .is_some_and(|e| e.is_connect() || e.is_request() || e.is_timeout()),
+    }
+}
+
 pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> {
     sqlx::query("UPDATE agency_remote_tasks SET cancel_requested=true WHERE task_id=$1")
         .bind(id)
@@ -379,34 +378,8 @@ pub async fn cancel_remote(store: &Store, cfg: &Config, id: Uuid) -> Result<()> 
         .iter()
         .find(|p| p.id == peer_id)
         .ok_or_else(|| anyhow::anyhow!("unknown peer"))?;
-    let token = std::env::var(
-        peer.outbound_token_env
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("missing credential"))?,
-    )?;
-    let endpoint = peer
-        .endpoint
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("missing endpoint"))?;
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(10))
-        .build()?;
-    bounded(
-        client
-            .post(format!(
-                "{}/tasks/{}:cancel",
-                endpoint.trim_end_matches('/'),
-                urlencoding::encode(&remote)
-            ))
-            .header("A2A-Version", "1.0")
-            .header("Content-Type", "application/a2a+json")
-            .bearer_auth(token)
-            .json(&json!({}))
-            .send()
-            .await?,
-    )
-    .await?;
+    let transport = Transport::new(store, cfg, peer)?;
+    bounded(transport.call(Call::Cancel(&remote)).await?).await?;
     sqlx::query("UPDATE agency_remote_tasks SET cancel_completed=true WHERE task_id=$1")
         .bind(id)
         .execute(&store.pool)
@@ -451,14 +424,11 @@ pub async fn reconcile_submissions(store: &Store, cfg: &Config) -> Result<()> {
     for (id, peer_id, body) in pending {
         let result=async {
             let peer=cfg.peers.iter().find(|p|p.id==peer_id).ok_or_else(||anyhow::anyhow!("peer unavailable"))?;
-            let token=std::env::var(peer.outbound_token_env.as_ref().ok_or_else(||anyhow::anyhow!("peer credential unavailable"))?)?;
-            let endpoint=peer.endpoint.as_ref().ok_or_else(||anyhow::anyhow!("peer endpoint unavailable"))?;
+            let transport=Transport::new(store,cfg,peer)?;
             let request:a2a::SendMessageRequest=serde_json::from_value(body)?;
             let [Part::Data(data)]=request.message.parts.as_slice() else {anyhow::bail!("invalid stored submission")};
             let expected:Submit=serde_json::from_value(data.clone())?;
-            let client=reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).timeout(std::time::Duration::from_secs(10)).build()?;
-            let response=bounded(client.get(format!("{}/v1/task-requests/{}",endpoint.trim_end_matches('/'),urlencoding::encode(&expected.request_id)))
-                .bearer_auth(&token).send().await?).await?;
+            let response=bounded(transport.call(Call::Lookup(&expected.request_id)).await?).await?;
             let remote:StoredTask=serde_json::from_value(response)?;
             ensure!(fingerprint(&remote.request)?==fingerprint(&expected)?,"reconciled request mismatch");
             sqlx::query("UPDATE agency_remote_tasks SET remote_id=$2,context_id=$2,last_response=$3 WHERE task_id=$1 AND remote_id IS NULL")

@@ -1,0 +1,80 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.defs",
+  "defs": {
+    "message": {
+      "type": "object",
+      "required": [
+        "messageId",
+        "role",
+        "parts"
+      ],
+      "properties": {
+        "messageId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "unknown"
+          }
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "id",
+        "contextId",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "ref",
+          "ref": "dev.codifix.agency.defs#status"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "unknown"
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": [
+        "state",
+        "timestamp"
+      ],
+      "properties": {
+        "state": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "message": {
+          "type": "ref",
+          "ref": "dev.codifix.agency.defs#message"
+        }
+      }
+    }
+  }
+}

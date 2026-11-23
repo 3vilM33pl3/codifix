@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createECDH } from 'node:crypto';
+import { createServer } from 'node:https';
+import { request as forward } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +27,8 @@ const env = {
   GATE_ROTATION_KEY: key.getPrivateKey('hex'),
 };
 const compose = ['compose', '-p', project, '-f', join(directory, 'compose.yaml')];
-const runtimeMode = process.argv.includes('--runtime');
+const agencyMode = process.argv.includes('--agency');
+const runtimeMode = agencyMode || process.argv.includes('--runtime');
 function composeRun(args, environment = env) {
   const result = spawnSync('docker', [...compose, ...args],
     { env: environment, stdio: 'inherit', timeout: 60_000 });
@@ -55,12 +58,67 @@ async function probe(services, environment = env) {
 
 let started = false;
 let cleaned = true;
+// The real CLI requires TLS. The only upstream is this run's internal PDS.
+async function runAgency(testEnv, address, fixture, state) {
+  const localKey = join(tlsDirectory, 'agency-key.pem');
+  const csr = join(tlsDirectory, 'agency.csr');
+  const certificate = join(tlsDirectory, 'agency.pem');
+  const extensions = join(tlsDirectory, 'agency.ext');
+  await writeFile(extensions, 'subjectAltName=IP:127.0.0.1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n');
+  for (const args of [
+    ['req', '-new', '-newkey', 'rsa:2048', '-nodes', '-keyout', localKey, '-out', csr, '-subj', '/CN=Agency PDS fixture'],
+    ['x509', '-req', '-in', csr, '-CA', join(tlsDirectory, 'cert.pem'), '-CAkey', join(tlsDirectory, 'key.pem'),
+      '-set_serial', '2', '-days', '1', '-extfile', extensions, '-out', certificate],
+  ]) {
+    if (spawnSync('openssl', args, {stdio: 'ignore'}).status !== 0) throw new Error('Cannot create agency TLS leaf');
+  }
+  const proxy = createServer({
+    key: await readFile(localKey), cert: await readFile(certificate),
+  }, (request, response) => {
+    const upstream = forward({
+      hostname: address, port: 2583, method: request.method, path: request.url,
+      headers: request.headers, timeout: 15000,
+    }, incoming => {
+      response.writeHead(incoming.statusCode, incoming.headers);
+      incoming.pipe(response);
+    });
+    upstream.on('timeout', () => upstream.destroy());
+    upstream.on('error', () => response.destroy());
+    request.pipe(upstream);
+  });
+  await new Promise((resolve, reject) => {
+    proxy.once('error', reject);
+    proxy.listen(0, '127.0.0.1', resolve);
+  });
+  try {
+    const base = `https://127.0.0.1:${proxy.address().port}`;
+    await writeFile(fixture, JSON.stringify({base, repository: state.did, token: state.accessJwt,
+      signing_key: state.signingKey, recipient_did: state.recipientDid, recipient_key: state.recipientSigningKey, recipient_token: state.recipientToken}), { mode: 0o600 });
+    const child = spawn('cargo', ['test', '--locked', '-p', 'codifix-agency-runtime', '--test',
+      'http', '--test', 'conversation', ...(process.env.CODIFIX_TEST_PRIOR_AGENCY ? ['--test','upgrade'] : []), 'pds_social', '--', '--ignored', '--test-threads=1'], {
+      cwd: join(directory, '../..'), stdio: 'inherit',
+      env: {...testEnv, AGENCY_FIXTURE_ACCESS_TOKEN: state.accessJwt, SSL_CERT_FILE: join(tlsDirectory, 'cert.pem')},
+    });
+    const timer = setTimeout(() => child.kill('SIGTERM'), 540_000);
+    try {
+      const status = await new Promise((resolve, reject) => {
+        child.once('error', reject); child.once('exit', resolve);
+      });
+      if (status !== 0) throw new Error('Agency real PDS workflow failed');
+    } finally { clearTimeout(timer); }
+  } finally {
+    proxy.closeAllConnections();
+    await new Promise(resolve => proxy.close(resolve));
+  }
+}
+
 async function runtimeTest() {
   if (!process.env.CODIFIX_TEST_DATABASE_URL) {
     throw new Error('--runtime requires an explicitly disposable test PostgreSQL URL with CREATE DATABASE rights');
   }
-  const runtimeEnv = { ...env, GATE_PHASE: 'runtime' };
-  composeRun(['up', '-d', 'pds', 'pds-recovery', 'probe'], runtimeEnv);
+  const runtimeEnv = { ...env, GATE_PHASE: agencyMode ? 'agency' : 'runtime' };
+  const service = agencyMode ? 'pds' : 'pds-recovery';
+  composeRun(['up', '-d', ...new Set(['pds', service, 'probe'])], runtimeEnv);
   for (let attempt = 0; ; attempt++) {
     try { await readFile(join(stateDirectory, 'runtime-ready')); break; }
     catch (error) {
@@ -82,14 +140,14 @@ async function runtimeTest() {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
-  const container = spawnSync('docker', [...compose, 'ps', '-q', 'pds-recovery'],
+  const container = spawnSync('docker', [...compose, 'ps', '-q', service],
     { env: runtimeEnv, encoding: 'utf8' });
   if (container.status !== 0 || !/^[a-f0-9]+$/.test(container.stdout.trim())) throw new Error('Missing fixture PDS');
   const inspected = spawnSync('docker', ['inspect', container.stdout.trim()], { encoding: 'utf8' });
   if (inspected.status !== 0) throw new Error('Cannot inspect isolated fixture network');
   const network = JSON.parse(inspected.stdout)[0].NetworkSettings.Networks[`${project}_private`];
   if (!network || !/^[0-9.]+$/.test(network.IPAddress)) throw new Error('Missing private fixture address');
-  const state = JSON.parse(await readFile(join(stateDirectory, 'recovery-state.json'), 'utf8'));
+  const state = JSON.parse(await readFile(join(stateDirectory, agencyMode ? 'agency-state.json' : 'recovery-state.json'), 'utf8'));
   const fixture = join(runtime, 'pds-fixture.json');
   await writeFile(fixture, JSON.stringify({ base: `http://${network.IPAddress}:2583`,
     repository: state.did, token: state.accessJwt, signing_key: state.signingKey }), { mode: 0o600 });
@@ -97,6 +155,9 @@ async function runtimeTest() {
   delete testEnv.CODIFIX_CLIENT_TOKEN;
   delete testEnv.DATABASE_URL;
   delete testEnv.CODIFIX_FEDERATION_CONFIG;
+  if (agencyMode) {
+    await runAgency(testEnv, network.IPAddress, fixture, state);
+  } else {
   const child = spawn('cargo', ['test', '-p', 'codifix-federation-runtime', '--test', 'c_workflow', '--locked', '--', '--nocapture'],
     { cwd: join(directory, '../..'), env: testEnv, stdio: 'inherit' });
   const timer = setTimeout(() => child.kill('SIGTERM'), 540_000);
@@ -134,6 +195,7 @@ async function runtimeTest() {
     const code = await new Promise((resolve, reject) => { agents.once('error', reject); agents.once('exit', resolve); });
     if (code !== 0) throw new Error('Four-area watched-agent signed-PDS rehearsal failed');
   } finally { clearTimeout(agentsTimer); }
+  }
   await writeFile(join(stateDirectory, 'runtime-finished'), 'complete', { mode: 0o600 });
   const probeId = spawnSync('docker', [...compose, 'ps', '-aq', 'probe'], { env: runtimeEnv, encoding: 'utf8' });
   const completed = spawnSync('docker', ['wait', probeId.stdout.trim()], { encoding: 'utf8', timeout: 60_000 });
@@ -146,7 +208,7 @@ try {
   const cert = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048',
     '-nodes', '-days', '1', '-keyout', join(tlsDirectory, 'key.pem'),
     '-out', join(tlsDirectory, 'cert.pem'), '-subj', '/CN=Memory isolated PDS gate',
-    '-addext', 'subjectAltName=DNS:space.federation.example.com,DNS:pds.federation.example.com,DNS:recovery.federation.example.com'],
+    '-addext', 'subjectAltName=DNS:recipient.federation.example.com,DNS:space.federation.example.com,DNS:pds.federation.example.com,DNS:recovery.federation.example.com'],
   { encoding: 'utf8' });
   if (cert.status !== 0) throw new Error('Cannot create disposable TLS certificate');
   // Marker enables safe identification of this disposable run, not secret storage.

@@ -1,12 +1,12 @@
 use crate::{
     config::Config,
+    operation::Operation,
     store::{Store, StoredTask, Submit, fingerprint},
 };
 use anyhow::{Result, ensure};
 use chrono::Utc;
 use codifix_agency::{AcceptanceResult, TaskOutcome, TaskStatus, Usage};
 use codifix_store::jobs::{self, Completion, JobLease, JobPolicy};
-use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
 use uuid::Uuid;
@@ -20,6 +20,9 @@ pub fn policy() -> JobPolicy {
     }
 }
 pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
+    let delivered = crate::incidents::deliver_once(store, cfg)
+        .await
+        .unwrap_or(false);
     crate::inbox::dispatch_once(store, cfg).await?;
     crate::inbox::reconcile(store, cfg).await?;
     crate::inbox::defer_paused_jobs(store, cfg).await?;
@@ -30,7 +33,7 @@ pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
     )
     .await?
     else {
-        return Ok(false);
+        return Ok(delivered);
     };
     let mut tick = tokio::time::interval(std::time::Duration::from_secs(30));
     tick.tick().await;
@@ -95,17 +98,9 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
     let kind = task.request.payload["kind"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("operation kind required"))?;
-    let expected = match kind {
-        "inspect" => "status_observed",
-        "plan_prepare" => "plan_valid",
-        "plan_apply" => "linear_readback_verified",
-        "plan_inspect" => "linear_state_observed",
-        "model_draft" => "model_output_valid_json",
-        "conversation_turn" => codifix_agency::conversation::ACCEPTANCE,
-        "openbao_recover" => "openbao_unsealed",
-        "delegate" => "delegated_result_reported",
-        _ => anyhow::bail!("unsupported specialist operation"),
-    };
+    let operation = Operation::parse(kind)
+        .ok_or_else(|| anyhow::anyhow!("unsupported specialist operation"))?;
+    let expected = operation.criterion();
     ensure!(
         task.request.capability == kind,
         "operation exceeds requested capability"
@@ -115,40 +110,9 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
         store.update_contract(&task).await?;
         return Ok(());
     }
-    let evidence = match kind {
-        "inspect" => {
-            json!({"observed_at":Utc::now(),"specialist":task.contract.specialist_id,"mandate_active":true})
-        }
-        "plan_prepare" => match prepare_plan(store, cfg, &task).await? {
-            Some(e) => e,
-            None => return Ok(()),
-        },
-        "plan_apply" => apply_plan(store, cfg, &task, lease).await?,
-        "plan_inspect" => crate::inspection::plan_inspect(store, cfg, &task).await?,
-        "model_draft" => {
-            let prompt = task.request.payload["prompt"]
-                .as_str()
-                .ok_or_else(|| anyhow::anyhow!("prompt required"))?;
-            let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
-            crate::model::draft(store, cfg, &task, prompt, &routing).await?
-        }
-        "conversation_turn" => {
-            let turn: codifix_agency::conversation::ConversationTurn =
-                serde_json::from_value(task.request.payload["turn"].clone())?;
-            ensure!(
-                turn.recipient_instance_id == cfg.instance_id
-                    && turn.recipient_specialist_id == task.contract.specialist_id,
-                "conversation target mismatch"
-            );
-            let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
-            crate::model::conversation(store, cfg, &task, &turn, &routing).await?
-        }
-        "openbao_recover" => crate::openbao::recover(store, cfg, &task).await?,
-        "delegate" => match crate::exchange::delegate(store, cfg, &task).await? {
-            Some(value) => value,
-            None => return Ok(()),
-        },
-        _ => unreachable!(),
+    let OperationResult::Completed(evidence) = execute(operation, store, cfg, &task, lease).await?
+    else {
+        return Ok(());
     };
     let reference = format!("agency:task:{}:evidence", task.contract.id);
     let outcome = TaskOutcome {
@@ -170,18 +134,84 @@ async fn run_lease(store: &Store, cfg: &Config, lease: &JobLease) -> Result<()> 
     jobs::checkpoint_result(result).await?;
     Ok(())
 }
-#[derive(Deserialize)]
-struct LinearSettings {
-    endpoint: String,
-    token_env: String,
-    authorities: std::collections::BTreeMap<Uuid, codifix_agency_projects::Authority>,
+enum OperationResult {
+    Completed(Value),
+    Waiting,
 }
+
+async fn execute(
+    operation: Operation,
+    store: &Store,
+    cfg: &Config,
+    task: &StoredTask,
+    lease: &JobLease,
+) -> Result<OperationResult> {
+    let evidence = match operation {
+        Operation::Upgrade => match crate::upgrade::request(store, cfg, task).await? {
+            Some(result) => result,
+            None => return Ok(OperationResult::Waiting),
+        },
+        Operation::SshHostInspect | Operation::SshHostSign | Operation::SshHostInstall => {
+            match crate::ssh_renewal::execute(operation, store, task).await? {
+                Some(value) => value,
+                None => return Ok(OperationResult::Waiting),
+            }
+        }
+        Operation::IncidentReport => match crate::incidents::report(store, cfg, task).await? {
+            Some(value) => value,
+            None => return Ok(OperationResult::Waiting),
+        },
+        Operation::Inspect => {
+            json!({"observed_at":Utc::now(),"specialist":task.contract.specialist_id,"mandate_active":true})
+        }
+        Operation::PlanPrepare => match prepare_plan(store, cfg, task).await? {
+            Some(e) => e,
+            None => return Ok(OperationResult::Waiting),
+        },
+        Operation::PlanApply => apply_plan(store, cfg, task, lease).await?,
+        Operation::LinearTrack => match crate::linear_tracking::track(store, cfg, task).await? {
+            Some(evidence) => evidence,
+            None => return Ok(OperationResult::Waiting),
+        },
+        Operation::PlanInspect => crate::inspection::plan_inspect(store, cfg, task).await?,
+        Operation::ModelDraft => {
+            let prompt = task.request.payload["prompt"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("prompt required"))?;
+            let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
+            crate::model::draft(store, cfg, task, prompt, &routing).await?
+        }
+        Operation::ConversationTurn => {
+            let turn: codifix_agency::conversation::ConversationTurn =
+                serde_json::from_value(task.request.payload["turn"].clone())?;
+            ensure!(
+                turn.recipient_instance_id == cfg.instance_id
+                    && turn.recipient_specialist_id == task.contract.specialist_id,
+                "conversation target mismatch"
+            );
+            let routing = serde_json::from_value(task.request.payload["routing"].clone())?;
+            crate::model::conversation(store, cfg, task, &turn, &routing).await?
+        }
+        Operation::OpenBaoRecover => match crate::openbao::recover(store, cfg, task).await? {
+            Some(value) => value,
+            None => return Ok(OperationResult::Waiting),
+        },
+        Operation::Delegate => match crate::exchange::delegate(store, cfg, task).await? {
+            Some(value) => value,
+            None => return Ok(OperationResult::Waiting),
+        },
+    };
+    Ok(OperationResult::Completed(evidence))
+}
+
+use crate::linear_tracking::Settings as LinearSettings;
 fn linear(
     cfg: &Config,
     task: &StoredTask,
 ) -> Result<(
     codifix_agency_projects::LinearClient,
     codifix_agency_projects::Authority,
+    bool,
 )> {
     let settings: LinearSettings = serde_json::from_value(
         cfg.linear
@@ -200,7 +230,7 @@ fn linear(
         &token,
         std::time::Duration::from_secs(30),
     )?;
-    Ok((client, authority))
+    Ok((client, authority, settings.require_origin_confirmation))
 }
 async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<Option<Value>> {
     let plan: codifix_agency_projects::Plan =
@@ -220,7 +250,7 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         store.update_contract(&task).await?;
         return Ok(None);
     }
-    let (client, authority) = linear(cfg, task)?;
+    let (client, authority, require_confirmation) = linear(cfg, task)?;
     codifix_agency_projects::authorize_plan(&plan, &authority)?;
     ensure!(
         task.request.resource
@@ -230,25 +260,7 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
             },
         "plan resource binding mismatch"
     );
-    let selected = plan
-        .projects
-        .iter()
-        .map(|p| (&p.identity, codifix_agency_projects::EntityKind::Project))
-        .chain(
-            plan.milestones
-                .iter()
-                .map(|m| (&m.identity, codifix_agency_projects::EntityKind::Milestone)),
-        )
-        .chain(
-            plan.issues
-                .iter()
-                .map(|i| (&i.identity, codifix_agency_projects::EntityKind::Issue)),
-        )
-        .chain(
-            plan.dependencies
-                .iter()
-                .map(|d| (&d.identity, codifix_agency_projects::EntityKind::Dependency)),
-        );
+    let selected = plan.resources();
     let mut baseline = codifix_agency_projects::Baseline::new();
     for (identity, kind) in selected {
         store
@@ -272,6 +284,18 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         .authorize(task.contract.id, task.revision, Usage::default())
         .await?;
     let changes = codifix_agency_projects::prepare(&plan, &baseline, &authority)?;
+    let mut origin_confirmation = None;
+    if require_confirmation
+        && let Some((question, answer)) = crate::linear_tracking::issue_confirmation(&changes)
+    {
+        if !crate::linear_tracking::confirmed(store, task, &question, &answer).await? {
+            let mut waiting = task.clone();
+            waiting.contract.clarify(question, Utc::now())?;
+            store.update_contract(&waiting).await?;
+            return Ok(None);
+        }
+        origin_confirmation = Some(answer);
+    }
     let id = Uuid::new_v5(&task.contract.id, plan.digest().as_bytes());
     let mut tx = store.pool.begin().await?;
     let head:Option<Uuid>=sqlx::query_scalar("INSERT INTO agency_plan_heads(plan_id,mandate_id,revision,digest,prepared_id) VALUES($1,$2,$3,$4,$5) ON CONFLICT(plan_id,mandate_id) DO UPDATE SET revision=$3,digest=$4,prepared_id=$5 WHERE agency_plan_heads.revision<$3 OR (agency_plan_heads.revision=$3 AND agency_plan_heads.digest=$4) RETURNING prepared_id")
@@ -284,7 +308,7 @@ async fn prepare_plan(store: &Store, cfg: &Config, task: &StoredTask) -> Result<
         .bind(id).bind(task.request.mandate_id).bind(serde_json::to_value(&plan)?).bind(serde_json::to_value(&changes)?).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(Some(
-        json!({"prepared_id":id,"plan_digest":plan.digest(),"changes":changes,"source":plan.source}),
+        json!({"prepared_id":id,"plan_digest":plan.digest(),"changes":changes,"source":plan.source,"origin_confirmation":origin_confirmation}),
     ))
 }
 async fn apply_plan(
@@ -305,7 +329,17 @@ async fn apply_plan(
     let plan: codifix_agency_projects::Plan = serde_json::from_value(row.try_get("plan")?)?;
     let changes: codifix_agency_projects::PreparedChangeSet =
         serde_json::from_value(row.try_get("changes")?)?;
-    let (client, authority) = linear(cfg, task)?;
+    let (client, authority, require_confirmation) = linear(cfg, task)?;
+    if require_confirmation
+        && let Some((_, answer)) = crate::linear_tracking::issue_confirmation(&changes)
+    {
+        let confirmed:bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agency_outcomes o JOIN agency_tasks t ON t.id=o.task_id WHERE o.evidence->>'prepared_id'=$1 AND o.evidence->>'origin_confirmation'=$2 AND t.payload->>'capability'='plan_prepare' AND t.requester=$3 AND t.mandate_id=$4)")
+            .bind(id.to_string()).bind(answer).bind(&task.requester).bind(task.request.mandate_id).fetch_one(&store.pool).await?;
+        ensure!(
+            confirmed,
+            "issue wording requires confirmation by the originating peer"
+        );
+    }
     let head: String = sqlx::query_scalar(
         "SELECT digest FROM agency_plan_heads WHERE plan_id=$1 AND mandate_id=$2",
     )
@@ -542,7 +576,9 @@ pub async fn schedules(store: &Store, cfg: &Config) -> Result<()> {
         }
         // Every due slot advances even if permission or budget is unavailable;
         // an orphan cannot starve other schedules. No failed slot is replayed.
-        let _ = store.submit(&req, peer).await;
+        let _ = store
+            .submit_observed(&req, peer, cfg.observation_enabled)
+            .await;
         {
             sqlx::query("UPDATE agency_schedules SET next_at=GREATEST(next_at+make_interval(secs=>$2),clock_timestamp()+make_interval(secs=>$2)) WHERE id=$1 AND next_at=$3")
                 .bind(id).bind(f64::from(interval)).bind(due).execute(&store.pool).await?;

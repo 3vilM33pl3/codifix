@@ -1,6 +1,7 @@
 //! Deterministic, secret-free controller; independent local-share custodians.
 //! No Codifix service, database, model or cloud credentials are used.
 #![cfg(unix)]
+pub mod phone;
 pub mod protected;
 pub mod service;
 pub mod transport;
@@ -30,6 +31,12 @@ pub enum Error {
     Authentication,
     #[error("ceremony incomplete; human escalation required")]
     Incomplete,
+    #[error("participant declined the request")]
+    Declined,
+    #[error("participant share rejected")]
+    InvalidShare,
+    #[error("OpenBao is unsealed but not ready")]
+    NotReady,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -167,7 +174,7 @@ pub fn validate_roster(roster: &[Member], target: &Target) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Ceremony {
     pub challenge: String,
@@ -186,7 +193,7 @@ impl Ceremony {
             || self.issued_at > now
             || self.expires_at <= now
             || self.expires_at <= self.issued_at
-            || self.expires_at - self.issued_at > 120
+            || self.expires_at - self.issued_at > 900
             || self.target_binding != target.binding()?
         {
             return Err(Error::Ceremony);
@@ -249,6 +256,8 @@ pub struct ControllerState {
 pub struct CustodianState {
     pub last_sequence: u64,
     pub last_challenge: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phone: Option<phone::Pending>,
     pub binding: String,
 }
 
@@ -256,6 +265,9 @@ pub struct CustodianState {
 #[serde(rename_all = "snake_case")]
 pub enum Observation {
     Unsealed,
+    ContributionRequested { custodian_id: String, sequence: u64 },
+    ShareRejected { custodian_id: String, sequence: u64 },
+    AwaitingOperator { custodian_id: String, sequence: u64 },
     CeremonyStarted { sequence: u64, challenge: String },
     CustodianSubmitted { custodian_id: String, sequence: u64 },
     Escalation { code: String },
@@ -264,6 +276,8 @@ pub enum Observation {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Peer {
+    #[serde(default)]
+    pub interactive: bool,
     pub custodian_id: String,
     pub endpoint: Endpoint,
     pub controller_token_file: PathBuf,
@@ -271,6 +285,8 @@ pub struct Peer {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ControllerConfig {
+    #[serde(default)]
+    pub notice_peers: Vec<String>,
     pub target: Target,
     pub roster: Vec<Member>,
     pub peers: Vec<Peer>,
@@ -282,7 +298,9 @@ pub struct CustodianConfig {
     pub target: Target,
     pub roster: Vec<Member>,
     pub custodian_id: String,
-    pub share_file: PathBuf,
+    pub share_file: Option<PathBuf>,
+    #[serde(default)]
+    pub phone_token_file: Option<PathBuf>,
     /// Controller capability scoped solely to this custodian.
     pub controller_token_file: PathBuf,
     pub state_file: PathBuf,
@@ -295,9 +313,16 @@ impl CustodianConfig {
             .roster
             .iter()
             .any(|m| m.custodian_id == self.custodian_id)
-            || self.share_file == self.controller_token_file
-            || self.share_file == self.target.attestor_token_file
-            || self.share_file == self.state_file
+            || self.share_file.is_some() == self.phone_token_file.is_some()
+            || self
+                .share_file
+                .iter()
+                .chain(self.phone_token_file.iter())
+                .any(|p| {
+                    p == &self.controller_token_file
+                        || p == &self.target.attestor_token_file
+                        || p == &self.state_file
+                })
         {
             return Err(Error::Configuration);
         }
@@ -312,7 +337,7 @@ pub fn now() -> u64 {
 }
 
 /// Per-step native nonce/progress prevents continuing an unrelated/reset ceremony.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Submission {
     pub ceremony: Ceremony,

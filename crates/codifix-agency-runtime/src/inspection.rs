@@ -7,21 +7,12 @@ use crate::{
 use anyhow::{Result, ensure};
 use chrono::Utc;
 use codifix_agency::{ResourceScope, Usage};
-use codifix_agency_projects::{
-    Authority, EntityKind, InspectionSnapshot, Plan, authorize_plan, stable_id,
-};
+use codifix_agency_projects::{EntityKind, InspectionSnapshot, Plan, authorize_plan, stable_id};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LinearSettings {
-    endpoint: String,
-    token_env: String,
-    authorities: BTreeMap<Uuid, Authority>,
-}
+use crate::linear_tracking::Settings as LinearSettings;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObservationStatus {
@@ -99,21 +90,7 @@ pub async fn plan_inspect(store: &Store, cfg: &Config, task: &StoredTask) -> Res
         &token,
         std::time::Duration::from_secs(30),
     )?;
-    let selected = plan
-        .projects
-        .iter()
-        .map(|p| (&p.identity, EntityKind::Project))
-        .chain(
-            plan.milestones
-                .iter()
-                .map(|m| (&m.identity, EntityKind::Milestone)),
-        )
-        .chain(plan.issues.iter().map(|i| (&i.identity, EntityKind::Issue)))
-        .chain(
-            plan.dependencies
-                .iter()
-                .map(|d| (&d.identity, EntityKind::Dependency)),
-        );
+    let selected = plan.resources();
     let mut resources = Vec::new();
     let mut blockers = plan
         .unresolved_questions

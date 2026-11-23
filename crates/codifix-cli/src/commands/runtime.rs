@@ -3782,6 +3782,14 @@ pub(super) async fn run() -> Result<()> {
     let cli_config_path = cli_config.clone();
     let mut config = AppConfig::load_from_path(cli_config).context("load config")?;
     config.resolved_area_routing_path = routing_path;
+    if matches!(&command, Command::Tui(_)) {
+        if let Some(route) = &route {
+            anyhow::ensure!(
+                config.area.as_ref() == Some(&route.identity),
+                "Selected TUI area identity changed while loading config; select the intended area again"
+            );
+        }
+    }
     let client = Client::builder()
         .timeout(config.service.request_timeout)
         .default_headers(write_headers(&config)?)

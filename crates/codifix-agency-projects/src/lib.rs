@@ -1,8 +1,10 @@
 //! Versioned project plans and explicit, reconciled Linear effects.
 mod linear;
 mod plan;
+mod roadmap;
 pub use linear::*;
 pub use plan::*;
+pub use roadmap::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

@@ -22,6 +22,13 @@ pub struct Identity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_date: Option<chrono::NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<chrono::NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_id: Option<Uuid>,
+
     pub identity: Identity,
     pub name: String,
     pub description: String,
@@ -32,6 +39,8 @@ pub struct Project {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Milestone {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_date: Option<chrono::NaiveDate>,
     pub identity: Identity,
     pub project_key: String,
     pub name: String,
@@ -41,6 +50,19 @@ pub struct Milestone {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Issue {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_ids: Option<BTreeSet<Uuid>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<chrono::NaiveDate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_key: Option<String>,
+
     pub identity: Identity,
     pub project_key: String,
     pub milestone_key: Option<String>,
@@ -68,6 +90,8 @@ pub struct Plan {
     pub milestones: Vec<Milestone>,
     pub issues: Vec<Issue>,
     pub dependencies: Vec<Dependency>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roadmap: Vec<crate::RoadmapRecord>,
     pub unresolved_questions: Vec<String>,
 }
 
@@ -85,6 +109,23 @@ pub fn stable_id(plan_id: Uuid, key: &str) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 impl Plan {
+    pub fn resources(&self) -> impl Iterator<Item = (&Identity, EntityKind)> {
+        self.projects
+            .iter()
+            .map(|e| (&e.identity, EntityKind::Project))
+            .chain(
+                self.milestones
+                    .iter()
+                    .map(|e| (&e.identity, EntityKind::Milestone)),
+            )
+            .chain(self.issues.iter().map(|e| (&e.identity, EntityKind::Issue)))
+            .chain(
+                self.dependencies
+                    .iter()
+                    .map(|e| (&e.identity, EntityKind::Dependency)),
+            )
+            .chain(self.roadmap.iter().map(|e| (&e.identity, e.kind())))
+    }
     pub fn digest(&self) -> String {
         fingerprint(self)
     }
@@ -110,14 +151,7 @@ impl Plan {
         }
         let mut keys = BTreeSet::new();
         let mut ids = BTreeSet::new();
-        for identity in self
-            .projects
-            .iter()
-            .map(|x| &x.identity)
-            .chain(self.milestones.iter().map(|x| &x.identity))
-            .chain(self.issues.iter().map(|x| &x.identity))
-            .chain(self.dependencies.iter().map(|x| &x.identity))
-        {
+        for (identity, _) in self.resources() {
             if identity.key.trim().is_empty()
                 || !keys.insert(&identity.key)
                 || !ids.insert(
@@ -154,7 +188,18 @@ impl Plan {
                 ));
             }
         }
+        let mut parents = BTreeMap::new();
         for i in &self.issues {
+            if i.priority.is_some_and(|n| n > 4)
+                || i.parent_key
+                    .as_ref()
+                    .is_some_and(|key| parents.get(key) != Some(&&i.project_key))
+            {
+                return Err(invalid(
+                    "priority must be 0–4 and a parent issue must precede its child in the same project",
+                ));
+            }
+            parents.insert(i.identity.key.clone(), &i.project_key);
             let project = self
                 .projects
                 .iter()
@@ -182,6 +227,9 @@ impl Plan {
             .iter()
             .map(|i| i.identity.key.as_str())
             .collect();
+        for record in &self.roadmap {
+            record.validate(self)?;
+        }
         let mut edges = BTreeSet::new();
         for d in &self.dependencies {
             if !issue_keys.contains(d.blocking_issue_key.as_str())
@@ -228,6 +276,11 @@ pub enum EntityKind {
     Milestone,
     Issue,
     Dependency,
+    Initiative,
+    InitiativeProject,
+    ProjectDependency,
+    ProjectUpdate,
+    InitiativeUpdate,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -400,6 +453,11 @@ pub fn authorize_plan(plan: &Plan, authority: &Authority) -> Result<()> {
             blocking.project_key.as_str(),
         ));
     }
+    resources.extend(
+        plan.roadmap
+            .iter()
+            .map(|r| (&r.identity, r.kind(), r.project_key.as_str())),
+    );
     for (identity, kind, project_key) in resources {
         if !scope.project_keys.contains(project_key) {
             return Err(Error::Authority("project exceeds scope".into()));
@@ -438,12 +496,8 @@ pub fn prepare(
     }
     let scope = authority.scope(plan)?;
     let ids: BTreeMap<_, _> = plan
-        .projects
-        .iter()
-        .map(|x| &x.identity)
-        .chain(plan.milestones.iter().map(|x| &x.identity))
-        .chain(plan.issues.iter().map(|x| &x.identity))
-        .chain(plan.dependencies.iter().map(|x| &x.identity))
+        .resources()
+        .map(|(identity, _)| identity)
         .map(|i| {
             (
                 i.key.clone(),
@@ -456,13 +510,67 @@ pub fn prepare(
         if !p.team_ids.is_subset(&scope.team_ids) {
             return Err(Error::Authority("project teams exceed scope".into()));
         }
-        entities.push((&p.identity, EntityKind::Project, p.identity.key.clone(), json!({"name":p.name,"description":p.description,"content":description(&p.description,&p.acceptance_criteria,&plan.source),"teamIds":p.team_ids,"leadId":p.owner_id})));
+        let mut value = json!({"name":p.name,"description":p.description,"content":description(&p.description,&p.acceptance_criteria,&plan.source),"teamIds":p.team_ids,"leadId":p.owner_id});
+        if let Some(date) = p.start_date {
+            value["startDate"] = json!(date);
+        }
+        if let Some(date) = p.target_date {
+            value["targetDate"] = json!(date);
+        }
+        if let Some(status) = p.status_id {
+            value["statusId"] = json!(status);
+        }
+        entities.push((
+            &p.identity,
+            EntityKind::Project,
+            p.identity.key.clone(),
+            value,
+        ));
     }
     for m in &plan.milestones {
-        entities.push((&m.identity,EntityKind::Milestone,m.project_key.clone(),json!({"name":m.name,"description":description(&m.description,&m.acceptance_criteria,&plan.source),"projectId":ids[&m.project_key]})));
+        let mut value = json!({"name":m.name,"description":description(&m.description,&m.acceptance_criteria,&plan.source),"projectId":ids[&m.project_key]});
+        if let Some(date) = m.target_date {
+            value["targetDate"] = json!(date);
+        }
+        entities.push((
+            &m.identity,
+            EntityKind::Milestone,
+            m.project_key.clone(),
+            value,
+        ));
     }
     for i in &plan.issues {
-        entities.push((&i.identity,EntityKind::Issue,i.project_key.clone(),json!({"title":i.title,"description":description(&i.description,&i.acceptance_criteria,&plan.source),"projectId":ids[&i.project_key],"projectMilestoneId":i.milestone_key.as_ref().map(|k| ids[k]),"teamId":i.team_id,"assigneeId":i.owner_id})));
+        let mut value = json!({"title":i.title,"description":description(&i.description,&i.acceptance_criteria,&plan.source),"projectId":ids[&i.project_key],"projectMilestoneId":i.milestone_key.as_ref().map(|k| ids[k]),"teamId":i.team_id,"assigneeId":i.owner_id});
+        if let Some(n) = i.priority {
+            value["priority"] = json!(n);
+        }
+        if let Some(labels) = &i.label_ids {
+            value["labelIds"] = json!(labels);
+        }
+        if let Some(state) = i.state_id {
+            value["stateId"] = json!(state);
+        }
+        if let Some(cycle) = i.cycle_id {
+            value["cycleId"] = json!(cycle);
+        }
+        if let Some(key) = &i.parent_key {
+            value["parentId"] = json!(ids[key]);
+        }
+        if let Some(date) = i.due_date {
+            value["dueDate"] = json!(date);
+        }
+        entities.push((&i.identity, EntityKind::Issue, i.project_key.clone(), value));
+    }
+    // Create initiatives before their project associations and progress updates.
+    let mut roadmap: Vec<_> = plan.roadmap.iter().collect();
+    roadmap.sort_by_key(|r| r.kind() != EntityKind::Initiative);
+    for r in roadmap {
+        entities.push((
+            &r.identity,
+            r.kind(),
+            r.project_key.clone(),
+            r.desired(&ids),
+        ));
     }
     for d in &plan.dependencies {
         let project_key = plan
@@ -511,6 +619,18 @@ pub fn prepare(
             .filter(|(k, v)| prior.is_none_or(|p| p.fields.get(*k) != Some(*v)))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
+        if prior.is_some()
+            && match kind {
+                EntityKind::InitiativeProject => !patch.is_empty(),
+                EntityKind::ProjectUpdate => patch.contains_key("projectId"),
+                EntityKind::InitiativeUpdate => patch.contains_key("initiativeId"),
+                _ => false,
+            }
+        {
+            return Err(Error::Conflict(
+                "existing roadmap record belongs to different resources".into(),
+            ));
+        }
         if patch.is_empty() {
             continue;
         }

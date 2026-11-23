@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.sendMessage",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deliver an A2A message to an enrolled companion.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "ref",
+              "ref": "dev.codifix.agency.defs#message"
+            },
+            "configuration": {
+              "type": "unknown"
+            },
+            "metadata": {
+              "type": "unknown"
+            },
+            "tenant": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "task"
+          ],
+          "properties": {
+            "task": {
+              "type": "ref",
+              "ref": "dev.codifix.agency.defs#task"
+            }
+          }
+        }
+      }
+    }
+  }
+}

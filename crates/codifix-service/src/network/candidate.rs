@@ -53,6 +53,9 @@ struct Server {
 impl Server {
     async fn start(router: Router) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        Self::serve(listener, router)
+    }
+    fn serve(listener: TcpListener, router: Router) -> Self {
         Self {
             origin: format!("http://{}", listener.local_addr().unwrap()),
             task: tokio::spawn(async move { axum::serve(listener, router).await.unwrap() }),
@@ -417,6 +420,7 @@ impl Candidate {
             },
         };
         let config = Config {
+            observation_enabled: false,
             inbox_enabled: true,
             instance_id: home,
             listen: "127.0.0.1:0".parse().unwrap(),
@@ -462,6 +466,7 @@ impl Candidate {
             }],
             public_profile: None,
             private_repository_dids: vec![],
+            social: None,
             openbao_controllers: BTreeMap::new(),
             linear: Some(
                 json!({"endpoint":format!("{}/graphql",linear_server.origin),"token_env":LINEAR_TOKEN_ENV,"authorities":{mandate.id.to_string():authority}}),
@@ -473,10 +478,15 @@ impl Candidate {
             "reinforcement":{"enabled":false},"consolidation":{"enabled":false},"background_work":{"enabled":false},
             "mcp":{"enabled":false},"embeddings":{"enabled":false,"create_enabled":false},"inbox":{"enabled":true,"home_instance_id":home}})).unwrap();
         service_config.auth.mode = AuthMode::MultiUser;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        service_config.auth.public_base_url =
+            Some(format!("http://{}", listener.local_addr().unwrap()));
+        let web = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/dist");
+        service_config.service.web_root = Some(web.display().to_string());
         let state = crate::runtime::build_state(service_config, Arc::new(Mutex::new(None)))
             .await
             .unwrap();
-        let service = Server::start(crate::routes::build_http_app(state)).await;
+        let service = Server::serve(listener, crate::routes::build_http_app(state));
         Self {
             service,
             model: model_state,
@@ -919,4 +929,98 @@ async fn workflow(pool: PgPool) {
     }
     assert!(f.model.lock().unwrap().replies.is_empty());
     assert_eq!(f.model.lock().unwrap().turns.len(), 8);
+}
+
+#[tokio::test]
+#[ignore = "requires built web assets, Playwright Chromium, and disposable PostgreSQL"]
+async fn phone_browser_inbox_replies_and_clarifies() {
+    let db = IsolatedDatabase::new()
+        .await
+        .expect("browser test requires a database");
+    let result = tokio::spawn(phone_workflow(db.pool.clone())).await;
+    db.cleanup().await.unwrap();
+    result.unwrap();
+}
+
+async fn phone_workflow(pool: PgPool) {
+    let web = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web");
+    assert!(
+        web.join("dist/index.html").is_file(),
+        "build the web app first"
+    );
+    let f = Candidate::start(pool.clone()).await;
+    let owner = f.grant.principal_id;
+    let chat = f
+        .inbox
+        .create(
+            owner,
+            &codifix_inbox::CreateConversation {
+                client_request_id: Uuid::new_v4(),
+                title: "Phone Inbox rehearsal".into(),
+                specialist_id: f.grant.contact.id,
+            },
+        )
+        .await
+        .unwrap()
+        .conversation
+        .id;
+    f.inbox
+        .send(
+            owner,
+            chat,
+            &codifix_inbox::SendMessage {
+                client_message_id: Uuid::new_v4(),
+                body: "Check the release".into(),
+                format: "text".into(),
+                artifact: None,
+                recipient_member_ids: vec![],
+            },
+        )
+        .await
+        .unwrap();
+    f.model.lock().unwrap().replies.push_back(json!({
+        "version":1, "reply":"Release review started.", "question":"Which build should I check?",
+        "actions":[], "peer_requests":[]
+    }));
+    assert!(f.run_worker().await);
+    let detail = f.inbox.detail(owner, chat).await.unwrap();
+    assert!(detail.tasks.iter().any(|t| t.question.is_some()));
+    // Same cookie credential type as the OIDC callback. No external identity provider is contacted.
+    let session = format!("mls_{}", Uuid::new_v4());
+    let csrf = format!("mlc_{}", Uuid::new_v4());
+    sqlx::query("INSERT INTO auth_web_sessions(id,principal_id,session_hash,csrf_hash,session_kind,expires_at) VALUES($1,$2,$3,$4,'browser',now()+interval '1 hour')")
+        .bind(Uuid::new_v4()).bind(owner).bind(crate::auth::hash_secret(&session)).bind(crate::auth::hash_secret(&csrf)).execute(&pool).await.unwrap();
+    let mut child = Command::new("node")
+        .arg("tests/inbox-phone-live.mjs")
+        .current_dir(&web)
+        .stdin(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let input =
+        json!({"origin":f.service.origin,"session":session,"csrf":csrf,"conversation":chat});
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(&serde_json::to_vec(&input).unwrap())
+        .await
+        .unwrap();
+    let status = timeout(std::time::Duration::from_secs(45), child.wait())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(status.success(), "phone browser scenario failed");
+    let detail = f.inbox.detail(owner, chat).await.unwrap();
+    for text in ["Use the ARM64 build", "Send the result here"] {
+        assert_eq!(
+            detail
+                .messages
+                .iter()
+                .filter(|message| message.body == text)
+                .count(),
+            1
+        );
+    }
+    assert!(detail.tasks.iter().all(|task| task.question.is_none()));
 }

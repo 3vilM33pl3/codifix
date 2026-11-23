@@ -263,3 +263,26 @@ fn part_accepts_optional_wire_fields_but_rejects_ambiguous_or_nonobject_data() {
     let schema: Value = serde_json::from_str(CAPABILITY_LEXICON).expect("lexicon");
     assert_eq!(schema["defs"]["main"]["key"], "any");
 }
+
+#[test]
+fn temporary_announcements_expire_without_removing_permanent_capabilities() {
+    let mut p = profile();
+    p.capabilities.insert("temporary".into());
+    p.expirations.push(CapabilityExpiry {
+        capability: "temporary".into(),
+        expires_at: now(),
+    });
+    p.validate().unwrap();
+    p.retain_available(now() - chrono::Duration::seconds(1));
+    assert!(p.capabilities.contains("temporary"));
+    p.retain_available(now());
+    assert_eq!(p.capabilities, profile().capabilities);
+    assert!(p.expirations.is_empty());
+    p.capabilities.clear();
+    p.validate().unwrap();
+    p.expirations.push(CapabilityExpiry {
+        capability: "unknown".into(),
+        expires_at: now(),
+    });
+    assert!(p.validate().is_err());
+}

@@ -105,10 +105,12 @@ mkdir -p \
   "$PKG_ROOT/usr/bin" \
   "$PKG_ROOT/usr/libexec/codifix" \
   "$PKG_ROOT/usr/libexec/codifix/releases" \
+  "$PKG_ROOT/usr/libexec/codifix/agency" \
   "$PKG_ROOT/etc/codifix" \
   "$PKG_ROOT/lib/systemd/system" \
   "$PKG_ROOT/usr/share/doc/codifix" \
   "$PKG_ROOT/usr/share/doc/codifix/areas" \
+  "$PKG_ROOT/usr/share/doc/codifix/agency" \
   "$PKG_ROOT/usr/share/codifix/agency" \
   "$PKG_ROOT/usr/share/codifix/skill-template" \
   "$PKG_ROOT/usr/share/codifix/web" \
@@ -124,6 +126,7 @@ echo "Building the opt-in private federation gateway..."
 cargo build --release --locked -p codifix-federation-runtime --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix-federation-gateway --target "$RUST_TARGET"
 echo "Building the inactive-by-default specialist agency runtime..."
 cargo build --release --locked -p codifix-agency-runtime --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix-agency --target "$RUST_TARGET"
+cargo build --release --locked -p codifix-agency-openbao --manifest-path "$ROOT_DIR/Cargo.toml" --bin codifix-agency-openbao --target "$RUST_TARGET"
 COMPLETION_BIN="$BIN_PATH"
 if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
   echo "Building a host-native lean CLI for shell completions ($HOST_TARGET)..."
@@ -139,6 +142,21 @@ install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-area" "$PKG_ROO
 install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-area-import" "$PKG_ROOT/usr/bin/codifix-area-import"
 install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-federation-gateway" "$PKG_ROOT/usr/bin/codifix-federation-gateway"
 install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-agency" "$PKG_ROOT/usr/bin/codifix-agency"
+install -m 0755 "$CARGO_TARGET_ROOT/$RUST_TARGET/release/codifix-agency-openbao" "$PKG_ROOT/usr/bin/codifix-agency-openbao"
+install -m 0755 "$ROOT_DIR/scripts/agency/release-rollout.py" "$PKG_ROOT/usr/libexec/codifix/agency/release-rollout.py"
+install -m 0644 "$ROOT_DIR/crates/codifix-agency-runtime/ssh/renew.py" "$PKG_ROOT/usr/libexec/codifix/agency/ssh-renew.py"
+install -m 0755 "$ROOT_DIR/crates/codifix-agency-runtime/examples/inspect-systemd.py" "$PKG_ROOT/usr/libexec/codifix/agency/inspect-systemd.py"
+sed 's|/usr/local/libexec/inspect-systemd.py|/usr/libexec/codifix/agency/inspect-systemd.py|g' \
+  "$ROOT_DIR/crates/codifix-agency-runtime/examples/incidents.json" > "$PKG_ROOT/usr/share/codifix/agency/incidents.json.example"
+chmod 0644 "$PKG_ROOT/usr/share/codifix/agency/incidents.json.example"
+for guide in autonomous-specialists network-inbox companion-release-rollout ssh-host-renewal incident-response; do
+  install -m 0644 "$ROOT_DIR/docs/user/$guide.md" "$PKG_ROOT/usr/share/doc/codifix/agency/$guide.md"
+done
+install -m 0644 "$ROOT_DIR/crates/codifix-agency-openbao/README.md" "$PKG_ROOT/usr/share/doc/codifix/agency/openbao.md"
+mkdir -p "$PKG_ROOT/usr/share/codifix/agency/openbao"
+for example in "$ROOT_DIR"/crates/codifix-agency-openbao/examples/*.json; do
+  install -m 0644 "$example" "$PKG_ROOT/usr/share/codifix/agency/openbao/"
+done
 "$COMPLETION_BIN" completion bash > "$PKG_ROOT/usr/share/bash-completion/completions/codifix"
 "$COMPLETION_BIN" completion zsh > "$PKG_ROOT/usr/share/zsh/vendor-completions/_codifix"
 "$COMPLETION_BIN" completion fish > "$PKG_ROOT/usr/share/fish/vendor_completions.d/codifix.fish"
@@ -183,7 +201,7 @@ SHLIB_ARGS=(-O)
 if [[ "$HOST_TARGET" != "$RUST_TARGET" ]]; then
   SHLIB_ARGS+=("-l/usr/$GNU_TARGET/lib")
 fi
-for executable in codifix codifix-area codifix-area-import codifix-federation-gateway codifix-agency; do
+for executable in codifix codifix-area codifix-area-import codifix-federation-gateway codifix-agency codifix-agency-openbao; do
   SHLIB_ARGS+=("-e$PKG_ROOT/usr/bin/$executable")
 done
 DEPENDENCY_LINE="$(cd "$BUILD_ROOT"; DEB_HOST_ARCH="$DEB_ARCH" DEB_HOST_GNU_TYPE="$GNU_TARGET" dpkg-shlibdeps "${SHLIB_ARGS[@]}")"

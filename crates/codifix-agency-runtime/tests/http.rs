@@ -176,6 +176,7 @@ async fn fixture() -> Option<Fixture> {
     )
     .unwrap();
     let cfg = Config {
+        observation_enabled: false,
         inbox_enabled: false,
         instance_id: instance,
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -188,6 +189,7 @@ async fn fixture() -> Option<Fixture> {
         public_profile: Some(serde_json::to_value(profile).unwrap()),
         private_repository_dids: vec!["did:plc:private-never-public".into()],
         linear: None,
+        social: None,
         openbao_controllers: BTreeMap::new(),
     };
     store
@@ -824,3 +826,6 @@ async fn request_id_reconciliation_is_private_to_the_original_sender() {
     f.server.abort();
     f.db.cleanup().await.unwrap();
 }
+
+#[path = "pds/social.rs"]
+mod pds_social;

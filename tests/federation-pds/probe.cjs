@@ -16,20 +16,28 @@ const did = 'did:web:space.federation.example.com';
 const handle = 'space.federation.example.com';
 const serviceDid = 'did:web:pds.federation.example.com';
 let document;
+const recipientHandle = 'recipient.federation.example.com';
+const recipientDid = `did:web:${recipientHandle}`;
+let recipientDocument;
 const server = https.createServer({
   key: readFileSync('/gate-tls/key.pem'),
   cert: readFileSync('/gate-tls/cert.pem'),
 }, (req, res) => {
-  if (req.headers.host === handle && req.url === '/.well-known/did.json') {
+  const requested = req.headers.host === handle ? document : req.headers.host === recipientHandle ? recipientDocument : undefined;
+  if (requested && req.url === '/.well-known/did.json') {
     res.writeHead(200, { 'content-type': 'application/did+ld+json' });
-    res.end(JSON.stringify(document));
+    res.end(JSON.stringify(requested));
   } else {
     res.writeHead(404); res.end();
   }
 });
 
 function setDocument(signingDid, endpoint = 'https://pds.federation.example.com') {
-  document = {
+  document = didDocument(handle, did, signingDid, endpoint);
+}
+
+function didDocument(handle, did, signingDid, endpoint) {
+  return {
     '@context': ['https://www.w3.org/ns/did/v1'], id: did,
     alsoKnownAs: [`at://${handle}`],
     verificationMethod: [{ id: `${did}#atproto`, type: 'Multikey', controller: did,
@@ -91,6 +99,33 @@ async function main() {
   setDocument(signingKey);
   await rpc('com.atproto.server.activateAccount', { token, method: 'POST' });
   console.log('PASS DID signing-key handoff and account activation');
+  if (process.env.GATE_PHASE === 'agency') {
+    const bootstrap = await Secp256k1Keypair.create({ exportable: true });
+    const endpoint = 'https://pds.federation.example.com';
+    recipientDocument = didDocument(recipientHandle, recipientDid, bootstrap.did(), endpoint);
+    const recipientInvite = await rpc('com.atproto.server.createInviteCode', { admin: true, body: { useCount: 1 } });
+    const bootstrapJwt = await createServiceJwt({ iss: recipientDid, aud: serviceDid,
+      lxm: 'com.atproto.server.createAccount', keypair: bootstrap });
+    const recipient = await rpc('com.atproto.server.createAccount', { token: bootstrapJwt, body: {
+      did: recipientDid, handle: recipientHandle, email: 'recipient@federation.example.com',
+      password: randomBytes(24).toString('hex'), inviteCode: recipientInvite.code,
+    } });
+    const keys = await rpc('com.atproto.identity.getRecommendedDidCredentials', { token: recipient.accessJwt });
+    const recipientSigningKey = keys.verificationMethods.atproto;
+    recipientDocument = didDocument(recipientHandle, recipientDid, recipientSigningKey, endpoint);
+    await rpc('com.atproto.server.activateAccount', { token: recipient.accessJwt, method: 'POST' });
+    const state = '/gate-state/agency-state.json';
+    writeFileSync(state, JSON.stringify({ did, signingKey, accessJwt: token, recipientDid, recipientSigningKey, recipientToken: recipient.accessJwt }), { mode: 0o600 });
+    chownSync(state, Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
+    await waitForRuntime();
+    const bytes = await rpc('com.atproto.sync.getRepo', { query: { did } });
+    await verifyRepoCar(bytes, did, signingKey);
+    const collections = await rpc('com.atproto.repo.describeRepo', { query: { repo: did } });
+    assert.deepEqual(collections.collections, ['dev.codifix.agency.v1.capability']);
+    assert.ok(!Buffer.from(bytes).includes(Buffer.from('PRIVATE_SOCIAL_SENTINEL')));
+    console.log('PASS signed public capability repository contains only discovery records');
+    return;
+  }
   const schemas = new Lexicons(readdirSync('/gate/lexicons').map(file =>
     JSON.parse(readFileSync(`/gate/lexicons/${file}`, 'utf8'))));
   const golden = JSON.parse(readFileSync('/gate/create_record_request.json', 'utf8'));
@@ -204,9 +239,7 @@ async function restore() {
   console.log('PARTIAL PRODUCT GATE: Memory gateway access, outbox/inbox recovery, two Memory instances and writer fencing remain unproven');
 }
 
-async function runtime() {
-  await main();
-  chownSync('/gate-state/recovery-state.json', Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
+async function waitForRuntime() {
   writeFileSync('/gate-state/runtime-ready', 'ready', { mode: 0o600 });
   chownSync('/gate-state/runtime-ready', Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
   const deadline = Date.now() + 600_000;
@@ -214,6 +247,12 @@ async function runtime() {
     assert.ok(Date.now() < deadline, 'Rust runtime verification timed out');
     await new Promise(resolve => setTimeout(resolve, 250));
   }
+}
+
+async function runtime() {
+  await main();
+  chownSync('/gate-state/recovery-state.json', Number(process.env.GATE_HOST_UID), Number(process.env.GATE_HOST_GID));
+  await waitForRuntime();
   const state = JSON.parse(readFileSync('/gate-state/recovery-state.json', 'utf8'));
   const base = 'http://pds-recovery:2583';
   const collection = 'dev.codifix.unspecced.publication';

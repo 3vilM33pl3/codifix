@@ -175,7 +175,13 @@ impl BrokerClient {
         for profile in &result.profiles {
             profile.validate()?;
         }
-        Ok(result.profiles)
+        let mut profiles = result.profiles;
+        let now = Utc::now();
+        for entry in &mut profiles {
+            entry.profile.retain_available(now);
+        }
+        profiles.retain(|entry| !entry.profile.capabilities.is_empty());
+        Ok(profiles)
     }
     pub async fn metadata(&self) -> Result<serde_json::Value> {
         self.socket_permissions()?;

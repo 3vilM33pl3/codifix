@@ -50,6 +50,9 @@ pub(crate) fn build_http_app(state: AppState) -> Router {
     let web_assets = state.web_root.clone();
     let mcp_config = state.config.mcp.clone();
     let mut app = Router::new()
+        .route("/v1/projects/{project}/agency/companion", get(crate::agency_observation::companion))
+        .route("/v1/projects/{project}/agency/exchanges", get(crate::agency_observation::exchanges))
+        .route("/v1/projects/{project}/agency/exchanges/{task_id}", get(crate::agency_observation::detail))
         .route("/v1/network/status", get(crate::network::status).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/network/specialists", get(crate::network::specialists).layer(axum::extract::DefaultBodyLimit::max(131072)))
         .route("/v1/network/discover", post(crate::network::discover).layer(axum::extract::DefaultBodyLimit::max(131072)))

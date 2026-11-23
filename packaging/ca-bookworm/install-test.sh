@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Real native dpkg lifecycle on a fresh disposable GitHub-hosted Linux runner.
-# Never invoke on build-host, the CA, a self-hosted runner or another installation.
+# Never invoke on example-host, the CA, a self-hosted runner or another installation.
 set -euo pipefail
 if [[ $# != 1 || "$1" != /* || ! -f "$1" || -L "$1" || ${GITHUB_ACTIONS:-} != true || ${RUNNER_OS:-} != Linux || ${RUNNER_ENVIRONMENT:-} != github-hosted || ${CODIFIX_HOSTED_INSTALL_TEST:-} != yes || $(id -u) != 0 ]]; then
   echo 'Requires an explicitly disposable GitHub-hosted Linux runner and root.' >&2

@@ -1,0 +1,69 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.deliverIncidentNotice",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deliver one private service incident update to a conversation selected by the receiving agency.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "incident_id",
+            "event_id",
+            "service",
+            "state",
+            "summary"
+          ],
+          "properties": {
+            "incident_id": {
+              "type": "string"
+            },
+            "event_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "service": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "acknowledged",
+                "investigated",
+                "unclassified",
+                "condition_failed",
+                "waiting_for_operator",
+                "approved",
+                "repairing",
+                "failed",
+                "recovered",
+                "followup"
+              ]
+            },
+            "summary": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "received"
+          ],
+          "properties": {
+            "received": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

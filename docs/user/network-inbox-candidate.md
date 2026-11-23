@@ -8,12 +8,9 @@ checks below are not a production acceptance result. Follow this page and the
 [Network and Inbox operator setup](network-inbox.md#operator-setup) from the
 source revision named by the candidate manifest.
 
-The candidate artifacts are staged under
-`/absolute/path/to/candidate-artifacts` on the
-build host. For portable commands below, set `CANDIDATE_DIR` to that directory
-or to the directory containing the candidate's delivered manifest, provenance,
-checksums, and artifacts. The manifest is the authority for filenames and
-build/provenance paths; do not infer a package from its name alone.
+Set `CANDIDATE_DIR` to the directory containing the delivered manifest,
+provenance, checksums and artifacts. Use the filenames and provenance paths
+recorded in that manifest.
 
 ## 1. Verify candidate bytes and provenance
 
@@ -207,3 +204,20 @@ manual result. Distinguish extraction or process-startup smoke from an
 interactive GUI session and from the full native transport/database workflow.
 Report a check as passed only when its corresponding output or manual evidence
 has been retained.
+
+### Phone browser rehearsal
+
+Build the checkout's web app with `npm --prefix web ci` and
+`npm --prefix web run build`. With `CODIFIX_TEST_DATABASE_URL` pointing to a
+disposable pgvector PostgreSQL server, run the mobile browser scenario:
+
+```sh
+CODIFIX_TEST_REQUIRE_DB=1 cargo test -p codifix-service --locked \
+  phone_browser_inbox_replies_and_clarifies -- --ignored --nocapture
+```
+
+Use Playwright's installed Chromium or set `CHROMIUM_EXECUTABLE` to a local
+Chromium executable. The scenario uses a disposable human browser session and
+the real service with CSRF checks. It checks the sign-in return link, opens an
+Inbox conversation, submits a clarification and a reply, and verifies both
+messages in PostgreSQL.

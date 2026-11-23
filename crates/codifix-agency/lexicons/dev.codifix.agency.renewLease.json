@@ -1,0 +1,38 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.renewLease",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Renew the bounded execution lease.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "renewed"
+          ],
+          "properties": {
+            "renewed": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

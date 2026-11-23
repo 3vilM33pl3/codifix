@@ -238,6 +238,7 @@ impl Fixture {
         });
         let profiles = vec![profile("local", local(), 2), profile("cloud", cloud(), 10)];
         let cfg = Config {
+            observation_enabled: false,
             inbox_enabled: false,
             instance_id: instance,
             listen: "127.0.0.1:0".parse().unwrap(),
@@ -269,6 +270,7 @@ impl Fixture {
             public_profile: None,
             private_repository_dids: vec![],
             linear: None,
+            social: None,
             openbao_controllers: BTreeMap::new(),
         };
         Some(Self {

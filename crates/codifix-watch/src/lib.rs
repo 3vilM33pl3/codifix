@@ -1149,6 +1149,7 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            agency_observation: None,
             laptop_cache: None,
             area: None,
             resolved_area_routing_path: None,

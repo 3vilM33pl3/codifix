@@ -1,0 +1,14 @@
+.phone-inbox { margin: 0 auto; max-width: 48rem; padding: 1rem; overflow-wrap: anywhere; }
+.phone-inbox header { display: flex; align-items: center; justify-content: space-between; }
+.phone-inbox a { color: var(--accent); }
+.phone-inbox h1 { font-size: 1.6rem; }
+.phone-inbox h2 { font-size: 1.15rem; margin-top: 1.5rem; }
+.phone-inbox small { display: block; margin-top: .4rem; color: var(--muted); }
+.phone-inbox p { white-space: pre-wrap; }
+.inbox-list { list-style: none; padding: 0; }
+.inbox-list li, .phone-inbox article { border-bottom: 1px solid var(--line); padding: .8rem 0; }
+.inbox-list a { display: block; padding: .45rem 0; }
+.phone-inbox form { display: grid; gap: .5rem; margin: 1rem 0; }
+.phone-inbox textarea { display: block; width: 100%; min-height: 5rem; margin-top: .4rem; padding: .6rem; font: inherit; font-size: 16px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.phone-inbox button, .phone-inbox header a { min-height: 44px; align-content: center; }
+.phone-inbox button:disabled { opacity: .55; }

@@ -62,6 +62,7 @@ async fn fixture() -> Option<Fixture> {
         outbound_token_env: None,
     };
     let cfg = Config {
+        observation_enabled: false,
         inbox_enabled: false,
         instance_id: instance,
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -80,6 +81,7 @@ async fn fixture() -> Option<Fixture> {
         public_profile: None,
         private_repository_dids: vec![],
         linear: None,
+        social: None,
         openbao_controllers: BTreeMap::new(),
     };
     store
@@ -147,6 +149,49 @@ async fn standing_schedule_initiates_and_completes_verified_work() {
         .await
         .unwrap();
     assert_eq!(f.store.list(&f.peer).await.unwrap().len(), 1);
+    f.db.cleanup().await.unwrap();
+}
+#[tokio::test]
+async fn only_verified_dispatch_publishes_task_evidence() {
+    let Some(f) = fixture().await else { return };
+    for (kind, criterion, expected) in [
+        ("inspect", "status_observed", TaskStatus::Completed),
+        ("inspect", "unverified_claim", TaskStatus::InputRequired),
+        (
+            "model_draft",
+            "model_output_valid_json",
+            TaskStatus::InputRequired,
+        ),
+        ("unknown", "status_observed", TaskStatus::InputRequired),
+    ] {
+        let mut request = submit(&f);
+        request.payload = json!({"kind": kind});
+        request.acceptance_criteria = vec![criterion.into()];
+        let task = f.store.submit(&request, &f.peer).await.unwrap();
+        assert!(
+            codifix_agency_runtime::worker::run_once(&f.store, &f.cfg)
+                .await
+                .unwrap()
+        );
+        let contract = f
+            .store
+            .get_internal(task.contract.id)
+            .await
+            .unwrap()
+            .contract;
+        let evidence_exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agency_outcomes WHERE task_id=$1)")
+                .bind(contract.id)
+                .fetch_one(&f.db.pool)
+                .await
+                .unwrap();
+        assert_eq!(contract.status, expected, "{kind} / {criterion}");
+        assert_eq!(
+            contract.outcome.is_some(),
+            expected == TaskStatus::Completed
+        );
+        assert_eq!(evidence_exists, expected == TaskStatus::Completed);
+    }
     f.db.cleanup().await.unwrap();
 }
 #[tokio::test]

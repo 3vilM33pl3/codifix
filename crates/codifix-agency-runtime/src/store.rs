@@ -1,4 +1,4 @@
-use crate::config::Peer;
+use crate::{config::Peer, operation::Operation};
 use anyhow::{Result, ensure};
 use chrono::{DateTime, Utc};
 use codifix_agency::{
@@ -43,6 +43,31 @@ pub struct Store {
     pub pool: PgPool,
 }
 
+impl Store {
+    /// Metadata-only opt-in. Schema provisioning remains a separate operator action.
+    pub async fn heartbeat(&self, cfg: &crate::config::Config) -> Result<()> {
+        if !cfg.observation_enabled {
+            return Ok(());
+        }
+        let specialists = cfg
+            .specialists
+            .iter()
+            .map(|s| s.specialist_id.clone())
+            .take(100)
+            .collect::<Vec<_>>();
+        let peers = cfg
+            .peers
+            .iter()
+            .filter(|p| !p.operator && p.instance_id != cfg.instance_id)
+            .map(|p| p.id.clone())
+            .take(100)
+            .collect::<Vec<_>>();
+        sqlx::query("INSERT INTO agency_runtime_heartbeats(instance_id,version,enabled_specialists,enrolled_peers) VALUES($1,$2,$3,$4) ON CONFLICT(instance_id) DO UPDATE SET version=excluded.version,enabled_specialists=excluded.enabled_specialists,enrolled_peers=excluded.enrolled_peers,observed_at=clock_timestamp()")
+            .bind(cfg.instance_id).bind(env!("CARGO_PKG_VERSION")).bind(specialists).bind(peers).execute(&self.pool).await?;
+        Ok(())
+    }
+}
+
 pub struct PlanAdmission<'a> {
     pub task_id: Uuid,
     pub revision: i64,
@@ -57,10 +82,22 @@ pub fn fingerprint(value: &impl Serialize) -> Result<String> {
     use sha2::{Digest, Sha256};
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
 }
-async fn admission(tx: &mut Transaction<'_, Postgres>) -> Result<()> {
+pub(crate) async fn admission(tx: &mut Transaction<'_, Postgres>) -> Result<()> {
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('agency-admission',0))")
         .execute(&mut **tx)
         .await?;
+    Ok(())
+}
+// Called inside the same admission lock as peer moderation, including when a
+// queued task reaches its first physical effect after an enrollment changes.
+async fn check_moderation(
+    tx: &mut Transaction<'_, Postgres>,
+    instance: Uuid,
+    peer: &str,
+) -> Result<()> {
+    let blocked:bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agency_social_moderation WHERE instance_id=$1 AND peer_id=$2 AND (banned_until IS NULL OR banned_until>clock_timestamp()))")
+        .bind(instance).bind(peer).fetch_one(&mut **tx).await?;
+    ensure!(!blocked, "peer blocked by local moderation");
     Ok(())
 }
 async fn mandate_tx(
@@ -181,7 +218,17 @@ impl Store {
         Ok(())
     }
     pub async fn submit(&self, req: &Submit, peer: &Peer) -> Result<StoredTask> {
-        self.submit_inner(req, peer, None).await
+        self.submit_inner(req, peer, None, false).await
+    }
+
+    /// Only trusted host configuration can opt authenticated peer work into capture.
+    pub async fn submit_observed(
+        &self,
+        req: &Submit,
+        peer: &Peer,
+        capture: bool,
+    ) -> Result<StoredTask> {
+        self.submit_inner(req, peer, None, capture).await
     }
 
     /// A same-database dispatch ticket is the only way to obtain this internal
@@ -196,7 +243,8 @@ impl Store {
             endpoint: None,
             outbound_token_env: None,
         };
-        self.submit_inner(req, &peer, Some((ticket, home))).await
+        self.submit_inner(req, &peer, Some((ticket, home)), false)
+            .await
     }
 
     async fn submit_inner(
@@ -204,6 +252,7 @@ impl Store {
         req: &Submit,
         peer: &Peer,
         inbox: Option<(Uuid, Uuid)>,
+        capture: bool,
     ) -> Result<StoredTask> {
         ensure!(
             peer.operator || peer.mandates.contains(&req.mandate_id),
@@ -256,6 +305,7 @@ impl Store {
             return self.get(id, peer).await;
         }
         let (m, project, usage) = mandate_tx(&mut tx, req.mandate_id).await?;
+        check_moderation(&mut tx, m.subject_instance_id, &peer.id).await?;
         ensure!(
             m.specialist_id == req.specialist_id,
             "specialist binding mismatch"
@@ -361,6 +411,41 @@ impl Store {
         } else if let Some(parent) = req.parent_id {
             codifix_inbox::store::inherit_task_origin(&mut tx, parent, id).await?;
         }
+        // Preserve authenticated admission, never infer identity from a later payload.
+        // Inbox and child tasks deliberately have no public peer observation origin.
+        if capture
+            && inbox.is_none()
+            && req.parent_id.is_none()
+            && peer.id.len() <= 128
+            && req.resource.id.len() <= 128
+            && !peer.id.starts_with("inbox-gateway:")
+            && !serde_json::to_string(&req.payload)?.contains("conversation_turn")
+            && !serde_json::to_string(&req.payload)?.contains("inbox-gateway:")
+        {
+            let outgoing = peer.operator
+                && peer.instance_id == m.subject_instance_id
+                && req.capability == "delegate"
+                && req.resource.kind == "peer"
+                && req.payload["kind"] == "delegate"
+                && req.payload["peer"].as_str() == Some(req.resource.id.as_str())
+                && req.payload["request"]["capability"]
+                    .as_str()
+                    .and_then(Operation::parse)
+                    .is_some_and(Operation::permits_peer_observation)
+                && req.payload["request"]["capability"].as_str()
+                    == req.payload["request"]["payload"]["kind"].as_str();
+            let incoming = !peer.operator
+                && peer.instance_id != m.subject_instance_id
+                && Operation::parse(&req.capability)
+                    .is_some_and(Operation::permits_peer_observation)
+                && req.payload["kind"].as_str() == Some(req.capability.as_str());
+            if outgoing || incoming {
+                sqlx::query("INSERT INTO agency_task_observation_origins(task_id,home_instance_id,requester,requester_instance_id,requester_operator,peer,direction) VALUES($1,$2,$3,$4,$5,$6,$7)")
+                    .bind(id).bind(m.subject_instance_id).bind(&peer.id).bind(peer.instance_id).bind(peer.operator)
+                    .bind(if outgoing { &req.resource.id } else { &peer.id }).bind(if outgoing { "outgoing" } else { "incoming" })
+                    .execute(&mut *tx).await?;
+            }
+        }
         enqueue(&mut tx, project, id, 1).await?;
         tx.commit().await?;
         self.get(id, peer).await
@@ -465,7 +550,8 @@ impl Store {
         ensure!(task.request.deadline > Utc::now(), "deadline expired");
         let mut tx = self.pool.begin().await?;
         admission(&mut tx).await?;
-        mandate_tx(&mut tx, task.request.mandate_id).await?;
+        let (m, _, _) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+        check_moderation(&mut tx, m.subject_instance_id, &task.requester).await?;
         let expiry: Option<DateTime<Utc>> =
             sqlx::query_scalar("SELECT execution_lease_until FROM agency_tasks WHERE id=$1")
                 .bind(task.contract.id)
@@ -522,6 +608,7 @@ impl Store {
             "task closed"
         );
         let (m, _, _) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+        check_moderation(&mut tx, m.subject_instance_id, &task.requester).await?;
         codifix_inbox::store::authorize_task_origin(
             &mut tx,
             task.contract.id,
@@ -580,7 +667,23 @@ impl Store {
             peer.operator || task.requester == peer.id,
             "task unavailable"
         );
+        if task.request.capability == "linear_track" {
+            ensure!(
+                task.requester == peer.id,
+                "only the originating peer can answer a tracking request"
+            );
+        }
         ensure!(task.request.deadline > Utc::now(), "task deadline expired");
+        if task.request.capability == "ssh_host_sign" {
+            let (m, _, _) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+            ensure!(
+                peer.operator
+                    && peer.instance_id == m.subject_instance_id
+                    && crate::ssh_renewal::operator_allowed(&task.request.resource.id, &peer.id)?,
+                "named local signing operator required"
+            );
+            ensure!(replacement.is_none() && (answer=="approve" || answer.strip_prefix("reject: ").is_some_and(|reason| !reason.trim().is_empty() && reason.len()<=256)), "invalid signing decision");
+        }
         let body = json!({"answer":answer,"replacement":replacement});
         let prior: Option<Value> = sqlx::query_scalar(
             "SELECT body FROM agency_messages WHERE task_id=$1 AND message_id=$2",
@@ -599,6 +702,7 @@ impl Store {
             "invalid message"
         );
         let (m, _, usage) = mandate_tx(&mut tx, task.request.mandate_id).await?;
+        check_moderation(&mut tx, m.subject_instance_id, &task.requester).await?;
         m.budget.check(usage.checked_add(Usage {
             turns: 1,
             ..Usage::default()
@@ -654,7 +758,7 @@ impl Store {
         self.get(id, peer).await
     }
 }
-async fn enqueue(
+pub(crate) async fn enqueue(
     tx: &mut Transaction<'_, Postgres>,
     project: Uuid,
     id: Uuid,
@@ -735,6 +839,10 @@ async fn authorize_tx(
     .checked_add(extra)?;
     task.request.budget.check(total)?;
     let (mut m, _, usage) = mandate_tx(tx, task.request.mandate_id).await?;
+    check_moderation(tx, m.subject_instance_id, &task.requester).await?;
+    if task.request.capability == "delegate" && task.request.resource.kind == "peer" {
+        check_moderation(tx, m.subject_instance_id, &task.request.resource.id).await?;
+    }
     // Enrolled senders may narrow, never broaden, the destination grant. The
     // bound survives clarification and is propagated on every further delegation.
     if let Some(value) = task.request.payload.get("source_destinations") {

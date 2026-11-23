@@ -1,0 +1,6 @@
+# Include in /etc/apparmor.d/local/usr.bin.swtpm for the default disposable lab.
+# Do not disable the swtpm profile or add a broad /data/** rule.
+owner /data/VMs/memory-windows-native/lab/tpm/ rw,
+owner /data/VMs/memory-windows-native/lab/tpm/** rwk,
+owner /data/VMs/memory-windows-native/lab/tpm.sock rwk,
+owner /data/VMs/memory-windows-native/lab/swtpm.pid rw,

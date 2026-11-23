@@ -1,3 +1,5 @@
+mod delivery;
+
 use crate::*;
 use anyhow::{Result, ensure};
 use codifix_agency::{Budget, Mandate, ResourceScope, Usage};
@@ -244,6 +246,7 @@ impl Store {
                         "inspect"
                             | "plan_prepare"
                             | "plan_apply"
+                            | "linear_track"
                             | "plan_inspect"
                             | "openbao_recover"
                     )
@@ -296,6 +299,49 @@ impl Store {
         tx.commit().await?;
         Ok(out)
     }
+    /// Append a status message only to the receiver's configured human conversation.
+    /// No dispatch or authority is created for a notification.
+    pub async fn receive_notice(
+        &self,
+        conversation: Uuid,
+        id: Uuid,
+        body: &str,
+        handoff: Option<&str>,
+    ) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        admission(&mut tx).await?;
+        let principal: Uuid = sqlx::query_scalar("SELECT principal_id FROM inbox_conversations WHERE id=$1 AND home_instance_id=$2 FOR UPDATE")
+            .bind(conversation).bind(self.home_instance_id).fetch_one(&mut *tx).await?;
+        human(&mut tx, principal).await?;
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM inbox_messages WHERE id=$1 AND conversation_id=$2)",
+        )
+        .bind(id)
+        .bind(conversation)
+        .fetch_one(&mut *tx)
+        .await?;
+        if !exists {
+            let artifact = handoff.map(|url| json!({"protected_unseal_url":url}));
+            append(
+                &mut tx,
+                conversation,
+                id,
+                "system",
+                None,
+                id,
+                body,
+                "text",
+                artifact.as_ref(),
+                &[],
+                &digest(&body)?,
+                "confirmed",
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn list(&self, principal: Uuid) -> Result<Vec<Conversation>> {
         let mut tx = self.pool.begin().await?;
         human(&mut tx, principal).await?;
@@ -408,119 +454,6 @@ impl Store {
         admission(&mut tx).await?;
         owner(&mut tx, self.home_instance_id, principal, id).await?;
         join(&mut tx, self.home_instance_id, principal, id, req).await?;
-        tx.commit().await?;
-        self.detail(principal, id).await
-    }
-    pub async fn send(&self, principal: Uuid, id: Uuid, req: &SendMessage) -> Result<Detail> {
-        self.send_inner(principal, id, req, None).await
-    }
-    async fn send_inner(
-        &self,
-        principal: Uuid,
-        id: Uuid,
-        req: &SendMessage,
-        resume: Option<(Uuid, Uuid)>,
-    ) -> Result<Detail> {
-        ensure!(
-            !req.client_message_id.is_nil()
-                && !req.body.trim().is_empty()
-                && req.body.len() <= 32768
-                && matches!(req.format.as_str(), "text" | "markdown" | "plan")
-                && serde_json::to_vec(&req.artifact)?.len() <= 32768
-                && req.recipient_member_ids.len() <= 8,
-            "invalid message"
-        );
-        ensure!(context_message(&json!({"body":req.body,"artifact":req.artifact,"role":"human"}))["body"].as_str().is_some_and(|body| body.len()<=32768), "message and plan artifact exceed context limit");
-        let mut tx = self.pool.begin().await?;
-        admission(&mut tx).await?;
-        let c = owner(&mut tx, self.home_instance_id, principal, id).await?;
-        let hash = digest(&(req, resume))?;
-        if let Some(row) =
-            sqlx::query("SELECT conversation_id,request_digest FROM inbox_messages WHERE id=$1")
-                .bind(req.client_message_id)
-                .fetch_optional(&mut *tx)
-                .await?
-        {
-            ensure!(
-                row.try_get::<Uuid, _>("conversation_id")? == id
-                    && row.try_get::<String, _>("request_digest")? == hash,
-                "message id conflict"
-            );
-            tx.commit().await?;
-            return self.detail(principal, id).await;
-        }
-        ensure!(!c.try_get::<bool, _>("paused")?, "conversation paused");
-        let mut recipients = req.recipient_member_ids.clone();
-        if recipients.is_empty() {
-            recipients.push(
-                c.try_get::<Option<Uuid>, _>("lead_member_id")?
-                    .ok_or_else(|| anyhow::anyhow!("choose a lead"))?,
-            );
-        }
-        recipients.sort();
-        recipients.dedup();
-        let mut grants = Vec::new();
-        for member in &recipients {
-            grants.push(
-                member_live(&mut tx, self.home_instance_id, principal, id, *member)
-                    .await?
-                    .0,
-            );
-        }
-        let root = resume
-            .map(|(_, root)| root)
-            .unwrap_or(req.client_message_id);
-        if let Some((task, _)) = resume {
-            let question: bool = sqlx::query_scalar("SELECT document->'question' IS NOT NULL AND document->'question'<>'null'::jsonb FROM inbox_task_cards WHERE task_id=$1 AND conversation_id=$2 FOR UPDATE").bind(task).bind(id).fetch_one(&mut *tx).await?;
-            ensure!(question, "question already answered");
-            sqlx::query("UPDATE inbox_task_cards SET document=jsonb_set(jsonb_set(document,'{question}','null'::jsonb),'{status}',to_jsonb('continuing'::text)) WHERE task_id=$1").bind(task).execute(&mut *tx).await?;
-        }
-        append(
-            &mut tx,
-            id,
-            req.client_message_id,
-            "human",
-            None,
-            root,
-            &req.body,
-            &req.format,
-            req.artifact.as_ref(),
-            &recipients,
-            &hash,
-            "queued",
-        )
-        .await?;
-        if resume.is_none() {
-            let budget = template(&grants[0].request)?.3;
-            let deadline = grants
-                .iter()
-                .map(|g| g.expires_at)
-                .min()
-                .ok_or_else(|| anyhow::anyhow!("recipient missing"))?
-                .min(Utc::now() + chrono::Duration::hours(1));
-            sqlx::query(
-                "INSERT INTO inbox_roots(id,conversation_id,budget,deadline) VALUES($1,$2,$3,$4)",
-            )
-            .bind(root)
-            .bind(id)
-            .bind(serde_json::to_value(budget)?)
-            .bind(deadline)
-            .execute(&mut *tx)
-            .await?;
-        }
-        for member in recipients {
-            enqueue_turn(
-                &mut tx,
-                self.home_instance_id,
-                principal,
-                id,
-                member,
-                root,
-                req.client_message_id,
-                None,
-            )
-            .await?;
-        }
         tx.commit().await?;
         self.detail(principal, id).await
     }
@@ -1253,7 +1186,14 @@ pub async fn record_task_result(
     if response.is_none()
         && matches!(
             payload["payload"]["kind"].as_str(),
-            Some("inspect" | "plan_prepare" | "plan_apply" | "plan_inspect" | "openbao_recover")
+            Some(
+                "inspect"
+                    | "plan_prepare"
+                    | "plan_apply"
+                    | "linear_track"
+                    | "plan_inspect"
+                    | "openbao_recover"
+            )
         )
         && (question.is_some()
             || matches!(status, "completed" | "failed" | "cancelled" | "rejected"))
@@ -1519,7 +1459,12 @@ async fn enqueue_action(
     ensure!(
         matches!(
             kind.as_str(),
-            "inspect" | "plan_prepare" | "plan_apply" | "plan_inspect" | "openbao_recover"
+            "inspect"
+                | "plan_prepare"
+                | "plan_apply"
+                | "linear_track"
+                | "plan_inspect"
+                | "openbao_recover"
         ),
         "action kind denied"
     );
@@ -1591,34 +1536,5 @@ impl Store {
         sqlx::query("UPDATE inbox_task_cards SET document=jsonb_set(document,'{cancel_requested}','true'::jsonb) WHERE task_id IN(SELECT task_id FROM inbox_task_origins WHERE root_message_id=$1)").bind(root).execute(&mut *tx).await?;
         tx.commit().await?;
         self.detail(principal, conversation).await
-    }
-    pub async fn respond(
-        &self,
-        principal: Uuid,
-        conversation: Uuid,
-        task: Uuid,
-        client_message_id: Uuid,
-        answer: String,
-    ) -> Result<Detail> {
-        let mut tx = self.pool.begin().await?;
-        admission(&mut tx).await?;
-        owner(&mut tx, self.home_instance_id, principal, conversation).await?;
-        let o=sqlx::query("SELECT o.root_message_id,o.member_id,c.document FROM inbox_task_origins o JOIN inbox_task_cards c ON c.task_id=o.task_id WHERE o.task_id=$1 AND o.conversation_id=$2 AND o.principal_id=$3").bind(task).bind(conversation).bind(principal).fetch_one(&mut *tx).await?;
-        let root = o.try_get("root_message_id")?;
-        let member = o.try_get("member_id")?;
-        tx.commit().await?;
-        self.send_inner(
-            principal,
-            conversation,
-            &SendMessage {
-                client_message_id,
-                body: answer,
-                format: "text".into(),
-                artifact: None,
-                recipient_member_ids: vec![member],
-            },
-            Some((task, root)),
-        )
-        .await
     }
 }

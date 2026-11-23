@@ -2,7 +2,7 @@
 
 This library turns a structured, versioned plan into reviewed project-management
 effects. The plan is provider-neutral; the included HTTP adapter targets Linear
-projects (roadmap units), milestones, issues and blocking issue dependencies.
+projects, initiatives, milestones, issues, their relationships and progress updates.
 It does not discover credentials, send clarification messages, call a model, or
 write to a workspace unless its host explicitly invokes `LinearClient::execute`.
 
@@ -121,12 +121,14 @@ otherwise introduce unreviewed fields or auxiliary effects. It refuses truncated
 project team lists (over 100 teams), malformed readback, unexpected object IDs,
 GraphQL errors and HTTP failures. Provider-specific field limits and permission
 checks are enforced by Linear and surfaced as failures, without assuming a
-mutation did not happen. Optional initiatives, dates, status changes, deletion,
-attachments, and discovery/search are outside this first adapter.
+mutation did not happen. The companion tracking operation uses a project- and team-scoped title lookup.
+Roadmap preparation supports project dates/status, issue triage and cycles,
+initiative links, project dependencies, and progress/health updates. Omitted
+metadata fields preserve their current provider values.
 
 The HTTP contract was checked against the official
 [Linear SDK GraphQL schema](https://github.com/linear/linear/blob/master/packages/sdk/src/schema.graphql)
-on 2026-10-31. The adapter was tested against local HTTP mocks, never against a
+for the original adapter and again on 2026-11-20 for the roadmap fields. The adapter was tested against local HTTP mocks, never against a
 real workspace; schema compatibility and permissions still require an explicitly
 authorized integration check before live use.
 
