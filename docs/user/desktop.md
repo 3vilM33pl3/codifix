@@ -1,208 +1,34 @@
-# Linux desktop
+# Linux Desktop
 
-Codifix Desktop provides the approved streamlined interface: Home, Memories,
-Sessions and Activity, with project context above and Settings below. Start with
-[desktop setup and framework decisions](../../desktop/README.md).
+Use Codifix Desktop to pick up work on a Linux machine. **Home** shows a project briefing, **Memories** lets you inspect evidence, and **Sessions** shows agent activity. The app connects to a Codifix service you already have access to.
 
-The application connects to an existing service. It does not install a database,
-start watchers, change sharing permissions or configure agents. Select the right
-service/knowledge area before choosing a project. A project folder must already
-have a Codifix marker or an existing service slug.
+## Connect to your area
 
-Review and job retry controls use the service's current permissions. Approvals
-and rejections refresh the queue only after a matching receipt. An interrupted
-response is reported as uncertain. Browser sign-in returns you automatically to the app with your existing account permissions. Its session
-is saved in your OS keyring and checked again when the app reopens; passwords
-stay in your browser. Pasted service tokens remain in memory only.
+1. Install your team's Linux Desktop build or follow the [desktop build guide](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/desktop/README.md). Desktop has its own release cycle. The desktop source at the Codifix 3.1.0 tag is **0.2.0-rc.1**. The core Debian packages install the service tools; obtain the graphical app separately.
+2. Choose **Area** beside the project selector. Select the area your administrator assigned. For a manually configured service, use **Connection settings** and its approved HTTPS address.
+3. Choose **Sign in** and complete sign-in in your browser. When you return to Desktop, check the selected area and connection. The native session uses your existing account permissions and is saved in the OS keyring. **Disconnect** keeps that session for your next connection. **Sign out** revokes it.
+4. Select an accessible project, or use **Open project folder** for a repository configured with an area route. A project slug is scoped to the selected area. If two areas have the same slug, confirm the area before opening the project.
 
-## Sign in (0.1.3)
+For routed areas the client checks the service's area UUID before sending credentials. If the identity is unexpected or the area is unavailable, check the route with your administrator. See [Areas and projects](https://codifix.dev/docs/areas).
 
-Click **Sign in**, log in in your default browser, and return to Codifix automatically.
-There are no device codes, fingerprint comparisons or project approval screens.
-Your account keeps its existing permissions. If needed, choose a project after
-signing in; this is navigation, not an access grant.
+## Pick up a project
 
-The installed Workshop build has its HTTPS service preset. Other services and
-local/token access are under **Connection settings**. Sign out revokes the saved
-app session; Disconnect keeps it for next time. Old managed-device credentials
-remain separate, with an explicit removal option in Connection settings.
+Open **Home** for the resume briefing, then open **Memories** to inspect the source and replacement history for a decision. **Sessions** shows agent activity for the selected folder or project. Use the session reference and project briefing when returning to the agent.
 
-## Current acceptance limits
+Use **Activity** to inspect recent events, failed jobs and job details. Confirm an authorized retry once, then check for its receipt. An interrupted response can leave an operation uncertain. Refresh the view before deciding what to do next.
 
-The first package is built on the current Linux host. Linux builds depend on
-WebKitGTK 4.1 and the host's system library baseline; a binary built on a newer
-distribution is not an assurance of compatibility with older distributions.
-The included CI workflow builds on Ubuntu 24.04, but is not claimed to have run
-until CI executes it.
+Open **Network** or **Inbox** to contact an enrolled specialist for your signed-in area. The [Network and Inbox guide](https://codifix.dev/docs/network-inbox) explains how to inspect a message and the work it triggered.
 
-Automated checks and browser visual review do not establish GNOME/KDE, Wayland,
-Orca, native file chooser and notification acceptance on every desktop. Windows
-and macOS share the source architecture but have not been built or validated in
-this increment. Resuming arbitrary external LLM sessions is unavailable; use the
-session reference and project resume briefing. Enrolled specialist conversations
-are available through the opt-in [Network and Inbox](network-inbox.md) feature.
-Advanced service administration
-remains available through explicit browser links.
+## Platform scope
 
-Code Connect templates are saved locally. Figma requires an Organization or
-Enterprise plan to save the associations for this library.
+The desktop build depends on WebKitGTK 4.1 and a compatible Linux system library baseline. The package workflow targets Linux amd64. Platform claims for the core Debian, macOS and Windows packages are listed in [release compatibility](https://codifix.dev/docs/help/known-limitations).
 
-## Implementation verification (25 October 2026)
+### Connection and routing checks
 
-Built on Ubuntu 26.04.1 amd64 with WebKitGTK 2.52.6 and GTK 3.24.52.
-Eight renderer workflow tests and three native transport tests pass. The
-production frontend and DEB build succeed. A native process under an isolated
-Xvfb display stayed alive for the ten-second smoke interval and exited only
-when the harness timeout stopped it. Xvfb reported missing DRI3 acceleration;
-this check establishes startup, not accelerated graphics or interactive native
-acceptance. Light Home, Memories and dark Settings were inspected with the
-explicit browser review fixture.
+For each configured area, the bound client TOML must contain a matching `[area]` identity and `[auth].public_base_url` for its exact HTTPS origin. The native bridge checks the `area_instance_id` from `/healthz` before restoring a saved credential. HTTPS uses the OS trust store. Organizations using a private certificate authority must provision its trust through their normal device-management process.
 
-The configured local endpoint returned HTTP 401 without credentials. Live
-protected-project reads and writes have therefore not been claimed as verified;
-use your area’s public HTTPS address and **Sign in through browser** in the
-connection dialog to exercise them.
-No production memory was approved, rejected or retried during testing.
+If a folder is selected before sign-in, Desktop keeps the selection pending. Switching areas clears the previous area's cached data. Recent projects stay bound to their origin and area UUID, including after reopening the app. If the wrong recent is selected, choose the intended area and reopen the mapped folder.
 
-## Previous device enrollment (0.1.1–0.1.2, superseded)
+### Acceptance evidence
 
-In **Manage connection**, enter your public Codifix HTTPS service origin and
-choose **Sign in through browser**. Compare the code and fingerprint, select
-projects in the browser and approve Codifix Desktop. The app completes the
-connection automatically. A configured device-onboarding service and an unlocked
-desktop keyring are required. Use the advanced local/token option for a local
-single-user service; browser access does not authenticate the separate dev service.
-
-In the browser, choose **Sign in to review this device** before **Review device
-request**. The review button is unavailable until the browser identity is checked.
-An authenticated account without project grants can review the device but will see
-no available projects; an administrator must review its existing membership and
-project onboarding policy. A denied identity check is a service error, not proof
-that you are signed out. Expired device requests must be restarted in the desktop.
-
-**Sign out browser access** revokes this desktop credential and removes it from
-the keyring. **Disconnect** keeps it for the next connection. If cancellation
-cannot be confirmed, retry it. The explicitly confirmed local-forget recovery
-option removes only the saved credential and does not revoke remote access.
-
-The 0.1.1 change passes twelve renderer tests and seven native tests, including
-late approval cancellation and exact device/principal binding. A disposable
-credential was written, read and removed from this host's Linux Secret Service.
-Live browser authentication and protected project access still require the user's
-identity-provider sign-in and project approval; automated checks do not claim
-that approval occurred.
-
-### Browser identity check repair (25 October 2026)
-
-The Workshop service hotfix at `79dcf24f` removes an incorrect memory-read
-permission requirement from identity inspection and logout. Previously, a valid
-OIDC account with no project grants received HTTP 403 from `/v1/auth/me`; the
-approval page mislabeled that response as a missing login and disabled review.
-Identity failures now distinguish signed-out, denied and connection states.
-
-Verification: 92 backend authentication tests passed against a disposable
-PostgreSQL database, including zero-grant identity/empty review, unauthorized
-read/approval rejection, logout CSRF and invalid/expired/revoked/disabled sessions.
-All 296 web tests and the web/release builds passed. The optimized service and
-web assets were installed only on Workshop, with previous assets retained;
-health reported `ok` and database `up`. Configuration, grants and schema were
-unchanged. In the real Chrome approval page, the current account became visible
-and clicking **Review device request** returned the expected expired-request
-message. Signing into the intended account and approving a fresh device request
-remain human actions; no project access was granted by this repair.
-
-The 0.1.1 DEB was installed per-user on the current host and launched with no
-startup log errors. A second launch exited successfully while the original
-process remained running and owned the single-instance D-Bus name. Package and
-installed executable checksums match the preserved release artifacts; the 0.1.0
-installation is retained for rollback. This checks installation and process
-lifecycle, not completion of the user's browser approval.
-
-## Private certificate authorities (0.1.2)
-
-Desktop HTTPS now uses the operating system trust store. The earlier bundled
-public-root list rejected Workshop's already trusted Robot Motel CA with
-`InvalidCertificate(UnknownIssuer)`, before any device request reached the server.
-Certificate and hostname checks remain enabled. Connection failures now distinguish
-TLS, network and timeout errors and no longer imply that onboarding is disabled.
-
-Verification: the old transport reproduced the certificate failure; the updated
-transport reached Workshop's unauthenticated endpoint and received HTTP 401.
-A local TLS regression using the production client passed trusted-CA success,
-untrusted-CA rejection and hostname-mismatch rejection, without changing system
-trust. Seven native unit tests and Clippy passed; the frontend and DEB built.
-
-After installing 0.1.2, a native WebKit WebDriver click on **Sign in through
-browser** reached Workshop's real enrollment endpoint and opened the default
-Chrome browser at the matching device approval page. The app displayed the same
-user code and waited for browser approval without a connection error. The test
-driver and its listening ports were stopped while the desktop remained open.
-Human sign-in and selection of project grants remain the user's steps; they
-were not completed automatically or claimed as tested.
-
-## Simplified human login verification (0.1.3, 25 October 2026)
-
-The normal desktop flow now uses the human OIDC account with PKCE and an
-origin-bound native session. Device onboarding remains available separately for
-managed devices; normal desktop login no longer depends on its project manifests.
-
-Validation: 94 service authentication tests passed against a disposable database;
-14 renderer workflows and 10 native tests passed. Independent review checked
-native/browser credential separation, transactional exchange and audit, current
-permissions, callback validation, cancellation and failed-sign-out recovery.
-Clippy, the host native-keyring write/read/delete test, all three TLS regression
-cases and the frontend/DEB build passed. The installed native WebKit window shows
-one Sign in button with Workshop preset. The live browser reaches Authentik's
-username login directly, including when a stale Codifix browser cookie exists.
-The user completed the real browser login as `olivier`; the app returned to
-Connected with a verified `human_oidc` identity. Restarting the installed binary
-restored the same saved session without another browser login. The test driver
-was then closed and the installed app relaunched normally.
-
-Workshop was upgraded to schema 86 with the existing application role granted
-CRUD only on the new auth_desktop_codes table. The service remains verify-only;
-configuration and human/project grants were unchanged. The old executable and a
-PostgreSQL custom-format backup are retained under
-`~/.local/state/codifix-simple-login-20261025/`. Health reports database up/status
-ok. Because the old executable verifies schema 85, rollback after any native
-logins requires a reviewed schema/data recovery, not just swapping binaries.
-
-The per-user 0.1.3 package, install receipt and native sign-in screenshot are in
-`~/Documents/ChatGPT/Codifix/linux-desktop-build/0.1.3/`; 0.1.2 remains available
-for desktop rollback. The build presets only public service URL/name through
-Vite environment variables; saved user connection preferences take precedence.
-
-
-## Area routing in 0.1.4
-
-The desktop now shares the TUI's operator-owned area routing. Choose **Area** beside
-its project selector, or **Open project folder** to resolve the folder's repository
-route before fetching project data. Entering only a project slug uses the selected
-area; names such as `homelab` do not guess another service. Folder selection remains
-pending while you sign in through the browser.
-
-Each locally available area needs its bound client config's matching `[area]`
-identity and `[auth].public_base_url` set to its exact public HTTPS origin. The
-native bridge verifies that origin's `/healthz` area UUID before restoring or
-sending credentials. It never uses the client config's service token. Missing,
-remote-only and mismatched areas fail explicitly and do not fall back to Workshop.
-The **Custom service** choice retains advanced manual service/local-token access.
-
-Switching areas clears cached data and cancels pending sign-in. Recents keep their
-origin and area UUID. On upgrade, an older recent receives an area UUID only when
-its saved origin exactly matches a configured area: a Workshop recent called
-`homelab` stays bound to Workshop. Select Homelab explicitly or open its mapped
-folder to move to Homelab. Restart preserves the selected area's browser session.
-
-Source tests cover routing precedence, identity mismatches without credential
-leakage, unavailable areas, equal project names across areas, pending folder login,
-cache invalidation and stale responses. This source-level validation does not by
-itself confirm an installed package or a real identity-provider login.
-
-## Private specialist conversations
-
-Network and Inbox provide optional, account-scoped conversations with enrolled
-Codifix specialists, including reviewed participant disclosure and durable task
-progress. See [Network and Inbox](network-inbox.md) for configuration and limits.
-AT identity linking is optional and does not grant authority. Arbitrary external
-LLM session handoff remains unavailable.
+The 0.1.3 human sign-in workflow was exercised on one Linux installation. Its tests cover browser callback validation, persistence in the OS keyring, restoration across restart and failed sign-out recovery. The later routing tests cover equal project names across areas, unavailable services and mismatched UUIDs. Native behavior on other desktops, accessibility tools and identity providers needs its own acceptance run. See the [desktop validation guide](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/desktop/README.md#validation-and-visual-review).
