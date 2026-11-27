@@ -6,22 +6,47 @@ use codifix_federation_runtime::PdsPublisher;
 use codifix_federation_store::WorkerOutcome;
 use sqlx::postgres::PgPoolOptions;
 use std::{
+    path::{Path, PathBuf},
     process::Stdio,
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 use tokio::io::AsyncWriteExt;
 
-// The test binary and CLI share the selected Cargo profile/target directory.
-// Never fall back to a stale pre-rename executable in a warm build cache.
-pub(super) fn cli_binary() -> std::path::PathBuf {
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(format!("codifix{}", std::env::consts::EXE_SUFFIX))
+// CI passes Cargo's published artifact path. Local runs also support both
+// layouts for test executables when the build and target directories are shared.
+pub(super) fn cli_binary() -> PathBuf {
+    let binary = match std::env::var_os("CODIFIX_FEDERATION_TEST_CLI") {
+        Some(path) => PathBuf::from(path),
+        None => {
+            let executable = std::env::current_exe().expect("resolve the current test binary");
+            let output = executable
+                .parent()
+                .expect("resolve the test output directory");
+            let profile = match output.file_name().and_then(std::ffi::OsStr::to_str) {
+                Some("deps") => output.parent(),
+                Some("out") => output
+                    .ancestors()
+                    .nth(3)
+                    .filter(|path| path.ends_with("build"))
+                    .and_then(Path::parent),
+                _ => None,
+            }
+            .unwrap_or_else(|| {
+                panic!(
+                    "set CODIFIX_FEDERATION_TEST_CLI for the Cargo test path {}",
+                    executable.display()
+                )
+            });
+            profile.join(format!("codifix{}", std::env::consts::EXE_SUFFIX))
+        }
+    };
+    assert!(
+        binary.is_absolute() && binary.is_file(),
+        "build the current Codifix CLI or set CODIFIX_FEDERATION_TEST_CLI: {}",
+        binary.display()
+    );
+    binary
 }
 
 pub(super) struct ServiceProcess {
@@ -227,16 +252,7 @@ pub(super) async fn app(
         crate::test_private_files::write(&config_path, config.as_bytes());
         crate::test_private_files::write(&token_path, token.as_bytes());
         crate::test_private_files::write(&runtime_path,&serde_json::to_vec(&json!({"role":"instance","space":n.space,"authority":n.authority,"instance":instance,"project":project,"principal":writer_id,"gateway":n.url,"token_file":token_path,"receipt_keys":n.security.trust().keys(),"disposable_test_mode":true})).unwrap());
-        // The integration binary is in <profile>/deps; honor CARGO_TARGET_DIR,
-        // release profiles and the native executable suffix rather than a
-        // hard-coded source-checkout target/debug path.
-        let executable = cli_binary();
-        assert!(
-            executable.is_file(),
-            "build the current Codifix CLI: {}",
-            executable.display()
-        );
-        let mut command = std::process::Command::new(executable);
+        let mut command = std::process::Command::new(cli_binary());
         for (key, _) in std::env::vars_os() {
             if key.to_string_lossy().starts_with("CODIFIX_") {
                 command.env_remove(key);

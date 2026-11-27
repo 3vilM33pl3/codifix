@@ -250,10 +250,18 @@ jobs:
         with:
           node-version: 22
       - run: docker pull ghcr.io/bluesky-social/pds@sha256:d95725b24dbe53af9d91dc69750556931ebed6c396f2cfa42b221434db642f12
+      - name: Build and locate the Codifix CLI
+        shell: bash
+        run: |
+          executable=$(
+            cargo build -p codifix-cli --bin codifix --locked --message-format=json-render-diagnostics |
+              jq -ser '[.[] | select(.reason == "compiler-artifact" and .target.name == "codifix" and .executable) | .executable] | if length == 1 then .[0] else error("expected one Codifix CLI executable") end'
+          )
+          test -x "$executable"
+          printf 'CODIFIX_FEDERATION_TEST_CLI=%s\n' "$executable" >> "$GITHUB_ENV"
       - run: node tests/federation-pds/backup.test.cjs
       - run: node tests/federation-pds/run.mjs
       - run: cargo test -p codifix-federation-runtime --test c_workflow --locked --no-run
-      - run: cargo build -p codifix-cli --locked
       - run: npm --prefix web ci
       - run: npm --prefix web run test
       - run: npm --prefix web run build
@@ -550,11 +558,12 @@ jobs:
 
   ca-release-preparation:
     name: Offline CA Release Preparation Tests
-    runs-on: [self-hosted, codifix, Linux, X64]
+    runs-on: ubuntu-24.04
     needs: changes
     if: needs.changes.outputs.package == 'true'
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -579,7 +588,7 @@ jobs:
 
   macos-onboarding-contract:
     name: macOS Onboarding Contract (Synthetic Linux Tests)
-    runs-on: [self-hosted, codifix, Linux, X64]
+    runs-on: ubuntu-24.04
     needs: changes
     if: needs.changes.outputs.package == 'true'
     steps:
