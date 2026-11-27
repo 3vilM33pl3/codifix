@@ -7,12 +7,14 @@ use crate::{
 use anyhow::{Context, Result, ensure};
 use chrono::Utc;
 use codifix_agency::Usage;
-use codifix_agency_projects::{LinearClient, RemoteEntity, fingerprint, stable_id};
+use codifix_agency_projects::{EntityKind, LinearClient, RemoteEntity, fingerprint, stable_id};
 use codifix_store::effects::{self, EffectIntent, EffectKind, EffectReason, EffectStatus};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use uuid::Uuid;
+
+mod lifecycle;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -30,6 +32,8 @@ pub(crate) struct Settings {
 struct Scope {
     project_id: Uuid,
     team_id: Uuid,
+    #[serde(default)]
+    automatic: Option<lifecycle::AutomaticScope>,
 }
 
 async fn wait(store: &Store, task: &StoredTask, question: String) -> Result<Option<Value>> {
@@ -56,6 +60,48 @@ fn scope_matches(issue: &RemoteEntity, scope: &Scope) -> bool {
         && issue.fields.get("teamId") == Some(&json!(scope.team_id))
 }
 
+fn tracking_metadata(value: Option<&Value>) -> Result<BTreeMap<String, Value>> {
+    let Some(value) = value else {
+        return Ok(BTreeMap::new());
+    };
+    let fields = value
+        .as_object()
+        .context("issue metadata must be an object")?;
+    fields
+        .iter()
+        .map(|(name, value)| {
+            let field = match name.as_str() {
+                "priority" => {
+                    let priority = value
+                        .as_u64()
+                        .filter(|n| *n <= 4)
+                        .context("invalid issue priority")?;
+                    json!(priority)
+                }
+                "dueDate" => {
+                    let date: Option<chrono::NaiveDate> = serde_json::from_value(value.clone())?;
+                    json!(date)
+                }
+                "assigneeId" | "stateId" | "cycleId" | "parentId" | "projectMilestoneId" => {
+                    let id: Option<Uuid> = serde_json::from_value(value.clone())?;
+                    ensure!(!id.is_some_and(|id| id.is_nil()), "nil issue metadata ID");
+                    json!(id)
+                }
+                "labelIds" => {
+                    let ids: BTreeSet<Uuid> = serde_json::from_value(value.clone())?;
+                    ensure!(
+                        ids.len() <= 100 && ids.iter().all(|id| !id.is_nil()),
+                        "invalid issue labels"
+                    );
+                    json!(ids)
+                }
+                _ => anyhow::bail!("unsupported issue metadata field"),
+            };
+            Ok((name.clone(), field))
+        })
+        .collect()
+}
+
 pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Result<Option<Value>> {
     let settings: Settings =
         serde_json::from_value(cfg.linear.clone().context("Linear unavailable")?)?;
@@ -69,6 +115,14 @@ pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Res
         "tracking project mismatch"
     );
     let data = &task.request.payload;
+    if data.get("tracking_key").is_some()
+        || data.get("lifecycle").is_some()
+        || data.get("blocker").is_some()
+        || data.get("verification").is_some()
+    {
+        return lifecycle::track(store, task, &settings, scope).await;
+    }
+    let metadata = tracking_metadata(data.get("metadata"))?;
     let title = data["title"].as_str().unwrap_or_default().trim();
     let description = data["description"].as_str().unwrap_or_default().trim();
     if title.is_empty() || description.is_empty() {
@@ -87,11 +141,7 @@ pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Res
             && description.len() <= 16384,
         "issue wording exceeds limits"
     );
-    let client = LinearClient::new(
-        &settings.endpoint,
-        &std::env::var(&settings.token_env).context("Linear credential unavailable")?,
-        std::time::Duration::from_secs(30),
-    )?;
+    let client = client(&settings)?;
     let scoped_key = stable_id(
         scope.project_id,
         &format!("{}:{}", scope.team_id, lookup.to_lowercase()),
@@ -120,14 +170,13 @@ pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Res
         explicit.is_none() || existing.is_some(),
         "selected issue does not exist"
     );
-    let exact = |issue: &RemoteEntity| {
-        issue.fields.get("title") == Some(&json!(title))
-            && issue.fields.get("description") == Some(&json!(description))
-    };
-    let issue = if let Some(issue) = existing.as_ref().filter(|i| exact(i)) {
+    let mut fields = metadata.clone();
+    fields.insert("title".into(), json!(title));
+    fields.insert("description".into(), json!(description));
+    let issue = if let Some(issue) = existing.as_ref().filter(|i| matches_fields(i, &fields)) {
         issue.clone()
     } else {
-        let digest = fingerprint(&(
+        let text_digest = fingerprint(&(
             task.contract.id,
             &task.requester,
             scope.project_id,
@@ -137,13 +186,104 @@ pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Res
             title,
             description,
         ));
+        let (digest, changes) = if metadata.is_empty() {
+            (text_digest, String::new())
+        } else {
+            (
+                fingerprint(&(&text_digest, &metadata)),
+                format!(
+                    "\n\nIssue fields:\n{}",
+                    serde_json::to_string_pretty(&metadata)?
+                ),
+            )
+        };
         let confirmation = format!("confirm {digest}");
         let question = format!(
-            "Proposed Linear issue {id}\n\n{title}\n\n{description}\n\nReply with `{confirmation}` or supply corrected wording."
+            "Proposed Linear issue {id}\n\n{title}\n\n{description}{changes}\n\nReply with `{confirmation}` or supply corrected wording."
         );
         if !confirmed(store, task, &question, &confirmation).await? {
             return wait(store, task, question).await;
         }
+        if let Some(parent) = metadata.get("parentId").and_then(Value::as_str) {
+            let parent = Uuid::parse_str(parent)?;
+            ensure!(parent != id, "issue cannot be its own parent");
+            debit_read(store, task).await?;
+            ensure!(
+                client
+                    .scoped_issue(scope.project_id, scope.team_id, parent)
+                    .await?
+                    .is_some(),
+                "parent issue outside configured project/team"
+            );
+        }
+        if let Some(milestone) = metadata.get("projectMilestoneId").and_then(Value::as_str) {
+            debit_read(store, task).await?;
+            let milestone = client
+                .retrieve(EntityKind::Milestone, Uuid::parse_str(milestone)?)
+                .await?;
+            ensure!(
+                milestone.is_some_and(
+                    |item| item.fields.get("projectId") == Some(&json!(scope.project_id))
+                ),
+                "milestone outside configured project"
+            );
+        }
+        IssueWriter {
+            store,
+            task,
+            client: &client,
+            scope,
+        }
+        .write(id, existing.is_some(), &fields, digest)
+        .await?
+    };
+    let url = issue
+        .fields
+        .get("url")
+        .and_then(Value::as_str)
+        .context("missing Linear issue URL")?;
+    let mut evidence = json!({"issue_id":id,"url":url,"title":title,"readback_verified":true});
+    if !metadata.is_empty() {
+        evidence["metadata"] = json!(metadata);
+    }
+    Ok(Some(evidence))
+}
+
+fn client(settings: &Settings) -> Result<LinearClient> {
+    Ok(LinearClient::new(
+        &settings.endpoint,
+        &std::env::var(&settings.token_env).context("Linear credential unavailable")?,
+        std::time::Duration::from_secs(30),
+    )?)
+}
+
+fn matches_fields(issue: &RemoteEntity, fields: &BTreeMap<String, Value>) -> bool {
+    fields
+        .iter()
+        .all(|(name, value)| issue.fields.get(name) == Some(value))
+}
+
+struct IssueWriter<'a> {
+    store: &'a Store,
+    task: &'a StoredTask,
+    client: &'a LinearClient,
+    scope: &'a Scope,
+}
+
+impl IssueWriter<'_> {
+    async fn write(
+        &self,
+        id: Uuid,
+        existing: bool,
+        fields: &BTreeMap<String, Value>,
+        digest: String,
+    ) -> Result<RemoteEntity> {
+        let Self {
+            store,
+            task,
+            client,
+            scope,
+        } = *self;
         let effect_id = Uuid::new_v5(&task.contract.id, digest.as_bytes());
         store
             .admit_effect(
@@ -165,43 +305,34 @@ pub(crate) async fn track(store: &Store, cfg: &Config, task: &StoredTask) -> Res
                 },
             )
             .await?;
-        client
-            .write_issue_text(
-                id,
-                existing.is_some(),
-                scope.project_id,
-                scope.team_id,
-                title,
-                description,
-            )
-            .await?;
-        debit_read(store, task).await?;
-        let issue = client
-            .scoped_issue(scope.project_id, scope.team_id, id)
-            .await?
-            .context("issue missing on readback")?;
-        ensure!(
-            scope_matches(&issue, scope) && exact(&issue),
-            "saved issue differs from confirmed wording"
-        );
-        effects::conclude(
-            &store.pool,
-            effect_id,
-            Uuid::new_v4(),
-            EffectStatus::Confirmed,
-            EffectReason::Observed,
-        )
-        .await?;
-        issue
-    };
-    let url = issue
-        .fields
-        .get("url")
-        .and_then(Value::as_str)
-        .context("missing Linear issue URL")?;
-    Ok(Some(
-        json!({"issue_id":id,"url":url,"title":title,"readback_verified":true}),
-    ))
+        let write = client
+            .write_tracking_issue(id, existing, scope.project_id, scope.team_id, fields)
+            .await;
+        // A mutation may commit before its response or before the issue index
+        // catches up. Only retry the scoped readback.
+        for delay_ms in [0, 250, 750, 1500] {
+            tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            debit_read(store, task).await?;
+            if let Ok(Some(issue)) = client
+                .scoped_issue(scope.project_id, scope.team_id, id)
+                .await
+                && scope_matches(&issue, scope)
+                && matches_fields(&issue, fields)
+            {
+                effects::conclude(
+                    &store.pool,
+                    effect_id,
+                    Uuid::new_v4(),
+                    EffectStatus::Confirmed,
+                    EffectReason::Observed,
+                )
+                .await?;
+                return Ok(issue);
+            }
+        }
+        write?;
+        anyhow::bail!("could not verify the saved Linear issue fields")
+    }
 }
 
 pub(crate) fn issue_confirmation(

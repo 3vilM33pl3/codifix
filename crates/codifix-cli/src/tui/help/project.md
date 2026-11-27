@@ -11,6 +11,7 @@ Show high-level project health, counts, embedding/search state, recent activity,
 - `j/k` or `Up/Down`: scroll.
 - `PgUp/PgDn`: page. `Home`: jump to top.
 - `r`: refresh project state outside help.
+- `L`: toggle Linear tracking for this project when an operator mapping is installed.
 
 ## Workflows
 - Start here for a quick project health check.

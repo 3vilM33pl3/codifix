@@ -23,6 +23,7 @@ struct App {
     description: String,
     description_active: bool,
     phase: Phase,
+    correction: Option<(Uuid, i64)>,
     message: String,
     scroll: u16,
 }
@@ -31,7 +32,7 @@ struct App {
 enum Phase {
     #[default]
     Draft,
-    Submitting(Value),
+    Submitting(Submission),
     Waiting(Uuid),
     Review {
         id: Uuid,
@@ -42,6 +43,15 @@ enum Phase {
     },
     Finished(String),
     Stopped(String),
+}
+
+enum Submission {
+    Draft(Value),
+    Correction {
+        id: Uuid,
+        revision: i64,
+        payload: Value,
+    },
 }
 
 pub(super) async fn run(path: &Path) -> Result<()> {
@@ -104,7 +114,19 @@ async fn run_ui(terminal: &mut ratatui::DefaultTerminal, agency: &Agency) -> Res
                     if app.title.is_empty() || app.description.is_empty() {
                         app.message = "Enter a title and description.".into();
                     } else {
-                        app.phase = Phase::Submitting(agency.draft(&app.title, &app.description));
+                        let submission = match app.correction.take() {
+                            Some((id, revision)) => Submission::Correction {
+                                id,
+                                revision,
+                                payload: serde_json::json!({
+                                    "kind": "linear_track",
+                                    "title": app.title,
+                                    "description": app.description,
+                                }),
+                            },
+                            None => Submission::Draft(agency.draft(&app.title, &app.description)),
+                        };
+                        app.phase = Phase::Submitting(submission);
                         submit(agency, &mut app).await;
                         next_poll = Instant::now();
                     }
@@ -124,11 +146,16 @@ async fn run_ui(terminal: &mut ratatui::DefaultTerminal, agency: &Agency) -> Res
                 expected,
                 ..
             } => {
-                if key.code == KeyCode::Enter {
+                if ctrl && key.code == KeyCode::Char('e') {
+                    app.correction = Some((*id, *revision));
+                    app.phase = Phase::Draft;
+                    app.message.clear();
+                    app.scroll = 0;
+                } else if key.code == KeyCode::Enter {
                     if answer != expected {
                         app.message = "Confirmation must match the proposal exactly.".into();
                     } else {
-                        match agency.answer(*id, *revision, answer).await {
+                        match agency.answer(*id, *revision, answer, None).await {
                             Ok(()) => {
                                 app.phase = Phase::Waiting(*id);
                                 app.scroll = 0;
@@ -169,10 +196,21 @@ fn edit(s: &mut String, key: KeyCode, ctrl: bool, multiline: bool, max: usize) {
 }
 
 async fn submit(agency: &Agency, app: &mut App) {
-    let Phase::Submitting(body) = &app.phase else {
+    let Phase::Submitting(submission) = &app.phase else {
         return;
     };
-    match agency.submit(body).await {
+    let result = match submission {
+        Submission::Draft(body) => agency.submit(body).await,
+        Submission::Correction {
+            id,
+            revision,
+            payload,
+        } => agency
+            .answer(*id, *revision, "Correct the wording", Some(payload))
+            .await
+            .map(|()| *id),
+    };
+    match result {
         Ok(id) => {
             app.phase = Phase::Waiting(id);
             app.message.clear();
@@ -239,7 +277,11 @@ fn draw(frame: &mut Frame<'_>, app: &App) {
     .split(frame.area());
     let (heading, body, field, input, keys) = match &app.phase {
         Phase::Draft => (
-            "Draft Linear issue",
+            if app.correction.is_some() {
+                "Correct Linear proposal"
+            } else {
+                "Draft Linear issue"
+            },
             app.description.as_str(),
             "Title",
             app.title.as_str(),
@@ -252,7 +294,7 @@ fn draw(frame: &mut Frame<'_>, app: &App) {
             question.as_str(),
             "Confirmation",
             answer.as_str(),
-            "Enter approve   Ctrl+U clear confirmation   PgUp/PgDn scroll   Esc quit",
+            "Enter approve   Ctrl+E correct wording   PgUp/PgDn scroll   Esc quit",
         ),
         Phase::Waiting(_) => (
             "Waiting for the Linear specialist",

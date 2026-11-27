@@ -8,6 +8,8 @@
     "query",
     "resume",
     "tui",
+    "linear-tui",
+    "linear",
     "status",
     "urls",
     "health",
@@ -66,7 +68,9 @@
         "remember",
         "query",
         "resume",
-        "tui"
+        "tui",
+        "linear-tui",
+        "linear"
       ],
       "description": "Capture finished work, ask cited questions, recover context, and inspect memory."
     },

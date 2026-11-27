@@ -10,6 +10,7 @@ pub(super) struct Graphql {
     pub(super) objects: BTreeMap<String, Value>,
     pub(super) reads: usize,
     pub(super) writes: Vec<Value>,
+    pub(super) fail_next_write: bool,
 }
 pub(super) async fn graphql(
     State(state): State<Arc<Mutex<Graphql>>>,
@@ -50,6 +51,9 @@ pub(super) async fn graphql(
         });
     }
     state.writes.push(body.clone());
+    if std::mem::take(&mut state.fail_next_write) {
+        return Json(json!({"errors":[{"extensions":{"code":"PROVIDER_UNAVAILABLE"}}]}));
+    }
     let n = state.writes.len();
     let input = &body["variables"]["input"];
     let create = query.contains("CreateInput");
@@ -74,6 +78,7 @@ pub(super) async fn graphql(
             "teamId" => Some("team"),
             "leadId" => Some("lead"),
             "assigneeId" => Some("assignee"),
+            "stateId" => Some("state"),
             "issueId" => Some("issue"),
             "relatedIssueId" => Some("relatedIssue"),
             _ => None,

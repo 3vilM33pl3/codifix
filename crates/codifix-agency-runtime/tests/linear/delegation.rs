@@ -68,18 +68,44 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
         )
         .await
         .unwrap();
+    let automatic_project = Uuid::new_v4();
+    let in_progress = Uuid::new_v4();
+    let done = Uuid::new_v4();
+    let mut automatic = mandate.clone();
+    automatic.id = Uuid::new_v4();
+    automatic.resources = BTreeSet::from([ResourceScope {
+        kind: "linear_project".into(),
+        id: automatic_project.to_string(),
+    }]);
+    remote
+        .store
+        .install_mandate(
+            local_project,
+            &automatic,
+            &remote.operator,
+            remote.cfg.instance_id,
+        )
+        .await
+        .unwrap();
     remote.cfg.specialists[0]
         .capabilities
         .insert("linear_track".into());
-    remote.cfg.linear = Some(
-        json!({"endpoint":gql_url,"token_env":"CODIFIX_FIXTURE_LINEAR_PAT","require_origin_confirmation":true,"tracking":{mandate.id.to_string():{"project_id":project,"team_id":team}}}),
-    );
+    remote.cfg.linear = Some(json!({
+        "endpoint":gql_url,
+        "token_env":"CODIFIX_FIXTURE_LINEAR_PAT",
+        "require_origin_confirmation":true,
+        "tracking":{
+            mandate.id.to_string():{"project_id":project,"team_id":team},
+            automatic.id.to_string():{"project_id":automatic_project,"team_id":team,
+                "automatic":{"requester":"human-home","in_progress_state_id":in_progress,"done_state_id":done}}
+        }
+    }));
     let source = Peer {
         id: "human-home".into(),
         instance_id: home.cfg.instance_id,
         token_env: "UNUSED".into(),
         operator: false,
-        mandates: BTreeSet::from([mandate.id]),
+        mandates: BTreeSet::from([mandate.id, automatic.id]),
         endpoint: None,
         outbound_token_env: None,
     };
@@ -139,6 +165,7 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
     outer.payload = json!({"kind":"delegate","peer":"remote","request":inner});
     let client = reqwest::Client::new();
     let send = async |msg: Value| {
+        let label = msg["messageId"].clone();
         let resp = client
             .post(format!("{origin_url}/message:send"))
             .header("A2A-Version", "1.0")
@@ -149,7 +176,7 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
             .unwrap();
         let status = resp.status();
         let body = resp.json::<Value>().await.unwrap();
-        assert!(status.is_success(), "{status} {body}");
+        assert!(status.is_success(), "{label}: {status} {body}");
         body
     };
     let ack =
@@ -198,12 +225,21 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
         "{initial}"
     );
     let old_confirm = initial.split('`').nth(1).unwrap();
-    answer("correct",json!({"answer":"Correct the wording","replacement_payload":{"kind":"linear_track","title":"Reviewed issue title","description":"Reviewed acceptance criteria"}})).await;
+    let reviewed = json!({"kind":"linear_track","title":"Reviewed issue title",
+                          "description":"Reviewed acceptance criteria",
+                          "metadata":{"priority":2,"dueDate":"2026-12-15"}});
+    answer(
+        "correct",
+        json!({"answer":"Correct the wording","replacement_payload":reviewed}),
+    )
+    .await;
     let corrected = question(&run(id).await);
     assert!(
         corrected.contains("Reviewed issue title\n\nReviewed acceptance criteria"),
         "{corrected}"
     );
+    assert!(corrected.contains("\"priority\": 2"));
+    assert!(corrected.contains("2026-12-15"));
     assert_eq!(
         initial.lines().next(),
         corrected.lines().next(),
@@ -225,6 +261,7 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
     let readback = evidence_for(&evidence["reported_result"]);
     assert_eq!(readback["readback_verified"], true);
     assert_eq!(readback["title"], "Reviewed issue title");
+    assert_eq!(readback["metadata"], reviewed["metadata"]);
     let issue = readback["issue_id"].as_str().unwrap();
     assert_eq!(
         readback["url"],
@@ -237,10 +274,12 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
             state.objects[issue]["description"],
             "Reviewed acceptance criteria"
         );
+        assert_eq!(state.objects[issue]["priority"], 2);
+        assert_eq!(state.objects[issue]["dueDate"], "2026-12-15");
     }
     // A fresh task with the reviewed wording finds that same issue and returns its link.
     outer.request_id = Uuid::new_v4().to_string();
-    outer.payload["request"]["payload"] = json!({"kind":"linear_track","title":"Reviewed issue title","description":"Reviewed acceptance criteria"});
+    outer.payload["request"]["payload"] = reviewed;
     let next =
         send(json!({"messageId":outer.request_id,"role":"ROLE_USER","parts":[{"data":outer}]}))
             .await;
@@ -254,6 +293,64 @@ async fn signed_linear_delegation_corrects_confirms_and_returns_issue_link() {
         readback["url"]
     );
     assert_eq!(graphql.lock().unwrap().writes.len(), 1);
+    let key = Uuid::new_v4();
+    let send_lifecycle = async |phase: &str, blocker: Option<&str>| {
+        let mut message = outer.clone();
+        message.request_id = Uuid::new_v4().to_string();
+        message.budget.calls = 6;
+        message.payload["request"]["mandate_id"] = json!(automatic.id);
+        message.payload["request"]["resource"] =
+            json!({"kind":"linear_project","id":automatic_project});
+        message.payload["request"]["budget"]["calls"] = json!(6);
+        message.payload["request"]["payload"] = json!({
+            "kind":"linear_track", "tracking_key":key, "lifecycle":phase,
+            // The same title in another destination cannot adopt the Homelab issue.
+            "title":"Reviewed issue title", "description":"Original task wording",
+            "blocker":blocker,
+            "verification":(phase == "completed").then_some("The signed acceptance test passed.")
+        });
+        let reply = send(json!({"messageId":message.request_id,"role":"ROLE_USER",
+                               "parts":[{"data":message}]}))
+        .await;
+        run(reply["task"]["id"].as_str().unwrap()).await
+    };
+    let lifecycle_evidence = |task: &Value| -> Value {
+        assert_eq!(task["status"]["state"], "TASK_STATE_COMPLETED", "{task}");
+        evidence_for(&evidence_for(task)["reported_result"]).clone()
+    };
+    graphql.lock().unwrap().fail_next_write = true;
+    assert_eq!(
+        send_lifecycle("started", None).await["status"]["state"],
+        "TASK_STATE_INPUT_REQUIRED"
+    );
+    let started = lifecycle_evidence(&send_lifecycle("started", None).await);
+    assert_eq!(started["state_id"], json!(in_progress));
+    let tracked = started["issue_id"].as_str().unwrap();
+    assert_ne!(tracked, issue);
+    let blocked =
+        lifecycle_evidence(&send_lifecycle("blocked", Some("Waiting for test evidence")).await);
+    assert_eq!(blocked["issue_id"], started["issue_id"]);
+    let repeated =
+        lifecycle_evidence(&send_lifecycle("blocked", Some("Waiting for test evidence")).await);
+    assert_eq!(repeated["issue_id"], started["issue_id"]);
+    let completed = lifecycle_evidence(&send_lifecycle("completed", None).await);
+    assert_eq!(completed["state_id"], json!(done));
+    let resumed = lifecycle_evidence(&send_lifecycle("started", None).await);
+    assert_eq!(resumed["state_id"], json!(done));
+    {
+        let state = graphql.lock().unwrap();
+        assert_eq!(state.writes.len(), 5); // manual, failed attempt, create, blocker, finish
+        assert_eq!(
+            state.objects[tracked]["project"]["id"],
+            json!(automatic_project)
+        );
+        assert_eq!(
+            state.objects[tracked]["description"],
+            "Original task wording\n\n### Blocker\n\nWaiting for test evidence\n\n### Verification\n\nThe signed acceptance test passed."
+        );
+        assert_eq!(state.objects[issue]["project"]["id"], json!(project));
+        assert_eq!(state.objects.len(), 2);
+    }
     remote_worker.abort();
     home_server.abort();
     remote_server.abort();

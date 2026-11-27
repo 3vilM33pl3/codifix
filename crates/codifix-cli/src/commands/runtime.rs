@@ -1363,6 +1363,9 @@ pub(in crate::commands) enum Command {
         profile: PathBuf,
     },
 
+    /// Configure per-project tracking through the resident Linear Agent.
+    Linear(crate::linear_tracking::LinearArgs),
+
     // --- Status and health ---
     #[command(about = "Show the aggregate Codifix diagnostic status.", after_help = STATUS_AFTER_HELP)]
     Status(StatusArgs),
@@ -2800,6 +2803,12 @@ pub(in crate::commands) struct CheckpointStartExecutionArgs {
     /// Validate and preview the execution-start flow without writing checkpoint or memory state.
     #[arg(long)]
     pub(crate) dry_run: bool,
+    /// Skip independent Linear tracking, for example for a subtask covered by a parent issue.
+    #[arg(long, env = "CODIFIX_SKIP_LINEAR")]
+    pub(crate) skip_linear: bool,
+    /// Short shareable work summary for the Linear issue.
+    #[arg(long)]
+    pub(crate) linear_summary: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -2822,6 +2831,12 @@ pub(in crate::commands) struct CheckpointStartTaskArgs {
     /// Emit the task-start report as JSON.
     #[arg(long)]
     pub(crate) json: bool,
+    /// Skip independent Linear tracking, for example for a subtask covered by a parent issue.
+    #[arg(long, env = "CODIFIX_SKIP_LINEAR")]
+    pub(crate) skip_linear: bool,
+    /// Short shareable work summary for the Linear issue.
+    #[arg(long)]
+    pub(crate) linear_summary: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -2932,6 +2947,9 @@ pub(in crate::commands) struct RememberArgs {
     /// Preview the derived capture and curate actions without writing them.
     #[arg(long)]
     pub(crate) dry_run: bool,
+    /// The thread key passed to checkpoint start-task, if it differed from this title.
+    #[arg(long)]
+    pub(crate) linear_thread_key: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -3706,6 +3724,16 @@ pub(super) async fn run() -> Result<()> {
     if let Command::LinearTui { profile } = &command {
         return crate::linear_tui::run(profile).await;
     }
+    if let Command::Linear(crate::linear_tracking::LinearArgs {
+        command: crate::linear_tracking::LinearCommand::Drain { routes },
+    }) = &command
+    {
+        let routes = match routes {
+            Some(path) => path.clone(),
+            None => crate::linear_tracking::default_routes()?,
+        };
+        return crate::linear_tracking::drain(&routes, None).await;
+    }
     // Company enrollment never loads local configuration, area routing or the
     // default API client: those may carry unrelated owner/service credentials.
     if crate::commands::auth_enrollment::handle_command(&command).await? {
@@ -3927,6 +3955,7 @@ pub(super) async fn run() -> Result<()> {
         Command::Embeddings(args) => {
             crate::commands::embeddings::handle(args, client, config).await?
         }
+        Command::Linear(args) => crate::linear_tracking::handle(args, &config).await?,
         Command::Health => crate::commands::health::handle(client, config).await?,
         Command::Archive(args) => crate::commands::archive::handle(args, client, config).await?,
         Command::Watcher(args) => {

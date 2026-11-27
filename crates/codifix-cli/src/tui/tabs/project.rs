@@ -33,6 +33,13 @@ pub(in crate::tui) fn draw_project_tab(
             Span::styled(&app.meta.overview.project, Style::default().fg(Theme::TEXT)),
         ),
         metric_line(
+            "Linear tracking (L)",
+            Span::styled(
+                &app.project_tab.linear_status,
+                Style::default().fg(Theme::TEXT),
+            ),
+        ),
+        metric_line(
             "Latest plan",
             Span::styled(latest_plan_display(app), Style::default().fg(Theme::TEXT)),
         ),

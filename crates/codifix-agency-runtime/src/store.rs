@@ -726,7 +726,7 @@ impl Store {
         })?;
         task.contract
             .answer_clarification(answer.into(), Utc::now())?;
-        // The origin replies to the home task. Only wording travels to Linear;
+        // The origin replies to the home task. Only issue details travel to Linear;
         // the original peer, mandate and delegated request stay bound to that task.
         if let Some(value) = &replacement {
             ensure!(
@@ -749,7 +749,7 @@ impl Store {
                 ensure!(
                     fields.keys().all(|k| matches!(
                         k.as_str(),
-                        "kind" | "title" | "description" | "lookup_title" | "issue_id"
+                        "kind" | "title" | "description" | "lookup_title" | "issue_id" | "metadata"
                     )) && fields.get("kind").is_none_or(|k| k == "linear_track"),
                     "invalid issue correction"
                 );
@@ -765,7 +765,7 @@ impl Store {
                 let revised = payload
                     .as_object_mut()
                     .context("invalid issue correction")?;
-                for key in ["title", "description", "issue_id"] {
+                for key in ["title", "description", "issue_id", "metadata"] {
                     if let Some(value) = old.get(key) {
                         revised.entry(key).or_insert_with(|| value.clone());
                     }

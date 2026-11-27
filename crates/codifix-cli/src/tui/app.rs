@@ -180,6 +180,11 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
                 app.request_stream_connect(&api);
             }
             if app.chrome.needs_redraw || last_draw.elapsed() >= Duration::from_secs(1) {
+                if app.active_tab == TabKind::Project {
+                    app.project_tab.linear_status = crate::linear_tracking::status(&api.config, &app.project)
+                        .map(|status| status.text())
+                        .unwrap_or_else(|_| "Configuration unavailable".into());
+                }
                 terminal.draw(|frame| draw(frame, &app))?;
                 app.chrome.needs_redraw = false;
                 last_draw = Instant::now();
@@ -552,7 +557,10 @@ impl App {
                 errors_table_state,
                 errors_detail_scroll: 0,
             },
-            project_tab: ProjectTabState { project_scroll: 0 },
+            project_tab: ProjectTabState {
+                project_scroll: 0,
+                linear_status: String::new(),
+            },
             review: ReviewTabState {
                 replacement_policy: load_repo_replacement_policy(&repo_root).unwrap_or_default(),
                 replacement_proposals: Vec::new(),
@@ -1687,6 +1695,18 @@ impl App {
                 self.chrome.needs_redraw = true;
                 return Ok(false);
             }
+        }
+        if self.active_tab == TabKind::Project && key.code == KeyCode::Char('L') {
+            self.chrome.status_message =
+                match crate::linear_tracking::toggle(&api.config, &self.project) {
+                    Ok(status) => {
+                        self.project_tab.linear_status = status.text();
+                        format!("Linear tracking {}", status.text())
+                    }
+                    Err(error) => format!("Linear tracking unavailable: {error}"),
+                };
+            self.chrome.needs_redraw = true;
+            return Ok(false);
         }
         let tab_action = super::tabs::dispatch_update(self.active_tab, &Event::Key(key), self);
         if !tab_action.handled() {

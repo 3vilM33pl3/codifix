@@ -15,6 +15,9 @@ install -d -m 0755 "$local_bin" "$libexec" "$libexec/private-pds"
 install -m 0755 "$bin_dir/codifix" "$bin_dir/codifix-agency" "$libexec/"
 install -m 0644 "$source_dir/linear-tui.py" "$libexec/"
 install -m 0644 "$source_dir/private-pds/"{compose.yaml,directory.cjs,install.sh} "$libexec/private-pds/"
+user_units=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
+install -d -m 0755 "$user_units"
+install -m 0644 "$source_dir/codifix-linear.service" "$user_units/"
 wrapper=$(mktemp "$local_bin/.codifix-linear.XXXXXX")
 trap 'rm -f -- "$wrapper"' EXIT
 cat > "$wrapper" <<'WRAPPER'

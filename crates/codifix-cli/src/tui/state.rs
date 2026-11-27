@@ -178,6 +178,7 @@ pub(super) struct ErrorsTabState {
 }
 
 pub(super) struct ProjectTabState {
+    pub(in crate::tui) linear_status: String,
     pub(in crate::tui) project_scroll: u16,
 }
 

@@ -452,16 +452,15 @@ impl LinearClient {
         }
     }
 
-    pub async fn write_issue_text(
+    pub async fn write_tracking_issue(
         &self,
         id: Uuid,
         existing: bool,
         project: Uuid,
         team: Uuid,
-        title: &str,
-        description: &str,
+        fields: &BTreeMap<String, Value>,
     ) -> Result<()> {
-        let mut fields = json!({"title":title,"description":description});
+        let mut fields = json!(fields);
         if !existing {
             fields["projectId"] = json!(project);
             fields["teamId"] = json!(team);
