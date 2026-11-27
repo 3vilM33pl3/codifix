@@ -1,0 +1,20 @@
+[Unit]
+Description=Private Alertmanager ingress for the Codifix incident canary
+Wants=network-online.target
+After=network-online.target codifix-agency-homelab.service
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /usr/local/libexec/codifix-incident-canary/ingress.py
+LoadCredential=tls.crt:/etc/codifix-agency/canary-ingress/tls.crt
+LoadCredential=tls.key:/etc/codifix-agency/canary-ingress/tls.key
+LoadCredential=alert.token:/etc/codifix-agency/canary-ingress/alert.token
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET
+
+[Install]
+WantedBy=multi-user.target
