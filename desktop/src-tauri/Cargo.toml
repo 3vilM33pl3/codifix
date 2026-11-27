@@ -23,10 +23,13 @@ open = "5"
 
 uuid = { version = "1", features = ["v4", "serde"] }
 sha2 = "0.10"
-chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+chrono = { package = "sad-chrono", version = "=0.5.2", default-features = false, features = ["clock", "serde"] }
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust", "apple-native", "windows-native"] }
 tauri-plugin-single-instance = "2"
 codifix-platform = { path = "../../crates/codifix-platform" }
 codifix-config = { path = "../../crates/codifix-config" }
 codifix-record = { path = "../../crates/codifix-record" }
 base64 = "0.22"
+
+[patch.crates-io]
+chrono = { path = "../../vendor/chrono-compat" }

@@ -744,16 +744,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
+version = "0.4.45"
 dependencies = [
- "iana-time-zone",
- "js-sys",
- "num-traits",
- "serde",
- "wasm-bindgen",
- "windows-link 0.2.1",
+ "sad-chrono",
 ]
 
 [[package]]
@@ -828,8 +821,8 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 name = "codifix-agency"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "http",
+ "sad-chrono",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -864,8 +857,8 @@ name = "codifix-agency-projects"
 version = "3.1.0"
 dependencies = [
  "axum",
- "chrono",
  "reqwest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -882,7 +875,6 @@ dependencies = [
  "atrium-crypto",
  "axum",
  "base64 0.22.1",
- "chrono",
  "clap",
  "codifix-agency",
  "codifix-agency-openbao",
@@ -894,6 +886,7 @@ dependencies = [
  "hmac 0.12.1",
  "http-body-util",
  "reqwest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -909,10 +902,10 @@ dependencies = [
 name = "codifix-agenttop"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-platform",
  "dirs",
  "libc",
+ "sad-chrono",
  "serde",
  "serde_json",
  "tempfile",
@@ -988,10 +981,10 @@ dependencies = [
  "atrium-api",
  "atrium-repo",
  "atrium-xrpc",
- "chrono",
  "codifix-federation",
  "futures",
  "http",
+ "sad-chrono",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
@@ -1007,12 +1000,12 @@ dependencies = [
  "atrium-api",
  "atrium-crypto",
  "atrium-repo",
- "chrono",
  "codifix-atproto",
  "codifix-federation",
  "futures",
  "multibase",
  "proptest",
+ "sad-chrono",
  "serde",
  "serde_bytes",
  "serde_ipld_dagcbor",
@@ -1028,7 +1021,6 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "chrono",
  "clap",
  "clap_complete",
  "codifix-agenttop",
@@ -1050,6 +1042,7 @@ dependencies = [
  "ratatui",
  "reqwest",
  "rustix 1.1.6",
+ "sad-chrono",
  "security-framework",
  "semver",
  "serde",
@@ -1068,11 +1061,11 @@ dependencies = [
 name = "codifix-config"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-platform",
  "codifix-record",
  "config",
  "humantime-serde",
+ "sad-chrono",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1093,10 +1086,10 @@ dependencies = [
 name = "codifix-curate"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-record",
  "codifix-store",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1110,8 +1103,8 @@ name = "codifix-eval"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-record",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1123,9 +1116,9 @@ dependencies = [
 name = "codifix-federation"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-record",
  "proptest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "serde_json_canonicalizer",
@@ -1140,7 +1133,6 @@ version = "3.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
- "chrono",
  "codifix-atproto",
  "codifix-atproto-verify",
  "codifix-curate",
@@ -1155,6 +1147,7 @@ dependencies = [
  "hyper-util",
  "reqwest",
  "rustix 1.1.6",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1172,10 +1165,10 @@ dependencies = [
 name = "codifix-federation-store"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-federation",
  "codifix-record",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sqlx",
@@ -1189,11 +1182,11 @@ name = "codifix-graph"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-analyze",
  "codifix-record",
  "codifix-store",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sqlx",
@@ -1206,9 +1199,9 @@ name = "codifix-identity"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-agency",
  "reqwest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "tokio",
@@ -1220,9 +1213,9 @@ name = "codifix-inbox"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-agency",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1235,9 +1228,9 @@ dependencies = [
 name = "codifix-loops"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-platform",
  "codifix-record",
+ "sad-chrono",
  "serde",
  "serde_json",
  "uuid",
@@ -1249,13 +1242,13 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "chrono",
  "codifix-config",
  "codifix-platform",
  "codifix-record",
  "http",
  "reqwest",
  "rmcp",
+ "sad-chrono",
  "serde",
  "serde_json",
  "tokio",
@@ -1289,9 +1282,9 @@ dependencies = [
 name = "codifix-record"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-supervisor",
  "humantime-serde",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1305,12 +1298,12 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
  "codifix-config",
  "codifix-curate",
  "codifix-record",
  "codifix-store",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sqlx",
@@ -1325,7 +1318,6 @@ version = "3.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
  "codifix-config",
  "codifix-record",
  "codifix-store",
@@ -1333,6 +1325,7 @@ dependencies = [
  "pgvector",
  "proptest",
  "reqwest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1351,7 +1344,6 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.22.1",
- "chrono",
  "codifix-agency",
  "codifix-agency-projects",
  "codifix-agency-runtime",
@@ -1389,6 +1381,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rmcp",
+ "sad-chrono",
  "semver",
  "serde",
  "serde_json",
@@ -1411,10 +1404,10 @@ name = "codifix-skills"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-config",
  "codifix-platform",
  "reqwest",
+ "sad-chrono",
  "semver",
  "serde",
  "zip",
@@ -1424,9 +1417,9 @@ dependencies = [
 name = "codifix-store"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-record",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "serde_json_canonicalizer",
@@ -1467,7 +1460,6 @@ name = "codifix-supervisor-runtime"
 version = "3.1.0"
 dependencies = [
  "axum",
- "chrono",
  "codifix-platform",
  "codifix-platform-files",
  "codifix-supervisor",
@@ -1476,6 +1468,7 @@ dependencies = [
  "codifix-test-support",
  "reqwest",
  "rustix 1.1.6",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1494,10 +1487,10 @@ dependencies = [
 name = "codifix-supervisor-store"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-record",
  "codifix-supervisor",
  "codifix-test-support",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1512,8 +1505,8 @@ name = "codifix-test-support"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "codifix-search",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1527,13 +1520,13 @@ name = "codifix-watch"
 version = "3.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "codifix-config",
  "codifix-platform",
  "codifix-record",
  "notify",
  "reqwest",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -4946,6 +4939,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04d056b875a9d2e6cb9a61d127afee9ac5999b9f87bcb32079d1318e505be714"
 
 [[package]]
+name = "sad-chrono"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b4ceca8325c0291d1f5b2cab1c1c23d096e679be0ec4a6b49f325ed81154ab5"
+dependencies = [
+ "iana-time-zone",
+ "js-sys",
+ "num-traits",
+ "serde",
+ "wasm-bindgen",
+ "windows-link 0.100.0",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7065,6 +7072,12 @@ name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+
+[[package]]
+name = "windows-link"
+version = "0.100.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b39de7c7fe78858b0144c50c3fc000bab3be17d5e9b85b1053871693c7f7415"
 
 [[package]]
 name = "windows-numerics"

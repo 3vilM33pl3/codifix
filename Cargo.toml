@@ -48,6 +48,8 @@ atrium-common = { path = "vendor/atrium-common" }
 atrium-crypto = { path = "vendor/atrium-crypto" }
 # Keep OIDC verification compatible with the supported RSA dependency.
 openidconnect = { path = "vendor/openidconnect" }
+# Give transitive dependencies the same maintained timestamp types.
+chrono = { path = "vendor/chrono-compat" }
 
 [workspace.package]
 version = "3.1.0"
@@ -58,7 +60,7 @@ authors = ["Olivier Van Acker"]
 [workspace.dependencies]
 anyhow = "1.0.100"
 axum = { version = "0.8.6", features = ["macros", "ws"] }
-chrono = { version = "0.4.42", features = ["serde"] }
+chrono = { package = "sad-chrono", version = "=0.5.2", features = ["serde"] }
 clap = { version = "4.5.50", features = ["derive", "env"] }
 clap_complete = "4.5.60"
 config = { version = "0.15.18", default-features = false, features = ["toml"] }

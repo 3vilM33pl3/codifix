@@ -509,15 +509,8 @@ dependencies = [
 [[package]]
 name = "chrono"
 version = "0.4.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
- "iana-time-zone",
- "js-sys",
- "num-traits",
- "serde",
- "wasm-bindgen",
- "windows-link 0.2.1",
+ "sad-chrono",
 ]
 
 [[package]]
@@ -534,11 +527,11 @@ dependencies = [
 name = "codifix-config"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-platform",
  "codifix-record",
  "config",
  "humantime-serde",
+ "sad-chrono",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -551,13 +544,13 @@ name = "codifix-desktop"
 version = "0.2.0-rc.1"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "codifix-config",
  "codifix-platform",
  "codifix-record",
  "keyring",
  "open",
  "reqwest 0.12.28",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2",
@@ -598,9 +591,9 @@ dependencies = [
 name = "codifix-record"
 version = "3.1.0"
 dependencies = [
- "chrono",
  "codifix-supervisor",
  "humantime-serde",
+ "sad-chrono",
  "serde",
  "serde_json",
  "sha2",
@@ -1246,9 +1239,9 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
@@ -1823,7 +1816,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3573,6 +3566,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "sad-chrono"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b4ceca8325c0291d1f5b2cab1c1c23d096e679be0ec4a6b49f325ed81154ab5"
+dependencies = [
+ "iana-time-zone",
+ "js-sys",
+ "num-traits",
+ "serde",
+ "wasm-bindgen",
+ "windows-link 0.100.0",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4963,9 +4970,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "url"
-version = "2.5.8"
+version = "2.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed"
+checksum = "f00cd2407bb42c0ef17be88d4cf020f5cceffd121665bac9b8b9493a369b3b1a"
 dependencies = [
  "form_urlencoded",
  "idna",
@@ -5434,6 +5441,12 @@ name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+
+[[package]]
+name = "windows-link"
+version = "0.100.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b39de7c7fe78858b0144c50c3fc000bab3be17d5e9b85b1053871693c7f7415"
 
 [[package]]
 name = "windows-numerics"
