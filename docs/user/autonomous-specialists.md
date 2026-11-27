@@ -193,7 +193,10 @@ native monitoring. A failure stops and emits a secret-free escalation; connect
 its service failure/journal signal to the chosen human alert channel during
 installation. The independent watcher emits local observations. For social coordination,
 schedule the CA specialist's `openbao_recover` operation and configure its
-notice recipients. Run one controller for the instance. The phone opens the
+notice recipients. Interactive recovery requires distinct enrolled ATProto peers
+with configured endpoints for the operator and another companion. A task with
+missing notice enrollment stops before any contribution request. Run one
+controller for the instance. The phone opens the
 receiver-configured protected handoff from the waiting notice in Inbox. The general runtime may coordinate a
 configured profile using `openbao_recover`, criterion `openbao_unsealed`, resource
 `{ "kind": "openbao", "id": PROFILE }`, payload

@@ -153,6 +153,7 @@ impl Fixture {
             vec![task],
             mock,
             vec![SHARE_A.into(), SHARE_B.into()],
+            3,
             std::process::id(),
             None,
         )
@@ -163,6 +164,7 @@ impl Fixture {
         mut tasks: Vec<JoinHandle<()>>,
         mock: Mock,
         shares: Vec<String>,
+        share_count: u32,
         pid: u32,
         paths: Option<(PathBuf, PathBuf, PathBuf)>,
     ) -> Self {
@@ -176,7 +178,7 @@ impl Fixture {
             key_generation: 1,
             native_binding: native.binding().unwrap(),
             seal_type: "shamir".into(),
-            shares: 3,
+            shares: share_count,
             threshold: shares.len().try_into().unwrap(),
             valid_until: now() + 600,
         };
@@ -585,24 +587,24 @@ async fn attestor_detects_real_process_restart_or_exit() {
 #[tokio::test]
 #[ignore = "requires local bao executable; creates isolated synthetic vault"]
 async fn actual_openbao_shamir_two_of_three() {
-    native_restart(2, None).await;
+    native_restart(2, 3, None).await;
 }
 
 #[tokio::test]
 #[ignore = "requires local bao executable; creates isolated three-share vault"]
 async fn actual_openbao_shamir_three_of_three() {
-    native_restart(3, None).await;
+    native_restart(3, 3, None).await;
 }
 
 #[tokio::test]
 #[ignore = "requires bao, Chromium, and web npm dependencies"]
-async fn mobile_three_of_three_approve_and_decline() {
+async fn mobile_three_of_five_approve_and_decline() {
     for decision in ["approve", "decline"] {
-        native_restart(3, Some(decision)).await;
+        native_restart(3, 5, Some(decision)).await;
     }
 }
 
-async fn native_restart(threshold: usize, phone_decision: Option<&str>) {
+async fn native_restart(threshold: usize, share_count: u32, phone_decision: Option<&str>) {
     let dir = TempDir::new().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let socket = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -646,7 +648,7 @@ async fn native_restart(threshold: usize, phone_decision: Option<&str>) {
     assert!(ready);
     let mut init: serde_json::Value = http
         .post(format!("{base}/v1/sys/init"))
-        .json(&serde_json::json!({"secret_shares":3,"secret_threshold":threshold}))
+        .json(&serde_json::json!({"secret_shares":share_count,"secret_threshold":threshold}))
         .send()
         .await
         .unwrap()
@@ -674,6 +676,7 @@ async fn native_restart(threshold: usize, phone_decision: Option<&str>) {
         vec![],
         mock,
         shares,
+        share_count,
         child.0.id(),
         Some((config.clone(), storage.clone(), native_pid_file.clone())),
     )
@@ -874,6 +877,7 @@ async fn native_restart(threshold: usize, phone_decision: Option<&str>) {
             .await
             .unwrap();
         assert!(partial.sealed);
+        assert_eq!(partial.n, share_count);
         assert_eq!(partial.progress, 2);
         let web = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web");
         let mut browser = tokio::process::Command::new("node")

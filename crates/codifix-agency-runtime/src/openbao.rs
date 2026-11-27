@@ -6,7 +6,30 @@ use crate::{
 use anyhow::{Result, ensure};
 use codifix_agency::{ResourceScope, Usage};
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 use uuid::Uuid;
+
+fn check_notice_recipients(
+    interactive: bool,
+    recipients: &[String],
+    enrolled: impl Fn(&str) -> bool,
+) -> Result<()> {
+    let unique: BTreeSet<_> = recipients.iter().collect();
+    ensure!(
+        unique.len() == recipients.len(),
+        "OpenBao notice recipients must be distinct"
+    );
+    ensure!(
+        !interactive || unique.len() >= 2,
+        "Interactive OpenBao recovery requires the operator and a companion notice recipient"
+    );
+    ensure!(
+        unique.iter().all(|peer| enrolled(peer)),
+        "OpenBao notice recipient is not enrolled"
+    );
+    Ok(())
+}
+
 pub async fn recover(store: &Store, cfg: &Config, task: &StoredTask) -> Result<Option<Value>> {
     let profile = task.request.payload["controller"]
         .as_str()
@@ -25,13 +48,25 @@ pub async fn recover(store: &Store, cfg: &Config, task: &StoredTask) -> Result<O
         .ok_or_else(|| anyhow::anyhow!("controller is not enrolled"))?;
     let controller: codifix_agency_openbao::ControllerConfig =
         codifix_agency_openbao::protected::load(std::path::Path::new(path))?;
-    for peer in &controller.notice_peers {
-        ensure!(
+    if let Err(error) = check_notice_recipients(
+        controller.peers.iter().any(|peer| peer.interactive),
+        &controller.notice_peers,
+        |peer| {
             cfg.social
                 .as_ref()
-                .is_some_and(|s| s.peers.contains_key(peer)),
-            "OpenBao notice recipient is not enrolled"
-        );
+                .is_some_and(|s| s.peers.contains_key(peer))
+                && cfg
+                    .peers
+                    .iter()
+                    .any(|p| p.id == peer && p.endpoint.is_some())
+        },
+    ) {
+        let mut waiting = task.clone();
+        waiting
+            .contract
+            .clarify(error.to_string(), chrono::Utc::now())?;
+        store.update_contract(&waiting).await?;
+        return Ok(None);
     }
     let id = Uuid::new_v5(&task.contract.id, b"openbao-recovery");
     store
@@ -193,4 +228,27 @@ async fn notify(
         }
     }
     delivered
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_notice_recipients;
+
+    #[test]
+    fn interactive_recovery_rejects_missing_duplicate_or_unenrolled_recipients() {
+        let enrolled = |peer: &str| matches!(peer, "operator" | "homelab");
+        let check = |recipient_names: &[&str]| {
+            let recipients = recipient_names
+                .iter()
+                .map(|id| (*id).into())
+                .collect::<Vec<_>>();
+            check_notice_recipients(true, &recipients, enrolled)
+        };
+        assert!(check(&[]).is_err());
+        assert!(check(&["operator"]).is_err());
+        assert!(check(&["operator", "operator"]).is_err());
+        assert!(check(&["operator", "unregistered"]).is_err());
+        assert!(check(&["operator", "homelab"]).is_ok());
+        assert!(check_notice_recipients(false, &[], enrolled).is_ok());
+    }
 }

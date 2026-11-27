@@ -262,9 +262,9 @@ cargo test -p codifix-agency-openbao --all-targets --locked
 cargo clippy -p codifix-agency-openbao --all-targets --locked -- -D warnings
 # Explicit opt-in; requires `bao` on PATH, creates only a disposable local vault:
 cargo test -p codifix-agency-openbao --test ceremony actual_openbao_shamir --locked -- --ignored
-# Synthetic phone approval and decline on separately restarted 3-of-3 vaults:
+# Synthetic phone approval and decline on separately restarted 3-of-5 vaults with exactly three enrolled custodians:
 npm --prefix web ci
-CHROMIUM_EXECUTABLE=/usr/bin/chromium cargo test -p codifix-agency-openbao --test ceremony mobile_three_of_three --locked -- --ignored
+CHROMIUM_EXECUTABLE=/usr/bin/chromium cargo test -p codifix-agency-openbao --test ceremony mobile_three_of_five --locked -- --ignored
 # Private operator notices on disposable PDS and PostgreSQL:
 node tests/federation-pds/run.mjs --agency
 ```
