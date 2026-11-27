@@ -274,6 +274,19 @@ jobs:
       - run: node tests/federation-pds/run.mjs --runtime
         env:
           CODIFIX_FEDERATION_E_CLIENTS: "1"
+
+  federation-isolation:
+    name: Dedicated Federation Network Isolation
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.federation_pds == 'true'
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
       - run: node tests/federation-isolation/run.mjs
 
   plugin-contract:
