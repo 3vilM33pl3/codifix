@@ -7,7 +7,9 @@ description: "Read the storage model at a high level without depending on unstab
 
 Codifix stores durable state in PostgreSQL. This page explains the stable storage concepts and table groups; exact columns and indexes are implementation details owned by the migrations in `migrations/`.
 
-The service runs append-only migrations at startup. Codifix 3.1.0 embeds
+In apply mode the service runs append-only migrations at startup. In
+`verify_only` mode, the migration owner applies them first and the service
+checks the schema on startup. Codifix 3.1.0 embeds
 migrations through 0105. PostgreSQL must have pgvector
 installed; the schema-owner setup must permit its extension and migrations.
 Do not infer application-version compatibility from an early table definition.
