@@ -67,10 +67,8 @@ Git commit is different from notarizing or signing an installer.
 | Demo | The interactive website demo uses static sample data and does not establish local service, auth or database health. |
 | Evaluations | Fixture, rehearsal and historical benchmark results are bounded evidence. They do not establish a new paid R3 result, ROI or universal coding improvement. |
 
-The [dependency security evidence](https://github.com/3vilM33pl3/codifix/blob/main/docs/reviews/security-dependencies-20261017.md)
-retains the unpatched upstream RSA advisory and the lockfile's yanked-dependency
-warning. The inspected OIDC path verifies public keys rather than performing
-the affected private-key operation; the Rust audit is not described as clean.
+The core release requires a clean dependency audit. Windows PDS has a separate
+validation workflow and is provisioned independently of the core installers.
 
 ## Historical Memory Layer releases
 

@@ -128,7 +128,7 @@ jobs:
           npm --prefix docs-site run check:assets
           npm --prefix docs-site run build
           npm --prefix docs-site audit --audit-level=low
-      - name: Rust audit with explicit documented RSA exception
+      - name: Require a clean Rust audit
         run: |
           cargo install cargo-audit --locked
           mkdir -p target
