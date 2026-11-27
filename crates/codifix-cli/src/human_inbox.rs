@@ -374,12 +374,11 @@ impl HumanInbox {
                 Ok(Err(error)) => Err(error),
                 Err(_) => Err("Inbox sign-in timed out; try again".into()),
             };
-            if let Ok(mut s) = this.state.lock() {
-                if s.generation == generation {
-                    if let Some(p) = s.pending.as_mut() {
-                        p.progress = result;
-                    }
-                }
+            if let Ok(mut s) = this.state.lock()
+                && s.generation == generation
+                && let Some(p) = s.pending.as_mut()
+            {
+                p.progress = result;
             }
         });
         Ok(info)
@@ -543,16 +542,14 @@ impl HumanInbox {
         if result
             .as_ref()
             .is_err_and(|e| e == "Inbox returned HTTP 401")
+            && let Ok(mut s) = self.state.lock()
+            && s.generation == generation
         {
-            if let Ok(mut s) = self.state.lock() {
-                if s.generation == generation {
-                    if let Some(credential) = s.session.take() {
-                        s.cleanup.push(credential);
-                    }
-                    s.pending = None;
-                    s.generation = s.generation.wrapping_add(1);
-                }
+            if let Some(credential) = s.session.take() {
+                s.cleanup.push(credential);
             }
+            s.pending = None;
+            s.generation = s.generation.wrapping_add(1);
         }
         self.current(generation)?;
         if let Err(error) = self.verify().await {

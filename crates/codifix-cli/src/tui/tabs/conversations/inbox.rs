@@ -126,10 +126,8 @@ impl ConversationsState {
                     state.cancel_read();
                     state.clear_private();
                 }
-                if was_login {
-                    if let Some(client) = &state.client {
-                        client.cancel_login();
-                    }
+                if was_login && let Some(client) = &state.client {
+                    client.cancel_login();
                 }
                 if was_logout {
                     state.message = Some(
