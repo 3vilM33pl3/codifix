@@ -36,14 +36,17 @@ SYSTEMCTL
     /usr/bin/codifix-agency --help >/dev/null
     /usr/bin/codifix-agency-openbao --help >/dev/null
     /usr/libexec/codifix/agency/release-rollout.py --help >/dev/null
-    test -s /usr/libexec/codifix/agency/ssh-renew.py
-    test -s /usr/share/doc/codifix/agency/ssh-host-renewal.md
-    test -s /usr/share/doc/codifix/agency/openbao.md
+    local file
+    for file in /usr/libexec/codifix/agency/ssh-renew.py \
+      /usr/share/doc/codifix/agency/{ssh-host-renewal,openbao,incident-response}.md \
+      /usr/share/codifix/agency/{incidents.json.example,codifix-agency.service.example}; do
+      if [[ ! -s $file ]]; then
+        echo "Installed package is missing $file" >&2
+        return 1
+      fi
+    done
     test -x /usr/libexec/codifix/agency/inspect-systemd.py
-    test -s /usr/share/codifix/agency/incidents.json.example
-    test -s /usr/share/doc/codifix/agency/incident-response.md
     test ! -e /lib/systemd/system/codifix-agency.service
-    test -s /usr/share/codifix/agency/codifix-agency.service.example
   }
 
   dpkg -i "$package"
