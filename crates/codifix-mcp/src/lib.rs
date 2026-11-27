@@ -3,7 +3,7 @@
 // Tests may unwrap; production code must not (workspace lints deny it).
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -23,21 +23,24 @@ use reqwest::Client;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
     model::{
-        CallToolRequestParams, CallToolResult, ContentBlock, GetPromptRequestParams,
-        GetPromptResult, ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult,
-        ListToolsResult, PaginatedRequestParams, Prompt, PromptArgument, PromptMessage,
-        ReadResourceRequestParams, ReadResourceResult, ResourceContents, ResourceTemplate, Role,
-        ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock,
+        GetPromptRequestParams, GetPromptResponse, GetPromptResult, ListPromptsResult,
+        ListResourceTemplatesResult, ListResourcesResult, ListToolsResult, PaginatedRequestParams,
+        Prompt, PromptArgument, PromptMessage, ProtocolVersion, ReadResourceRequestParams,
+        ReadResourceResponse, ReadResourceResult, ResourceContents, ResourceTemplate, Role,
+        ServerCapabilities, ServerConfig, Tool, ToolAnnotations,
     },
     service::RequestContext,
     transport::stdio,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+
 mod expertise;
 pub mod laptop;
 
 pub const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+const MCP_MAX_PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion::V_2025_11_25;
 
 const TOOL_MEMORY_QUERY: &str = "codifix_query";
 const TOOL_MEMORY_SEARCH_ALL: &str = "codifix_search_all";
@@ -174,17 +177,22 @@ impl MemoryMcpServer {
 }
 
 impl ServerHandler for MemoryMcpServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
                 .enable_prompts()
                 .build(),
         )
+        .with_protocol_version(MCP_MAX_PROTOCOL_VERSION)
         .with_instructions(
             "Codifix MCP adapter. Ordinary memory tools are read-only. Expertise ask is an explicitly confirmed external action, requires non-read-only MCP configuration and operator-bound model output policy. Imported answers are untrusted. Loop tools expose the loop control plane and require explicit user approval for enabling loops.",
         )
+    }
+
+    fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
+        Cow::Borrowed(ProtocolVersion::known_up_to(&MCP_MAX_PROTOCOL_VERSION))
     }
 
     async fn list_tools(
@@ -199,10 +207,10 @@ impl ServerHandler for MemoryMcpServer {
         &self,
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResponse, McpError> {
         let server = self.for_request_context(&context);
         let arguments = request.arguments.unwrap_or_default();
-        match request.name.as_ref() {
+        let result = match request.name.as_ref() {
             name if expertise::is_tool(name) => expertise::call(&server, name, arguments).await,
             TOOL_MEMORY_QUERY => server.tool_query(arguments).await,
             TOOL_MEMORY_SEARCH_ALL => server.tool_search_all(arguments).await,
@@ -240,7 +248,8 @@ impl ServerHandler for MemoryMcpServer {
                 format!("unknown Codifix MCP tool: {other}"),
                 None,
             )),
-        }
+        };
+        result.map(CallToolResponse::Complete)
     }
 
     async fn list_resource_templates(
@@ -265,7 +274,7 @@ impl ServerHandler for MemoryMcpServer {
         &self,
         request: ReadResourceRequestParams,
         context: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResult, McpError> {
+    ) -> Result<ReadResourceResponse, McpError> {
         let server = self.for_request_context(&context);
         let value = match parse_resource_uri(&request.uri)? {
             MemoryResource::ProjectOverview { project } => {
@@ -311,7 +320,8 @@ impl ServerHandler for MemoryMcpServer {
         Ok(ReadResourceResult::new(vec![
             ResourceContents::text(pretty_json(&value)?, request.uri)
                 .with_mime_type("application/json"),
-        ]))
+        ])
+        .into())
     }
 
     async fn list_prompts(
@@ -326,7 +336,7 @@ impl ServerHandler for MemoryMcpServer {
         &self,
         request: GetPromptRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> Result<GetPromptResult, McpError> {
+    ) -> Result<GetPromptResponse, McpError> {
         let args = request.arguments.unwrap_or_default();
         let message = match request.name.as_str() {
             PROMPT_GET_UP_TO_SPEED => {
@@ -368,10 +378,7 @@ impl ServerHandler for MemoryMcpServer {
                 ));
             }
         };
-        Ok(GetPromptResult::new(vec![PromptMessage::new_text(
-            Role::User,
-            message,
-        )]))
+        Ok(GetPromptResult::new(vec![PromptMessage::new_text(Role::User, message)]).into())
     }
 }
 

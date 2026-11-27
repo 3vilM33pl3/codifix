@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 axum.workspace = true
-axum-server = { version = "0.7.3", features = ["tls-rustls-no-provider"] }
+axum-server = { version = "0.8.0", features = ["tls-rustls-no-provider"] }
 clap.workspace = true
 bytes = "1"
 subtle = "2"
