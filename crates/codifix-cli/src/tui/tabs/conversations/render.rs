@@ -494,7 +494,7 @@ fn append_transcript_event(
     match kind {
         "request" | "answer" => transcript_message(lines, initiator, incoming, body),
         "clarification" | "result" => transcript_message(lines, responder, !incoming, body),
-        "snapshot" => lines.push(line(body)),
+        "snapshot" => lines.extend(body.lines().map(line)),
         _ => {}
     }
 }

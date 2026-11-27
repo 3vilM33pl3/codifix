@@ -1357,6 +1357,9 @@ pub(in crate::commands) enum Command {
     Tui(TuiArgs),
     /// Draft and approve a Linear issue through a local companion.
     #[cfg(feature = "tui")]
+    #[command(
+        after_help = "Agent notes:\n  The installed codifix-linear launcher supplies the operator profile. Review the exact proposal in the terminal before approving it.\n\nSee also:\n  docs/user/cli/linear-tui.md"
+    )]
     LinearTui {
         /// Dedicated operator profile for the loopback companion.
         #[arg(long)]
@@ -1364,6 +1367,7 @@ pub(in crate::commands) enum Command {
     },
 
     /// Configure per-project tracking through the resident Linear Agent.
+    #[command(after_help = crate::linear_tracking::HELP)]
     Linear(crate::linear_tracking::LinearArgs),
 
     // --- Status and health ---

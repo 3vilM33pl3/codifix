@@ -644,6 +644,14 @@ pub(crate) fn verified_url(task: &Value) -> Option<String> {
     None
 }
 
+pub(crate) const HELP: &str = "\
+Agent notes:
+  Select the same area and project used for the Codifix task. The companion uses the operator-enrolled Linear route.
+  Use status to inspect state and block to record a blocker on an existing tracked task.
+
+See also:
+  docs/user/cli/linear.md";
+
 #[derive(Debug, clap::Args)]
 pub(crate) struct LinearArgs {
     #[command(subcommand)]
@@ -653,26 +661,31 @@ pub(crate) struct LinearArgs {
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum LinearCommand {
     /// Show the configured destination, switch and last synchronization result.
+    #[command(after_help = HELP)]
     Status {
         #[arg(long)]
         project: Option<String>,
     },
     /// Enable the resident agent's enrolled route for this Codifix project.
+    #[command(after_help = HELP)]
     Enable {
         #[arg(long)]
         project: Option<String>,
     },
     /// Stop automatic writes and retain previously verified issue links.
+    #[command(after_help = HELP)]
     Disable {
         #[arg(long)]
         project: Option<String>,
     },
     /// Advance one pending synchronization for this project.
+    #[command(after_help = HELP)]
     Sync {
         #[arg(long)]
         project: Option<String>,
     },
     /// Report a blocker on an already tracked task.
+    #[command(after_help = HELP)]
     Block {
         #[arg(long)]
         project: Option<String>,
@@ -682,7 +695,7 @@ pub(crate) enum LinearCommand {
         reason: String,
     },
     /// Advance locally queued requests. Used by the resident companion.
-    #[command(hide = true)]
+    #[command(hide = true, after_help = HELP)]
     Drain {
         #[arg(long)]
         routes: Option<PathBuf>,
