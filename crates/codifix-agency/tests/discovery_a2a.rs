@@ -272,14 +272,14 @@ fn temporary_announcements_expire_without_removing_permanent_capabilities() {
         capability: "temporary".into(),
         expires_at: now(),
     });
-    p.validate().unwrap();
+    p.validate().expect("valid temporary capability profile");
     p.retain_available(now() - chrono::Duration::seconds(1));
     assert!(p.capabilities.contains("temporary"));
     p.retain_available(now());
     assert_eq!(p.capabilities, profile().capabilities);
     assert!(p.expirations.is_empty());
     p.capabilities.clear();
-    p.validate().unwrap();
+    p.validate().expect("valid empty capability profile");
     p.expirations.push(CapabilityExpiry {
         capability: "unknown".into(),
         expires_at: now(),
