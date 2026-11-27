@@ -1,8 +1,8 @@
 class Codifix < Formula
   desc "Local project memory service and terminal UI for coding agents"
   homepage "https://github.com/3vilM33pl3/codifix"
-  url "https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/codifix-3.0.0.tar.gz"
-  sha256 "982ce1b353ba982c093899ebd157698b472b6d1f9d0ddfeb0681292d020b4220"
+  url "https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/codifix-3.1.0.tar.gz"
+  sha256 "cdbfe9d20111f1235c57333da70726d64f9c20cea33a5d53e8152dfc15e3cd02"
   head "https://github.com/3vilM33pl3/codifix.git", branch: "main"
 
   depends_on "node" => :build
