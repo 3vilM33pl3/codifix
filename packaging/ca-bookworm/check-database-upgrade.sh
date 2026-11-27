@@ -63,8 +63,11 @@ verify_digest() {
 request() {
   local path=$1
   shift
-  curl --fail-with-body --silent --show-error --max-time 15 --noproxy '*' \
-    --header "Authorization: Bearer $token" "$@" "$origin$path"
+  if ! curl --fail-with-body --silent --show-error --max-time 15 --noproxy '*' \
+    --header "x-api-token: $token" "$@" "$origin$path"; then
+    echo "Upgrade request failed at $path" >&2
+    return 1
+  fi
 }
 
 start_service() {
