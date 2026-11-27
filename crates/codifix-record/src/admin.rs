@@ -429,10 +429,10 @@ pub struct PruneHistoryRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     /// Overrides `RetentionConfig::tombstone_after` for this call.
-    #[serde(default, with = "humantime_serde::option")]
+    #[serde(default, with = "crate::human_duration::option")]
     pub tombstone_after: Option<Duration>,
     /// Overrides `RetentionConfig::superseded_after` for this call.
-    #[serde(default, with = "humantime_serde::option")]
+    #[serde(default, with = "crate::human_duration::option")]
     pub superseded_after: Option<Duration>,
     /// When true, count what would be deleted without actually deleting.
     #[serde(default)]

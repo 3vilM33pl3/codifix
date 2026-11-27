@@ -87,12 +87,12 @@ pub struct AutomationConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repo_root: Option<String>,
     #[serde(default = "default_poll_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub poll_interval: Duration,
     #[serde(default = "default_file_events")]
     pub file_events: bool,
     #[serde(default = "default_capture_idle_threshold", alias = "idle_threshold")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub capture_idle_threshold: Duration,
     #[serde(default = "default_min_changed_files")]
     pub min_changed_files: usize,
@@ -394,7 +394,7 @@ pub struct ProvenanceConfig {
     #[serde(default = "default_true")]
     pub reverify_enabled: bool,
     #[serde(default = "default_reverify_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub reverify_interval: Duration,
 }
 
@@ -415,18 +415,18 @@ pub struct RetentionConfig {
     /// Delete a canonical memory entirely (all its versions) when its
     /// latest version is a tombstone older than this duration. Default
     /// None means "never prune tombstones".
-    #[serde(default, with = "humantime_serde::option")]
+    #[serde(default, with = "codifix_record::human_duration::option")]
     pub tombstone_after: Option<Duration>,
     /// Delete superseded (non-latest, non-tombstone) versions whose
     /// `updated_at` is older than this duration. The latest version of
     /// each canonical memory is always kept. Default None means "never
     /// prune superseded versions".
-    #[serde(default, with = "humantime_serde::option")]
+    #[serde(default, with = "codifix_record::human_duration::option")]
     pub superseded_after: Option<Duration>,
     /// Delete high-frequency operational timeline events (query,
     /// watcher_health) older than this duration. Mutation and provenance
     /// events are always kept. Default None means "never prune".
-    #[serde(default, with = "humantime_serde::option")]
+    #[serde(default, with = "codifix_record::human_duration::option")]
     pub operational_events_after: Option<Duration>,
 }
 
@@ -459,7 +459,7 @@ pub struct ReinforcementConfig {
     pub direct_read_boost: f64,
     /// Activation halves after this long without access.
     #[serde(default = "default_reinforcement_half_life")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub half_life: Duration,
     /// Per-hop decay factor for spreading activation to linked memories.
     #[serde(default = "default_hop_decay")]
@@ -483,12 +483,12 @@ pub struct ReinforcementConfig {
     /// Minimum wait after any validation run before the same memory can
     /// be validated again (hysteresis).
     #[serde(default = "default_validation_cooldown")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub validation_cooldown: Duration,
     /// Base revalidation interval for already-validated memories; divided
     /// by `1 + volatility * volatility_revalidation_factor`.
     #[serde(default = "default_min_revalidation_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub min_revalidation_interval: Duration,
     /// How strongly volatility shortens the revalidation interval.
     #[serde(default = "default_volatility_revalidation_factor")]
@@ -498,7 +498,7 @@ pub struct ReinforcementConfig {
     pub volatility_ewma_alpha: f64,
     /// Background reinforcement scheduler tick interval.
     #[serde(default = "default_reinforcement_scheduler_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub scheduler_interval: Duration,
     /// Maximum validations started per scheduler cycle per project.
     #[serde(default = "default_validation_batch_size")]
@@ -529,7 +529,7 @@ pub struct ReinforcementConfig {
     pub needs_review_rank_penalty: f64,
     /// How long individual access events are kept before pruning.
     #[serde(default = "default_access_event_retention")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub access_event_retention: Duration,
     /// Capacity of the bounded access-recording channel; overflow drops
     /// events (scoring is advisory, load-shedding is deliberate).

@@ -331,7 +331,7 @@ pub struct ServiceConfig {
     #[serde(default = "default_api_token")]
     pub api_token: String,
     #[serde(default = "default_request_timeout")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub request_timeout: Duration,
     /// Student / kiosk mode: reject every mutating HTTP endpoint while
     /// keeping reads, queries, and briefings available. Activation still
@@ -378,10 +378,10 @@ pub struct ClusterConfig {
     #[serde(default = "default_cluster_discovery_multicast_addr")]
     pub discovery_multicast_addr: String,
     #[serde(default = "default_cluster_announce_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub announce_interval: Duration,
     #[serde(default = "default_cluster_peer_ttl")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub peer_ttl: Duration,
     #[serde(default = "default_cluster_priority")]
     pub priority: i32,
@@ -433,7 +433,7 @@ pub struct OfflineConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     #[serde(default = "default_offline_reconnect_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub reconnect_interval: Duration,
     #[serde(default = "default_offline_sync_batch_size")]
     pub sync_batch_size: usize,

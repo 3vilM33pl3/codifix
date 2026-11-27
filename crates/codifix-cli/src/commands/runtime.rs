@@ -1560,7 +1560,7 @@ pub(in crate::commands) struct AuthTokenCreateArgs {
     pub(crate) project: String,
     #[arg(long, value_enum)]
     pub(crate) role: ServiceAuthRole,
-    #[arg(long, value_parser = humantime::parse_duration)]
+    #[arg(long, value_parser = codifix_record::human_duration::parse)]
     pub(crate) ttl: std::time::Duration,
     #[arg(long)]
     pub(crate) json: bool,
@@ -2116,11 +2116,11 @@ pub(in crate::commands) struct PruneHistoryArgs {
     pub(crate) project: Option<String>,
     /// Duration (e.g. 30d, 12h) after which a tombstoned canonical's rows
     /// are deleted entirely. Overrides config.retention.tombstone_after.
-    #[arg(long, value_parser = humantime::parse_duration)]
+    #[arg(long, value_parser = codifix_record::human_duration::parse)]
     pub(crate) tombstone_after: Option<std::time::Duration>,
     /// Duration after which non-latest, non-tombstone versions are
     /// deleted. Overrides config.retention.superseded_after.
-    #[arg(long, value_parser = humantime::parse_duration)]
+    #[arg(long, value_parser = codifix_record::human_duration::parse)]
     pub(crate) superseded_after: Option<std::time::Duration>,
     /// Preview counts without touching the database.
     #[arg(long)]

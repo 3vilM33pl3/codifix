@@ -21,6 +21,7 @@ pub mod device_onboarding;
 pub mod error;
 pub mod event;
 pub mod graph;
+pub mod human_duration;
 pub mod jobs;
 pub mod laptop_cache;
 pub mod loops;

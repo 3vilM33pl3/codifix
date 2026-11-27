@@ -157,7 +157,7 @@ pub struct AuthConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub public_base_url: Option<String>,
     #[serde(default = "default_auth_session_ttl")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub session_ttl: Duration,
     #[serde(default)]
     pub multi_user_legacy_token_enabled: bool,
