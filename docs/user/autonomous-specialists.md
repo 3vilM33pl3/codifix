@@ -1,9 +1,6 @@
 # Run autonomous specialists
 
-This first implementation supplies a separate `codifix-agency` service, a Linear
-project specialist and an independent OpenBao recovery controller. Installation
-and grants are explicit. Building the binaries does not start a service, enroll
-a custodian, publish a profile or change a ticket.
+Codifix 3.1.0 supplies a separate `codifix-agency` service for enrolled specialists and an independent OpenBao recovery controller. An installation operator configures the service and grants each peer a specific capability and resource. For an end-to-end example, follow [a reviewed issue from draft to receipt](https://codifix.dev/docs/specialists).
 
 ## Prepare one instance
 
@@ -13,7 +10,7 @@ Build the companion binaries from the reviewed revision:
 cargo build -p codifix-agency-runtime -p codifix-agency-openbao --release --locked
 ```
 
-Copy the [example configuration](../../crates/codifix-agency-runtime/examples/config.json)
+Copy the [example configuration](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-runtime/examples/config.json)
 to a protected operator-owned location. Configure an instance UUID, specialist
 manifests, the intended database and distinct credentials for each enrolled peer.
 Use a TLS reverse proxy for the private endpoint; the service itself binds only
@@ -29,7 +26,7 @@ codifix-agency --config /etc/codifix-agency/config.json serve
 `migrate` explicitly applies the repository's additive migrations to the selected
 database. Back it up and verify its identity first. `check` validates configuration
 shape; it does not test remote authorization or approve a production rollout.
-An optional [systemd template](../../crates/codifix-agency-runtime/examples/codifix-agency.service)
+An optional [systemd template](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-runtime/examples/codifix-agency.service)
 shows a separate service account and environment file. It is not installed by
 Codifix's existing installer.
 
@@ -58,7 +55,7 @@ codifix-agency --config /etc/codifix-agency/config.json control \
 ```
 
 The grant document is `{ "project_id": "UUID", "mandate": { ... } }` using the
-[mandate contract](../../crates/codifix-agency/src/mandate.rs). Configure child
+[mandate contract](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency/src/mandate.rs). Configure child
 grants with smaller authority and reserved budgets. A revoked mandate cannot be
 resumed; issue a new reviewed grant. Pause/revoke stop future admissions, not an
 external request already sent.
@@ -93,7 +90,7 @@ entry points.
 
 ## Plan, discuss and apply in Linear
 
-The [Linear Agent configuration](../../crates/codifix-agency-runtime/examples/linear-agent.json)
+The [Linear Agent configuration](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-runtime/examples/linear-agent.json)
 exposes Linear as its only external tool. Replace the sample actor, project,
 team and mandate identifiers. Install the corresponding mandate with the
 `linear_project` resource and give each originating companion a peer binding
@@ -123,11 +120,11 @@ Start with a designated test team/project and a restricted test credential.
 `Config.linear` contains `endpoint`, `token_env` and an `authorities` map keyed by
 mandate UUID. The endpoint is normally `https://api.linear.app/graphql`. A raw
 personal API key or full OAuth `Bearer ...` value goes in the named environment
-variable. The operator-owned [authority example](../../crates/codifix-agency-projects/examples/standing-authority.json)
+variable. The operator-owned [authority example](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-projects/examples/standing-authority.json)
 binds the source, exact plan UUID, allowed teams/projects and adopted records.
 Never take authority from the planning model's output.
 
-Use the provider-neutral [plan example](../../crates/codifix-agency-projects/examples/plan.json):
+Use the provider-neutral [plan example](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-projects/examples/plan.json):
 
 1. Submit `plan_prepare` with resource `{ "kind": "plan", "id": PLAN_UUID }`,
    criterion `plan_valid` and payload `{ "kind": "plan_prepare", "plan": PLAN }`.
@@ -157,7 +154,7 @@ The Linear Agent example requires the originating peer's exact wording
 confirmation for plan operations that change issue text. Keep stable plan
 UUIDs and item keys between revisions. The originating agent can relay each
 verified outcome from the private task, and use `plan_inspect` to report
-relevant subsequent changes. [Reconciliation details](../../crates/codifix-agency-projects/README.md)
+relevant subsequent changes. [Reconciliation details](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-projects/README.md)
 
 A2A calls use `A2A-Version: 1.0`, bearer authentication and an object data part.
 Use `configuration.returnImmediately: true` for asynchronous work and poll the
@@ -167,13 +164,13 @@ in its data part. A remote `delegate` task supplies an enrolled `peer` and a
 nested `request`. Both instances must implement Codifix's execution-lease and
 source-policy extension; generic A2A alone is insufficient for delegated authority.
 
-See [SSH host certificate renewal](ssh-host-renewal.md) for the operator-approved Step CA and OpenBao handoff.
+See [SSH host certificate renewal](https://codifix.dev/docs/specialists/ssh-renewal) for the operator-approved Step CA and OpenBao handoff.
 
-For authenticated service alerts, runbooks and incident tracking, see [Respond to a service outage](incident-response.md).
+For authenticated service alerts, runbooks and incident tracking, see [Respond to a service outage](https://codifix.dev/docs/specialists/incidents).
 
 ## Recover OpenBao without an LLM or database
 
-Use the separate [OpenBao enrollment and custody runbook](../../crates/codifix-agency-openbao/README.md).
+For the operator's phone workflow, see [Review an OpenBao ceremony](https://codifix.dev/docs/specialists/openbao). For installation, use the separate [OpenBao enrollment and custody runbook](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-openbao/README.md).
 Verify the actual seal type, threshold, native binary/configuration/storage and
 maintenance generation. Do not change seal arrangement as part of this pilot.
 Keep bootstrap TLS trust, attestation credentials and replay state available
@@ -231,7 +228,7 @@ per completed task, with distinct evidence and case identity. Promotion requires
 at least 20 passing canary assessments, all assigned canary tasks completed and
 assessed, no failures and quality at least the
 held-out baseline. `revert` restores the prior baseline for subsequent tasks.
-The [typed learning API](../../crates/codifix-agency-runtime/src/learning.rs)
+The [typed learning API](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/crates/codifix-agency-runtime/src/learning.rs)
 defines these documents and rejects undeclared fields such as a reusable
 `passed: true` claim. Only operator/evaluation credentials can accept these
 decisions; candidates cannot rewrite their own criteria or authority.
@@ -246,6 +243,6 @@ A synthetic report is not evidence of real cost savings or better task quality.
 The implementation has local HTTP fixtures and real PostgreSQL coverage, plus
 an actual disposable OpenBao restart/unseal test. Live Linear compatibility,
 real distributed custody, your TLS/alerting setup and production rollout remain
-operator acceptance work. The [architecture](../developer/architecture/agency.md)
+operator acceptance work. The [architecture](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/docs/developer/architecture/agency.md)
 and specialist runbooks describe these limits. Jira, additional specialisms,
 model-weight training, autonomous deployment and live trading are later work.
