@@ -290,7 +290,6 @@ Copy-Item -Force (Join-Path $RootDir 'codifix.toml.example') (Join-Path $StageDi
 Copy-Item -Force (Join-Path $RootDir 'packaging\windows\postgres.compose.yaml') (Join-Path $StageDir 'share\codifix\postgres.compose.yaml')
 Copy-Tree (Join-Path $RootDir 'web\dist') (Join-Path $StageDir 'share\codifix\web')
 Copy-Tree (Join-Path $RootDir '.agents\skills') (Join-Path $StageDir 'share\codifix\skill-template')
-Copy-Tree (Join-Path $RootDir 'packaging\windows-pds') (Join-Path $StageDir 'share\codifix\windows-pds')
 New-Item -ItemType Directory -Force -Path (Join-Path $StageDir 'share\codifix\operators') | Out-Null
 foreach ($operator in @('native-instance.ps1', 'native-instance-functions.ps1', 'release-identity.ps1',
     'native-prerequisites.ps1', 'native-prerequisites-functions.ps1',

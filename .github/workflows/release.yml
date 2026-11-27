@@ -128,12 +128,6 @@ jobs:
           npm --prefix docs-site run check:assets
           npm --prefix docs-site run build
           npm --prefix docs-site audit --audit-level=low
-      - name: Pinned PDS security overlay validation
-        run: |
-          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
-          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream rebuild better-sqlite3 --config.node-linker=hoisted
-          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream audit --audit-level=low
-          node --test packaging/windows-pds/security.test.mjs packaging/windows-pds/http-stdio.test.mjs packaging/windows-pds/windows-paths.test.mjs
       - name: Rust audit with explicit documented RSA exception
         run: |
           cargo install cargo-audit --locked

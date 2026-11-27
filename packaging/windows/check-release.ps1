@@ -33,7 +33,13 @@ $stage = Join-Path $env:RUNNER_TEMP ('codifix-release-check-' + [guid]::NewGuid(
 New-Item -ItemType Directory -Path $stage | Out-Null
 $zip = @($manifest.artifacts | Where-Object { $_.name.EndsWith('.zip') })
 if ($zip.Count -ne 1) { throw 'Expected one portable ZIP' }
+function Assert-CorePayload([string]$Root) {
+    if (Test-Path -LiteralPath (Join-Path $Root 'share\codifix\windows-pds')) {
+        throw 'Optional Windows PDS payload is present in a core release package'
+    }
+}
 Expand-Archive -LiteralPath (Join-Path $DistDir $zip[0].name) -DestinationPath $stage
+Assert-CorePayload $stage
 foreach ($file in $manifest.payload_files) {
     $path = [IO.Path]::GetFullPath((Join-Path $stage $file.name))
     if (-not $path.StartsWith($stage + '\', [StringComparison]::OrdinalIgnoreCase) -or
@@ -144,10 +150,12 @@ foreach ($artifact in @($manifest.artifacts | Where-Object { $_.name.EndsWith('.
     # User-created data is outside the package component inventory and must
     # survive both repair and uninstall; no database or service is activated.
     Invoke-Msi @('/i', "`"$package`"", '/qn', '/norestart', '/l*v', "`"$stage\install-$($artifact.name).log`"")
+    Assert-CorePayload $install
     Check-Codifix (Join-Path $install 'bin\codifix.exe')
     $sentinel = Join-Path $install 'release-user-data-sentinel.txt'
     [IO.File]::WriteAllText($sentinel, 'preserved user data')
     Invoke-Msi @('/fa', "`"$package`"", '/qn', '/norestart')
+    Assert-CorePayload $install
     Check-Codifix (Join-Path $install 'bin\codifix.exe')
     Invoke-Msi @('/x', "`"$package`"", '/qn', '/norestart')
     if ([IO.File]::ReadAllText($sentinel) -cne 'preserved user data') { throw 'MSI removed user data' }
