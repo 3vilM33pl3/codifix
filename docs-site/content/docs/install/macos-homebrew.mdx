@@ -5,9 +5,9 @@ description: "Review Codifix macOS package names and Homebrew availability."
 
 # macOS
 
-The [Codifix v3.0.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) provides macOS packages. The existing
+The [Codifix v3.1.0 release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0) provides macOS packages. The existing
 v2.1.0 release is the previous Memory Layer product; its assets are not
-Codifix installers. Homebrew provides a stable formula pinned to the v3.0.0 source archive and checksum.
+Codifix installers. Homebrew provides a stable formula pinned to the v3.1.0 source archive and checksum.
 
 ## Homebrew
 
@@ -24,8 +24,8 @@ This compiles the checksum-pinned stable source locally. Use `--HEAD` only to op
 
 The standard packages are:
 
-- Intel Mac: `codifix-3.0.0-macos-x86_64.pkg`
-- Apple Silicon: `codifix-3.0.0-macos-aarch64.pkg`
+- Intel Mac: `codifix-3.1.0-macos-x86_64.pkg`
+- Apple Silicon: `codifix-3.1.0-macos-aarch64.pkg`
 
 The matching packages ending in
 `-macos-x86_64-application-update.pkg` or
@@ -33,10 +33,10 @@ The matching packages ending in
 installation. They do not migrate Memory Layer. Standard packages require
 separately configured PostgreSQL/pgvector; application-update packages preserve
 the Codifix runtime they update. Verify downloads against the release
-[SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS). The packages are unsigned and not notarized;
+[SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/SHA256SUMS). The packages are unsigned and not notarized;
 native package acceptance passed on Intel and Apple Silicon.
 
-Download only from the Codifix 3.0.0 release and verify its
+Download only from the Codifix 3.1.0 release and verify its
 matching checksum. For an existing Memory Layer installation, first follow the
 [Update guide](/docs/install/update) and the
 [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).

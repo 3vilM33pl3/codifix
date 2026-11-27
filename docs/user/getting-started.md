@@ -2,7 +2,7 @@
 
 This guide is written for someone who just wants Codifix working with as little setup friction as possible.
 
-The current distribution is the [Codifix v3.0.0 stable release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0).
+The current distribution is the [Codifix v3.1.0 stable release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0).
 These instructions follow current `main`; source fixes after the candidate are
 not included in its packages. If you are joining an existing installation,
 start with [Team setup](https://codifix.dev/docs/team-setup) instead of creating
@@ -188,7 +188,7 @@ preview with `codifix wizard --dry-run`, and preserve customizations.
 
 1. Download the architecture-matched Codifix release and verify its checksum
    using the [Linux install guide](https://codifix.dev/docs/install/linux-debian).
-   Debian release filenames use the stable `3.0.0` version; follow the guide's
+   Debian release filenames use the stable `3.1.0` version; follow the guide's
    exact package name and checksum instructions.
 2. Install it:
 
@@ -250,7 +250,7 @@ codifix tui
 
 1. Prefer the architecture-matched unsigned release package described in the
    [macOS install guide](https://codifix.dev/docs/install/macos-homebrew).
-   Homebrew builds the checksum-pinned v3.0.0 release source:
+   Homebrew builds the checksum-pinned v3.1.0 release source:
 
 ```bash
 brew tap 3vilM33pl3/codifix https://github.com/3vilM33pl3/codifix

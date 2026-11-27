@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.0
+## 3.1.0 - 2026-11-27
 
 - Add specialist coordination, private Network and Inbox workflows, and Linux
   desktop session and area routing support. See the [release notes](docs/releases/3.1.0.md)
