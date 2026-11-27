@@ -3,8 +3,7 @@
 This guide is written for someone who just wants Codifix working with as little setup friction as possible.
 
 The current distribution is the [Codifix v3.1.0 stable release](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0).
-These instructions follow current `main`; source fixes after the candidate are
-not included in its packages. If you are joining an existing installation,
+These instructions follow current `main`. The stable inventory records the exact source commit for packaged builds. If you are joining an existing installation,
 start with [Team setup](https://codifix.dev/docs/team-setup) instead of creating
 another database. Moving from Memory Layer requires the
 [release-specific update procedure](https://codifix.dev/docs/install/update).
@@ -613,7 +612,10 @@ processes, ownership and recovery.
 ## Upgrading An Existing Install
 
 Follow the [Update guide](https://codifix.dev/docs/install/update) and the
-selected release's procedure. The Memory Layer-to-Codifix rename requires an
+selected release's procedure. Codifix 3.0.0 to 3.1.0 uses your existing database
+and configuration. Back up first, apply the additive migrations through `0105`,
+then check service readiness and read back a known project record.
+The Memory Layer-to-Codifix rename requires an
 explicit cutover with a matched backup; it is not an in-place package upgrade.
 Named areas have independently pinned executables, so neither package
 installation nor `service restart-all` upgrades those instances.
