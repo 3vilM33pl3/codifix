@@ -5,6 +5,8 @@
 - Add specialist coordination, private Network and Inbox workflows, and Linux
   desktop session and area routing support. See the [release notes](docs/releases/3.1.0.md)
   for upgrade requirements and platform support.
+- Add per-project Linear tracking, verified incident follow-ups, CA upgrade
+  supervision, and private notice checks for OpenBao ceremonies.
 
 ## 3.0.0 - 2026-10-20
 
