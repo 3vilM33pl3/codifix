@@ -48,13 +48,14 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         frame.area(),
     );
 
+    let companion = app.conversations.footer_companion();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Min(10),
-            Constraint::Length(footer_height(app.meta.profile)),
+            Constraint::Length(footer_height(app.meta.profile, companion.is_some())),
         ])
         .split(frame.area());
 
@@ -350,30 +351,25 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         draw_backend_recovery(frame, app, chunks[2]);
     }
 
-    let footer_constraints = match app.meta.profile {
-        Profile::Dev => vec![
-            Constraint::Length(3),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ],
-        Profile::Prod => vec![Constraint::Length(3), Constraint::Length(1)],
-    };
-    let footer_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(footer_constraints)
-        .split(chunks[3]);
+    let footer_chunks = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(1),
+        Constraint::Length(u16::from(companion.is_some())),
+        Constraint::Length(u16::from(app.meta.profile == Profile::Dev)),
+    ])
+    .split(chunks[3]);
 
     let footer = Paragraph::new(app.chrome.status_message.clone())
         .style(status_message_style(app))
         .wrap(Wrap { trim: false })
         .block(themed_block("Status"));
     frame.render_widget(footer, footer_chunks[0]);
-    match app.meta.profile {
-        Profile::Dev => {
-            draw_bottom_status_bar(frame, app, footer_chunks[1]);
-            draw_dev_status_bar(frame, app, footer_chunks[2]);
-        }
-        Profile::Prod => draw_bottom_status_bar(frame, app, footer_chunks[1]),
+    draw_bottom_status_bar(frame, app, footer_chunks[1]);
+    if let Some((version, freshness)) = companion {
+        draw_companion_status_bar(frame, version.as_deref(), freshness, footer_chunks[2]);
+    }
+    if app.meta.profile == Profile::Dev {
+        draw_dev_status_bar(frame, app, footer_chunks[3]);
     }
 }
 

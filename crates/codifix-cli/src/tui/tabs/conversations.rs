@@ -33,7 +33,7 @@ pub(in crate::tui) struct ConversationsState {
     companion_generation: u64,
     companion_busy: bool,
     companion_error: Option<String>,
-    companion_loaded: Option<Instant>,
+    companion_checked: Option<Instant>,
     companion_task: Option<tokio::task::JoinHandle<()>>,
     page: Option<ExchangePage>,
     detail: Option<ExchangeDetail>,
@@ -77,6 +77,21 @@ enum Read {
 }
 
 impl ConversationsState {
+    pub(in crate::tui) fn footer_companion(&self) -> Option<(Option<String>, &'static str)> {
+        let status = self.companion.as_ref().filter(|status| status.enabled)?;
+        let freshness = match (self.companion_error.is_some(), status.state.as_str()) {
+            (true, _) => "unavailable",
+            (false, "fresh") => "fresh",
+            (false, "stale") => "stale",
+            _ => "awaiting heartbeat",
+        };
+        let version = status
+            .version
+            .as_deref()
+            .filter(|version| !version.trim().is_empty())
+            .map(|version| render::plain(version).replace('\n', " "));
+        Some((version, freshness))
+    }
     pub(in crate::tui) fn my_inbox_selected(&self) -> bool {
         self.my_inbox
     }
@@ -136,6 +151,7 @@ impl ConversationsState {
             }
             self.companion_busy = false;
             self.companion_task = None;
+            self.companion_checked = Some(Instant::now());
             match result {
                 Ok(ObservationResult::Companion(status)) => {
                     if self
@@ -160,13 +176,11 @@ impl ConversationsState {
                     self.observation_denied = !status.exchange_access;
                     self.companion = Some(status);
                     self.companion_error = None;
-                    self.companion_loaded = Some(Instant::now());
                 }
                 Ok(ObservationResult::CompanionError(e)) => {
                     if denied(&e) {
                         self.deny_exchanges();
                         self.companion = None;
-                        self.companion_loaded = None;
                     }
                     self.companion_error = Some(e);
                 }
@@ -298,22 +312,16 @@ impl App {
             self.conversations.invalidate(scope);
         }
         self.conversations.inbox.check_expiry();
-        if !matches!(self.active_tab, TabKind::Watchers | TabKind::Conversations) {
-            return;
-        }
         let state = &self.conversations;
         if !state.companion_busy
-            && state.companion_loaded.is_none()
-            && state.companion_error.is_none()
-        {
-            self.observation_request(api, Read::Companion);
-        } else if !state.companion_busy
             && state
-                .companion_loaded
-                .is_some_and(|t| t.elapsed() >= Duration::from_secs(30))
-            && state.companion_error.is_none()
+                .companion_checked
+                .is_none_or(|t| t.elapsed() >= Duration::from_secs(30))
         {
             self.observation_request(api, Read::Companion);
+        }
+        if !matches!(self.active_tab, TabKind::Watchers | TabKind::Conversations) {
+            return;
         }
         let state = &self.conversations;
         if self.active_tab == TabKind::Conversations && state.live_selected() {
@@ -349,7 +357,6 @@ impl App {
             }
             state.companion_generation = state.companion_generation.wrapping_add(1);
             state.companion_busy = true;
-            state.companion_error = None;
             state.companion_generation
         } else {
             if let Some(task) = state.exchange_task.take() {
@@ -683,7 +690,10 @@ impl App {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Min(10),
-            Constraint::Length(crate::tui::render::footer_height(self.meta.profile)),
+            Constraint::Length(crate::tui::render::footer_height(
+                self.meta.profile,
+                self.conversations.footer_companion().is_some(),
+            )),
         ])
         .split(area);
         root[2]

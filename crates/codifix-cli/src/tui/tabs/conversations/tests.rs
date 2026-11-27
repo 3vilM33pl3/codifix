@@ -466,7 +466,7 @@ async fn repeated_detail_scrolling_stops_at_the_end_and_can_move_back() {
     app.active_tab = TabKind::Conversations;
     app.conversations.tasks_view = true;
     app.conversations.companion = Some(status());
-    app.conversations.companion_loaded = Some(Instant::now());
+    app.conversations.companion_checked = Some(Instant::now());
     app.conversations.page = Some(ExchangePage {
         exchanges: vec![],
         next_before: None,
@@ -502,4 +502,83 @@ fn missing_companion_route_clears_cached_heartbeat_and_exchange_detail() {
     assert!(s.companion.is_none());
     assert!(s.detail.is_none());
     assert!(!s.can_observe());
+}
+
+#[test]
+fn footer_shows_companion_heartbeat_version_separately_from_rc2_components() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = App::new(
+        "p".into(),
+        "/tmp/test".into(),
+        crate::tui::state::ToolVersions {
+            mem_cli: "3.1.0-rc.2".into(),
+            mem_service: "3.1.0-rc.2".into(),
+            watch_manager: "3.1.0-rc.2".into(),
+            memory_watch: "3.1.0-rc.2".into(),
+        },
+        false,
+        codifix_config::Profile::Prod,
+        tx,
+    );
+    app.conversations = state();
+    let mut heartbeat = status();
+    heartbeat.version = Some("3.1.0-rc.3".into());
+    heartbeat.exchange_access = false;
+    app.conversations.receive_observation(
+        scope("p"),
+        0,
+        Ok(ObservationResult::Companion(heartbeat)),
+    );
+
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    terminal
+        .draw(|frame| crate::tui::render::draw(frame, &app))
+        .unwrap();
+    let row = |y| {
+        (0..80)
+            .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+            .collect::<String>()
+    };
+    assert!(row(22).contains("TUI v3.1.0-rc.2"));
+    assert!(row(22).contains("Service v3.1.0"));
+    assert!(row(23).contains("Companion v3.1.0-rc.3 fresh"));
+
+    app.conversations.receive_observation(
+        scope("p"),
+        0,
+        Ok(ObservationResult::CompanionError("offline".into())),
+    );
+    terminal
+        .draw(|frame| crate::tui::render::draw(frame, &app))
+        .unwrap();
+    let footer = terminal.backend().buffer().content()[23 * 80..]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect::<String>();
+    assert!(footer.contains("Companion v3.1.0-rc.3 unavailable"));
+}
+
+#[tokio::test]
+async fn observation_reads_heartbeat_without_polling_exchanges_on_other_tabs() {
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut app = App::new(
+        "p".into(),
+        "/tmp/test".into(),
+        crate::tui::state::ToolVersions {
+            mem_cli: "test".into(),
+            mem_service: "test".into(),
+            watch_manager: "test".into(),
+            memory_watch: "test".into(),
+        },
+        false,
+        codifix_config::Profile::Prod,
+        tx,
+    );
+    app.active_tab = TabKind::Project;
+    let api = ApiClient::new(reqwest::Client::new(), serde_json::from_value(json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
+    app.observation_tick(&api);
+    assert!(app.conversations.companion_busy);
+    app.conversations.companion = Some(status());
+    app.observation_tick(&api);
+    assert!(!app.conversations.exchange_busy);
 }

@@ -13,7 +13,9 @@ codifix tui --project <project-slug>
 
 The header identifies the active project and, for routed installations, the area,
 durable instance and executable release. Check it before writing. The footer
-reports TUI, service, watcher, and skill health. A source checkout uses an
+reports TUI, service, watcher, and skill health. If the service exposes an enabled
+companion, a separate footer row shows the worker version from its heartbeat
+and whether that observation is fresh. A source checkout uses an
 isolated dev profile; its header is marked `[dev]` so it is not confused with a
 packaged installation. See [Areas and projects](https://codifix.dev/docs/areas).
 

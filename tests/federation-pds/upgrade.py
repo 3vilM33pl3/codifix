@@ -324,6 +324,88 @@ p.write_text(str(child.pid))
     assert not availability(), "public availability remained after requesting private assistance"
     print(f"Verified release {version}, rejected certification, private assistance and withdrawal.")
 
+    # Enroll the distinct TUI installation resource. The same peer and release
+    # protocol must fetch, install and return a private receipt without a worker restart.
+    tui_scope = {"kind":"tui_installation","id":ids[1]}
+    tui_grant = json.loads((root/"grant1.json").read_text())
+    tui_grant["mandate"]["id"] = ID()
+    tui_grant["mandate"]["resources"] = [tui_scope]
+    cli(1, "grant", "--peer", "operator", "--file", write(root/"grant-tui.json", tui_grant))
+    ca_config = json.loads(configs[1].read_text())
+    next(p for p in ca_config["peers"] if p["id"] == "publisher")["mandates"].append(tui_grant["mandate"]["id"])
+    write(configs[1], ca_config)
+    os.kill(int(pid.read_text()), signal.SIGTERM)
+    for _ in range(100):
+        try:
+            with socket.create_connection(("127.0.0.1", ports[1]), timeout=.1):
+                pass
+        except OSError:
+            break
+        time.sleep(.05)
+    else:
+        raise AssertionError("previous fixture worker did not stop")
+    current_ca = launch([active, "--config", configs[1], "serve"], envs[1], log)
+    pid.write_text(str(current_ca.pid))
+    stack.callback(stop, current_ca)
+    wait_json(urls[1]+"/health", {"status":"ok"})
+    child = delegate["payload"]["request"]
+    child.update(mandate_id=tui_grant["mandate"]["id"], resource=tui_scope, request_id=ID())
+    rollout_data = json.loads(rollout.read_text())
+    rollout_data["delegation"] = delegate
+    write(rollout, rollout_data)
+
+    client_artifact = os.environ.get("CODIFIX_TEST_TUI_CANDIDATE")
+    client_verifier = os.environ.get("CODIFIX_TEST_TUI_VERIFY")
+    assert bool(client_artifact) == bool(client_verifier), "provide the TUI candidate and PTY verifier together"
+    fixture = root/"client-fixture"
+    if client_artifact:
+        shutil.copyfile(client_artifact, fixture)
+    else:
+        fixture.write_text("verified disposable TUI payload")
+    live_client = root/"installed-tui"
+    fetch = helper("fetch-tui", f'''import shutil,sys
+assert sys.argv[1] == "codifix-releases/ca/3.1.0-rc.3/tui-companion-footer-disposable"
+shutil.copyfile({str(fixture)!r}, sys.argv[2])
+''')
+    verify = helper("verify-tui", f'''from pathlib import Path
+import sys
+assert sys.argv[2] == "3.1.0-rc.3"
+assert Path(sys.argv[1]).read_bytes() == Path({str(fixture)!r}).read_bytes()
+''')
+    hooks = HERE.parents[2]/"scripts/agency/ca-rollout/tui.py"
+    profile = write(root/"tui-supervisor.json", {
+        "publisher_peer":"publisher", "artifact":str(root/"staged-tui"),
+        "installed_artifact":str(live_client),
+        "install_command":["/usr/bin/python3", str(hooks), "install", str(live_client)],
+        "tui":{"object_origin":"https://objects.example.test/","fetch_command":[str(fetch)],"verify_command":[client_verifier or str(verify)]},
+    })
+    tui_release = release | {
+        "version":"3.1.0-rc.3",
+        "url":"https://objects.example.test/codifix-releases/ca/3.1.0-rc.3/tui-companion-footer-disposable",
+        "sha256":hash_file(fixture),
+    }
+    run_rollout(write(root/"tui-tested.json", tui_release), profile, root/"tui-success.out", 0)
+    assert current_ca.poll() is None, "client deployment restarted the companion worker"
+    assert hash_file(live_client) == tui_release["sha256"]
+    result = subprocess.check_output([
+        "psql", "-XAt", envs[1]["FIXTURE_DB"], "-c",
+        "SELECT report FROM agency_upgrades WHERE state='verified' AND report->>'companion_footer_verified'='true'"
+    ])
+    assert json.loads(result) == {
+        "installed_version":tui_release["version"], "installed_sha256":tui_release["sha256"],
+        "companion_footer_verified":True, "peer_message":True,
+    }
+    bad_release = tui_release | {"sha256":"0" * 64}
+    failure = root/"tui-failure.out"
+    run_rollout(write(root/"tui-bad-digest.json", bad_release), profile, failure, 1)
+    update = json.loads(failure.read_text().splitlines()[-1])
+    assert update["status"] == "input_required"
+    assert "artifact_digest" in update["question"]["question"]
+    assert hash_file(live_client) == tui_release["sha256"]
+    print("Private ATProto applied and verified the TUI installation and rejected a wrong digest without replacing it.")
+    if client_verifier:
+        print("The installed candidate passed the supplied PTY verifier.")
+
 
 if __name__=="__main__":
     with tempfile.TemporaryDirectory(prefix="codifix-upgrade-") as directory, ExitStack() as stack:

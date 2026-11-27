@@ -419,8 +419,10 @@ fn dev_commit_label_formats_clean_dirty_and_unknown_states() {
 
 #[test]
 fn footer_height_adds_dev_banner_without_changing_prod_footer() {
-    assert_eq!(super::footer_height(Profile::Prod), 4);
-    assert_eq!(super::footer_height(Profile::Dev), 5);
+    assert_eq!(super::footer_height(Profile::Prod, false), 4);
+    assert_eq!(super::footer_height(Profile::Dev, false), 5);
+    assert_eq!(super::footer_height(Profile::Prod, true), 5);
+    assert_eq!(super::footer_height(Profile::Dev, true), 6);
 }
 
 #[test]
