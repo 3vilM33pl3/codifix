@@ -1,5 +1,6 @@
 ---
 name: codifix-scenario-testing
+version: 3.1.0
 description: Turn Codifix multi-agent scenarios into repeatable acceptance tests and review who may request, approve, and perform each action. Use for companion exchanges, operator handoffs, and scenario verification across agents and interfaces.
 ---
 

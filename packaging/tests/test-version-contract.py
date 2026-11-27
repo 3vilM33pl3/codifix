@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-CORE = "3.1.0-rc.1"
+CORE = "3.1.0"
 DESKTOP = "0.2.0-rc.1"
 
 
@@ -50,7 +50,9 @@ def main():
 
     for candidate, lower, upper in (
         ("3.0.0~rc.1", "2.0.0", "3.0.0"),
-        ("3.1.0~rc.1", "3.0.0", "3.1.0"),
+        ("3.1.0~rc.1", "3.0.0", "3.1.0~rc.2"),
+        ("3.1.0~rc.2", "3.1.0~rc.1", "3.1.0~rc.3"),
+        ("3.1.0~rc.3", "3.1.0~rc.2", CORE),
         ("0.2.0~rc.1", "0.1.4", "0.2.0"),
     ):
         command("dpkg", "--compare-versions", candidate, "gt", lower)

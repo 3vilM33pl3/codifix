@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.0
+
+- Add specialist coordination, private Network and Inbox workflows, and Linux
+  desktop session and area routing support. See the [release notes](docs/releases/3.1.0.md)
+  for upgrade requirements and platform support.
+
 ## 3.0.0 - 2026-10-20
 
 Codifix 3.0.0 is the stable release. See [release notes](docs/releases/3.0.0.md)

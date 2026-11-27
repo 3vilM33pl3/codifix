@@ -7,7 +7,7 @@ on:
         description: Application version (3.1.0-rc.1 or 3.1.0)
         type: string
         required: true
-        default: 3.1.0-rc.1
+        default: 3.1.0
       publish:
         description: Publish the verified release (otherwise build candidate only)
         type: boolean
@@ -385,7 +385,7 @@ jobs:
         env:
           VERSION: ${{ needs.contract.outputs.version }}
         run: |
-          # Release-specific ledger: RC.1 is build 1; stable must order after it.
+          # Keep installer builds in sync with scripts/release/identity.mjs.
           $installerBuild = switch ($env:VERSION) {
             '3.0.0-rc.1' { 1 }
             '3.0.0' { 2 }
