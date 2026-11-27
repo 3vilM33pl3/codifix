@@ -9,9 +9,9 @@ use sqlx::{
 };
 use std::{borrow::Cow, path::PathBuf, time::Duration};
 
-// Explicitly reviewed through the Codifix federation-retirement migration. Never
+// Explicitly reviewed through the Codifix 3.1 agency upgrades migration. Never
 // derive this from the current directory: new SQL requires a fresh-schema review.
-const HEAD: i64 = 85;
+const HEAD: i64 = 105;
 // Same compatibility rule as codifix-service::runtime and codifix-test-support. Preserve
 // the applied checksum; migration 16 removes the obsolete dimensionless index.
 const VECTOR_COMPAT: &str = r#"
@@ -79,24 +79,29 @@ fn describe(migrator: &Migrator) -> Result<SchemaPlan> {
 }
 
 fn describe_profile(migrator: &Migrator, profile: Profile) -> Result<SchemaPlan> {
+    // The 3.1 runtime ships no migrations 101 or 102. Require exactly the
+    // reviewed ordered sequence, including the absence of those versions.
+    let mut expected = (1..=profile.head()).filter(|version| !matches!(version, 101 | 102));
     let mut identity = Vec::new();
-    for (index, migration) in migrator.iter().enumerate() {
-        if migration.version != index as i64 + 1 || migration.no_tx {
+    let mut count = 0;
+    for migration in migrator.iter() {
+        if Some(migration.version) != expected.next() || migration.no_tx {
             return Err(Failure::Schema);
         }
         // Bind both historic applied identity and the exact executable SQL.
         identity.extend_from_slice(&migration.version.to_be_bytes());
         identity.extend_from_slice(&migration.checksum);
         identity.extend_from_slice(hash(migration.sql.as_bytes()).as_bytes());
+        count += 1;
     }
-    if migrator.iter().count() != profile.head() as usize {
+    if expected.next().is_some() {
         return Err(Failure::Schema);
     }
     Ok(SchemaPlan {
         status: "schema_plan_only_no_database_connection",
         profile,
         migration_head: profile.head(),
-        migrations: profile.head() as usize,
+        migrations: count,
         schema_sha256: hash(&identity),
         creates_credentials: false,
         starts_services: false,
@@ -304,8 +309,8 @@ mod tests {
         let original = sqlx::migrate!("../../migrations");
         let compatible = migrations();
         let plan = describe(&compatible).unwrap();
-        assert_eq!(plan.migration_head, 85);
-        assert_eq!(plan.migrations, 85);
+        assert_eq!(plan.migration_head, 105);
+        assert_eq!(plan.migrations, 103);
         assert!(!plan.creates_credentials && !plan.starts_services);
         for (original, actual) in original.iter().zip(compatible.iter()) {
             assert_eq!(original.checksum, actual.checksum);
@@ -322,9 +327,14 @@ mod tests {
         changed.migrations.to_mut()[0].no_tx = false;
         changed.migrations.to_mut().pop();
         assert!(describe(&changed).is_err());
+        for unexpected in [101, 102] {
+            let mut changed = migrations();
+            changed.migrations.to_mut()[100].version = unexpected;
+            assert!(describe(&changed).is_err());
+        }
         let mut future = migrations();
         let mut next = future.iter().last().unwrap().clone();
-        next.version = 85;
+        next.version = 106;
         future.migrations.to_mut().push(next);
         assert!(describe(&future).is_err());
     }
