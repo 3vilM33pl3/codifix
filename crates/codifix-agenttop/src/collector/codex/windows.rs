@@ -60,17 +60,15 @@ fn candidates(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 fn plain(meta: &fs::Metadata) -> bool {
-    if meta.file_type().is_symlink() {
-        return false;
-    }
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt;
-        if meta.file_attributes() & 0x400 != 0 {
-            return false;
-        }
+        !meta.file_type().is_symlink() && meta.file_attributes() & 0x400 == 0
     }
-    true
+    #[cfg(not(windows))]
+    {
+        !meta.file_type().is_symlink()
+    }
 }
 
 fn same_generation(expected: u64, observed: u64, current: u64) -> bool {

@@ -583,7 +583,7 @@ jobs:
 
   package-smoke:
     name: Debian Package Smoke (amd64)
-    runs-on: [self-hosted, codifix, Linux, X64]
+    runs-on: ubuntu-24.04
     needs: [changes, rust-test, web-build]
     if: needs.changes.outputs.package == 'true'
     steps:
@@ -594,6 +594,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Install Debian build tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev clang libclang-dev cmake
       - run: ./packaging/build-deb.sh --arch amd64 --target x86_64-unknown-linux-gnu
       - name: Disposable container installation lifecycle
         run: |
