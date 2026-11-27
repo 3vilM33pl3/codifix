@@ -16,6 +16,8 @@ pub(crate) enum CredentialSource {
     LegacyServiceToken,
     ServiceToken,
     BrowserSession,
+    /// Human session delivered only to the native PKCE client as a bearer.
+    NativeSession,
 }
 
 #[derive(Debug, Clone)]

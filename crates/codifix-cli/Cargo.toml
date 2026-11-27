@@ -8,6 +8,7 @@ autobins = false
 
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
 chrono.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
@@ -25,7 +26,7 @@ codifix-platform = { path = "../codifix-platform" }
 codifix-service = { path = "../codifix-service", optional = true, default-features = false }
 codifix-skills = { path = "../codifix-skills" }
 codifix-watch = { path = "../codifix-watch" }
-ratatui = { workspace = true, optional = true }
+ratatui = { workspace = true, features = ["unstable-rendered-line-info"], optional = true }
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -51,7 +52,7 @@ rustix = { version = "=1.1.4", features = ["fs", "process"], optional = true }
 
 [features]
 default = ["full"]
-tui = ["dep:ratatui", "dep:crossterm"]
+tui = ["dep:ratatui", "dep:crossterm", "dep:rustix"]
 project-sync = ["dep:codifix-federation-runtime", "dep:rustix"]
 embedded-service-postgres = ["dep:codifix-service", "project-sync"]
 embedded-service = ["embedded-service-postgres", "codifix-service/offline"]

@@ -3,6 +3,7 @@
 // Tests may unwrap; production code must not (workspace lints deny it).
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+pub mod agency_observation;
 pub mod app;
 pub mod area;
 pub mod auth;

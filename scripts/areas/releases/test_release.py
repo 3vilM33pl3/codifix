@@ -53,13 +53,15 @@ class ManifestTests(unittest.TestCase):
     def test_stable_and_candidate_precedence_without_rewriting_signed_bytes(self):
         self.assertLess(TOOL.version_precedence("3.0.0-rc.9"), TOOL.version_precedence("3.0.0-rc.10"))
         self.assertLess(TOOL.version_precedence("3.0.0-rc.999999"), TOOL.version_precedence("3.0.0"))
-        for version in ("3.0.0-rc.1", "3.0.0-rc.999999", "3.0.0"):
+        self.assertLess(TOOL.version_precedence("3.0.0"), TOOL.version_precedence("3.1.0-rc.1"))
+        self.assertLess(TOOL.version_precedence("3.1.0-rc.1"), TOOL.version_precedence("3.1.0"))
+        for version in ("3.0.0-rc.1", "3.0.0-rc.999999", "3.0.0", "3.1.0-rc.1", "3.1.0"):
             changed = copy.deepcopy(self.manifest)
             changed["release_version"] = version
             before = TOOL.canonical(changed)
             TOOL.validate(changed)
             self.assertEqual(TOOL.canonical(changed), before)
-        for version in ("3.0.0-rc.0", "3.0.0-rc.01", "3.0.0-rc.1000000", "v3.0.0", "3.0.0+build.1", "2.2.0", None):
+        for version in ("3.0.0-rc.0", "3.0.0-rc.01", "3.0.0-rc.1000000", "3.2.0-rc.1", "v3.0.0", "3.0.0+build.1", "2.2.0", None):
             with self.subTest(version=version), self.assertRaises(TOOL.ReleaseError):
                 TOOL.version_precedence(version)
 

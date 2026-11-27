@@ -1,0 +1,47 @@
+{
+  "instance_id": "00000000-0000-4000-8000-000000000001",
+  "listen": "127.0.0.1:8150",
+  "public_url": "https://agency.example.invalid",
+  "database_env": "CODIFIX_AGENCY_DATABASE_URL",
+  "specialists": [
+    {
+      "schema_version": 1,
+      "instance_id": "00000000-0000-4000-8000-000000000001",
+      "specialist_id": "operations",
+      "name": "Operations",
+      "capabilities": [
+        "inspect",
+        "openbao_recover",
+        "delegate"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "instance_id": "00000000-0000-4000-8000-000000000001",
+      "specialist_id": "projects",
+      "name": "Project coordination",
+      "capabilities": [
+        "plan_prepare",
+        "plan_apply",
+        "plan_inspect",
+        "model_draft",
+        "delegate"
+      ]
+    }
+  ],
+  "peers": [
+    {
+      "id": "operator",
+      "instance_id": "00000000-0000-4000-8000-000000000001",
+      "token_env": "CODIFIX_AGENCY_OPERATOR_TOKEN",
+      "operator": true,
+      "mandates": []
+    }
+  ],
+  "models": [],
+  "model_profiles": [],
+  "public_profile": null,
+  "private_repository_dids": [],
+  "linear": null,
+  "openbao_controllers": {}
+}

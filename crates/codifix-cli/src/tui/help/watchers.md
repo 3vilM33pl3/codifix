@@ -21,3 +21,12 @@ Show project watchers, heartbeat state, agent ownership, service identity, resta
 ## Troubleshooting
 - If a managed watcher stays stale, check Manager footer and Errors.
 - If only manual watchers exist, start through the manager-integrated path.
+
+## Companions
+
+This tab is **Watchers & Companions**. `c` switches focus between watcher
+inspection and the companion panel, preserving watcher scroll controls.
+Companion state distinguishes disabled, unknown, fresh and stale observations.
+A heartbeat does not prove peer reachability or task success. In the companion
+panel, `j/k` selects a peer seen on the exchange page and `Enter` opens that
+peer in Conversations. `r` refreshes status and the observed exchange page.

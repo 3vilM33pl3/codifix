@@ -1,0 +1,63 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.deliverNotice",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deliver a structured private ceremony notice to the enrolled recipient Inbox.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "task_id",
+            "attempt",
+            "subject",
+            "event"
+          ],
+          "properties": {
+            "task_id": {
+              "type": "string"
+            },
+            "attempt": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "enum": [
+                "unseal_started",
+                "contribution_requested",
+                "awaiting_operator",
+                "contribution_accepted",
+                "contribution_declined",
+                "invalid_share",
+                "unseal_blocked",
+                "unsealed_ready"
+              ]
+            },
+            "participant": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "received"
+          ],
+          "properties": {
+            "received": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

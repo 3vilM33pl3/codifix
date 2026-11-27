@@ -1,0 +1,99 @@
+{
+  "instance_id": "00000000-0000-4000-8000-000000000001",
+  "listen": "127.0.0.1:8150",
+  "public_url": "https://agency.example.invalid",
+  "database_env": "CODIFIX_AGENCY_DATABASE_URL",
+  "specialists": [
+    {
+      "schema_version": 1,
+      "instance_id": "00000000-0000-4000-8000-000000000001",
+      "specialist_id": "linear",
+      "name": "Linear Agent",
+      "capabilities": [
+        "linear_track",
+        "plan_prepare",
+        "plan_apply",
+        "plan_inspect",
+        "conversation_turn",
+        "model_draft"
+      ]
+    }
+  ],
+  "peers": [
+    {
+      "id": "operator",
+      "instance_id": "00000000-0000-4000-8000-000000000001",
+      "token_env": "CODIFIX_AGENCY_OPERATOR_TOKEN",
+      "operator": true,
+      "mandates": []
+    },
+    {
+      "id": "homelab",
+      "instance_id": "b95f3c5e-d405-4469-b3d5-f7f4e5189833",
+      "token_env": "CODIFIX_HOMELAB_PEER_TOKEN",
+      "mandates": [
+        "a0345d28-0363-4511-b9d9-6b00ae1e1550"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "profile_id": "linear-local",
+      "url": "http://127.0.0.1:11434/v1/chat/completions",
+      "token_env": null,
+      "model": "qwen2.5:7b",
+      "max_input_bytes": 8192,
+      "max_output_tokens": 512,
+      "reserve_micro_usd": 12,
+      "input_micro_usd_per_million": 1,
+      "output_micro_usd_per_million": 1
+    }
+  ],
+  "model_profiles": [
+    {
+      "id": "linear-local",
+      "model_revision": "qwen2.5:7b",
+      "destination": {
+        "kind": "local",
+        "runtime": "ollama"
+      },
+      "accepted_locally": false,
+      "context_tokens": 8192,
+      "local_memory_mib": 6144,
+      "evaluations": []
+    }
+  ],
+  "public_profile": null,
+  "private_repository_dids": [],
+  "linear": {
+    "endpoint": "https://api.linear.app/graphql",
+    "token_env": "CODIFIX_LINEAR_TOKEN",
+    "require_origin_confirmation": true,
+    "tracking": {
+      "a0345d28-0363-4511-b9d9-6b00ae1e1550": {
+        "project_id": "ed52e5a9-32de-48ba-a615-281edc65b03e",
+        "team_id": "48821d31-2784-4fe9-a277-35775ac6c750"
+      }
+    },
+    "authorities": {
+      "a0345d28-0363-4511-b9d9-6b00ae1e1550": {
+        "kind": "standing",
+        "reference": "policy://operator-approved/example-launch",
+        "source_reference": "chat://agency/request-42",
+        "scope": {
+          "plan_id": "ce4aa490-9ec7-4b45-a6bc-da317e9dcf02",
+          "existing_resources": {},
+          "project_keys": [
+            "launch"
+          ],
+          "team_ids": [
+            "48821d31-2784-4fe9-a277-35775ac6c750"
+          ],
+          "create": true,
+          "update": true
+        }
+      }
+    }
+  },
+  "openbao_controllers": {}
+}

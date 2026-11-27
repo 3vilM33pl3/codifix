@@ -39,6 +39,14 @@ and inserts an authenticated principal extension for handlers. Mutating
 handlers receive the legacy internal API token only after authorization so old
 repository guards remain an internal defense rather than the authority.
 
+`/v1/auth/me` and `/v1/auth/logout` use the caller's resolved identity without
+requiring memory or project permissions. An authenticated human with no grants
+can inspect their identity and sign out. Invalid, expired, revoked or disabled
+credentials still fail resolution, and browser logout retains Origin/CSRF checks.
+Anonymous single-user identity inspection remains available before local bootstrap.
+Device review separately requires a human browser session and offers only projects
+allowed by current permissions; identifying a user does not grant access.
+
 In multi-user mode, capture writer identity, workspace writer identity, loop
 setting attribution, and proposal reviewers are stamped from the server-side
 principal. Client-supplied attribution cannot override them.
@@ -73,6 +81,49 @@ persisted. The browser receives:
 
 Mutating cookie-authenticated requests require the exact Origin derived from
 `auth.public_base_url` and an `x-csrf-token` matching the session.
+
+## Desktop human OIDC
+
+The Linux desktop starts `GET /v1/auth/desktop/login` with an exact
+`http://127.0.0.1:<nonzero port>/callback` redirect, a random 64-character lowercase
+hex state, and an S256 PKCE challenge. This uses the same configured provider and
+`/v1/auth/callback` registration as browser login and requests `prompt=login` so a
+previous browser SSO session does not silently choose the desktop identity.
+
+Migration `0086_desktop_human_sessions.sql` adds a nullable typed desktop context
+in `auth_oidc_flows`; `return_to` remains reserved for browser paths. Native flow
+state expires after ten minutes. The callback validates the OIDC claims and
+upserts the human, then returns only an opaque, single-use code and the original
+native state to the exact loopback URI. Provider denials return a stable
+`access_denied` error after consuming validated flow state. No human session secret
+is placed in a URL or browser JavaScript.
+
+`POST /v1/auth/desktop/exchange` verifies the 43–128-character RFC 7636 verifier,
+exact redirect and 60-second code expiry. Code consumption, native session
+creation and protected audit insertion commit together. Only this response returns
+the random `mld_` token, principal UUID and RFC 3339 expiry. No project selection,
+device enrollment, project grant or service token is created. A human with no
+projects can still inspect `/v1/auth/me` and sign out.
+
+Native sessions use `auth_web_sessions.session_kind='desktop'`; existing rows
+default to `browser`. HTTP recognizes native secrets only as explicit Bearer
+credentials, while cookies resolve only browser rows. Native sessions resolve
+current human/group/membership permissions on every request and use the existing
+configured session TTL. They require no browser CSRF token. Browser-only
+`HumanSession` workflows retain their existing restrictions. Background work and
+administrative mutations continue to recheck revocation and expiry.
+
+`POST /v1/auth/desktop/logout` revokes exactly the presented native session and
+returns `{"logged_out":true}` without setting cookies. Its narrow credential-proof
+fallback accepts an expired, revoked or disabled native identity only on this
+route, with no permissions, making retries idempotent. It cannot authenticate an
+ordinary request. Browser secrets and cookies cannot invoke native logout.
+
+Before activating a binary containing this flow, operators must apply migration
+0086 through the normal migration owner, then run the existing verify-only schema
+check. An existing verify-only runtime cannot apply this migration on startup.
+The migration is additive and preserves all browser sessions; deployment and
+schema activation are separate operator steps.
 
 ## Service Tokens And Transports
 

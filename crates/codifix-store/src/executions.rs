@@ -59,6 +59,18 @@ impl Execution {
         })
     }
 
+    /// Check the dedicated connection before admitting another external action.
+    /// A broken connection must not silently reacquire ownership through a pool.
+    pub async fn check_ownership(&mut self) -> Result<()> {
+        let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+            .fetch_one(&mut self._connection)
+            .await?;
+        if pid != self.pid {
+            return Err(Error::StaleLease);
+        }
+        Ok(())
+    }
+
     /// Register in the SAME transaction as the domain run and start journal.
     pub async fn register(
         &self,

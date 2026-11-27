@@ -27,6 +27,8 @@ jobs:
       plugin: ${{ steps.filter.outputs.plugin }}
       formal: ${{ steps.filter.outputs.formal }}
       federation_pds: ${{ steps.filter.outputs.federation_pds }}
+      inbox: ${{ steps.filter.outputs.inbox }}
+      broker: ${{ steps.filter.outputs.broker }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v3
@@ -61,6 +63,11 @@ jobs:
               - "crates/codifix-federation-runtime/**"
               - "crates/codifix-atproto/**"
               - "crates/codifix-atproto-verify/**"
+              - "crates/codifix-agency*/**"
+              - "crates/codifix-inbox/**"
+              - "crates/codifix-identity/**"
+              - "desktop/src-tauri/**"
+              - "scripts/test-inbox-candidate.sh"
               - "migrations/**"
             web:
               - "web/**"
@@ -88,6 +95,9 @@ jobs:
               - "Cargo.lock"
               - "web/**"
               - "packaging/**"
+              - "identity-broker/**"
+              - "scripts/release/**"
+              - "crates/codifix-agency*/**"
               - "scripts/areas/releases/**"
               - "deploy/areas/**"
               - ".github/workflows/ci.yml"
@@ -126,6 +136,78 @@ jobs:
               - "crates/codifix-atproto-verify/**"
               - "fixtures/federation/atproto/**"
               - ".github/workflows/ci.yml"
+
+            inbox:
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "crates/**"
+              - "migrations/**"
+              - "desktop/src-tauri/**"
+              - "scripts/test-inbox-candidate.sh"
+              - ".github/workflows/ci.yml"
+            broker:
+              - "identity-broker/**"
+              - "packaging/identity-broker/**"
+              - "packaging/build-identity-broker.mjs"
+              - ".github/workflows/ci.yml"
+
+  identity-broker:
+    name: Disabled Identity Broker Candidate
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.broker == 'true' || needs.changes.outputs.package == 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm --prefix identity-broker ci --omit=dev --ignore-scripts --no-audit
+      - run: npm --prefix identity-broker test
+      # This reports the exact unresolved advisory, never an audit-clean claim.
+      # All other advisories, malformed reports and audit errors fail the job.
+      - run: node identity-broker/scripts/audit.mjs broker-audit.json
+      - run: node packaging/build-identity-broker.mjs "$RUNNER_TEMP/broker-candidate"
+      - run: node packaging/tests/test-identity-broker.mjs "$RUNNER_TEMP"/broker-candidate/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disabled-identity-broker-candidate
+          path: |
+            ${{ runner.temp }}/broker-candidate/*
+            broker-audit.json
+
+  inbox-workflow:
+    name: Synthetic Native Inbox to Linear Workflow
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.inbox == 'true'
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: candidate
+          POSTGRES_PASSWORD: candidate-test-only
+          POSTGRES_DB: candidate_test
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U candidate -d candidate_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      CODIFIX_TEST_DATABASE_URL: postgres://candidate:candidate-test-only@127.0.0.1:55439/candidate_test
+      CODIFIX_TEST_REQUIRE_DB: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Native test dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libdbus-1-dev libssl-dev librsvg2-dev patchelf
+      - run: npm --prefix desktop ci
+      - run: npm --prefix desktop test
+      - run: npm --prefix desktop run build
+      - run: bash scripts/test-inbox-candidate.sh
 
   federation-pds:
     name: Private PDS Prerequisites and Durable Federation
@@ -462,6 +544,9 @@ jobs:
     if: needs.changes.outputs.package == 'true'
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
       - name: Test inactive release boundaries (no CA or provider access)
         run: |
           command -v gpg
@@ -478,6 +563,8 @@ jobs:
           bash packaging/tests/test-debian-lifecycle.sh
           python3 packaging/tests/test-instance-launcher.py
           python3 packaging/tests/test-ca-preflight.py
+          python3 packaging/tests/test-version-contract.py
+          node --test scripts/release/*.test.mjs
 
   macos-onboarding-contract:
     name: macOS Onboarding Contract (Synthetic Linux Tests)
@@ -508,6 +595,12 @@ jobs:
         with:
           node-version: 22
       - run: ./packaging/build-deb.sh --arch amd64 --target x86_64-unknown-linux-gnu
+      - name: Disposable container installation lifecycle
+        run: |
+          docker build -f packaging/tests/Dockerfile.install-test -t codifix-installer-test .
+          package_image=$(docker image inspect --format '{{.Id}}' codifix-installer-test)
+          package_path=$(realpath target/debian/*_amd64.deb)
+          bash packaging/tests/test-debian-install-docker.sh "$package_image" "$package_path"
       - uses: actions/upload-artifact@v4
         with:
           name: codifix-deb-amd64

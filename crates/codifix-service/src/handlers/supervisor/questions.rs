@@ -39,7 +39,8 @@ fn actor(principal: &crate::AuthenticatedPrincipal) -> Result<QuestionActor, Api
     use crate::auth::CredentialSource;
     match principal.credential_source {
         CredentialSource::ServiceToken if principal.token_id.is_some() => {}
-        CredentialSource::BrowserSession if principal.session_id.is_some() => {}
+        CredentialSource::BrowserSession | CredentialSource::NativeSession
+            if principal.session_id.is_some() => {}
         _ => {
             return Err(ApiError::forbidden(
                 "a revocable session or service token is required",

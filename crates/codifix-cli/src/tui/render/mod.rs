@@ -58,7 +58,9 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
         .split(frame.area());
 
-    let titles = VISIBLE_TABS
+    let (visible_tabs, selected_tab) =
+        tab_window(app.active_tab, chunks[0].width.saturating_sub(2));
+    let titles = visible_tabs
         .into_iter()
         .map(|tab| Line::from(Span::styled(tab.label(), Style::default().fg(Theme::TEXT))))
         .collect::<Vec<_>>();
@@ -75,7 +77,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ));
     }
     let tabs = Tabs::new(titles)
-        .select(app.active_tab.index())
+        .select(selected_tab)
         .block(themed_block(title).borders(Borders::ALL))
         .style(Style::default().fg(Theme::MUTED).bg(Theme::PANEL))
         .highlight_style(
@@ -101,6 +103,15 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
     } else {
         let mut spans = match app.active_tab {
+            TabKind::Conversations => vec![Span::raw(if app.conversations.my_inbox_selected() {
+                "v view  r refresh  Enter open  i sign in  o sign out"
+            } else if app.conversations.live_selected() {
+                "PgUp scroll back  End follow live  / peer  m tasks  r refresh"
+            } else if app.conversations.exchange_open() {
+                "j/k scroll  PgUp/PgDn page  m transcript/details  Esc back  r refresh"
+            } else {
+                "j/k select  Enter open  / peer  PgDn older  v Inbox  r refresh"
+            })],
             TabKind::Offline => vec![Span::raw(
                 "r refresh  j/k subscription  / question  Enter search  d/u scroll",
             )],
@@ -233,6 +244,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
                 Span::styled("r", Style::default().fg(Theme::TEXT)),
             ],
             TabKind::Watchers => vec![
+                Span::raw("c watchers/companions  Enter peer exchanges  r refresh  "),
                 accent_span("scroll "),
                 Span::styled("j/k  ", Style::default().fg(Theme::TEXT)),
                 accent_span("page "),
@@ -320,6 +332,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
             TabKind::Jobs => super::tabs::jobs::draw(frame, app, chunks[2]),
             TabKind::Supervisor => super::tabs::supervisor::draw(frame, app, chunks[2]),
             TabKind::Offline => super::tabs::offline::draw(frame, app, chunks[2]),
+            TabKind::Conversations => super::tabs::conversations::draw(frame, app, chunks[2]),
             TabKind::Resume => draw_resume_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Memories => draw_memories_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Agents => draw_agents_tab(frame, &tab_ctx, chunks[2]),
@@ -361,5 +374,54 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
             draw_dev_status_bar(frame, app, footer_chunks[2]);
         }
         Profile::Prod => draw_bottom_status_bar(frame, app, footer_chunks[1]),
+    }
+}
+
+/// Keep the active tab visible even in an 80-column terminal.
+fn tab_window(active: TabKind, width: u16) -> (Vec<TabKind>, usize) {
+    let selected = active.index();
+    let mut start = selected;
+    let mut end = selected + 1;
+    let mut used = active.label().chars().count() + 2;
+    loop {
+        let previous = start
+            .checked_sub(1)
+            .map(|i| VISIBLE_TABS[i].label().chars().count() + 3);
+        if let Some(cost) = previous.filter(|cost| used + cost <= usize::from(width)) {
+            start -= 1;
+            used += cost;
+        } else {
+            break;
+        }
+        if end < VISIBLE_TABS.len() {
+            let cost = VISIBLE_TABS[end].label().chars().count() + 3;
+            if used + cost <= usize::from(width) {
+                end += 1;
+                used += cost;
+            }
+        }
+    }
+    while end < VISIBLE_TABS.len() {
+        let cost = VISIBLE_TABS[end].label().chars().count() + 3;
+        if used + cost > usize::from(width) {
+            break;
+        }
+        used += cost;
+        end += 1;
+    }
+    (VISIBLE_TABS[start..end].to_vec(), selected - start)
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::*;
+    #[test]
+    fn active_tab_stays_in_window_at_every_width() {
+        for width in [1, 20, 40, 80, 160, 300] {
+            for tab in VISIBLE_TABS {
+                let (tabs, selected) = tab_window(tab, width);
+                assert_eq!(tabs[selected], tab);
+            }
+        }
     }
 }

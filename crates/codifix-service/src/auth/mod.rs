@@ -8,6 +8,7 @@ pub(crate) mod company_delivery_delegate;
 pub(crate) mod company_device_delivery;
 mod company_device_proxy;
 pub(crate) mod company_devices;
+mod desktop;
 pub(crate) mod device;
 pub(crate) mod device_contributions;
 pub(crate) mod device_replication;
@@ -20,6 +21,7 @@ pub(crate) mod scoped_delivery;
 mod scoped_token_tests;
 mod store;
 
+pub(crate) use desktop::*;
 pub(crate) use model::*;
 pub(crate) use oidc::*;
 pub(crate) use policy::*;

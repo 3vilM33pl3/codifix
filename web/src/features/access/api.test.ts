@@ -3,6 +3,17 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 beforeEach(() => { vi.resetModules(); document.cookie = "codifix_csrf=onboarding-csrf; path=/"; });
 afterEach(() => { vi.unstubAllGlobals(); document.cookie = "codifix_csrf=; max-age=0; path=/"; });
 
+it("preserves signed-out detection and exposes sanitized identity status", async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response("private server detail", { status: 401 }));
+  vi.stubGlobal("fetch", fetcher);
+  const { getAuthMe, AuthIdentityError } = await import("../../api");
+  await expect(getAuthMe()).rejects.toMatchObject({ status: 401, message: expect.stringMatching(/^401 /) });
+  fetcher.mockResolvedValue(new Response("private server detail", { status: 403 }));
+  await expect(getAuthMe(true)).rejects.toBeInstanceOf(AuthIdentityError);
+  await expect(getAuthMe(true)).rejects.toMatchObject({ status: 403, message: "403 Could not verify browser identity." });
+  expect(fetcher).toHaveBeenCalledWith("/v1/auth/me", expect.objectContaining({ cache: "no-store", credentials: "same-origin" }));
+});
+
 it("uses the central session and CSRF boundary for company mutations", async () => {
   const fetcher = vi.fn().mockImplementation(async (url: string) => new Response(JSON.stringify(url === "/v1/auth/me"
     ? { mode: "multi_user", read_only: false, principal: { id: "admin" } }

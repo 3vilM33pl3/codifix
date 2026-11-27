@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Codifix Desktop",
+  "version": "0.2.0-rc.1",
+  "identifier": "com.codifix.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Codifix Desktop",
+        "width": 1280,
+        "height": 764,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "deb",
+      "appimage"
+    ],
+    "icon": [
+      "icons/icon.png"
+    ],
+    "shortDescription": "A streamlined desktop client for Codifix project knowledge",
+    "category": "DeveloperTool"
+  }
+}

@@ -1,9 +1,15 @@
 [workspace]
 members = [
+  "crates/codifix-inbox",
+  "crates/codifix-identity",
+  "crates/codifix-agency-openbao",
+  "crates/codifix-agency-projects",
+  "crates/codifix-agency-runtime",
   "crates/codifix-area",
   "crates/codifix-area-store",
   "crates/codifix-area-ops",
   "crates/codifix-agenttop",
+  "crates/codifix-agency",
   "crates/codifix-analyze",
   "crates/codifix-atproto",
   "crates/codifix-atproto-verify",
@@ -40,7 +46,7 @@ resolver = "2"
 atrium-common = { path = "vendor/atrium-common" }
 
 [workspace.package]
-version = "3.0.0"
+version = "3.1.0-rc.3"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["Olivier Van Acker"]

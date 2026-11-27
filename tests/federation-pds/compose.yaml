@@ -82,6 +82,7 @@ services:
     networks:
       private:
         aliases:
+          - recipient.federation.example.com
           - space.federation.example.com
           - pds.federation.example.com
           - recovery.federation.example.com

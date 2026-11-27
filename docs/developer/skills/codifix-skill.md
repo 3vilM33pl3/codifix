@@ -15,6 +15,9 @@ The focused skills that sit beside it are:
 - `.agents/skills/codifix-remember/SKILL.md`
 - `.agents/skills/codifix-federation-expertise/SKILL.md`
 
+For Codifix product scenarios, use [`codifix-scenario-testing`](../../../.agents/skills/codifix-scenario-testing/SKILL.md)
+to define acceptance tests and verify agent and operator handoffs.
+
 Use this page to understand how the bundle is intended to behave without reading every raw skill file line by line.
 
 ## Table of Contents

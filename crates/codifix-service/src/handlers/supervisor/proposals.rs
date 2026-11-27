@@ -67,7 +67,8 @@ pub(super) async fn access(
             if state.config.auth.mode == codifix_record::AuthMode::SingleUser
                 && principal.id == crate::auth::local_owner_id() => {}
         CredentialSource::ServiceToken if principal.token_id.is_some() => {}
-        CredentialSource::BrowserSession if principal.session_id.is_some() => {}
+        CredentialSource::BrowserSession | CredentialSource::NativeSession
+            if principal.session_id.is_some() => {}
         _ => {
             return Err(ApiError::forbidden(
                 "a current authenticated credential is required",

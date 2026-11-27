@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { approveDevice, authLoginUrl, deviceReview, getAuthMe } from "../../api";
+import { approveDevice, AuthIdentityError, authLoginUrl, deviceReview, getAuthMe } from "../../api";
 import type { AuthMeResponse } from "../../types";
 import type { DeviceApprovalReceipt, DeviceApprovalSelection, DeviceProjectRole, DeviceReview } from "./types";
 import { CompanyDeviceApproval } from "./CompanyDeviceApproval";
@@ -43,7 +43,14 @@ function LocalDeviceApprovalPage({ initialCode, onLock }: { initialCode: string;
   useEffect(() => {
     let cancelled = false;
     void getAuthMe(true).then((identity) => { if (!cancelled) setAuth(identity); })
-      .catch(() => { if (!cancelled) setError("Sign in to verify your human browser session before reviewing this device."); })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setError(error instanceof AuthIdentityError && error.status === 401
+          ? "Sign in to verify your human browser session before reviewing this device."
+          : error instanceof AuthIdentityError && error.status === 403
+            ? "The service denied the browser identity check. Signing in again may not resolve this. Ask your administrator to check access to /v1/auth/me."
+            : "Could not check your browser identity. Check the service connection and reload this page before reviewing the device.");
+      })
       .finally(() => { if (!cancelled) setCheckingIdentity(false); });
     return () => { cancelled = true; };
   }, []);

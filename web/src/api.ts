@@ -173,12 +173,19 @@ async function ensureSession(): Promise<void> {
   return sessionBootstrapPromise;
 }
 
+export class AuthIdentityError extends Error {
+  constructor(public readonly status: number) {
+    // Keep the status prefix for the main shell's existing signed-out detection.
+    super(`${status} ${status === 401 ? "Sign in to verify your browser session." : "Could not verify browser identity."}`);
+  }
+}
+
 export async function getAuthMe(refresh = false): Promise<AuthMeResponse> {
   if (refresh) authMePromise = null;
   if (!authMePromise) {
-    authMePromise = parseJson<AuthMeResponse>(
-      await fetch("/v1/auth/me", { credentials: "same-origin" }),
-    )
+    const response = await fetch("/v1/auth/me", { credentials: "same-origin", cache: "no-store" });
+    if (!response.ok) throw new AuthIdentityError(response.status);
+    authMePromise = parseJson<AuthMeResponse>(response)
       .then((payload) => {
         serviceReadOnly = payload.read_only;
         return payload;
@@ -1108,4 +1115,17 @@ export async function rejectProposal(
       { method: "POST" },
     ),
   );
+}
+
+/** Human-owned Inbox. A browser always uses its current same-origin session. */
+export async function inboxRequest<T>(suffix: string, signal?: AbortSignal, body?: unknown): Promise<T> {
+  const response = await apiFetch(`/v1/inbox/conversations${suffix}`, {
+    signal, cache: "no-store", ...(body ? {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    } : {}),
+  });
+  if (response.status === 401 || response.status === 403) throw new AuthIdentityError(response.status);
+  if (response.status === 404) throw new Error("Inbox or conversation unavailable on this service.");
+  if (!response.ok) throw new Error(body ? "Reply not confirmed. Refresh or retry the same reply." : "Could not load the Inbox.");
+  return response.json();
 }

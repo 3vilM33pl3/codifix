@@ -1355,6 +1355,13 @@ pub(in crate::commands) enum Command {
     Resume(ResumeArgs),
     #[command(about = "Open the terminal UI.", after_help = TUI_AFTER_HELP)]
     Tui(TuiArgs),
+    /// Draft and approve a Linear issue through a local companion.
+    #[cfg(feature = "tui")]
+    LinearTui {
+        /// Dedicated operator profile for the loopback companion.
+        #[arg(long)]
+        profile: PathBuf,
+    },
 
     // --- Status and health ---
     #[command(about = "Show the aggregate Codifix diagnostic status.", after_help = STATUS_AFTER_HELP)]
@@ -3695,6 +3702,10 @@ pub(super) async fn run() -> Result<()> {
     {
         return super::eval_campaign::handle(campaign).await;
     }
+    #[cfg(feature = "tui")]
+    if let Command::LinearTui { profile } = &command {
+        return crate::linear_tui::run(profile).await;
+    }
     // Company enrollment never loads local configuration, area routing or the
     // default API client: those may carry unrelated owner/service credentials.
     if crate::commands::auth_enrollment::handle_command(&command).await? {
@@ -3782,6 +3793,14 @@ pub(super) async fn run() -> Result<()> {
     let cli_config_path = cli_config.clone();
     let mut config = AppConfig::load_from_path(cli_config).context("load config")?;
     config.resolved_area_routing_path = routing_path;
+    if matches!(&command, Command::Tui(_)) {
+        if let Some(route) = &route {
+            anyhow::ensure!(
+                config.area.as_ref() == Some(&route.identity),
+                "Selected TUI area identity changed while loading config; select the intended area again"
+            );
+        }
+    }
     let client = Client::builder()
         .timeout(config.service.request_timeout)
         .default_headers(write_headers(&config)?)
@@ -3790,6 +3809,8 @@ pub(super) async fn run() -> Result<()> {
 
     match command {
         Command::Urls(_) => unreachable!("URL inventory is handled before configuration loading"),
+        #[cfg(feature = "tui")]
+        Command::LinearTui { .. } => unreachable!("Linear companion has its own profile"),
         Command::Wizard(_) => unreachable!("wizard is handled before config loading"),
         Command::Init(_) => unreachable!("init is handled before config loading"),
         Command::Upgrade(_) => unreachable!("upgrade is handled before config loading"),

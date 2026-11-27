@@ -7,6 +7,8 @@ authors.workspace = true
 autobins = false
 
 [dependencies]
+codifix-inbox = { path = "../codifix-inbox" }
+codifix-identity = { path = "../codifix-identity" }
 anyhow.workspace = true
 axum.workspace = true
 matchit.workspace = true
@@ -63,6 +65,9 @@ default = ["offline"]
 offline = ["dep:duckdb"]
 
 [dev-dependencies]
+codifix-agency = { path = "../codifix-agency" }
+codifix-agency-projects = { path = "../codifix-agency-projects" }
+codifix-agency-runtime = { path = "../codifix-agency-runtime" }
 codifix-atproto-verify = { path = "../codifix-atproto-verify", features = ["test-fixtures"] }
 codifix-test-support = { path = "../codifix-test-support" }
 codifix-supervisor = { path = "../codifix-supervisor" }
