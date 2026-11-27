@@ -166,8 +166,19 @@ jobs:
       # This reports the exact unresolved advisory, never an audit-clean claim.
       # All other advisories, malformed reports and audit errors fail the job.
       - run: node identity-broker/scripts/audit.mjs broker-audit.json
-      - run: node packaging/build-identity-broker.mjs "$RUNNER_TEMP/broker-candidate"
-      - run: node packaging/tests/test-identity-broker.mjs "$RUNNER_TEMP"/broker-candidate/*.tar.gz
+      - name: Verify candidate-only packaging
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+          if [[ "$version" == *-rc.* ]]; then
+            node packaging/build-identity-broker.mjs "$RUNNER_TEMP/broker-candidate"
+            node packaging/tests/test-identity-broker.mjs "$RUNNER_TEMP"/broker-candidate/*.tar.gz
+          else
+            if node packaging/build-identity-broker.mjs "$RUNNER_TEMP/broker-candidate" > "$RUNNER_TEMP/broker-packaging.log" 2>&1; then
+              echo 'Stable source unexpectedly produced a broker candidate archive' >&2
+              exit 1
+            fi
+            grep -F 'Broker archive restricted to a release candidate' "$RUNNER_TEMP/broker-packaging.log"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: disabled-identity-broker-candidate
