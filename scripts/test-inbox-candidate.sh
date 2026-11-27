@@ -37,4 +37,4 @@ PY
 export CODIFIX_INBOX_NATIVE_TEST
 cargo test --locked -p codifix-service --no-default-features --lib \
     network::candidate::native_inbox_linear_workflow -- --ignored --exact --nocapture | tee "$build_messages"
-rg -qx 'INBOX_CANDIDATE_VERIFIED' "$build_messages"
+grep -Fqx 'INBOX_CANDIDATE_VERIFIED' "$build_messages"
