@@ -32,10 +32,19 @@ the principal is valid but lacks the required role or project. Read
 [Authentication and access](/docs/reference/authentication) for configuration,
 roles, token lifecycle, and migration.
 
+## Desktop and private task workflows
+
+The [3.1.0 OpenAPI document](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/docs/api/openapi.yaml)
+marks the native desktop login flow as core. The Network, Inbox and project agency
+exchange routes are internal. Inbox history is scoped to the signed-in owner.
+Executing a specialist action also requires a current invocation grant. Follow the
+[desktop sign-in](/docs/desktop) and [private Inbox](/docs/network-inbox) guides
+to use those flows.
+
 ## API version and stability
 
 The `/v1` prefix is the HTTP API namespace; it is not the Codifix product
-release number. The current source workspace declares `3.0.0`; packaged
+release number. The current source workspace declares `3.1.0`; packaged
 builds with that version may precede later source increments. Fetch the
 specification from the selected service when upgrading a direct integration.
 

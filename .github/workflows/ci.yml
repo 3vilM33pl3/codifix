@@ -74,6 +74,8 @@ jobs:
             docs_site:
               - "docs-site/**"
               - "docs/user/**"
+              - "docs/developer/agent-interoperability.md"
+              - "plugins/codifix/skills/**"
               - "README.md"
               - "CHANGELOG.md"
               - "Cargo.toml"

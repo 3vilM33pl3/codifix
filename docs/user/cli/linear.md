@@ -3,18 +3,26 @@
 Enable automatic issue tracking from the Project tab with `L`, or use the CLI
 with the same area and project that you use for normal Codifix work.
 
+Set `AREA` and `PROJECT` to the enrolled area and project slug. Check the mapping in the status output before enabling tracking.
+
 ```sh
-codifix --area workshop linear status --project codifix
-codifix --area workshop linear enable --project codifix
-codifix --area workshop linear sync --project codifix
-codifix --area workshop linear disable --project codifix
+codifix --area "$AREA" linear status --project "$PROJECT"
+codifix --area "$AREA" linear enable --project "$PROJECT"
+codifix --area "$AREA" linear status --project "$PROJECT"
+```
+
+To advance one pending event manually, run:
+
+```sh
+codifix --area "$AREA" linear sync --project "$PROJECT"
 ```
 
 The operator installs the resident companion's approved project binding before
 enabling tracking. The central companion retains the Linear credential. The
 local switch delegates only to the enrolled project and shows the mapped
 project, the last synchronization result and the last verified issue link.
-Disabling tracking pauses queued events and preserves their issue links.
+To pause queued events while preserving their issue links, run
+`codifix --area "$AREA" linear disable --project "$PROJECT"`.
 A request the companion already accepted can finish.
 
 Approved plans and explicit implementation task starts enqueue tracking after
@@ -31,7 +39,7 @@ it as `--linear-thread-key` to `remember`. Failed or absent verification
 does not close the issue. To report a blocker, run:
 
 ```sh
-codifix --area workshop linear block --project codifix --thread-key my-task --reason "Waiting for provider access"
+codifix --area "$AREA" linear block --project "$PROJECT" --thread-key my-task --reason "Waiting for provider access"
 ```
 
 The resident companion periodically drains pending events. A service outage can
@@ -39,5 +47,4 @@ delay synchronization while Codifix task work continues. The local status
 shows pending work or a retry. A proposal requiring review appears as
 **Needs review in the companion**.
 
-See [resident Linear enrollment](../linear-homelab-enrollment.md) for the
-private companion path.
+To draft an individual issue with wording approval, use [Manual Linear review](https://codifix.dev/docs/specialists/linear-review). Operators can inspect the [3.1.0 resident companion enrollment guide](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/docs/user/linear-homelab-enrollment.md) for the private peer binding.

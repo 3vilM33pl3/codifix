@@ -9,12 +9,7 @@ Joining an existing organization? Start with [Team setup](/docs/team-setup) and
 your administrator's approved company origin. The standalone installation below
 creates and configures your own service/database; it is a different journey.
 
-Codifix v3.1.0 is the current stable release. ([v3.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0)). The existing v2.1.0 release remains under the Memory Layer product identity; it is not a Codifix installer or upgrade path.
-
-The Codifix release introduces a breaking product rename. Installing it over
-an existing Memory Layer setup does not transfer its state. If you are moving
-an existing installation, read the [Update guide](/docs/install/update) and
-the [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md).
+For a new service, install the current stable release, [v3.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0). If you already run Codifix 3.0.0, back up the existing database and configuration and follow the [3.1 upgrade steps](/docs/install/update#upgrade-codifix-300-to-310). Memory Layer v2.x installations have a [separate reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/v3.1.0/packaging/CODIFIX-3-REINSTALL.md).
 
 ## Stable package names
 
@@ -27,7 +22,7 @@ them against its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/dow
 | macOS | `codifix-3.1.0-macos-x86_64.pkg`, `codifix-3.1.0-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
 | Windows x86_64 | `codifix-3.1.0-windows-x86_64-build.4.zip`, `.msi`, and `-server-tools.msi` |
 
-Debian filenames use `codifix_3.1.0_ARCH.deb`. Verify packages against the release checksums.
+The Linux packages above contain core service and client tools. See [Linux Desktop](/docs/desktop) for the separately versioned graphical client.
 
 Follow the instructions for your platform:
 

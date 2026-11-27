@@ -13,11 +13,7 @@ commit; a version string alone does not identify package contents. For a source 
 `codifix --version`. Later changes on `main` are not retroactively part of the
 published release.
 
-The release contains project memory, private federation, device/project
-onboarding, synchronized knowledge and durable background jobs. Availability
-still depends on build capabilities, explicit configuration, current grants
-and the selected installation. A passing test or a controlled rehearsal does
-not establish complete deployment or platform acceptance.
+Codifix 3.1.0 adds desktop sessions and area routing, privately enrolled specialists, and Network and Inbox. A signed-in user can review specialist conversations and task receipts on an enabled home service. Operators configure Linear tracking, incident response, SSH renewal and OpenBao ceremonies separately. See [Linux Desktop](https://codifix.dev/docs/desktop), [Network and Inbox](https://codifix.dev/docs/network-inbox) and [specialist workflows](https://codifix.dev/docs/specialists).
 
 ## Rename and recovery boundary
 
@@ -29,7 +25,7 @@ for a reviewed cutover that preserves knowledge and recovery material.
 
 Preserve a matched backup of the database, configuration, credentials,
 attachments, state and original executables before a cutover. PostgreSQL
-migrations are append-only and run at service startup; they do not perform the
+migrations are append-only. Installations in `verify_only` mode require an authorized migration before service startup. Database migrations do not perform the
 product rename. The release embeds migrations through `0105`, including the additive
 migrations after `0085` for upgrades from Codifix 3.0.0. Never run an old
 Memory Layer binary against a database after Codifix has accepted writes.
