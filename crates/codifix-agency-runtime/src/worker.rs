@@ -19,6 +19,15 @@ pub fn policy() -> JobPolicy {
         ..Default::default()
     }
 }
+/// Check one approved, read-only incident watch independently of the job queue.
+pub async fn verify_incident_recovery(
+    store: &Store,
+    cfg: &Config,
+    cursor: Option<Uuid>,
+) -> Result<Option<Uuid>> {
+    crate::incidents::verify_once(store, cfg, cursor).await
+}
+
 pub async fn run_once(store: &Store, cfg: &Config) -> Result<bool> {
     let delivered = crate::incidents::deliver_once(store, cfg)
         .await

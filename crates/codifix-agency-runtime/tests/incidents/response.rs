@@ -1,16 +1,36 @@
 use super::*;
+use atrium_crypto::keypair::{Did, Secp256k1Keypair};
 use axum::extract::State;
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use codifix_agency_runtime::{
     config::Auth,
     server::{App, router},
+    social::{SocialConfig, SocialPeer},
 };
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 const TOKEN: &str = "incident-synthetic-authenticated-peer-token";
-const AGENT: &str = "incident-synthetic-reporting-agent-token";
 const OPERATOR: &str = "incident-synthetic-local-operator-token";
+const REPORTER_DID: &str = "did:web:incident-reporter.test";
+const HOME_DID: &str = "did:web:incident-home.test";
+
+fn reporter_token(signer: &Secp256k1Keypair) -> String {
+    let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"ES256K","typ":"JWT"}"#);
+    let claims = json!({
+        "iss": REPORTER_DID,
+        "aud": format!("{HOME_DID}#codifix_agency"),
+        "lxm": "dev.codifix.agency.sendMessage",
+        "jti": Uuid::new_v4(),
+        "exp": Utc::now().timestamp() + 60,
+    });
+    let body = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+    let signed = format!("{header}.{body}");
+    let signature = URL_SAFE_NO_PAD.encode(signer.sign(signed.as_bytes()).unwrap());
+    format!("{signed}.{signature}")
+}
+
 fn base(instance: Uuid, specialist: &str, capability: &str) -> Config {
     serde_json::from_value(json!({"instance_id":instance,"listen":"127.0.0.1:0","public_url":"https://fixture.example.invalid","database_env":"UNUSED","specialists":[{"schema_version":1,"instance_id":instance,"name":specialist,"specialist_id":specialist,"capabilities":[capability]}],"peers":[]})).unwrap()
 }
@@ -102,7 +122,11 @@ async fn fixture_service(
             (StatusCode::ACCEPTED, "started")
         }
         (Method::GET, "health") if restored.contains(&service) => (StatusCode::OK, "healthy"),
-        (Method::GET, "catalogue-item") if restored.contains(&service) && service != "failed" => {
+        (Method::GET, "catalogue-item")
+            if restored.contains(&service)
+                && service != "failed"
+                && (service != "manual" || restored.contains("manual-item")) =>
+        {
             (StatusCode::OK, "fixture-item-42")
         }
         _ => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
@@ -172,6 +196,23 @@ async fn alert_and_peer_reports_share_verified_incident_and_linear_record() {
     let mut hc = base(h, "homelab", "incident_report");
     let mut lc = base(l, "linear", "linear_track");
     hc.inbox_enabled = true;
+    let signer = Secp256k1Keypair::import(&[1; 32]).unwrap();
+    hc.social = Some(SocialConfig {
+        did: HOME_DID.into(),
+        pds: "https://fixture.example.invalid".into(),
+        access_token_env: "UNUSED".into(),
+        access_token_file: None,
+        peers: [(
+            agent.id.clone(),
+            SocialPeer {
+                did: REPORTER_DID.into(),
+                signing_key: signer.did(),
+                notice_inbox: None,
+                incident_conversation: None,
+            },
+        )]
+        .into(),
+    });
     let principal = Uuid::new_v4();
     let chat = Uuid::new_v4();
     sqlx::query("INSERT INTO auth_principals(id,kind,display_name) VALUES($1,'human_oidc','Outage operator')").bind(principal).execute(&db.pool).await.unwrap();
@@ -182,7 +223,7 @@ async fn alert_and_peer_reports_share_verified_incident_and_linear_record() {
         &owner,
         "homelab",
         "incident_report",
-        ["auto", "major", "failed"]
+        ["auto", "major", "failed", "manual"]
             .into_iter()
             .map(|s| ResourceScope {
                 kind: "service".into(),
@@ -227,7 +268,6 @@ async fn alert_and_peer_reports_share_verified_incident_and_linear_record() {
         hc.clone(),
         vec![
             (alert.clone(), TOKEN.into()),
-            (agent.clone(), AGENT.into()),
             (owner.clone(), OPERATOR.into()),
         ],
     )
@@ -242,16 +282,20 @@ elif op=='notify':
 "#).unwrap();
     let fixture_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let fixture_url = format!("http://{}", fixture_listener.local_addr().unwrap());
+    let restored = Arc::new(Mutex::new(BTreeSet::new()));
     let app = Router::new()
         .route(
             "/{service}/{op}",
             axum::routing::get(fixture_service).post(fixture_service),
         )
-        .with_state(Arc::new(Mutex::new(BTreeSet::new())));
+        .with_state(restored.clone());
     let fixture = tokio::spawn(async move { axum::serve(fixture_listener, app).await.unwrap() });
+    let mut manual_service = mode(root, &fixture_url, "manual", false);
+    manual_service["manual_recovery"] = json!(true);
+    manual_service.as_object_mut().unwrap().remove("repairs");
     fs::write(&path,serde_json::to_vec(&json!({"alert_peer":"alerts","specialist":"homelab","mandate_id":hm,"inbox":{"operator_conversation":chat},"notify":["/usr/bin/python3",root.join("fixture.py"),root,"any","notify"],
         "linear":{"peer":"linear","specialist":"linear","mandate_id":lm,"project_id":project},
-        "services":{"auto":mode(root,&fixture_url,"auto",false),"major":mode(root,&fixture_url,"major",true),"failed":mode(root,&fixture_url,"failed",false)}})).unwrap()).unwrap();
+        "services":{"auto":mode(root,&fixture_url,"auto",false),"major":mode(root,&fixture_url,"major",true),"failed":mode(root,&fixture_url,"failed",false),"manual":manual_service}})).unwrap()).unwrap();
     let starts = Utc::now();
     let client = reqwest::Client::new();
     let alerts = json!({"alerts":[{"status":"firing","labels":{"service":"auto","alertname":"Down"},"annotations":{"summary":"Service unreachable"},"startsAt":starts,"fingerprint":"abc123"}]});
@@ -306,9 +350,8 @@ elif op=='notify':
         let request = request(name);
         let envelope = json!({"message":{"messageId":request.request_id,"role":"ROLE_USER","parts":[{"data":request}]},"configuration":{"returnImmediately":true}});
         let response = client
-            .post(format!("{url}/message:send"))
-            .header("A2A-Version", "1.0")
-            .bearer_auth(AGENT)
+            .post(format!("{url}/xrpc/dev.codifix.agency.sendMessage"))
+            .bearer_auth(reporter_token(&signer))
             .json(&envelope)
             .send()
             .await
@@ -381,27 +424,30 @@ elif op=='notify':
     );
     // Advance the test clock for durable status delivery. The actual Linear worker
     // sends its confirmation challenge and uses the disposable GraphQL provider.
-    for _ in 0..160 {
-        let n = sqlx::query_scalar::<_, i64>(
-            "SELECT count(*) FROM agency_incident_events WHERE NOT (tracked AND notified)",
+    let drain_outbox = async || {
+        for _ in 0..160 {
+            let n = sqlx::query_scalar::<_, i64>(
+                "SELECT count(*) FROM agency_incident_events WHERE NOT (tracked AND notified)",
+            )
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+            if n == 0 {
+                break;
+            }
+            sqlx::query("UPDATE agency_incident_events SET retry_at=statement_timestamp() WHERE NOT (tracked AND notified)").execute(&db.pool).await.unwrap();
+            worker::run_once(&home, &hc).await.unwrap();
+            worker::run_once(&linear, &lc).await.unwrap();
+        }
+        let pending: Vec<(String, Option<String>)> = sqlx::query_as(
+            "SELECT event_id,problem FROM agency_incident_events WHERE NOT (tracked AND notified)",
         )
-        .fetch_one(&db.pool)
+        .fetch_all(&db.pool)
         .await
         .unwrap();
-        if n == 0 {
-            break;
-        }
-        sqlx::query("UPDATE agency_incident_events SET retry_at=statement_timestamp() WHERE NOT (tracked AND notified)").execute(&db.pool).await.unwrap();
-        worker::run_once(&home, &hc).await.unwrap();
-        worker::run_once(&linear, &lc).await.unwrap();
-    }
-    let pending: Vec<(String, Option<String>)> = sqlx::query_as(
-        "SELECT event_id,problem FROM agency_incident_events WHERE NOT (tracked AND notified)",
-    )
-    .fetch_all(&db.pool)
-    .await
-    .unwrap();
-    assert!(pending.is_empty(), "{pending:?}");
+        assert!(pending.is_empty(), "{pending:?}");
+    };
+    drain_outbox().await;
     let status = client
         .get(format!("{url}/v1/incidents/{}", pair[0]))
         .bearer_auth(OPERATOR)
@@ -418,12 +464,22 @@ elif op=='notify':
     assert!(status["ticket"]["url"].is_string());
     let stored = graphql_state.lock().unwrap().objects.clone();
     assert_eq!(stored.len(), 4, "three incidents plus one linked follow-up");
-    assert!(stored.values().any(|issue| {
-        issue["description"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("Follow-up to incident")
-    }));
+    let followup = stored
+        .values()
+        .find(|issue| {
+            issue["description"]
+                .as_str()
+                .unwrap_or_default()
+                .contains(&format!("Follow-up to incident {major}"))
+        })
+        .unwrap();
+    let postmortem = fs::read_to_string(root.join("reports").join(format!("{major}.md"))).unwrap();
+    let followup_url = followup["url"].as_str().unwrap();
+    assert!(postmortem.contains("## Timeline"));
+    assert_eq!(
+        postmortem.matches(&format!("](<{followup_url}>)")).count(),
+        1
+    );
     let inbox = codifix_inbox::store::Store {
         pool: db.pool.clone(),
         home_instance_id: h,
@@ -441,6 +497,98 @@ elif op=='notify':
             && notices.contains("waiting_for_operator")
             && notices.contains("recovered")
     );
+    let manual = report("manual").await;
+    worker::run_once(&home, &hc).await.unwrap();
+    assert_eq!(
+        home.get_internal(manual).await.unwrap().contract.status,
+        TaskStatus::Completed
+    );
+    let incident_status = async |id: Uuid| {
+        client
+            .get(format!("{url}/v1/incidents/{id}"))
+            .bearer_auth(OPERATOR)
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap()
+    };
+    assert_eq!(probe("manual", "health").await.status(), 503);
+    let cursor = worker::verify_incident_recovery(&home, &hc, None)
+        .await
+        .unwrap();
+    assert_eq!(cursor, Some(manual));
+    restored.lock().unwrap().insert("manual".into());
+    assert_eq!(probe("manual", "health").await.status(), 200);
+    assert_eq!(probe("manual", "catalogue-item").await.status(), 503);
+    worker::verify_incident_recovery(&home, &hc, cursor)
+        .await
+        .unwrap();
+    drain_outbox().await;
+    let waiting = incident_status(manual).await;
+    assert_eq!(waiting["state"], "watching_manual_recovery");
+    assert!(waiting["verified"].is_null());
+    let first_ticket = waiting["ticket"].clone();
+
+    home.control_mandate(hm, "pause", &owner).await.unwrap();
+    restored.lock().unwrap().insert("manual-item".into());
+    worker::verify_incident_recovery(&home, &hc, cursor)
+        .await
+        .unwrap();
+    assert_eq!(
+        incident_status(manual).await["state"],
+        "watching_manual_recovery"
+    );
+    home.control_mandate(hm, "resume", &owner).await.unwrap();
+    worker::verify_incident_recovery(&home, &hc, cursor)
+        .await
+        .unwrap();
+    assert_eq!(
+        worker::verify_incident_recovery(&home, &hc, cursor)
+            .await
+            .unwrap(),
+        None
+    );
+    drain_outbox().await;
+    let recovered = incident_status(manual).await;
+    assert_eq!(recovered["state"], "recovered");
+    assert_eq!(
+        recovered["verified"],
+        json!({"health":true,"user_request":true})
+    );
+    assert_eq!(recovered["ticket"]["issue_id"], first_ticket["issue_id"]);
+    assert_eq!(recovered["ticket"]["url"], first_ticket["url"]);
+    let recovery_events: Vec<&Value> = recovered["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|event| (event["event"]["state"] == "recovered").then_some(&event["event"]))
+        .collect();
+    assert_eq!(recovery_events.len(), 1);
+    assert_eq!(recovery_events[0]["automated_repair"], false);
+    let repairs: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM external_effects WHERE resource='service:manual'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(repairs, 0);
+    assert!(!root.join("reports").join(format!("{manual}.md")).exists());
+    let stored = graphql_state.lock().unwrap().objects.clone();
+    assert_eq!(
+        stored.len(),
+        5,
+        "manual recovery updates one additional issue"
+    );
+    assert!(stored.values().any(|issue| {
+        issue["id"] == first_ticket["issue_id"]
+            && issue["description"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("The companion only ran read-only probes.")
+    }));
     fixture.abort();
     provider.abort();
     home_server.abort();

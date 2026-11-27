@@ -100,7 +100,7 @@ async fn check_moderation(
     ensure!(!blocked, "peer blocked by local moderation");
     Ok(())
 }
-async fn mandate_tx(
+pub(crate) async fn mandate_tx(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
 ) -> Result<(Mandate, Uuid, Usage)> {

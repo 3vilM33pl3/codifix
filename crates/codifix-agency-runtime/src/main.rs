@@ -402,6 +402,21 @@ async fn run() -> Result<()> {
                             }
                         });
                     }
+                    {
+                        let store = store.clone();
+                        let cfg = cfg.clone();
+                        workers.spawn(async move {
+                            let mut cursor = None;
+                            loop {
+                                cursor = codifix_agency_runtime::worker::verify_incident_recovery(
+                                    &store, &cfg, cursor,
+                                )
+                                .await
+                                .unwrap_or(cursor);
+                                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                            }
+                        });
+                    }
                     workers.spawn(async move {
                         loop {
                             let _ = store.heartbeat(&cfg).await;

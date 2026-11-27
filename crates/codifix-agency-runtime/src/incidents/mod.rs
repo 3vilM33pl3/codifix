@@ -1,5 +1,6 @@
 //! Correlate service reports, apply one reviewed runbook, and verify a user request.
 mod delivery;
+mod manual;
 use crate::{
     config::Config,
     store::{Store, StoredTask},
@@ -9,6 +10,7 @@ use chrono::{DateTime, Utc};
 use codifix_agency::Usage;
 use codifix_store::effects::{self, EffectIntent, EffectKind, EffectReason, EffectStatus};
 pub(crate) use delivery::deliver_once;
+pub(crate) use manual::verify_once;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::Row;
@@ -57,7 +59,10 @@ pub(crate) struct Service {
     inspect: Vec<String>,
     health: Vec<String>,
     user_request: Vec<String>,
+    #[serde(default)]
     repairs: BTreeMap<String, Repair>,
+    #[serde(default)]
+    manual_recovery: bool,
     runbook: PathBuf,
     postmortem_directory: PathBuf,
 }
@@ -100,6 +105,13 @@ pub(crate) fn profile() -> Result<Option<Profile>> {
     ensure!(
         profile.inbox.is_some() || !profile.notify.is_empty(),
         "configure an incident notification recipient"
+    );
+    ensure!(
+        profile
+            .services
+            .values()
+            .all(|service| !service.manual_recovery || service.repairs.is_empty()),
+        "manual recovery profiles cannot contain repair commands"
     );
     Ok(Some(profile))
 }
@@ -297,6 +309,9 @@ pub(crate) async fn report(
             .await?;
             observation
         };
+    if rule.manual_recovery {
+        return manual::watch(store, id, service).await.map(Some);
+    }
     if phase == "repairing" || phase == "failed" {
         if !(check(&rule.health).await && check(&rule.user_request).await) {
             return blocked(store,task,id,"failed","Repair already attempted. The service or user request still fails. Operator intervention is required.").await;
@@ -431,18 +446,60 @@ pub(crate) async fn report(
 }
 
 fn event_summary(body: &Value) -> String {
-    let mut fields = vec![body["state"].as_str().unwrap_or("update").to_owned()];
-    for field in [
-        "source", "impact", "details", "action", "cause", "title", "operator",
-    ] {
+    let state = body["state"].as_str().unwrap_or("update");
+    let mut fields = vec![state.to_owned()];
+    if state == "waiting_for_operator" {
+        fields.push("Waiting for approval of the reviewed repair.".into());
+    }
+    let evidence = &body["evidence"];
+    if let (Some(health), Some(request)) = (
+        evidence["health"].as_bool(),
+        evidence["user_request"].as_bool(),
+    ) {
+        fields.push(format!(
+            "Health check: {health}. Representative request: {request}."
+        ));
+    }
+    for field in ["source", "impact", "action", "cause", "title", "operator"] {
         if let Some(value) = body[field].as_str() {
             fields.push(value.to_owned());
         }
     }
-    if let Some(evidence) = body.get("evidence") {
-        fields.push(evidence.to_string());
+    if state != "waiting_for_operator"
+        && let Some(details) = body["details"].as_str()
+    {
+        fields.push(details.to_owned());
+    }
+    if state == "investigated"
+        && let Some(cause) = evidence["cause"].as_str()
+    {
+        fields.push(cause.to_owned());
     }
     fields.join(" · ").chars().take(160).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ticket_timeline_uses_readable_evidence_and_omits_approval_challenges() {
+        let investigation = json!({"state":"investigated","evidence":{"cause":"Test catalogue failed","followups":[]}});
+        assert_eq!(
+            event_summary(&investigation),
+            "investigated · Test catalogue failed"
+        );
+        let approval =
+            json!({"state":"waiting_for_operator","details":"Reply with `approve TOKEN`."});
+        assert_eq!(
+            event_summary(&approval),
+            "waiting_for_operator · Waiting for approval of the reviewed repair."
+        );
+        let recovered = json!({"state":"recovered","impact":"x".repeat(200),"evidence":{"health":true,"user_request":true}});
+        assert!(
+            event_summary(&recovered).contains("Health check: true. Representative request: true.")
+        );
+    }
 }
 
 async fn close_notes(
@@ -483,8 +540,8 @@ async fn close_notes(
             "- {} — service health and representative request passed\n\n## Follow-up\n\n",
             Utc::now()
         ));
-        for followup in &e.followups {
-            text.push_str(&format!("- {followup}\n"));
+        for (index, followup) in e.followups.iter().enumerate() {
+            text.push_str(&format!("- {followup} <!-- followup:{index} -->\n"));
         }
         tokio::fs::create_dir_all(&rule.postmortem_directory).await?;
         tokio::fs::write(rule.postmortem_directory.join(format!("{id}.md")), text).await?;

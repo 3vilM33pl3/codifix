@@ -31,14 +31,19 @@ pub(crate) async fn deliver_once(store: &Store, cfg: &Config) -> Result<bool> {
         let update: Value = row.try_get("body")?;
         notified = profile.inbox.is_some() || !profile.notify.is_empty();
         if let Some(inbox) = &profile.inbox {
+            let state = update["state"].as_str().context("unknown incident event")?;
+            // The watch follows investigation. Keep its notice interoperable with
+            // receivers that do not recognize the new internal incident state.
+            let notice_state = if state == manual::WATCHING {
+                "investigated"
+            } else {
+                state
+            };
             let notice = crate::notice::IncidentNotice {
                 incident_id: id,
                 event_id: seq,
                 service: row.try_get("service")?,
-                state: update["state"]
-                    .as_str()
-                    .context("unknown incident event")?
-                    .to_owned(),
+                state: notice_state.to_owned(),
                 summary: update["details"]
                     .as_str()
                     .or_else(|| update["impact"].as_str())
@@ -80,7 +85,7 @@ pub(crate) async fn deliver_once(store: &Store, cfg: &Config) -> Result<bool> {
     }
     let earlier:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM agency_incident_events WHERE incident_id=$1 AND seq<$2 AND NOT tracked)").bind(id).bind(seq).fetch_one(&store.pool).await?;
     if !tracked && !earlier {
-        tracked = sync_ticket(store, cfg, &profile.linear, &row)
+        tracked = sync_ticket(store, cfg, &profile, &row)
             .await
             .unwrap_or(false);
     }
@@ -96,13 +101,14 @@ pub(crate) async fn deliver_once(store: &Store, cfg: &Config) -> Result<bool> {
     Ok(true)
 }
 
-async fn sync_ticket(store: &Store, cfg: &Config, linear: &Linear, row: &PgRow) -> Result<bool> {
+async fn sync_ticket(store: &Store, cfg: &Config, profile: &Profile, row: &PgRow) -> Result<bool> {
     let id: Uuid = row.try_get("incident_id")?;
     let seq: i64 = row.try_get("seq")?;
     let service: String = row.try_get("service")?;
     let key: String = row.try_get("event_id")?;
     let at: DateTime<Utc> = row.try_get("at")?;
     let body: Value = row.try_get("body")?;
+    let linear = &profile.linear;
     let ticket: Option<Value> =
         sqlx::query_scalar("SELECT ticket FROM agency_incidents WHERE id=$1")
             .bind(id)
@@ -135,7 +141,9 @@ async fn sync_ticket(store: &Store, cfg: &Config, linear: &Linear, row: &PgRow) 
         .find(|p| p.id == linear.peer && !p.operator && p.instance_id != cfg.instance_id)
         .context("missing Linear peer")?;
     let transport = Transport::new(store, cfg, peer)?;
-    let key = format!("incident-{id}-{seq}");
+    // Keep the existing issue identity and give changed timeline wording its
+    // own task key. Already tracked events are never submitted again.
+    let key = format!("incident-{id}-{seq}-summary-v2");
     let payload =
         json!({"kind":"linear_track","title":title,"description":description,"lookup_title":title});
     let request = Submit {
@@ -211,10 +219,68 @@ async fn sync_ticket(store: &Store, cfg: &Config, linear: &Linear, row: &PgRow) 
                     .execute(&store.pool)
                     .await?;
             } else {
-                sqlx::query("UPDATE agency_incident_events SET body=jsonb_set(body,'{issue_url}',$2) WHERE seq=$1").bind(seq).bind(json!(evidence["url"])).execute(&store.pool).await?;
+                let url = evidence["url"]
+                    .as_str()
+                    .context("missing verified follow-up URL")?;
+                if let Some(rule) = profile.services.get(&service) {
+                    link_postmortem_followup(rule, id, &key, &body, url).await?;
+                }
+                sqlx::query("UPDATE agency_incident_events SET body=jsonb_set(body,'{issue_url}',$2) WHERE seq=$1").bind(seq).bind(json!(url)).execute(&store.pool).await?;
             }
             Ok(true)
         }
         _ => Ok(false),
     }
+}
+
+async fn link_postmortem_followup(
+    rule: &Service,
+    incident_id: Uuid,
+    key: &str,
+    body: &Value,
+    url: &str,
+) -> Result<()> {
+    let postmortem = rule.postmortem_directory.join(format!("{incident_id}.md"));
+    let text = match tokio::fs::read_to_string(&postmortem).await {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let url = reqwest::Url::parse(url)?;
+    ensure!(
+        url.scheme() == "https" && url.username().is_empty() && url.password().is_none(),
+        "invalid follow-up link"
+    );
+    let marker = format!("<!-- {key} -->");
+    let title = body["title"].as_str().context("missing follow-up title")?;
+    let escaped_title = title
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('\\', "\\\\")
+        .replace('[', "\\[")
+        .replace(']', "\\]");
+    let linked = format!("- [{escaped_title}](<{url}>) {marker}");
+    if text.lines().any(|line| line == linked) {
+        return Ok(());
+    }
+    let pending = format!("- {title} {marker}");
+    let updated = if text.lines().any(|line| line == pending) {
+        text.replace(&pending, &linked)
+    } else {
+        // Older reports and hand-edited reports may not have the reserved line.
+        format!("{}\n\n{linked}\n", text.trim_end())
+    };
+    let staged = rule
+        .postmortem_directory
+        .join(format!(".{incident_id}-{}.md", Uuid::new_v4()));
+    let result = async {
+        tokio::fs::write(&staged, updated).await?;
+        tokio::fs::rename(&staged, &postmortem).await
+    }
+    .await;
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&staged).await;
+    }
+    Ok(result?)
 }
