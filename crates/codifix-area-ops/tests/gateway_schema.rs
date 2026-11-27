@@ -69,7 +69,8 @@ fn default_review_is_offline_exact_and_never_discloses_private_values() {
         review["status"],
         "gateway_schema_review_only_no_database_connection"
     );
-    assert_eq!(review["schema"]["migration_head"], 85);
+    assert_eq!(review["schema"]["migration_head"], 105);
+    assert_eq!(review["schema"]["migrations"], 103);
     assert_eq!(review["database"], "not_connected");
     assert_eq!(review["owner"], "schema_owner");
     assert_eq!(review["enrolls_gateway"], false);

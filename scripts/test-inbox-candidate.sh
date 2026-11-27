@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Build and run the native desktop -> service -> worker -> local Linear test.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+: "${CODIFIX_TEST_DATABASE_URL:?Set this to a disposable pgvector PostgreSQL database with CREATEDB access}"
+export CODIFIX_TEST_REQUIRE_DB=1
+export NO_PROXY=127.0.0.1,localhost
+export no_proxy="$NO_PROXY"
+export CODIFIX_INBOX_CANDIDATE_LINEAR_TOKEN=synthetic-inbox-candidate-linear-token
+
+build_messages=$(mktemp)
+trap 'rm -f "$build_messages"' EXIT
+desktop_target_args=()
+if [[ -n "${CODIFIX_DESKTOP_TARGET_DIR:-}" ]]; then
+    desktop_target_args=(--target-dir "$CODIFIX_DESKTOP_TARGET_DIR")
+fi
+cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked --bin codifix-desktop \
+    "${desktop_target_args[@]}" --no-run --message-format=json >"$build_messages"
+CODIFIX_INBOX_NATIVE_TEST=$(python3 - "$build_messages" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1]) as messages:
+    executables = [
+        message['executable']
+        for line in messages
+        if (message := json.loads(line))['reason'] == 'compiler-artifact'
+        and message['target']['name'] == 'codifix-desktop'
+        and message['profile']['test']
+        and message['executable']
+    ]
+if len(executables) != 1:
+    sys.exit('Expected one native desktop test executable')
+print(executables[0])
+PY
+)
+export CODIFIX_INBOX_NATIVE_TEST
+cargo test --locked -p codifix-service --no-default-features --lib \
+    network::candidate::native_inbox_linear_workflow -- --ignored --exact --nocapture | tee "$build_messages"
+grep -Fqx 'INBOX_CANDIDATE_VERIFIED' "$build_messages"

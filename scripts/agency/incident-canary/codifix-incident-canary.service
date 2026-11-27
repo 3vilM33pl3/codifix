@@ -1,0 +1,17 @@
+[Unit]
+Description=Codifix isolated incident canary
+
+[Service]
+User=codifix-agency-homelab
+StateDirectory=codifix-incident-canary
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -I /usr/local/libexec/codifix-incident-canary/service.py serve
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

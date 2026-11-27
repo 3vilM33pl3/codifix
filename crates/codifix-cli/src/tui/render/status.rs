@@ -264,11 +264,32 @@ pub(in crate::tui) fn status_message_style(app: &App) -> Style {
     Style::default().fg(color).bg(Theme::PANEL_ALT)
 }
 
-pub(in crate::tui) fn footer_height(profile: Profile) -> u16 {
-    match profile {
-        Profile::Dev => 5,
-        Profile::Prod => 4,
-    }
+pub(in crate::tui) fn footer_height(profile: Profile, show_companion: bool) -> u16 {
+    4 + u16::from(profile == Profile::Dev) + u16::from(show_companion)
+}
+
+pub(super) fn draw_companion_status_bar(
+    frame: &mut ratatui::Frame<'_>,
+    version: Option<&str>,
+    freshness: &str,
+    area: Rect,
+) {
+    let color = match freshness {
+        "fresh" => Theme::SUCCESS,
+        "stale" | "unavailable" => Theme::WARNING,
+        _ => Theme::MUTED,
+    };
+    frame.render_widget(
+        Paragraph::new(component_status_line(
+            "Companion",
+            version,
+            freshness,
+            color,
+            None,
+        ))
+        .style(Style::default().bg(Theme::PANEL_ALT)),
+        area,
+    );
 }
 
 pub(in crate::tui) fn draw_dev_status_bar(frame: &mut ratatui::Frame<'_>, app: &App, area: Rect) {
@@ -335,7 +356,7 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     frame.render_widget(
         Paragraph::new(component_status_line(
             "TUI",
-            &app.meta.versions.mem_cli,
+            Some(&app.meta.versions.mem_cli),
             tui_status_label(app),
             tui_status_color(app),
             tui_status_detail(app),
@@ -346,7 +367,7 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     frame.render_widget(
         Paragraph::new(component_status_line(
             "Service",
-            &app.meta.versions.mem_service,
+            Some(&app.meta.versions.mem_service),
             service_status_label(app),
             service_status_color(app),
             service_status_detail(app),
@@ -358,7 +379,7 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     frame.render_widget(
         Paragraph::new(component_status_line(
             "Manager",
-            &app.meta.versions.watch_manager,
+            Some(&app.meta.versions.watch_manager),
             manager_status_label(app),
             manager_status_color(app),
             manager_status_detail(app),
@@ -370,7 +391,7 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     frame.render_widget(
         Paragraph::new(component_status_line(
             "Watchers",
-            &app.meta.versions.memory_watch,
+            Some(&app.meta.versions.memory_watch),
             watcher_bar_status_label(app),
             watcher_bar_status_color(app),
             watcher_bar_status_detail(app),
@@ -382,7 +403,7 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     frame.render_widget(
         Paragraph::new(component_status_line(
             "Skills",
-            &app.meta.skill_inventory.bundle_version,
+            Some(&app.meta.skill_inventory.bundle_version),
             app.meta.skill_inventory.status.label(),
             skill_bundle_status_color(app.meta.skill_inventory.status),
             Some(app.meta.skill_inventory.summary.clone()),
@@ -392,33 +413,33 @@ pub(in crate::tui) fn draw_bottom_status_bar(
     );
 }
 
-pub(in crate::tui) fn component_status_line<'a>(
+fn component_status_line<'a>(
     label: &'a str,
-    version: &'a str,
+    version: Option<&'a str>,
     status: &'a str,
     status_color: Color,
     detail: Option<String>,
 ) -> Line<'a> {
-    let mut spans = vec![
-        Span::styled(
-            format!("{label} "),
-            Style::default()
-                .fg(Theme::ACCENT_STRONG)
-                .bg(Theme::PANEL_ALT)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
+    let mut spans = vec![Span::styled(
+        format!("{label} "),
+        Style::default()
+            .fg(Theme::ACCENT_STRONG)
+            .bg(Theme::PANEL_ALT)
+            .add_modifier(Modifier::BOLD),
+    )];
+    if let Some(version) = version {
+        spans.push(Span::styled(
             format!("v{version} "),
             Style::default().fg(Theme::TEXT).bg(Theme::PANEL_ALT),
-        ),
-        Span::styled(
-            status.to_string(),
-            Style::default()
-                .fg(status_color)
-                .bg(Theme::PANEL_ALT)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ];
+        ));
+    }
+    spans.push(Span::styled(
+        status.to_string(),
+        Style::default()
+            .fg(status_color)
+            .bg(Theme::PANEL_ALT)
+            .add_modifier(Modifier::BOLD),
+    ));
     if let Some(detail) = detail {
         spans.push(Span::styled(
             format!(" {detail}"),

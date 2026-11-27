@@ -1,0 +1,29 @@
+{
+  "home": {
+    "peer": "homelab",
+    "specialist": "incident-canary",
+    "instance": "00000000-0000-4000-8000-000000000001",
+    "project": "00000000-0000-4000-8000-000000000002",
+    "mandate": "00000000-0000-4000-8000-000000000003"
+  },
+  "reporter": {
+    "peer": "reporter",
+    "specialist": "incident-reporter",
+    "instance": "00000000-0000-4000-8000-000000000004",
+    "project": "00000000-0000-4000-8000-000000000005",
+    "mandate": "00000000-0000-4000-8000-000000000006"
+  },
+  "linear": {
+    "peer": "linear",
+    "specialist": "linear",
+    "instance": "00000000-0000-4000-8000-000000000007",
+    "project": "00000000-0000-4000-8000-000000000008",
+    "mandate": "00000000-0000-4000-8000-000000000009"
+  },
+  "operator_conversation": "00000000-0000-4000-8000-000000000010",
+  "reporter_conversation": "00000000-0000-4000-8000-000000000011",
+  "alert_instance": "00000000-0000-4000-8000-000000000012",
+  "linear_project": "00000000-0000-4000-8000-000000000013",
+  "linear_team": "00000000-0000-4000-8000-000000000014",
+  "alert_webhook": "https://monitoring.example.invalid/v1/incidents/alertmanager"
+}

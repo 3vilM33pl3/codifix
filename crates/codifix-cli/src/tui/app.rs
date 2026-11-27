@@ -86,120 +86,132 @@ pub(crate) async fn run(api: ApiClient, project: String, repo_root: PathBuf) -> 
             .take()
             .expect("embeddings_wake_rx present on fresh App"),
     );
-    terminal.draw(|frame| draw(frame, &app))?;
-    app.request_refresh(&api, RefreshMode::Startup);
-    app.request_activities(&api);
-    app.request_llm_audit_status(&api);
-    app.request_stream_connect(&api);
-    let mut stream: Option<StreamSession> = None;
-    let mut last_stream_connect_attempt = Instant::now();
+    let run_result = async {
+        terminal.draw(|frame| draw(frame, &app))?;
+        app.request_refresh(&api, RefreshMode::Startup);
+        app.request_activities(&api);
+        app.request_llm_audit_status(&api);
+        app.request_stream_connect(&api);
+        let mut stream: Option<StreamSession> = None;
+        let mut last_stream_connect_attempt = Instant::now();
 
-    let mut last_draw = Instant::now();
-    let mut last_laptop_refresh = Instant::now();
-    loop {
-        if api.config.laptop_cache.is_some()
-            && last_laptop_refresh.elapsed() >= Duration::from_secs(30)
-        {
-            app.request_refresh(&api, RefreshMode::Full);
-            last_laptop_refresh = Instant::now();
-        }
-        let mut stream_failed = false;
-        if let Some(current_stream) = stream.as_mut() {
-            match current_stream.try_recv() {
-                Ok(Some(response)) => {
-                    let mut detail_subscription = app.apply_stream_response(response);
-                    while let Ok(Some(response)) = current_stream.try_recv() {
-                        detail_subscription =
-                            app.apply_stream_response(response).or(detail_subscription);
-                    }
-                    if let Some(memory_id) = detail_subscription
-                        && let Err(error) = current_stream
-                            .send(StreamRequest::SubscribeMemory { memory_id })
-                            .await
-                    {
-                        app.chrome.status_message = error.to_string();
-                    }
-                    if std::mem::take(&mut app.chrome.needs_memories_refresh)
-                        && let Err(error) = current_stream
-                            .send(StreamRequest::ProjectMemories {
-                                project: app.project.clone(),
-                            })
-                            .await
-                    {
-                        app.chrome.status_message = error.to_string();
-                    }
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    app.handle_stream_disconnect(&error.to_string());
-                    stream_failed = true;
-                }
+        let mut last_draw = Instant::now();
+        let mut last_laptop_refresh = Instant::now();
+        loop {
+            if api.config.laptop_cache.is_some()
+                && last_laptop_refresh.elapsed() >= Duration::from_secs(30)
+            {
+                app.request_refresh(&api, RefreshMode::Full);
+                last_laptop_refresh = Instant::now();
             }
-        }
-        if stream_failed {
-            stream = None;
-            last_stream_connect_attempt = Instant::now();
-        }
-        while let Ok(event) = background_rx.try_recv() {
-            match event {
-                BackgroundEvent::StreamConnectCompleted { result } => {
-                    app.service.stream_connecting = false;
-                    match result {
-                        Ok(new_stream) => {
-                            stream = Some(*new_stream);
-                            app.chrome.status_message =
-                                "Streaming updates enabled. Refreshing project data...".to_string();
-                            app.chrome.needs_redraw = true;
-                            app.request_refresh(&api, RefreshMode::Full);
+            let mut stream_failed = false;
+            if let Some(current_stream) = stream.as_mut() {
+                match current_stream.try_recv() {
+                    Ok(Some(response)) => {
+                        let mut detail_subscription = app.apply_stream_response(response);
+                        while let Ok(Some(response)) = current_stream.try_recv() {
+                            detail_subscription =
+                                app.apply_stream_response(response).or(detail_subscription);
                         }
-                        Err(error) => {
-                            app.chrome.status_message = format!(
-                                "Streaming unavailable: {error}. Retrying live updates in the background."
-                            );
-                            app.chrome.needs_redraw = true;
+                        if let Some(memory_id) = detail_subscription
+                            && let Err(error) = current_stream
+                                .send(StreamRequest::SubscribeMemory { memory_id })
+                                .await
+                        {
+                            app.chrome.status_message = error.to_string();
+                        }
+                        if std::mem::take(&mut app.chrome.needs_memories_refresh)
+                            && let Err(error) = current_stream
+                                .send(StreamRequest::ProjectMemories {
+                                    project: app.project.clone(),
+                                })
+                                .await
+                        {
+                            app.chrome.status_message = error.to_string();
                         }
                     }
-                }
-                BackgroundEvent::ProjectRefreshLoaded(result) => {
-                    let loaded_memories = app.apply_project_refresh(*result);
-                    if loaded_memories {
-                        app.fetch_selected_detail(&api, stream.as_mut()).await;
+                    Ok(None) => {}
+                    Err(error) => {
+                        app.handle_stream_disconnect(&error.to_string());
+                        stream_failed = true;
                     }
                 }
-                other => app.apply_background_event(other),
             }
-        }
-        if should_attempt_stream_reconnect(
-            stream.is_some(),
-            app.service.stream_connecting,
-            last_stream_connect_attempt,
-        ) {
-            last_stream_connect_attempt = Instant::now();
-            app.request_stream_connect(&api);
-        }
-        if app.chrome.needs_redraw || last_draw.elapsed() >= Duration::from_secs(1) {
-            terminal.draw(|frame| draw(frame, &app))?;
-            app.chrome.needs_redraw = false;
-            last_draw = Instant::now();
-        }
-        if event::poll(Duration::from_millis(500))? {
-            match event::read()? {
-                Event::Key(key) if should_quit(key, &app) => break,
-                Event::Key(key) => {
-                    if app.handle_key(key, &api, stream.as_mut()).await? {
-                        break;
+            if stream_failed {
+                stream = None;
+                last_stream_connect_attempt = Instant::now();
+            }
+            while let Ok(event) = background_rx.try_recv() {
+                match event {
+                    BackgroundEvent::StreamConnectCompleted { result } => {
+                        app.service.stream_connecting = false;
+                        match result {
+                            Ok(new_stream) => {
+                                stream = Some(*new_stream);
+                                app.chrome.status_message =
+                                    "Streaming updates enabled. Refreshing project data...".to_string();
+                                app.chrome.needs_redraw = true;
+                                app.request_refresh(&api, RefreshMode::Full);
+                            }
+                            Err(error) => {
+                                app.chrome.status_message = format!(
+                                    "Streaming unavailable: {error}. Retrying live updates in the background."
+                                );
+                                app.chrome.needs_redraw = true;
+                            }
+                        }
                     }
-                    app.chrome.needs_redraw = true;
+                    BackgroundEvent::ProjectRefreshLoaded(result) => {
+                        let loaded_memories = app.apply_project_refresh(*result);
+                        if loaded_memories {
+                            app.fetch_selected_detail(&api, stream.as_mut()).await;
+                        }
+                    }
+                    other => app.apply_background_event(other),
                 }
-                Event::Resize(_, _) => {
-                    app.chrome.needs_redraw = true;
+            }
+            app.observation_tick(&api);
+            if should_attempt_stream_reconnect(
+                stream.is_some(),
+                app.service.stream_connecting,
+                last_stream_connect_attempt,
+            ) {
+                last_stream_connect_attempt = Instant::now();
+                app.request_stream_connect(&api);
+            }
+            if app.chrome.needs_redraw || last_draw.elapsed() >= Duration::from_secs(1) {
+                if app.active_tab == TabKind::Project {
+                    app.project_tab.linear_status = crate::linear_tracking::status(&api.config, &app.project)
+                        .map(|status| status.text())
+                        .unwrap_or_else(|_| "Configuration unavailable".into());
                 }
-                _ => {}
+                terminal.draw(|frame| draw(frame, &app))?;
+                app.chrome.needs_redraw = false;
+                last_draw = Instant::now();
+            }
+            if event::poll(Duration::from_millis(500))? {
+                match event::read()? {
+                    Event::Key(key) if should_quit(key, &app) => break,
+                    Event::Key(key) => {
+                        if app.handle_key(key, &api, stream.as_mut()).await? {
+                            break;
+                        }
+                        app.chrome.needs_redraw = true;
+                    }
+                    Event::Resize(_, _) => {
+                        app.chrome.needs_redraw = true;
+                    }
+                    _ => {}
+                }
             }
         }
+
+        Ok::<(), anyhow::Error>(())
     }
-
-    restore_terminal(terminal)
+    .await;
+    let restored = restore_terminal(terminal);
+    app.shutdown_inbox().await;
+    run_result.and(restored)
 }
 
 /// Fast cadence used while the Agents tab is visible.
@@ -442,7 +454,7 @@ async fn load_automation_snapshot(
 }
 
 impl App {
-    fn new(
+    pub(in crate::tui) fn new(
         project: String,
         repo_root: PathBuf,
         versions: ToolVersions,
@@ -545,14 +557,21 @@ impl App {
                 errors_table_state,
                 errors_detail_scroll: 0,
             },
-            project_tab: ProjectTabState { project_scroll: 0 },
+            project_tab: ProjectTabState {
+                project_scroll: 0,
+                linear_status: String::new(),
+            },
             review: ReviewTabState {
                 replacement_policy: load_repo_replacement_policy(&repo_root).unwrap_or_default(),
                 replacement_proposals: Vec::new(),
                 replacement_selected_index: 0,
                 review_table_state,
             },
-            watchers: WatchersTabState { watcher_scroll: 0 },
+            watchers: WatchersTabState {
+                watcher_scroll: 0,
+                companion_focus: false,
+            },
+            conversations: Default::default(),
             skills: SkillsTabState {
                 filter: SkillsFilter::Codifix,
                 selected_index: 0,
@@ -586,6 +605,7 @@ impl App {
             },
             service: ServiceState {
                 health_ok: false,
+                inbox_enabled: None,
                 backend_connection_state: BackendConnectionState::Connecting,
                 service_role: None,
                 service_health_state: None,
@@ -859,6 +879,12 @@ impl App {
         match result.health {
             Ok(health) => {
                 self.service.health_ok = true;
+                self.service.inbox_enabled = health
+                    .get("inbox_enabled")
+                    .and_then(serde_json::Value::as_bool);
+                if self.service.inbox_enabled != Some(true) {
+                    self.conversations.disable_inbox();
+                }
                 self.service.backend_connection_state = BackendConnectionState::Connected;
                 if let Some(version) = health.get("version").and_then(|value| value.as_str()) {
                     self.meta.versions.mem_service = version.to_string();
@@ -1004,6 +1030,7 @@ impl App {
     fn mark_service_unavailable(&mut self) {
         self.chrome.needs_redraw = true;
         self.service.health_ok = false;
+        self.service.inbox_enabled = None;
         self.service.backend_connection_state = BackendConnectionState::Unavailable;
         self.service.service_role = None;
         self.service.service_health_state = None;
@@ -1077,6 +1104,21 @@ impl App {
     fn apply_background_event(&mut self, event: BackgroundEvent) {
         self.chrome.needs_redraw = true;
         match event {
+            BackgroundEvent::Observation {
+                scope,
+                generation,
+                result,
+            } => {
+                self.conversations
+                    .receive_observation(scope, generation, result);
+            }
+            BackgroundEvent::HumanInbox {
+                scope,
+                generation,
+                result,
+            } => {
+                self.conversations.receive_inbox(scope, generation, result);
+            }
             BackgroundEvent::Offline { generation, result } => {
                 self.offline.receive(generation, result)
             }
@@ -1608,6 +1650,21 @@ impl App {
             return Ok(false);
         }
 
+        if self.active_tab == TabKind::Conversations
+            && key.code == KeyCode::Char('r')
+            && self.conversations.my_inbox_selected()
+            && (self.service.inbox_enabled != Some(true) || !self.service.health_ok)
+        {
+            self.request_refresh(api, RefreshMode::Full);
+            self.chrome.needs_redraw = true;
+            return Ok(false);
+        }
+        if matches!(self.active_tab, TabKind::Conversations | TabKind::Watchers)
+            && self.conversations_key(key, api)
+        {
+            self.chrome.needs_redraw = true;
+            return Ok(false);
+        }
         if self.active_tab == TabKind::Offline {
             if key.code == KeyCode::Char('r') && !self.offline.editing && !self.service.health_ok {
                 self.request_refresh(api, RefreshMode::Full);
@@ -1638,6 +1695,18 @@ impl App {
                 self.chrome.needs_redraw = true;
                 return Ok(false);
             }
+        }
+        if self.active_tab == TabKind::Project && key.code == KeyCode::Char('L') {
+            self.chrome.status_message =
+                match crate::linear_tracking::toggle(&api.config, &self.project) {
+                    Ok(status) => {
+                        self.project_tab.linear_status = status.text();
+                        format!("Linear tracking {}", status.text())
+                    }
+                    Err(error) => format!("Linear tracking unavailable: {error}"),
+                };
+            self.chrome.needs_redraw = true;
+            return Ok(false);
         }
         let tab_action = super::tabs::dispatch_update(self.active_tab, &Event::Key(key), self);
         if !tab_action.handled() {

@@ -22,6 +22,7 @@ use crate::commands::{
     runtime::{CheckpointArgs, CheckpointCommand},
     skill_support::resolve_repo_root,
 };
+use crate::linear_tracking::{self, Lifecycle};
 use crate::plan_execution::{
     derive_plan_thread_key, derive_plan_title, ensure_checkbox_plan, parse_plan_checkboxes,
 };
@@ -191,6 +192,17 @@ pub(super) async fn handle(
             {
                 eprintln!("warning: could not record active plan thread: {error}");
             }
+            if !args.dry_run && !args.skip_linear && !capture.queued_offline {
+                linear_tracking::report_enqueue(linear_tracking::enqueue(
+                    &config,
+                    &project,
+                    Some(capture.project_id),
+                    &thread_key,
+                    &title,
+                    Lifecycle::Started,
+                    args.linear_summary,
+                ));
+            }
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({
@@ -259,6 +271,17 @@ pub(super) async fn handle(
                         .context("verify direct task memory was created")?,
                 )
             };
+            if !args.dry_run && !args.skip_linear && !capture.queued_offline {
+                linear_tracking::report_enqueue(linear_tracking::enqueue(
+                    &config,
+                    &project,
+                    Some(capture.project_id),
+                    &thread_key,
+                    title,
+                    Lifecycle::Started,
+                    args.linear_summary,
+                ));
+            }
             let report = serde_json::json!({
                 "checkpoint": {
                     "path": path.display().to_string(),
@@ -492,6 +515,38 @@ pub(super) async fn handle(
                         eprintln!("warning: could not clear active plan thread: {error}");
                     }
                 }
+            }
+            if !args.dry_run {
+                let (lifecycle, detail) = if report.verified_complete {
+                    (
+                        Lifecycle::Completed,
+                        format!(
+                            "Codifix verified all {} plan steps and recorded the implementation.",
+                            report.total_items
+                        ),
+                    )
+                } else {
+                    (
+                        Lifecycle::Blocked,
+                        format!(
+                            "Codifix verification found {} remaining plan steps.",
+                            report.remaining_items.len()
+                        ),
+                    )
+                };
+                let source = implementation
+                    .as_ref()
+                    .and_then(|item| item.capture.as_ref())
+                    .map(|capture| capture.project_id);
+                linear_tracking::report_enqueue(linear_tracking::enqueue(
+                    &config,
+                    &project,
+                    source,
+                    &report.thread_key,
+                    &report.plan_title,
+                    lifecycle,
+                    Some(detail),
+                ));
             }
             if args.json {
                 println!(

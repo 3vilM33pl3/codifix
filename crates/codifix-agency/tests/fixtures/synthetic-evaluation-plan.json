@@ -1,0 +1,27 @@
+{
+  "evaluation_id": "synthetic-accounting-v1",
+  "dataset_revision": "synthetic-dataset-v1",
+  "task_revision": "task-v1",
+  "verifier_revision": "fixture-verifier-v1",
+  "held_out_set_id": "held-out-synthetic-v1",
+  "training_set_id": "training-synthetic-v1",
+  "cases": {
+    "case-a": "case-a-v1",
+    "case-b": "case-b-v1"
+  },
+  "conditions": {
+    "deterministic": {
+      "model_revision": "none",
+      "procedure_revision": "deterministic-v1"
+    },
+    "single_agent": {
+      "model_revision": "synthetic-model-v1",
+      "procedure_revision": "single_agent-v1"
+    },
+    "specialist_network": {
+      "model_revision": "synthetic-model-v1",
+      "procedure_revision": "specialist_network-v1"
+    }
+  },
+  "synthetic": true
+}

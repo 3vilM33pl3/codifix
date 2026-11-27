@@ -1,0 +1,429 @@
+use crate::*;
+use reqwest::Client;
+use std::time::Duration;
+use subtle::ConstantTimeEq;
+use zeroize::Zeroizing;
+
+pub(crate) fn token(path: &std::path::Path) -> Result<Zeroizing<String>> {
+    let bytes = protected::read(path)?;
+    let s = std::str::from_utf8(&bytes)
+        .map_err(|_| Error::ProtectedFile)?
+        .trim();
+    if s.len() < 32
+        || s.len() > 256
+        || !s
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+    {
+        return Err(Error::ProtectedFile);
+    }
+    Ok(Zeroizing::new(s.to_string()))
+}
+pub(crate) fn authenticate(path: &std::path::Path, headers: &axum::http::HeaderMap) -> Result<()> {
+    let expected = token(path)?;
+    let received = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(Error::Authentication)?;
+    let a = Sha256::digest(expected.as_bytes());
+    let b = Sha256::digest(received.as_bytes());
+    if bool::from(a.ct_eq(&b)) {
+        Ok(())
+    } else {
+        Err(Error::Authentication)
+    }
+}
+
+pub(crate) fn client(endpoint: &Endpoint) -> Result<Client> {
+    endpoint.validate()?;
+    let mut builder = Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(8))
+        .connect_timeout(Duration::from_secs(3))
+        .tls_built_in_root_certs(false);
+    if let Some(path) = &endpoint.ca_pem_file {
+        let pem = protected::read(path)?;
+        let cert = reqwest::Certificate::from_pem(&pem).map_err(|_| Error::Configuration)?;
+        builder = builder.add_root_certificate(cert);
+    }
+    builder.build().map_err(|_| Error::Transport)
+}
+pub(crate) fn url(endpoint: &Endpoint, path: &str) -> Result<reqwest::Url> {
+    reqwest::Url::parse(&endpoint.url)
+        .and_then(|u| u.join(path))
+        .map_err(|_| Error::Configuration)
+}
+pub(crate) async fn decode<T: serde::de::DeserializeOwned>(
+    mut response: reqwest::Response,
+) -> Result<T> {
+    if !response.status().is_success() {
+        return Err(Error::Transport);
+    }
+    let mut bytes = Zeroizing::new(Vec::new());
+    while let Some(chunk) = response.chunk().await.map_err(|_| Error::Transport)? {
+        if bytes.len() + chunk.len() > 65536 {
+            return Err(Error::Transport);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&bytes).map_err(|_| Error::Transport)
+}
+
+pub async fn verified_status(target: &Target) -> Result<SealStatus> {
+    target.validate(now())?;
+    let http = client(&target.endpoint)?;
+    let credential = token(&target.attestor_token_file)?;
+    let challenge = uuid::Uuid::new_v4().to_string();
+    let mut identity_url = url(&target.identity_endpoint, "/codifix-agency/v1/identity")?;
+    identity_url
+        .query_pairs_mut()
+        .append_pair("challenge", &challenge);
+    let attestation: crate::service::Attestation = decode(
+        client(&target.identity_endpoint)?
+            .get(identity_url)
+            .bearer_auth(&*credential)
+            .send()
+            .await
+            .map_err(|_| Error::Transport)?,
+    )
+    .await?;
+    let checked_at = now();
+    if attestation.identity != target.expected
+        || attestation.challenge != challenge
+        || attestation.issued_at > checked_at
+        || attestation.expires_at <= checked_at
+        || attestation.expires_at > attestation.issued_at.saturating_add(30)
+        || attestation.process.pid == 0
+        || attestation.process.marker.len() != 64
+        || !attestation
+            .process
+            .marker
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit())
+    {
+        return Err(Error::TargetChanged);
+    }
+    let status: SealStatus = decode(
+        http.get(url(&target.endpoint, "/v1/sys/seal-status")?)
+            .send()
+            .await
+            .map_err(|_| Error::Transport)?,
+    )
+    .await?;
+    status.check(target)?;
+    Ok(status)
+}
+
+/// Holds a private state lock across the bounded ceremony. The controller never
+/// receives a share; only each custodian talks to the native unseal endpoint.
+pub async fn controller_tick(
+    config: &ControllerConfig,
+    mut observe: impl FnMut(Observation),
+) -> Result<SealStatus> {
+    let result = controller_inner(config, &mut observe).await;
+    if let Err(e) = &result {
+        let code = match e {
+            Error::Declined => "participant_declined",
+            Error::InvalidShare => "invalid_share",
+            Error::NotReady => "not_ready",
+            Error::TargetChanged => "target_changed",
+            Error::Incomplete => "incomplete_ceremony",
+            Error::Ceremony => "invalid_ceremony",
+            Error::Transport => "transport_unavailable",
+            Error::ProtectedFile => "protected_state_unavailable",
+            Error::Configuration => "invalid_enrollment",
+            Error::Busy => "state_locked",
+            _ => "operator_required",
+        };
+        observe(Observation::Escalation { code: code.into() });
+    }
+    result
+}
+async fn controller_inner(
+    config: &ControllerConfig,
+    observe: &mut impl FnMut(Observation),
+) -> Result<SealStatus> {
+    config.target.validate(now())?;
+    validate_roster(&config.roster, &config.target)?;
+    let peer_ids: BTreeSet<_> = config.peers.iter().map(|p| &p.custodian_id).collect();
+    if peer_ids.len() != config.peers.len()
+        || peer_ids.len() != config.roster.len()
+        || config
+            .roster
+            .iter()
+            .any(|m| !peer_ids.contains(&m.custodian_id))
+    {
+        return Err(Error::Configuration);
+    }
+    let reader = token(&config.target.attestor_token_file)?;
+    let mut credentials = BTreeSet::new();
+    for p in &config.peers {
+        p.endpoint.validate()?;
+        if p.endpoint.fixture_localhost_http != config.target.endpoint.fixture_localhost_http {
+            return Err(Error::Configuration);
+        }
+        let secret = token(&p.controller_token_file)?;
+        if *secret == *reader
+            || !credentials.insert(format!("{:x}", Sha256::digest(secret.as_bytes())))
+        {
+            return Err(Error::Configuration);
+        }
+    }
+    let _lock = protected::StateLock::acquire(&config.state_file)?;
+    let mut state: ControllerState = protected::load(&config.state_file)?;
+    let binding = config.target.binding()?;
+    if state.binding != binding {
+        return Err(Error::TargetChanged);
+    }
+    let mut status = verified_status(&config.target).await?;
+    if !status.sealed {
+        native_health(&config.target).await?;
+        state.active = None;
+        protected::save(&config.state_file, &state)?;
+        observe(Observation::Unsealed);
+        return Ok(status);
+    }
+    // Partial native ceremonies, an interrupted prior controller, and migration
+    // never trigger a new automatic attempt. No reset endpoint is called.
+    if state.active.is_some() || status.progress != 0 {
+        return Err(Error::Incomplete);
+    }
+    state.sequence = state.sequence.checked_add(1).ok_or(Error::Ceremony)?;
+    let issued = now();
+    let ceremony = Ceremony {
+        challenge: uuid::Uuid::new_v4().to_string(),
+        sequence: state.sequence,
+        issued_at: issued,
+        expires_at: issued
+            + if config.peers.iter().any(|p| p.interactive) {
+                900
+            } else {
+                120
+            },
+        target_binding: binding,
+        selected: config
+            .roster
+            .iter()
+            .take(config.target.expected.threshold as usize)
+            .map(|m| m.custodian_id.clone())
+            .collect(),
+    };
+    ceremony.validate(&config.target, &config.roster, now())?;
+    state.active = Some(ceremony.clone());
+    protected::save(&config.state_file, &state)?;
+    observe(Observation::CeremonyStarted {
+        sequence: ceremony.sequence,
+        challenge: ceremony.challenge.clone(),
+    });
+    for id in &ceremony.selected {
+        if now() >= ceremony.expires_at {
+            return Err(Error::Ceremony);
+        }
+        let p = config
+            .peers
+            .iter()
+            .find(|p| &p.custodian_id == id)
+            .ok_or(Error::Configuration)?;
+        let secret = token(&p.controller_token_file)?;
+        observe(Observation::ContributionRequested {
+            custodian_id: id.clone(),
+            sequence: ceremony.sequence,
+        });
+        let submission = Submission {
+            ceremony: ceremony.clone(),
+            expected_progress: status.progress,
+            expected_nonce: status.nonce.clone(),
+        };
+        let http = client(&p.endpoint)?;
+        let address = url(&p.endpoint, "/v1/ceremony")?;
+        let mut previous_stage = None;
+        let response = loop {
+            if now() >= ceremony.expires_at {
+                return Err(Error::Incomplete);
+            }
+            let response = http
+                .post(address.clone())
+                .bearer_auth(&*secret)
+                .json(&submission)
+                .send()
+                .await
+                .map_err(|_| Error::Transport)?;
+            if p.interactive {
+                if response.status() == reqwest::StatusCode::GONE {
+                    return Err(Error::Declined);
+                }
+                if response.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
+                    return Err(Error::InvalidShare);
+                }
+                if response.status() == reqwest::StatusCode::ACCEPTED {
+                    let stage: crate::phone::Stage = decode(response).await?;
+                    if previous_stage != Some(stage) {
+                        match stage {
+                            crate::phone::Stage::InvalidShare => {
+                                observe(Observation::ShareRejected {
+                                    custodian_id: id.clone(),
+                                    sequence: ceremony.sequence,
+                                })
+                            }
+                            crate::phone::Stage::Waiting => {
+                                observe(Observation::AwaitingOperator {
+                                    custodian_id: id.clone(),
+                                    sequence: ceremony.sequence,
+                                })
+                            }
+                            crate::phone::Stage::Submitting => (),
+                            _ => return Err(Error::Ceremony),
+                        }
+                        previous_stage = Some(stage);
+                    }
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            }
+            break response;
+        };
+        let ack: crate::service::Acknowledgement = decode(response).await?;
+        if ack.custodian_id != *id
+            || ack.sequence != ceremony.sequence
+            || ack.challenge != ceremony.challenge
+        {
+            return Err(Error::Ceremony);
+        }
+        observe(Observation::CustodianSubmitted {
+            custodian_id: id.clone(),
+            sequence: ceremony.sequence,
+        });
+        status = verified_status(&config.target).await?;
+        if !status.sealed {
+            if submission.expected_progress + 1 != status.t {
+                return Err(Error::Incomplete);
+            }
+            native_health(&config.target).await?;
+            state.active = None;
+            protected::save(&config.state_file, &state)?;
+            observe(Observation::Unsealed);
+            return Ok(status);
+        }
+    }
+    Err(Error::Incomplete)
+}
+
+/// Authenticated server calls this after verifying its scoped controller token.
+/// Replay consumption is durable *before* reading the share or touching OpenBao.
+pub async fn custodian_submit(config: &CustodianConfig, submission: &Submission) -> Result<()> {
+    let ceremony = &submission.ceremony;
+    config.validate(now())?;
+    let controller_token = token(&config.controller_token_file)?;
+    let reader_token = token(&config.target.attestor_token_file)?;
+    if *controller_token == *reader_token {
+        return Err(Error::Configuration);
+    }
+    ceremony.validate(&config.target, &config.roster, now())?;
+    if !ceremony.selected.contains(&config.custodian_id) {
+        return Err(Error::Ceremony);
+    }
+    let _lock = protected::StateLock::acquire(&config.state_file)?;
+    let mut state: CustodianState = protected::load(&config.state_file)?;
+    if state.binding != config.target.binding()? {
+        return Err(Error::TargetChanged);
+    }
+    if ceremony.sequence <= state.last_sequence
+        || state.last_challenge.as_ref() == Some(&ceremony.challenge)
+    {
+        return Err(Error::Ceremony);
+    }
+    let status = verified_status(&config.target).await?;
+    submission.check_progress(&status, &config.custodian_id)?;
+    state.last_sequence = ceremony.sequence;
+    state.last_challenge = Some(ceremony.challenge.clone());
+    protected::save(&config.state_file, &state)?;
+    let raw = protected::read(config.share_file.as_ref().ok_or(Error::Configuration)?)?;
+    let share = std::str::from_utf8(&raw)
+        .map_err(|_| Error::ProtectedFile)?
+        .trim();
+    submit_share(config, submission, share).await
+}
+
+pub(crate) async fn submit_share(
+    config: &CustodianConfig,
+    submission: &Submission,
+    share: &str,
+) -> Result<()> {
+    let ceremony = &submission.ceremony;
+    if share.len() < 16
+        || share.len() > 4096
+        || !share
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"+/=_-".contains(&c))
+    {
+        return Err(Error::InvalidShare);
+    }
+    let enrolled = config
+        .roster
+        .iter()
+        .find(|m| m.custodian_id == config.custodian_id)
+        .ok_or(Error::Configuration)?;
+    if enrolled.share_id != format!("{:x}", Sha256::digest(share.as_bytes())) {
+        return Err(Error::InvalidShare);
+    }
+    // Recheck after disk I/O. TLS and attestor bind this enrolled target; the
+    // operator must fence rekey/reset and installation changes during a ceremony.
+    let checked = verified_status(&config.target).await?;
+    submission.check_progress(&checked, &config.custodian_id)?;
+    ceremony.validate(&config.target, &config.roster, now())?;
+    #[derive(Serialize)]
+    struct Body<'a> {
+        key: &'a str,
+    }
+    let body =
+        Zeroizing::new(serde_json::to_vec(&Body { key: share }).map_err(|_| Error::ProtectedFile)?);
+    let response = client(&config.target.endpoint)?
+        .post(url(&config.target.endpoint, "/v1/sys/unseal")?)
+        .header("content-type", "application/json")
+        .body(bytes::Bytes::from_owner(body))
+        .send()
+        .await
+        .map_err(|_| Error::Transport)?;
+    let result: SealStatus = decode(response).await?;
+    result.check(&config.target)?;
+    if !result.sealed && submission.expected_progress + 1 != result.t {
+        return Err(Error::Incomplete);
+    }
+    if result.sealed
+        && (result.progress != submission.expected_progress + 1 || result.nonce.is_empty())
+    {
+        return Err(Error::Incomplete);
+    }
+    Ok(())
+}
+
+/// Check the active OpenBao node, retaining the same enrolled TLS and target binding.
+pub async fn verified_ready(target: &Target) -> Result<()> {
+    if verified_status(target).await?.sealed {
+        return Err(Error::NotReady);
+    }
+    native_health(target).await
+}
+
+async fn native_health(target: &Target) -> Result<()> {
+    let response = client(&target.endpoint)?
+        .get(url(&target.endpoint, "/v1/sys/health")?)
+        .send()
+        .await
+        .map_err(|_| Error::Transport)?;
+    if response.status() != reqwest::StatusCode::OK {
+        return Err(Error::NotReady);
+    }
+    #[derive(Deserialize)]
+    struct Health {
+        initialized: bool,
+        sealed: bool,
+    }
+    let health: Health = decode(response).await?;
+    if !health.initialized || health.sealed {
+        return Err(Error::NotReady);
+    }
+    Ok(())
+}

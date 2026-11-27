@@ -525,6 +525,163 @@ fn peer_start_rate_is_bounded() {
     );
 }
 #[tokio::test]
+async fn http_identity_without_project_grants_preserves_access_boundaries() {
+    let Some(f) = fixture().await else { return };
+    sqlx::query("DELETE FROM auth_project_memberships WHERE principal_id=$1")
+        .bind(f.human.id)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let app = crate::routes::build_http_app(f.state.clone());
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .unwrap()
+    });
+    let client = reqwest::Client::new();
+    let cookie = format!("codifix_session={}; codifix_csrf={}", f.session, f.csrf);
+    let me = format!("{base}/v1/auth/me");
+    let response = client
+        .get(&me)
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let identity: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(identity["principal"]["id"], f.human.id.to_string());
+    assert_eq!(identity["principal"]["projects"], json!([]));
+    for request in [
+        client.get(&me),
+        client.get(&me).header("cookie", "codifix_session=invalid"),
+    ] {
+        assert_eq!(
+            request.send().await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    assert_eq!(
+        client
+            .get(format!("{base}/v1/projects/local/memories"))
+            .header("cookie", &cookie)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    let (request, _, _) = fresh_request();
+    let Json(started) = start(State(f.state.clone()), peer(67), Json(request))
+        .await
+        .unwrap();
+    let response = client
+        .get(format!(
+            "{base}/v1/onboarding/device/review?code={}",
+            started.user_code
+        ))
+        .header("cookie", &cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let review: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(review["projects"], json!([]));
+    assert_eq!(
+        client
+            .post(format!("{base}/v1/onboarding/device/approve"))
+            .header("cookie", &cookie)
+            .header("origin", "https://company.example.test")
+            .header("x-csrf-token", &f.csrf)
+            .json(&approval(&started.user_code, f.project, AuthRole::Reader))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    let logout = format!("{base}/v1/auth/logout");
+    assert_eq!(
+        client
+            .post(&logout)
+            .header("cookie", &cookie)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        client
+            .post(&logout)
+            .header("cookie", &cookie)
+            .header("origin", "https://company.example.test")
+            .header("x-csrf-token", &f.csrf)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        client
+            .get(&me)
+            .header("cookie", &cookie)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let (session, _) = super::super::mint_web_session(&f.state, &f.db.pool, f.human.id)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE auth_web_sessions SET expires_at=now()-interval '1 second' WHERE session_hash=$1",
+    )
+    .bind(super::super::hash_secret(&session))
+    .execute(&f.db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        client
+            .get(&me)
+            .header("cookie", format!("codifix_session={session}"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let (session, _) = super::super::mint_web_session(&f.state, &f.db.pool, f.human.id)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE auth_principals SET disabled_at=now() WHERE id=$1")
+        .bind(f.human.id)
+        .execute(&f.db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        client
+            .get(&me)
+            .header("cookie", format!("codifix_session={session}"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    server.abort();
+    let _ = server.await;
+    f.db.pool.close().await;
+    f.db.cleanup().await.unwrap();
+}
+
+#[tokio::test]
 async fn http_public_start_human_session_and_csrf_boundaries() {
     let Some(f) = fixture().await else { return };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

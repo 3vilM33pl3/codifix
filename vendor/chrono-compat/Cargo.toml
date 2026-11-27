@@ -1,0 +1,25 @@
+[package]
+name = "chrono"
+version = "0.4.45"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Compatibility adapter for dependencies that request the Chrono 0.4 API"
+publish = false
+
+[dependencies]
+sad-chrono = { version = "=0.5.2", default-features = false }
+
+[features]
+default = ["clock", "std", "oldtime", "wasmbind"]
+alloc = ["sad-chrono/alloc"]
+clock = ["sad-chrono/clock", "winapi", "iana-time-zone", "now"]
+iana-time-zone = ["sad-chrono/iana-time-zone"]
+js-sys = ["sad-chrono/js-sys"]
+now = ["sad-chrono/now", "std"]
+oldtime = ["sad-chrono/oldtime"]
+serde = ["sad-chrono/serde"]
+std = ["sad-chrono/std", "alloc"]
+wasm-bindgen = ["sad-chrono/wasm-bindgen"]
+wasmbind = ["sad-chrono/wasmbind", "wasm-bindgen", "js-sys"]
+winapi = ["sad-chrono/winapi", "windows-link"]
+windows-link = ["sad-chrono/windows-link"]

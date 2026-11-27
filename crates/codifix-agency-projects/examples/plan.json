@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "ce4aa490-9ec7-4b45-a6bc-da317e9dcf02",
+  "revision": 1,
+  "source": {
+    "reference": "chat://agency/request-42",
+    "version": "message-3",
+    "return_channel": "chat://agency/request-42"
+  },
+  "projects": [{
+    "identity": {"key": "launch", "remote_id": null},
+    "name": "Example launch",
+    "description": "A reviewable example roadmap.",
+    "acceptance_criteria": ["Reviewers can exercise the completed launch"],
+    "team_ids": ["48821d31-2784-4fe9-a277-35775ac6c750"],
+    "owner_id": null
+  }],
+  "milestones": [{
+    "identity": {"key": "prototype", "remote_id": null},
+    "project_key": "launch",
+    "name": "Prototype",
+    "description": "Demonstrate the main workflow.",
+    "acceptance_criteria": ["Prototype passes the agreed walkthrough"]
+  }],
+  "issues": [{
+    "identity": {"key": "build", "remote_id": null},
+    "project_key": "launch",
+    "milestone_key": "prototype",
+    "title": "Build prototype",
+    "description": "Implement the agreed walkthrough.",
+    "acceptance_criteria": ["Walkthrough executes from a clean start"],
+    "team_id": "48821d31-2784-4fe9-a277-35775ac6c750",
+    "owner_id": null
+  }, {
+    "identity": {"key": "review", "remote_id": null},
+    "project_key": "launch",
+    "milestone_key": "prototype",
+    "title": "Review prototype",
+    "description": "Capture walkthrough feedback.",
+    "acceptance_criteria": ["Reviewer feedback is recorded"],
+    "team_id": "48821d31-2784-4fe9-a277-35775ac6c750",
+    "owner_id": null
+  }],
+  "dependencies": [{
+    "identity": {"key": "build-blocks-review", "remote_id": null},
+    "blocking_issue_key": "build",
+    "blocked_issue_key": "review"
+  }],
+  "unresolved_questions": []
+}

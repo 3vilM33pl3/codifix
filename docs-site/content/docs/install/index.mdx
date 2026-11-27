@@ -1,6 +1,6 @@
 ---
 title: "Install"
-description: "Install Codifix 3.0.0, configure PostgreSQL with pgvector, and initialise your first project."
+description: "Install Codifix 3.1.0, configure PostgreSQL with pgvector, and initialise your first project."
 ---
 
 # Install
@@ -9,7 +9,7 @@ Joining an existing organization? Start with [Team setup](/docs/team-setup) and
 your administrator's approved company origin. The standalone installation below
 creates and configures your own service/database; it is a different journey.
 
-Codifix v3.0.0 is the current stable release. ([v3.0.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0)). The existing v2.1.0 release remains under the Memory Layer product identity; it is not a Codifix installer or upgrade path.
+Codifix v3.1.0 is the current stable release. ([v3.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0)). The existing v2.1.0 release remains under the Memory Layer product identity; it is not a Codifix installer or upgrade path.
 
 The Codifix release introduces a breaking product rename. Installing it over
 an existing Memory Layer setup does not transfer its state. If you are moving
@@ -18,16 +18,16 @@ the [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix
 
 ## Stable package names
 
-Download these packages from the [release page](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) and verify
-them against its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS).
+Download these packages from the [release page](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0) and verify
+them against its [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/SHA256SUMS).
 
 | Platform | Release asset names |
 |---|---|
-| Debian/Ubuntu | `codifix_3.0.0_amd64.deb`, `codifix_3.0.0_arm64.deb` |
-| macOS | `codifix-3.0.0-macos-x86_64.pkg`, `codifix-3.0.0-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
-| Windows x86_64 | `codifix-3.0.0-windows-x86_64-build.2.zip`, `.msi`, and `-server-tools.msi` |
+| Debian/Ubuntu | `codifix_3.1.0_amd64.deb`, `codifix_3.1.0_arm64.deb` |
+| macOS | `codifix-3.1.0-macos-x86_64.pkg`, `codifix-3.1.0-macos-aarch64.pkg`, and matching `-application-update.pkg` packages |
+| Windows x86_64 | `codifix-3.1.0-windows-x86_64-build.4.zip`, `.msi`, and `-server-tools.msi` |
 
-Debian filenames use `codifix_3.0.0_ARCH.deb`. Verify packages against the release checksums.
+Debian filenames use `codifix_3.1.0_ARCH.deb`. Verify packages against the release checksums.
 
 Follow the instructions for your platform:
 
@@ -54,7 +54,7 @@ semantic retrieval, but the core service works without them.
 |---|---|---|
 | PostgreSQL | Durable storage for projects, captures, memories, activity, and history. | `psql "$DATABASE_URL" -c "SELECT 1;"` |
 | pgvector | Vector storage for semantic retrieval. | `psql "$DATABASE_URL" -c "SELECT extversion FROM pg_extension WHERE extname = 'vector';"` |
-| Codifix 3.0.0 | Stable packages available; Windows remains a preview. | After installation: `codifix --version` |
+| Codifix 3.1.0 | Stable packages available; Windows remains a preview. | After installation: `codifix --version` |
 
 ## Configure after installation
 

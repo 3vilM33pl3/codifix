@@ -107,7 +107,7 @@ it("fails closed when the server rejects a stale HttpOnly session before discove
   vi.stubGlobal("fetch", fetch);
   const { federationRequest } = await import("../../api");
   await expect(federationRequest("homelab", null)).rejects.toThrow("401");
-  expect(fetch).toHaveBeenCalledExactlyOnceWith("/v1/auth/me", { credentials: "same-origin" });
+  expect(fetch).toHaveBeenCalledExactlyOnceWith("/v1/auth/me", { credentials: "same-origin", cache: "no-store" });
 });
 
 it("does not remint an already bootstrapped session after cookie loss and a denial", async () => {

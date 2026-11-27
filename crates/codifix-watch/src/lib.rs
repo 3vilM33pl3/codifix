@@ -1149,6 +1149,8 @@ mod tests {
 
     fn test_app_config() -> AppConfig {
         AppConfig {
+            inbox: None,
+            agency_observation: None,
             laptop_cache: None,
             area: None,
             resolved_area_routing_path: None,

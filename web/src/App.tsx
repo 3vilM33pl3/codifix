@@ -22,6 +22,7 @@ import { AccessTab } from "./features/access/AccessTab";
 import { LocalAdministrationButton } from "./features/access/LocalAdministrationButton";
 import { consumeAgentRequestLink } from "./features/access/agentRequestLink";
 import { FederationTab } from "./features/federation/FederationTab";
+import { InboxPage } from "./features/inbox/InboxPage";
 import { JobsTab } from "./features/jobs/JobsTab";
 import { SupervisorTab } from "./features/supervisor/SupervisorTab";
 import { OfflineTab } from "./features/offline/OfflineTab";
@@ -37,6 +38,7 @@ export default function App() {
   const query = new URLSearchParams(window.location.search);
   const deviceCode = query.get("device_code");
   const mode = query.has("company_device") ? query.get("company_device") === "1" ? "company" : "invalid" : "local";
+  if (deviceCode === null && query.get("inbox") === "1") return <InboxPage conversationId={query.get("conversation")} />;
   return deviceCode === null ? <MemoryApp agentLink={agentLink} /> : <DeviceApprovalPage initialCode={deviceCode} initialMode={mode} />;
 }
 
@@ -283,6 +285,7 @@ function MemoryApp({ agentLink }: { agentLink: { request?: string; notice?: stri
           <button type="submit">Load</button>
         </form>
         <div className="identity-control">
+          {authMe?.authenticated && authMe.principal.kind === "human_oidc" && <a className="button-link" href="/?inbox=1">Inbox</a>}
           {authRequired ? (
             <a className="button-link" href={authLoginUrl()}>Sign in</a>
           ) : authMe ? (

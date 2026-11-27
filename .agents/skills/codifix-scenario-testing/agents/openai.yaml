@@ -1,0 +1,5 @@
+version: 3.1.0
+interface:
+  display_name: "Codifix Scenario Testing"
+  short_description: "Verify multi-agent Codifix scenarios"
+  default_prompt: "Use $codifix-scenario-testing to turn this Codifix scenario into repeatable acceptance tests and verify its authorization and operator handoffs."

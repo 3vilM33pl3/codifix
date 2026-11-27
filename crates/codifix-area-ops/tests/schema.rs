@@ -65,7 +65,7 @@ fn failure(output: Output, message: &str) {
     assert!(String::from_utf8_lossy(&output.stderr).contains(message));
 }
 fn request(fixture: &Fixture, dir: &std::path::Path) -> Command {
-    request_profile(fixture, dir, "current", 85)
+    request_profile(fixture, dir, "current", 105)
 }
 fn request_profile(fixture: &Fixture, dir: &std::path::Path, profile: &str, head: i64) -> Command {
     let plan = success(
@@ -123,7 +123,7 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
             .fetch_one(&mut connection)
             .await
             .unwrap(),
-        85
+        105
     );
     for table in [
         "projects",
@@ -138,6 +138,10 @@ async fn cli_initializes_without_bootstrap_and_refuses_reinitialization() {
         "laptop_curated_outbox",
         "device_replica_records",
         "device_curated_contribution_receipts",
+        "auth_desktop_codes",
+        "agency_mandates",
+        "inbox_conversations",
+        "agency_upgrades",
     ] {
         assert_eq!(
             sqlx::query_scalar::<_, i64>(&format!("SELECT count(*) FROM {table}"))
@@ -163,7 +167,8 @@ fn historical_profile_is_explicit_distinct_and_not_an_arbitrary_head() {
             .unwrap(),
     );
     assert_eq!(current["profile"], "current");
-    assert_eq!(current["migration_head"], 85);
+    assert_eq!(current["migration_head"], 105);
+    assert_eq!(current["migrations"], 103);
     assert_eq!(historical["profile"], "area-import-65");
     assert_eq!(historical["migration_head"], 65);
     assert_ne!(current["schema_sha256"], historical["schema_sha256"]);
@@ -261,7 +266,7 @@ async fn explicit_historical_import_upgrades_without_receipt_relabeling_or_repla
             .fetch_one(&target)
             .await
             .unwrap(),
-        85
+        105
     );
     assert_eq!(
         support::rows(&target, "public.area_import_receipts").await,

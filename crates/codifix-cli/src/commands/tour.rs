@@ -37,6 +37,7 @@ pub(super) async fn handle(
     ));
     crate::commands::remember::handle(
         RememberArgs {
+            linear_thread_key: None,
             project: Some(project.clone()),
             title: Some("Completed the Codifix tour".to_string()),
             memory_type: Some("project".to_string()),

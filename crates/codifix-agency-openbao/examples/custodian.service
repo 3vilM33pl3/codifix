@@ -1,0 +1,26 @@
+# Review paths, account ownership, firewall and independent host placement first.
+# No installation or activation is performed by this repository change.
+[Unit]
+Description=Independent OpenBao share custodian 1
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bao-custodian-1
+Group=bao-custodian-1
+ExecStart=/usr/local/bin/codifix-agency-openbao custodian-serve /etc/codifix-bao/custodian-1/config.json /etc/codifix-bao/custodian-1/listener.json
+StateDirectory=codifix-bao-custodian-1
+StateDirectoryMode=0700
+UMask=0077
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/codifix-bao-custodian-1
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

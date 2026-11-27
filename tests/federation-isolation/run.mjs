@@ -17,7 +17,8 @@ function run(command,args,options={}) {
   const result=spawnSync(command,args,{cwd:repo,encoding:'utf8',timeout:60_000,...options});
   if(result.status!==0) {
     const safe=(result.stderr||'').replace(/[a-f0-9]{64}/gi,'[fixture-secret]').replace(/postgres(?:ql)?:\/\/\S+/g,'[database-url]');
-    throw new Error(`${command} ${args[0]} failed with exit ${result.status}: ${safe.slice(0,3000)}`);
+    const status=result.error?.code || result.status;
+    throw new Error(`${command} ${args[0]} failed (${status}): ${safe.trim().slice(-3000)}`);
   }
   return result.stdout?.trim() || '';
 }
@@ -79,7 +80,7 @@ try {
   const doc=topology({gatewayImage:image,pdsImage,postgresImage,proxyImage:proxy,root,uid:process.getuid()});
   await save(join(root,'compose.json'),doc);
   for(const s of Object.values(doc.services)) {if(s.ports||s.privileged||s.network_mode) throw new Error('forbidden exposure');}
-  started=true;run('docker',[...compose,'up','-d','gateway_db_a','gateway_db_b','instance_db_a','instance_db_b','pds_a','pds_b','pds_tls_a','pds_tls_b']);
+  started=true;run('docker',[...compose,'up','--quiet-pull','-d','gateway_db_a','gateway_db_b','instance_db_a','instance_db_b','pds_a','pds_b','pds_tls_a','pds_tls_b']);
   for(const id of ['a','b']) {
     const m=metadata[id],dir=join(root,id);
     for(let attempt=0;;attempt++) {

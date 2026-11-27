@@ -1,0 +1,31 @@
+name: Optional Windows PDS validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/windows-pds/**'
+      - '.github/workflows/windows-pds-validation.yml'
+  pull_request:
+    paths:
+      - 'packaging/windows-pds/**'
+      - '.github/workflows/windows-pds-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+      - name: Pinned PDS security overlay validation
+        run: |
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream rebuild better-sqlite3 --config.node-linker=hoisted
+          npx --yes pnpm@10.34.1 --dir packaging/windows-pds/upstream audit --audit-level=low
+          node --test packaging/windows-pds/security.test.mjs packaging/windows-pds/http-stdio.test.mjs packaging/windows-pds/windows-paths.test.mjs

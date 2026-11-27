@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agency operations</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;line-height:1.5;background:#f5f4f0;color:#252a32}*{box-sizing:border-box}body{margin:0}main{max-width:1120px;margin:auto;padding:2rem 1.25rem 4rem}h1{font-size:2rem;margin:0}h2{font-size:1.15rem;margin:0}h3{font-size:1rem;margin:.75rem 0 .25rem}.muted{color:#58616e}.intro{max-width:760px}section.panel,article{background:#fff;border:1px solid #d8dce1;border-radius:12px;padding:1.2rem;margin-top:1rem}label{font-weight:600}input,select,button{font:inherit;border:1px solid #788594;border-radius:6px;padding:.55rem .75rem}input{min-width:220px;flex:1;background:transparent;color:inherit}button{background:#edf1f5;color:inherit;cursor:pointer}button.primary{background:#24495e;color:#fff}button.danger{color:#9a2424;background:#fff4f1;border-color:#bb7e76}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #27769a;outline-offset:3px}.row{display:flex;flex-wrap:wrap;gap:.65rem;align-items:center}.row.spread{justify-content:space-between}.credentials{margin-top:.6rem}.toolbar{margin:1.5rem 0 .5rem}.status{font-size:.85rem;background:#e9eff5;border-radius:24px;padding:.2rem .65rem;white-space:nowrap}.waiting{background:#fff0cb}.terminal{background:#e3f0e4}.metadata{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem;font-size:.92rem}.metadata dt{font-weight:600}.metadata dd{margin:0;overflow-wrap:anywhere}.actions{margin-top:1rem}.controls-label{margin-top:.7rem;font-size:.9rem}#notice{min-height:1.5rem;margin:.7rem 0 0}#notice[data-error="true"]{color:#9a2424}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f5f7;padding:.8rem;border-radius:6px;font-size:.85rem}summary{cursor:pointer;font-weight:600}details{margin-top:.85rem}code{font-size:.88em;overflow-wrap:anywhere}.empty{padding:1rem 0}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}[hidden]{display:none!important}@media(max-width:620px){main{padding:1.3rem .9rem}.metadata{grid-template-columns:1fr;gap:.1rem}.metadata dd{margin-bottom:.5rem}input{width:100%}}@media(prefers-color-scheme:dark){:root{background:#171d23;color:#edf1f5}section.panel,article{background:#222a33;border-color:#46515e}.muted{color:#b8c1cd}button{background:#354453}button.danger{background:#432d2c;color:#ffb5a9}pre{background:#18212a}.status{background:#33475b}.waiting{background:#5a4a20}.terminal{background:#284735}#notice[data-error="true"]{color:#ffb5a9}input,select{background:#222a33;color:inherit}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Agency operations</h1><p class="muted intro">Follow specialist tasks, inspect their budgets and handle work that needs attention.</p></header>
+<section class="panel" aria-labelledby="access-heading">
+<h2 id="access-heading">Private access</h2>
+<p class="muted" id="access-help">Enter your operator or peer token. It stays in this page’s memory until you disconnect or close the page. Access follows the token’s existing permissions.</p>
+<label for="token">Bearer token</label>
+<div class="row credentials"><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="access-help"><button id="connect" class="primary" type="button">Connect</button><button id="disconnect" type="button" disabled>Disconnect and clear</button></div>
+<p id="notice" role="status" aria-live="polite">Disconnected. No private data loaded.</p>
+</section>
+<section aria-labelledby="tasks-heading">
+<div class="row spread toolbar"><h2 id="tasks-heading">Tasks</h2><div class="row"><label for="filter">Show</label><select id="filter"><option value="active">Active tasks</option><option value="all">All tasks</option></select><button id="refresh" type="button" disabled>Refresh</button></div></div>
+<p id="summary" class="muted">Connect to view authorized tasks.</p>
+<div id="tasks" aria-live="polite"></div>
+</section>
+</main>
+<script>
+(() => {
+  'use strict';
+  let bearer = '';
+  let tasks = [];
+  let generation = 0;
+  let busy = false;
+  const requests = new Set();
+  const $ = (id) => document.getElementById(id);
+  const active = new Set(['submitted', 'working', 'input_required', 'plan_review_required']);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const money = (value) => '$' + (numeric(value) / 1000000).toFixed(6);
+  function element(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
+  }
+  function notice(text, error = false) {
+    $('notice').textContent = text;
+    $('notice').dataset.error = String(error);
+  }
+  function controls() {
+    $('connect').disabled = busy;
+    $('disconnect').disabled = !bearer;
+    $('refresh').disabled = !bearer || busy;
+    for (const button of $('tasks').querySelectorAll('button')) button.disabled = busy || !bearer;
+  }
+  function clear() {
+    generation += 1;
+    bearer = '';
+    $('token').value = '';
+    for (const request of requests) request.abort();
+    requests.clear();
+    tasks = [];
+    busy = false;
+    $('tasks').replaceChildren();
+    $('summary').textContent = 'Connect to view authorized tasks.';
+    controls();
+  }
+  async function api(path, method = 'GET') {
+    // Paths are fixed below and IDs are validated. No input can choose a host.
+    if (!bearer || !path.startsWith('/v1/') || path.startsWith('//')) throw new Error('Access is not connected.');
+    const target = new URL(path, window.location.origin);
+    if (target.origin !== window.location.origin) throw new Error('Request origin rejected.');
+    const controller = new AbortController();
+    requests.add(controller);
+    try {
+      const response = await fetch(target.pathname, {
+        method, headers: { Authorization: 'Bearer ' + bearer },
+        credentials: 'omit', cache: 'no-store', redirect: 'error',
+        referrerPolicy: 'no-referrer', signal: controller.signal
+      });
+      if (response.status === 401 || response.status === 403) {
+        clear();
+        throw new Error('Access was denied. Reconnect with an authorized token.');
+      }
+      if (!response.ok) throw new Error('Request was denied or conflicted (HTTP ' + response.status + '). Refresh before retrying.');
+      return await response.json();
+    } finally { requests.delete(controller); }
+  }
+  function detail(list, label, value) {
+    list.append(element('dt', label), element('dd', value));
+  }
+  async function action(path, label) {
+    if (busy || !bearer) return;
+    const session = generation;
+    busy = true;
+    controls();
+    try {
+      await api(path, 'POST');
+      if (session !== generation) return;
+      await load();
+      if (session === generation) notice(label + ' accepted. Task state refreshed.');
+    } catch (error) {
+      if (error.name !== 'AbortError' && (session === generation || !bearer)) notice(error.message, true);
+    } finally {
+      if (session === generation) { busy = false; controls(); }
+    }
+  }
+  function actionButton(label, path, danger = false) {
+    const button = element('button', label, danger ? 'danger' : '');
+    button.type = 'button';
+    button.addEventListener('click', () => action(path, label));
+    return button;
+  }
+  function render() {
+    const list = $('tasks');
+    list.replaceChildren();
+    const visible = tasks.filter((task) => $('filter').value === 'all' || active.has(task.contract.status));
+    const current = tasks.filter((task) => active.has(task.contract.status)).length;
+    const waiting = tasks.filter((task) => ['input_required', 'plan_review_required'].includes(task.contract.status)).length;
+    $('summary').textContent = current + ' active · ' + waiting + ' waiting for input or review · ' + tasks.length + ' authorized tasks';
+    if (!visible.length) list.append(element('p', 'No tasks in this view.', 'empty muted'));
+    for (const task of visible) {
+      const contract = task.contract;
+      const request = task.request;
+      const card = element('article');
+      const heading = element('div', undefined, 'row spread');
+      const title = element('h3', contract.objective);
+      const state = String(contract.status).replaceAll('_', ' ');
+      heading.append(title, element('span', state, 'status ' + (active.has(contract.status) ? (contract.clarification ? 'waiting' : '') : 'terminal')));
+      card.append(heading);
+      const metadata = element('dl', undefined, 'metadata');
+      detail(metadata, 'Specialist', contract.specialist_id);
+      detail(metadata, 'Task', contract.id);
+      detail(metadata, 'Mandate', contract.mandate_id);
+      detail(metadata, 'Deadline', request.deadline);
+      detail(metadata, 'Spend', money(task.used_micro_usd) + ' of ' + money(request.budget.micro_usd));
+      detail(metadata, 'Calls', numeric(task.used_calls) + ' of ' + numeric(request.budget.calls));
+      detail(metadata, 'Turns', numeric(task.used_turns) + ' of ' + numeric(request.budget.turns));
+      card.append(metadata);
+      if (contract.clarification) {
+        card.append(element('h3', 'Clarification'), element('p', contract.clarification.question));
+        if (contract.clarification.answer) card.append(element('p', 'Answer: ' + contract.clarification.answer));
+      }
+      if (contract.outcome) {
+        card.append(element('h3', 'Outcome'), element('p', contract.outcome.summary));
+        const evidence = element('pre', JSON.stringify(contract.outcome, null, 2));
+        card.append(evidence);
+      }
+      const payload = element('details');
+      payload.append(element('summary', 'Show private request payload'));
+      payload.addEventListener('toggle', () => {
+        const previous = payload.querySelector('pre');
+        if (previous) previous.remove();
+        if (payload.open) payload.append(element('pre', JSON.stringify(request.payload, null, 2)));
+      });
+      card.append(payload);
+      if (uuid.test(contract.id) && active.has(contract.status)) {
+        const actions = element('div', undefined, 'row actions');
+        actions.append(actionButton('Cancel task', '/v1/tasks/' + encodeURIComponent(contract.id) + '/cancel'));
+        card.append(actions);
+      }
+      if (uuid.test(contract.mandate_id)) {
+        card.append(element('p', 'Mandate controls · require operator permission', 'controls-label muted'));
+        const actions = element('div', undefined, 'row');
+        for (const [label, command] of [['Pause mandate', 'pause'], ['Resume mandate', 'resume']]) {
+          actions.append(actionButton(label, '/v1/mandates/' + encodeURIComponent(contract.mandate_id) + '/' + command));
+        }
+        const revoke = element('button', 'Revoke mandate', 'danger');
+        revoke.type = 'button';
+        revoke.addEventListener('click', () => {
+          if (!busy && bearer && window.confirm('Revoke mandate ' + contract.mandate_id + '? This stops its future authorized work and cannot be resumed.')) {
+            action('/v1/mandates/' + encodeURIComponent(contract.mandate_id) + '/revoke', 'Revoke mandate');
+          }
+        });
+        actions.append(revoke);
+        card.append(actions);
+      }
+      list.append(card);
+    }
+    controls();
+  }
+  async function load() {
+    const session = generation;
+    const result = await api('/v1/tasks');
+    if (session !== generation) return;
+    if (!Array.isArray(result) || result.length > 1000 || result.some((task) => !task.contract || !task.request || !task.request.budget)) throw new Error('The task list could not be read safely.');
+    tasks = result;
+    render();
+  }
+  async function refresh() {
+    if (!bearer || busy) return;
+    const session = generation;
+    busy = true;
+    controls();
+    try { await load(); if (session === generation) notice('Authorized task state refreshed.'); }
+    catch (error) { if (error.name !== 'AbortError' && (session === generation || !bearer)) notice(error.message, true); }
+    finally { if (session === generation) { busy = false; controls(); } }
+  }
+  $('connect').addEventListener('click', async () => {
+    if (busy) return;
+    const token = $('token').value.trim();
+    clear();
+    if (!token) { notice('Enter an authorized token to connect.', true); return; }
+    bearer = token;
+    await refresh();
+  });
+  $('token').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); $('connect').click(); } });
+  $('disconnect').addEventListener('click', () => { clear(); notice('Disconnected. Private data cleared from this page.'); });
+  $('refresh').addEventListener('click', refresh);
+  $('filter').addEventListener('change', () => { if (bearer) render(); });
+  window.addEventListener('pagehide', clear);
+})();
+</script>
+</body>
+</html>

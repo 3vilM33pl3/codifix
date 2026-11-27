@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! A deliberately separate, project-bound cache bridge. Never delegates to the
 //! ordinary Codifix server, takes a caller's destination, or exposes mutations.
+use std::borrow::Cow;
+
 use anyhow::Result;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
     model::{
-        CallToolRequestParams, CallToolResult, ContentBlock, ListToolsResult,
-        PaginatedRequestParams, ServerCapabilities, ServerInfo, Tool, ToolAnnotations,
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, ListToolsResult,
+        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerConfig, Tool,
+        ToolAnnotations,
     },
     service::RequestContext,
     transport::stdio,
 };
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+
+use super::MCP_MAX_PROTOCOL_VERSION;
 
 /// The trusted native broker checks its independent Keychain identity, bounded
 /// disclosure receipt, exact profile and revocation before returning any bytes.
@@ -87,9 +92,13 @@ fn invalid() -> McpError {
     )
 }
 impl<B: LaptopCacheBackend> ServerHandler for LaptopMcpServer<B> {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_protocol_version(MCP_MAX_PROTOCOL_VERSION)
             .with_instructions("Read-only, project-bound approved cache. Does not expose ordinary queries, raw captures, tools, federation transfers, or remote expertise.")
+    }
+    fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
+        Cow::Borrowed(ProtocolVersion::known_up_to(&MCP_MAX_PROTOCOL_VERSION))
     }
     async fn list_tools(
         &self,
@@ -102,9 +111,10 @@ impl<B: LaptopCacheBackend> ServerHandler for LaptopMcpServer<B> {
         &self,
         request: CallToolRequestParams,
         _: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, McpError> {
+    ) -> Result<CallToolResponse, McpError> {
         self.call(&request.name, request.arguments.unwrap_or_default())
             .await
+            .map(CallToolResponse::Complete)
     }
 }
 pub async fn run_laptop_stdio(backend: impl LaptopCacheBackend) -> Result<()> {
@@ -156,7 +166,7 @@ mod tests {
             serde_json::from_str(&line).unwrap()
         }
         let initialized=exchange(&mut read,&mut write,json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"synthetic-native-agent","version":"1"}}})).await;
-        assert!(initialized.get("result").is_some());
+        assert_eq!(initialized["result"]["protocolVersion"], "2025-06-18");
         write
             .write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n")
             .await

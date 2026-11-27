@@ -438,12 +438,21 @@ fn docs_site_command_inventory_matches_visible_root_commands() {
         .filter(|command| command.get_name() != "help" && !command.is_hide_set())
         .map(|command| command.get_name().to_string())
         .collect::<Vec<_>>();
-    assert_eq!(manifest.visible_root_commands, actual);
+    let enabled_in_build = |name: &&String| cfg!(feature = "tui") || name.as_str() != "linear-tui";
+    let documented = manifest
+        .visible_root_commands
+        .iter()
+        .filter(enabled_in_build)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(documented, actual);
 
     let mut grouped = manifest
         .groups
         .iter()
-        .flat_map(|group| group.commands.iter().cloned())
+        .flat_map(|group| &group.commands)
+        .filter(enabled_in_build)
+        .cloned()
         .collect::<Vec<_>>();
     grouped.sort();
     grouped.dedup();
@@ -1186,6 +1195,7 @@ fn watcher_manager_run_requires_config_load() {
 fn remember_request_uses_defaults() {
     let request = build_remember_request(
         RememberArgs {
+            linear_thread_key: None,
             project: None,
             title: None,
             memory_type: None,
@@ -1777,6 +1787,7 @@ fn finish_execution_implementation_request_uses_completed_items() {
 fn remember_request_auto_detects_refactor_type() {
     let writer_id = "writer";
     let args = RememberArgs {
+        linear_thread_key: None,
         project: Some("memory".to_string()),
         title: Some("Refactor query helpers".to_string()),
         prompt: Some("Refactor query helpers with no functional change.".to_string()),
@@ -1807,6 +1818,7 @@ fn remember_request_auto_detects_refactor_type() {
 #[test]
 fn mixed_fix_and_refactor_remember_request_stays_implementation() {
     let args = RememberArgs {
+        linear_thread_key: None,
         project: Some("memory".to_string()),
         title: Some("Fix and refactor query helpers".to_string()),
         prompt: Some("Fix ranking and refactor helper layout.".to_string()),
@@ -2948,10 +2960,12 @@ fn write_file_if_changed_skips_identical_content() {
 
 fn test_app_config() -> AppConfig {
     AppConfig {
+        inbox: None,
         laptop_cache: None,
         area: None,
         resolved_area_routing_path: None,
         supervisor: None,
+        agency_observation: None,
         evaluation: Default::default(),
         background_work: Default::default(),
         service: codifix_config::ServiceConfig {

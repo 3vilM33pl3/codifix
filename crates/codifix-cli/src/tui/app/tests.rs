@@ -419,8 +419,10 @@ fn dev_commit_label_formats_clean_dirty_and_unknown_states() {
 
 #[test]
 fn footer_height_adds_dev_banner_without_changing_prod_footer() {
-    assert_eq!(super::footer_height(Profile::Prod), 4);
-    assert_eq!(super::footer_height(Profile::Dev), 5);
+    assert_eq!(super::footer_height(Profile::Prod, false), 4);
+    assert_eq!(super::footer_height(Profile::Dev, false), 5);
+    assert_eq!(super::footer_height(Profile::Prod, true), 5);
+    assert_eq!(super::footer_height(Profile::Dev, true), 6);
 }
 
 #[test]
@@ -1438,7 +1440,7 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Jobs.index(), 12);
     assert_eq!(TabKind::Supervisor.index(), 13);
     assert_eq!(TabKind::Jobs.next(), TabKind::Supervisor);
-    assert_eq!(TabKind::Memories.prev(), TabKind::Offline);
+    assert_eq!(TabKind::Memories.prev(), TabKind::Conversations);
     assert_eq!(TabKind::Memories.next(), TabKind::Agents);
     assert_eq!(TabKind::Query.next(), TabKind::Activity);
     assert_eq!(TabKind::Activity.prev(), TabKind::Query);
@@ -1461,7 +1463,10 @@ fn tab_order_restores_activity_after_query() {
     assert_eq!(TabKind::Resume.next(), TabKind::Jobs);
     assert_eq!(TabKind::Supervisor.next(), TabKind::Offline);
     assert_eq!(TabKind::Offline.index(), 14);
-    assert_eq!(TabKind::Offline.next(), TabKind::Memories);
+    assert_eq!(TabKind::Offline.next(), TabKind::Conversations);
+    assert_eq!(TabKind::Conversations.index(), 15);
+    assert_eq!(TabKind::Conversations.next(), TabKind::Memories);
+    assert_eq!(TabKind::Conversations.prev(), TabKind::Offline);
     assert_eq!(TabKind::Offline.prev(), TabKind::Supervisor);
     assert_eq!(TabKind::Jobs.prev(), TabKind::Resume);
 }
@@ -2757,4 +2762,91 @@ fn memory_detail_scroll_is_clamped_to_rendered_content() {
 
     app.scroll_memory_detail_in_area(-500, frame);
     assert_eq!(app.memories.memory_detail_scroll, 0);
+}
+
+#[tokio::test]
+async fn conversations_viewer_dispatch_keeps_navigation_and_read_controls_separate() {
+    let mut app = new_test_app();
+    app.service.health_ok = true;
+    let api = super::ApiClient::new(reqwest::Client::new(), serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
+    app.set_active_tab(TabKind::Conversations);
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('/')), &api));
+    assert!(app.conversations.editing_peer);
+    assert!(!super::should_quit(
+        KeyEvent::from(KeyCode::Char('q')),
+        &app
+    ));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('q')), &api));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Esc), &api));
+    assert!(!app.conversations.editing_peer);
+    // Human Inbox dispatch never falls through to project operations.
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('v')), &api));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('r')), &api));
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('R')), &api));
+    assert!(!app.conversations_key(KeyEvent::from(KeyCode::Right), &api));
+    app.set_active_tab(TabKind::Watchers);
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Char('c')), &api));
+    assert!(app.watchers.companion_focus);
+    assert!(app.conversations_key(KeyEvent::from(KeyCode::Enter), &api));
+    assert_eq!(app.active_tab, TabKind::Conversations);
+}
+
+#[test]
+fn conversations_and_companions_draw_in_narrow_terminals() {
+    use ratatui::{Terminal, backend::TestBackend};
+    let mut app = new_test_app();
+    app.service.health_ok = true;
+    for tab in [TabKind::Conversations, TabKind::Watchers] {
+        app.set_active_tab(tab);
+        for (width, height) in [(20, 10), (40, 15), (80, 24)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|f| super::draw(f, &app)).unwrap();
+            let rendered = terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<String>();
+            assert!(rendered.contains(if tab == TabKind::Conversations {
+                "Conversations"
+            } else {
+                "Watchers"
+            }));
+        }
+    }
+}
+
+#[tokio::test]
+async fn read_only_viewer_blocks_legacy_global_project_mutations() {
+    let mut app = new_test_app();
+    app.service.health_ok = true;
+    app.service.inbox_enabled = Some(false);
+    let api = super::ApiClient::new(reqwest::Client::new(), serde_json::from_value(serde_json::json!({"service":{"bind_addr":"127.0.0.1:1"},"database":{"url":"postgresql://unused/unused"}})).unwrap());
+    app.set_active_tab(TabKind::Conversations);
+    for inbox in [false, true] {
+        if inbox {
+            app.handle_key(KeyEvent::from(KeyCode::Char('v')), &api, None)
+                .await
+                .unwrap();
+        }
+        for shortcut in ['c', 'i', 'e', 'a', 'R'] {
+            // Any legacy curation/reindex/reembed/archive request would fail against
+            // this unreachable endpoint, rather than returning a handled UI event.
+            app.handle_key(KeyEvent::from(KeyCode::Char(shortcut)), &api, None)
+                .await
+                .unwrap();
+            assert_eq!(app.active_tab, TabKind::Conversations);
+        }
+    }
+    app.set_active_tab(TabKind::Watchers);
+    app.handle_key(KeyEvent::from(KeyCode::Char('c')), &api, None)
+        .await
+        .unwrap();
+    assert!(app.watchers.companion_focus);
+    for shortcut in ['i', 'e', 'a'] {
+        app.handle_key(KeyEvent::from(KeyCode::Char(shortcut)), &api, None)
+            .await
+            .unwrap();
+    }
 }

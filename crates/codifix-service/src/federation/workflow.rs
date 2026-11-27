@@ -461,7 +461,10 @@ pub(crate) async fn private_response(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    let private = request.uri().path().split('/').nth(4) == Some("federation");
+    let private = matches!(
+        request.uri().path().split('/').nth(4),
+        Some("federation" | "agency")
+    );
     let mut response = next.run(request).await;
     if private {
         response.headers_mut().insert(

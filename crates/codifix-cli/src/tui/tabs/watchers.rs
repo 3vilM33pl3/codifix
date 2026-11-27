@@ -17,9 +17,17 @@ pub(in crate::tui) fn draw_watchers_tab(
     area: Rect,
 ) {
     let app = ctx.app;
+    if app.watchers.companion_focus {
+        super::conversations::draw_companions(frame, app, area);
+        return;
+    }
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(5), Constraint::Min(10)])
+        .constraints([
+            Constraint::Length(5),
+            Constraint::Min(3),
+            Constraint::Length(6),
+        ])
         .split(area);
 
     let summary = Paragraph::new(vec![
@@ -48,6 +56,7 @@ pub(in crate::tui) fn draw_watchers_tab(
             app.watchers.watcher_scroll
         )));
     frame.render_widget(detail, chunks[1]);
+    super::conversations::draw_companions(frame, app, chunks[2]);
 }
 
 pub(in crate::tui) fn update(

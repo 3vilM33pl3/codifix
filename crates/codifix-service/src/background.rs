@@ -331,6 +331,7 @@ async fn execute(state: &AppState, pool: &PgPool, lease: &JobLease) -> Result<()
     let versions:Vec<Uuid>=sqlx::query_scalar("SELECT memory_id FROM background_work_versions WHERE project_id=$1 AND operation_id=$2 ORDER BY memory_id")
         .bind(lease.job.project_id).bind(lease.job.operation_id).fetch_all(pool).await?;
     match lease.job.kind {
+        JobKind::SpecialistTask => Err(fail(Code::Configuration)),
         JobKind::Embedding => embedding(state, pool, lease, &project, &versions).await,
         JobKind::SemanticDedup => semantic(state, pool, lease, &project, &versions).await,
         JobKind::ValidationDue => {

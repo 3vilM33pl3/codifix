@@ -1,0 +1,24 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.findRequest",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Reconcile a submitted request by its stable identifier. Returns a private Codifix stored task.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json"
+      }
+    }
+  }
+}

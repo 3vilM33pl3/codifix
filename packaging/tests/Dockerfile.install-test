@@ -1,0 +1,8 @@
+# Disposable native installer harness, never used as the application runtime.
+# Capture the resolved image ID with acceptance evidence; runtime has no network.
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 gpg libssl3t64 libstdc++6 zlib1g passwd \
+    && printf '%s\n' 'path-include=/usr/share/doc/codifix' 'path-include=/usr/share/doc/codifix/*' \
+      > /etc/dpkg/dpkg.cfg.d/zz-codifix-test-docs \
+    && rm -rf /var/lib/apt/lists/*

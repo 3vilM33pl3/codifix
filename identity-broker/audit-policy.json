@@ -1,0 +1,14 @@
+{
+  "status": "disabled-non-production-candidate",
+  "sdk": "0.5.13",
+  "zod": "3.25.76",
+  "advisory": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+  "affectedPackages": [
+    "@atproto-labs/did-resolver", "@atproto-labs/handle-resolver",
+    "@atproto-labs/handle-resolver-node", "@atproto-labs/identity-resolver",
+    "@atproto/common-web", "@atproto/did", "@atproto/jwk",
+    "@atproto/jwk-jose", "@atproto/jwk-webcrypto", "@atproto/lexicon",
+    "@atproto/oauth-client", "@atproto/oauth-client-node",
+    "@atproto/oauth-resolver", "@atproto/oauth-types", "@atproto/xrpc", "zod"
+  ]
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Private Codifix Linear companion
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/codifix-linear --serve
+UMask=0077
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

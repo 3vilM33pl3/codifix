@@ -5,7 +5,7 @@ description: "Install and verify the Codifix Debian release."
 
 # Linux / Debian
 
-The [Codifix v3.0.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.0.0) provides Debian packages. The
+The [Codifix v3.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0) provides Debian packages. The
 published v2.1.0 release installs the previous Memory Layer product and is not
 a Codifix package.
 
@@ -13,12 +13,12 @@ a Codifix package.
 
 The stable package names are:
 
-- x86_64: `codifix_3.0.0_amd64.deb`
-- arm64: `codifix_3.0.0_arm64.deb`
+- x86_64: `codifix_3.1.0_amd64.deb`
+- arm64: `codifix_3.1.0_arm64.deb`
 
 The arm64 package is for 64-bit Debian-family systems, including Raspberry Pi
 4/5. 32-bit Raspberry Pi OS is not a release target. Verify downloads against
-the release [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/SHA256SUMS) before installing.
+the release [SHA256SUMS](https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/SHA256SUMS) before installing.
 
 ## Install
 
@@ -27,14 +27,14 @@ with the `vector` extension enabled. Then download the package for your
 architecture, verify its checksum, and install it:
 
 ```bash
-curl -fL -o 'codifix_3.0.0_amd64.deb' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/codifix_3.0.0_amd64.deb'
-curl -fL -o 'codifix_3.0.0_amd64.deb.sha256' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.0.0/codifix_3.0.0_amd64.deb.sha256'
-sha256sum -c 'codifix_3.0.0_amd64.deb.sha256'
-sudo dpkg -i codifix_3.0.0_amd64.deb
+curl -fL -o 'codifix_3.1.0_amd64.deb' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/codifix_3.1.0_amd64.deb'
+curl -fL -o 'codifix_3.1.0_amd64.deb.sha256' 'https://github.com/3vilM33pl3/codifix/releases/download/v3.1.0/codifix_3.1.0_amd64.deb.sha256'
+sha256sum -c 'codifix_3.1.0_amd64.deb.sha256'
+sudo dpkg -i codifix_3.1.0_amd64.deb
 ```
 
 Replace `amd64` with `arm64` in all commands on 64-bit ARM.
-The Debian package version is `3.0.0`. This release is a breaking
+The Debian package version is `3.1.0`. This release is a breaking
 product rename. If replacing an existing Memory Layer install, follow the
 [Update guide](/docs/install/update) and the
 [release-specific reinstall procedure](https://github.com/3vilM33pl3/codifix/blob/main/packaging/CODIFIX-3-REINSTALL.md)

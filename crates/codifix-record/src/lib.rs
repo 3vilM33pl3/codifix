@@ -4,6 +4,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
 pub mod admin;
+pub mod agency_observation;
 pub mod bundle;
 pub mod capture;
 pub mod company_agents;
@@ -20,6 +21,7 @@ pub mod device_onboarding;
 pub mod error;
 pub mod event;
 pub mod graph;
+pub mod human_duration;
 pub mod jobs;
 pub mod laptop_cache;
 pub mod loops;

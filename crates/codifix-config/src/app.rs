@@ -40,6 +40,12 @@ pub struct TelemetryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Opt-in metadata and bounded peer exchange reads; no runtime activation.
+    #[serde(default)]
+    pub agency_observation: Option<crate::agency_observation::AgencyObservationConfig>,
+    /// Opt-in private human inbox; must share the companion agency database.
+    #[serde(default)]
+    pub inbox: Option<InboxConfig>,
     /// Explicit native laptop read-only cache view. No server default.
     #[serde(default)]
     pub laptop_cache: Option<crate::laptop_cache::LaptopCacheConfig>,
@@ -101,6 +107,16 @@ pub struct AppConfig {
     /// Path of the dev overlay if one was applied.
     #[serde(skip)]
     pub resolved_dev_overlay_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InboxConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub home_instance_id: Uuid,
+    #[serde(default)]
+    pub identity_broker_socket: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -315,7 +331,7 @@ pub struct ServiceConfig {
     #[serde(default = "default_api_token")]
     pub api_token: String,
     #[serde(default = "default_request_timeout")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub request_timeout: Duration,
     /// Student / kiosk mode: reject every mutating HTTP endpoint while
     /// keeping reads, queries, and briefings available. Activation still
@@ -362,10 +378,10 @@ pub struct ClusterConfig {
     #[serde(default = "default_cluster_discovery_multicast_addr")]
     pub discovery_multicast_addr: String,
     #[serde(default = "default_cluster_announce_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub announce_interval: Duration,
     #[serde(default = "default_cluster_peer_ttl")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub peer_ttl: Duration,
     #[serde(default = "default_cluster_priority")]
     pub priority: i32,
@@ -417,7 +433,7 @@ pub struct OfflineConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<PathBuf>,
     #[serde(default = "default_offline_reconnect_interval")]
-    #[serde(with = "humantime_serde")]
+    #[serde(with = "codifix_record::human_duration")]
     pub reconnect_interval: Duration,
     #[serde(default = "default_offline_sync_batch_size")]
     pub sync_batch_size: usize,

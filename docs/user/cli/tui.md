@@ -17,7 +17,8 @@ codifix tui --project memory
 
 - browse and filter memories
 - ask cited questions and inspect returned memories
-- review activities, errors, watchers, agents, and embeddings
+- review activities, errors, watchers, companions, agents, and embeddings
+- inspect project agent exchanges and a separately authenticated personal Inbox
 - switch embedding backends
 - inspect project health and get resume briefings
 

@@ -3,6 +3,7 @@
 // Tests may unwrap; production code must not (workspace lints deny it).
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod agency_observation;
 mod auth;
 mod background;
 mod consolidate;
@@ -16,6 +17,7 @@ mod laptop_memories;
 mod laptop_query;
 mod llm;
 mod mcp_http;
+mod network;
 #[cfg(feature = "offline")]
 mod offline;
 #[cfg(not(feature = "offline"))]

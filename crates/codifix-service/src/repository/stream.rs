@@ -421,10 +421,12 @@ pub(crate) async fn recent_activity_responses(
 }
 
 pub(crate) async fn health_payload(state: &AppState) -> Result<serde_json::Value> {
-    Ok(with_area_identity(
+    let mut payload = with_area_identity(
         health_payload_core(state).await?,
         state.config.area.as_ref().map(|area| area.instance_id),
-    ))
+    );
+    payload["inbox_enabled"] = serde_json::json!(crate::network::inbox_enabled(state));
+    Ok(payload)
 }
 
 fn with_area_identity(

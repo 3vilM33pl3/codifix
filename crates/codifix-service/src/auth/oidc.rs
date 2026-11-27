@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use super::desktop::DesktopContext;
 use axum::{
     extract::{Query, State},
     http::{HeaderValue, StatusCode, header},
@@ -44,7 +45,8 @@ pub(crate) struct AuthCallbackQuery {
     code: Option<String>,
     state: Option<String>,
     error: Option<String>,
-    error_description: Option<String>,
+    #[serde(rename = "error_description")]
+    _error_description: Option<String>,
 }
 
 pub(crate) async fn auth_login(
@@ -53,7 +55,16 @@ pub(crate) async fn auth_login(
 ) -> Result<Response, ApiError> {
     require_multiuser_oidc(&state)?;
     let return_to = validate_return_to(query.return_to.as_deref())?;
-    let client = discover_client(&state).await?;
+    start_oidc_login(&state, Some(return_to), None).await
+}
+
+pub(super) async fn start_oidc_login(
+    state: &AppState,
+    return_to: Option<String>,
+    desktop: Option<DesktopContext>,
+) -> Result<Response, ApiError> {
+    require_multiuser_oidc(state)?;
+    let client = discover_client(state).await?;
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let mut authorization = client
         .authorize_url(
@@ -65,20 +76,38 @@ pub(crate) async fn auth_login(
     for scope in additional_oidc_scopes(&state.config.auth.oidc.scopes) {
         authorization = authorization.add_scope(Scope::new(scope));
     }
+    if desktop.is_some() {
+        authorization = authorization.add_extra_param("prompt", "login");
+    }
     let (authorization_url, csrf_state, nonce) = authorization.url();
     let pool = state.pool()?;
     let mut tx = pool.begin().await.map_err(ApiError::sql)?;
-    sqlx::query("WITH expired AS (DELETE FROM auth_oidc_flows WHERE expires_at <= now() RETURNING id)
+    sqlx::query("SELECT pg_advisory_xact_lock(86202510)")
+        .execute(&mut *tx)
+        .await
+        .map_err(ApiError::sql)?;
+    sqlx::query("WITH expired AS (DELETE FROM auth_oidc_flows WHERE id IN (SELECT id FROM auth_oidc_flows WHERE expires_at <= now() LIMIT 256) RETURNING id)
         INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
         SELECT gen_random_uuid(),'oidc.flow.expired','success',jsonb_build_object('count',count(*)),now() FROM expired HAVING count(*)>0")
         .execute(&mut *tx)
         .await
         .map_err(ApiError::sql)?;
+    let active: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM auth_oidc_flows WHERE expires_at > now()")
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(ApiError::sql)?;
+    if active >= 1024 {
+        return Err(ApiError::status_message(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too many pending login attempts",
+        ));
+    }
     sqlx::query(
         r#"
         WITH created AS (INSERT INTO auth_oidc_flows
-            (id, state_hash, nonce, pkce_verifier, return_to, created_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, now(), $6) RETURNING id, expires_at)
+            (id, state_hash, nonce, pkce_verifier, return_to, desktop_context, created_at, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $7, now(), $6) RETURNING id, expires_at)
         INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
         SELECT gen_random_uuid(),'oidc.flow.created','success',jsonb_build_object('flow_id',id,'expires_at',expires_at),now() FROM created
         "#,
@@ -89,6 +118,7 @@ pub(crate) async fn auth_login(
     .bind(pkce_verifier.secret())
     .bind(return_to)
     .bind(Utc::now() + OIDC_FLOW_TTL)
+    .bind(desktop.map(serde_json::to_value).transpose().map_err(|_| ApiError::internal("serialize desktop context"))?)
     .execute(&mut *tx)
     .await
     .map_err(ApiError::sql)?;
@@ -102,33 +132,19 @@ pub(crate) async fn auth_callback(
     Query(query): Query<AuthCallbackQuery>,
 ) -> Result<Response, ApiError> {
     require_multiuser_oidc(&state)?;
-    if let Some(error) = query.error.as_deref() {
-        let description = query
-            .error_description
-            .as_deref()
-            .unwrap_or("no description");
-        return Err(ApiError::status_message(
-            StatusCode::BAD_REQUEST,
-            format!("OIDC provider rejected login: {error}: {description}"),
-        ));
-    }
-    let code = query
-        .code
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| ApiError::status_message(StatusCode::BAD_REQUEST, "missing OIDC code"))?;
     let returned_state = query
         .state
-        .filter(|value| !value.trim().is_empty())
+        .filter(|value| !value.trim().is_empty() && value.len() <= 512)
         .ok_or_else(|| ApiError::status_message(StatusCode::BAD_REQUEST, "missing OIDC state"))?;
     let pool = state.pool()?;
     let flow = sqlx::query(
         r#"
         WITH consumed AS (DELETE FROM auth_oidc_flows
         WHERE state_hash = $1 AND expires_at > now()
-        RETURNING id, nonce, pkce_verifier, return_to),
+        RETURNING id, nonce, pkce_verifier, return_to, desktop_context),
         audited AS (INSERT INTO auth_audit_events(id,event_type,outcome,metadata_json,recorded_at)
             SELECT gen_random_uuid(),'oidc.flow.consumed','success',jsonb_build_object('flow_id',id),now() FROM consumed)
-        SELECT id,nonce,pkce_verifier,return_to FROM consumed
+        SELECT id,nonce,pkce_verifier,return_to,desktop_context FROM consumed
         "#,
     )
     .bind(hash_secret(&returned_state))
@@ -143,24 +159,45 @@ pub(crate) async fn auth_callback(
     let pkce_verifier: String = flow.try_get("pkce_verifier").map_err(ApiError::sql)?;
     let return_to: Option<String> = flow.try_get("return_to").map_err(ApiError::sql)?;
 
+    let desktop: Option<DesktopContext> = flow
+        .try_get::<Option<serde_json::Value>, _>("desktop_context")
+        .map_err(ApiError::sql)?
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|_| ApiError::internal("invalid stored desktop context"))?;
+    if let Some(context) = desktop.as_ref() {
+        context.validate()?;
+    }
+    if query.error.is_some() {
+        if let Some(context) = desktop {
+            return context.redirect("error", "access_denied");
+        }
+        return Err(ApiError::status_message(
+            StatusCode::BAD_REQUEST,
+            "OIDC provider rejected login",
+        ));
+    }
+    let code = query
+        .code
+        .filter(|value| !value.is_empty() && value.len() <= 4096)
+        .ok_or_else(|| {
+            ApiError::status_message(StatusCode::BAD_REQUEST, "missing or invalid OIDC code")
+        })?;
     let client = discover_client(&state).await?;
     let http_client = oidc_http_client()?;
     let token_response = client
         .exchange_code(AuthorizationCode::new(code))
-        .map_err(|error| {
+        .map_err(|_error| {
             ApiError::status_message(
                 StatusCode::BAD_GATEWAY,
-                format!("OIDC provider does not support code exchange: {error}"),
+                "OIDC provider does not support code exchange",
             )
         })?
         .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
         .request_async(&http_client)
         .await
-        .map_err(|error| {
-            ApiError::status_message(
-                StatusCode::BAD_GATEWAY,
-                format!("OIDC code exchange failed: {error}"),
-            )
+        .map_err(|_error| {
+            ApiError::status_message(StatusCode::BAD_GATEWAY, "OIDC code exchange failed")
         })?;
     let id_token = token_response.id_token().ok_or_else(|| {
         ApiError::status_message(
@@ -170,11 +207,8 @@ pub(crate) async fn auth_callback(
     })?;
     let claims = id_token
         .claims(&client.id_token_verifier(), &Nonce::new(nonce))
-        .map_err(|error| {
-            ApiError::status_message(
-                StatusCode::UNAUTHORIZED,
-                format!("OIDC ID token validation failed: {error}"),
-            )
+        .map_err(|_error| {
+            ApiError::status_message(StatusCode::UNAUTHORIZED, "OIDC ID token validation failed")
         })?;
     let subject = claims.subject().as_str().to_string();
     let email = claims.email().map(|email| email.as_str().to_string());
@@ -196,6 +230,13 @@ pub(crate) async fn auth_callback(
     )
     .await?;
 
+    if let Some(context) = desktop {
+        let code = super::desktop::issue_desktop_code_tx(&mut tx, principal_id, &context).await?;
+        sqlx::query("INSERT INTO auth_audit_events(id,actor_principal_id,target_principal_id,event_type,outcome,metadata_json) VALUES(gen_random_uuid(),$1,$1,'oidc.desktop.login','success',jsonb_build_object('flow_id',$2::uuid))")
+            .bind(principal_id).bind(flow_id).execute(&mut *tx).await.map_err(ApiError::sql)?;
+        tx.commit().await.map_err(ApiError::sql)?;
+        return context.redirect("code", &code);
+    }
     let (session_secret, csrf_secret) =
         mint_web_session_tx(&mut tx, principal_id, state.config.auth.session_ttl).await?;
     sqlx::query(

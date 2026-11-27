@@ -1,0 +1,60 @@
+name: Desktop Linux
+on:
+  pull_request:
+    paths: ['desktop/**', 'packaging/tests/Dockerfile.desktop-install-test', 'crates/codifix-record/**', 'crates/codifix-supervisor/**', 'web/src/types.ts', 'web/src/features/jobs/types.ts', '.github/workflows/desktop.yml']
+  push:
+    branches: [main]
+    paths: ['desktop/**', 'packaging/tests/Dockerfile.desktop-install-test', 'crates/codifix-record/**', 'crates/codifix-supervisor/**', 'web/src/types.ts', 'web/src/features/jobs/types.ts', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libdbus-1-dev libssl-dev librsvg2-dev patchelf
+      - run: npm ci
+        working-directory: desktop
+      - run: npm test
+        working-directory: desktop
+      - run: python3 desktop/tests/test_normalize_deb_version.py
+      - run: python3 desktop/tests/test_build_desktop.py
+      - run: npm run build
+        working-directory: desktop
+      - run: cargo test --manifest-path desktop/src-tauri/Cargo.toml --locked -- --test-threads=1
+      - run: python3 desktop/tests/native_tls.py
+      - run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check
+      - run: npm run desktop:build
+        working-directory: desktop
+      - name: Verify Debian package version ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --locked --format-version 1 --manifest-path desktop/src-tauri/Cargo.toml | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          mapfile -t packages < <(find "$target_dir/release/bundle/deb" -maxdepth 1 -type f -name 'codifix-desktop_0.2.0~rc.1_amd64.deb' -print)
+          test "${#packages[@]}" -eq 1
+          test "$(dpkg-deb -f "${packages[0]}" Version)" = '0.2.0~rc.1'
+          dpkg --compare-versions 0.2.0~rc.1 gt 0.1.4
+          dpkg --compare-versions 0.2.0~rc.1 lt 0.2.0
+      - name: Build isolated desktop package test image
+        run: docker build --pull=false --file packaging/tests/Dockerfile.desktop-install-test --tag codifix-desktop-installer-test:ci .
+      - name: Native desktop install, upgrade, repair and removal checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(docker image inspect --format '{{.Id}}' codifix-desktop-installer-test:ci)"
+          target_dir="$(cargo metadata --no-deps --locked --format-version 1 --manifest-path desktop/src-tauri/Cargo.toml | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          package="$(realpath "$target_dir/release/bundle/deb/codifix-desktop_0.2.0~rc.1_amd64.deb")"
+          bash desktop/tests/test-debian-install-docker.sh "$image" "$package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codifix-linux-amd64
+          path: desktop/src-tauri/target/release/bundle/deb/*.deb

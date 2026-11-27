@@ -96,7 +96,9 @@ func run(args []string) int {
 func runPreludeCommand(mode outputMode, invocation helperInvocation, cmdArgs []string) int {
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	cmd.Stdin = os.Stdin
-	cmd.Env = commandEnvironment(invocation)
+	// A remember prelude backfills the local checkpoint. An explicit work
+	// start owns any external tracking. Older CLIs ignore this env setting.
+	cmd.Env = append(commandEnvironment(invocation), "CODIFIX_SKIP_LINEAR=true")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

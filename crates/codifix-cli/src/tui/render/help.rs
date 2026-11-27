@@ -78,6 +78,7 @@ pub(in crate::tui) fn tab_help_markdown(tab: TabKind) -> &'static str {
         TabKind::Jobs => include_str!("../help/jobs.md"),
         TabKind::Supervisor => include_str!("../help/supervisor.md"),
         TabKind::Offline => include_str!("../help/offline.md"),
+        TabKind::Conversations => include_str!("../help/conversations.md"),
     }
 }
 

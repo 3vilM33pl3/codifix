@@ -1,5 +1,19 @@
 # Private PDS prerequisite probe
 
+## Companion network scenarios
+
+Run `node tests/federation-pds/run.mjs --agency` with
+`CODIFIX_TEST_DATABASE_URL` pointing at a disposable pgvector database whose
+user can create databases. The runner provisions two independent accounts on
+one isolated, pinned PDS and exposes its XRPC API through a temporary
+loopback TLS proxy. The agency CLI publishes, withdraws and expires a public
+capability. The agency HTTP and conversation tests send private messages with
+PDS-issued service tokens, verify the automatic replies in a direct message
+and a group, exercise replay handling, and enforce the recipient's removal
+and temporary ban. The PDS probe independently verifies the signed repository
+and its public collection list. All credentials, messages and model responses
+in this gate are synthetic.
+
 ## F1 expertise gate
 
 `--runtime` also runs `f1_independent_instances_answer_and_enroll_game`

@@ -6,6 +6,11 @@
 mod commands;
 mod commits;
 mod error_hints;
+#[cfg(feature = "tui")]
+mod human_inbox;
+mod linear_tracking;
+#[cfg(feature = "tui")]
+mod linear_tui;
 mod plan_execution;
 mod resume;
 mod scan;

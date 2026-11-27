@@ -1,0 +1,47 @@
+{
+  "lexicon": 1,
+  "id": "dev.codifix.agency.checkUpgrade",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Confirm a fresh round trip from the upgraded companion for this enrolled delegation.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "#challenge"
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "#challenge"
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "required": [
+        "caTask",
+        "publisherTask",
+        "nonce",
+        "version"
+      ],
+      "properties": {
+        "caTask": {
+          "type": "string"
+        },
+        "publisherTask": {
+          "type": "string"
+        },
+        "nonce": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -48,17 +48,20 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         frame.area(),
     );
 
+    let companion = app.conversations.footer_companion();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Min(10),
-            Constraint::Length(footer_height(app.meta.profile)),
+            Constraint::Length(footer_height(app.meta.profile, companion.is_some())),
         ])
         .split(frame.area());
 
-    let titles = VISIBLE_TABS
+    let (visible_tabs, selected_tab) =
+        tab_window(app.active_tab, chunks[0].width.saturating_sub(2));
+    let titles = visible_tabs
         .into_iter()
         .map(|tab| Line::from(Span::styled(tab.label(), Style::default().fg(Theme::TEXT))))
         .collect::<Vec<_>>();
@@ -75,7 +78,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ));
     }
     let tabs = Tabs::new(titles)
-        .select(app.active_tab.index())
+        .select(selected_tab)
         .block(themed_block(title).borders(Borders::ALL))
         .style(Style::default().fg(Theme::MUTED).bg(Theme::PANEL))
         .highlight_style(
@@ -101,6 +104,15 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         ])
     } else {
         let mut spans = match app.active_tab {
+            TabKind::Conversations => vec![Span::raw(if app.conversations.my_inbox_selected() {
+                "v view  r refresh  Enter open  i sign in  o sign out"
+            } else if app.conversations.live_selected() {
+                "PgUp scroll back  End follow live  / peer  m tasks  r refresh"
+            } else if app.conversations.exchange_open() {
+                "j/k scroll  PgUp/PgDn page  m transcript/details  Esc back  r refresh"
+            } else {
+                "j/k select  Enter open  / peer  PgDn older  v Inbox  r refresh"
+            })],
             TabKind::Offline => vec![Span::raw(
                 "r refresh  j/k subscription  / question  Enter search  d/u scroll",
             )],
@@ -233,6 +245,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
                 Span::styled("r", Style::default().fg(Theme::TEXT)),
             ],
             TabKind::Watchers => vec![
+                Span::raw("c watchers/companions  Enter peer exchanges  r refresh  "),
                 accent_span("scroll "),
                 Span::styled("j/k  ", Style::default().fg(Theme::TEXT)),
                 accent_span("page "),
@@ -320,6 +333,7 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
             TabKind::Jobs => super::tabs::jobs::draw(frame, app, chunks[2]),
             TabKind::Supervisor => super::tabs::supervisor::draw(frame, app, chunks[2]),
             TabKind::Offline => super::tabs::offline::draw(frame, app, chunks[2]),
+            TabKind::Conversations => super::tabs::conversations::draw(frame, app, chunks[2]),
             TabKind::Resume => draw_resume_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Memories => draw_memories_tab(frame, &tab_ctx, chunks[2]),
             TabKind::Agents => draw_agents_tab(frame, &tab_ctx, chunks[2]),
@@ -337,29 +351,73 @@ pub(in crate::tui) fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         draw_backend_recovery(frame, app, chunks[2]);
     }
 
-    let footer_constraints = match app.meta.profile {
-        Profile::Dev => vec![
-            Constraint::Length(3),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ],
-        Profile::Prod => vec![Constraint::Length(3), Constraint::Length(1)],
-    };
-    let footer_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(footer_constraints)
-        .split(chunks[3]);
+    let footer_chunks = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Length(1),
+        Constraint::Length(u16::from(companion.is_some())),
+        Constraint::Length(u16::from(app.meta.profile == Profile::Dev)),
+    ])
+    .split(chunks[3]);
 
     let footer = Paragraph::new(app.chrome.status_message.clone())
         .style(status_message_style(app))
         .wrap(Wrap { trim: false })
         .block(themed_block("Status"));
     frame.render_widget(footer, footer_chunks[0]);
-    match app.meta.profile {
-        Profile::Dev => {
-            draw_bottom_status_bar(frame, app, footer_chunks[1]);
-            draw_dev_status_bar(frame, app, footer_chunks[2]);
+    draw_bottom_status_bar(frame, app, footer_chunks[1]);
+    if let Some((version, freshness)) = companion {
+        draw_companion_status_bar(frame, version.as_deref(), freshness, footer_chunks[2]);
+    }
+    if app.meta.profile == Profile::Dev {
+        draw_dev_status_bar(frame, app, footer_chunks[3]);
+    }
+}
+
+/// Keep the active tab visible even in an 80-column terminal.
+fn tab_window(active: TabKind, width: u16) -> (Vec<TabKind>, usize) {
+    let selected = active.index();
+    let mut start = selected;
+    let mut end = selected + 1;
+    let mut used = active.label().chars().count() + 2;
+    loop {
+        let previous = start
+            .checked_sub(1)
+            .map(|i| VISIBLE_TABS[i].label().chars().count() + 3);
+        if let Some(cost) = previous.filter(|cost| used + cost <= usize::from(width)) {
+            start -= 1;
+            used += cost;
+        } else {
+            break;
         }
-        Profile::Prod => draw_bottom_status_bar(frame, app, footer_chunks[1]),
+        if end < VISIBLE_TABS.len() {
+            let cost = VISIBLE_TABS[end].label().chars().count() + 3;
+            if used + cost <= usize::from(width) {
+                end += 1;
+                used += cost;
+            }
+        }
+    }
+    while end < VISIBLE_TABS.len() {
+        let cost = VISIBLE_TABS[end].label().chars().count() + 3;
+        if used + cost > usize::from(width) {
+            break;
+        }
+        used += cost;
+        end += 1;
+    }
+    (VISIBLE_TABS[start..end].to_vec(), selected - start)
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::*;
+    #[test]
+    fn active_tab_stays_in_window_at_every_width() {
+        for width in [1, 20, 40, 80, 160, 300] {
+            for tab in VISIBLE_TABS {
+                let (tabs, selected) = tab_window(tab, width);
+                assert_eq!(tabs[selected], tab);
+            }
+        }
     }
 }

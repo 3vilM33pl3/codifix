@@ -17,3 +17,15 @@
 *.dll -text
 *.msi -text
 *.pdf -text
+
+# Author configuration and live operational evidence are not source assets.
+.agents/codifix.toml export-ignore
+.claude/plans export-ignore
+docs/reviews/codifix-rename/ca-upgrade-agent-handoff.md export-ignore
+docs/reviews/codifix-rename/live-cutover.md export-ignore
+docs/reviews/codifix-rename/evidence/final-trust-exchange.json export-ignore
+docs/reviews/codifix-rename/evidence/populated-mac-cache-reads.md export-ignore
+docs/reviews/codifix-rename/evidence/populated-workshop-reads.md export-ignore
+docs/reviews/four-area-network/rc2-cutover-2026-09-30.md export-ignore
+docs/reviews/four-area-network/staging-evidence.md export-ignore
+tests/company-topology/evidence-2026-09-19.md export-ignore

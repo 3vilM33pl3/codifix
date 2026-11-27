@@ -1,0 +1,19 @@
+[package]
+name = "codifix-inbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+codifix-agency = { path = "../codifix-agency" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+[dev-dependencies]
+codifix-test-support = { path = "../codifix-test-support" }
+tokio.workspace = true
+[lints]
+workspace = true

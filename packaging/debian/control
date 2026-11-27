@@ -5,5 +5,5 @@ Priority: optional
 Architecture: amd64
 Maintainer: Codex <codex@example.invalid>
 Depends: ${shlibs:Depends}, python3 (>= 3.11), gpg
-Suggests: postgresql
+Suggests: postgresql, python3-cryptography (>= 40), openssh-client, openssh-server
 Description: Local-first project memory backend and CLI

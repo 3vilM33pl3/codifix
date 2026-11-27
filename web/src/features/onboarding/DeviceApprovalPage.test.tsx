@@ -1,12 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { approveDevice, deviceReview, getAuthMe } from "../../api";
+import { approveDevice, AuthIdentityError, deviceReview, getAuthMe } from "../../api";
 import type { AuthMeResponse } from "../../types";
 import { DeviceApprovalPage } from "./DeviceApprovalPage";
 import type { DeviceReview } from "./types";
 
 vi.mock("../../api", async (importOriginal) => ({
   authLoginUrl: (await importOriginal<typeof import("../../api")>()).authLoginUrl,
+  AuthIdentityError: (await importOriginal<typeof import("../../api")>()).AuthIdentityError,
   approveDevice: vi.fn(), deviceReview: vi.fn(), getAuthMe: vi.fn(),
 }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -41,6 +42,22 @@ async function confirmSelection() {
 }
 
 describe("human device approval", () => {
+  it("distinguishes a denied identity check from being signed out", async () => {
+    vi.mocked(getAuthMe).mockRejectedValue(new AuthIdentityError(403));
+    render(<DeviceApprovalPage initialCode="ABCD-1234" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service denied the browser identity check");
+    expect(screen.getByRole("button", { name: "Review device request" })).toBeDisabled();
+    expect(deviceReview).not.toHaveBeenCalled();
+  });
+
+  it("lets a signed-in human with no grants review the device without offering access", async () => {
+    vi.mocked(deviceReview).mockResolvedValue({ ...review, projects: [] });
+    await inspect();
+    expect(screen.getByText(/No authorized reviewed projects are available/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review selected access" })).toBeDisabled();
+    expect(approveDevice).not.toHaveBeenCalled();
+  });
+
   it("rejects local-owner and service credentials before making review requests", async () => {
     for (const identity of [{ ...human, mode: "single_user" as const, principal: { ...human.principal, kind: "internal" as const } },
       { ...human, principal: { ...human.principal, kind: "service_token" as const } }]) {

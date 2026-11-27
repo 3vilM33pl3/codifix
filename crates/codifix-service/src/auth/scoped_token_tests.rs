@@ -283,6 +283,16 @@ async fn single_user_scoped_tokens_http_mcp_and_browser() {
             .status(),
         StatusCode::OK
     );
+    // The browser checks the installation mode before local-owner bootstrap.
+    assert_eq!(
+        client
+            .get(format!("{base}/v1/auth/me"))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::OK
+    );
     let response = client
         .post(format!("{base}/v1/auth/session/bootstrap"))
         .send()
