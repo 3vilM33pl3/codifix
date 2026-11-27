@@ -478,30 +478,6 @@ fn event_summary(body: &Value) -> String {
     fields.join(" · ").chars().take(160).collect()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ticket_timeline_uses_readable_evidence_and_omits_approval_challenges() {
-        let investigation = json!({"state":"investigated","evidence":{"cause":"Test catalogue failed","followups":[]}});
-        assert_eq!(
-            event_summary(&investigation),
-            "investigated · Test catalogue failed"
-        );
-        let approval =
-            json!({"state":"waiting_for_operator","details":"Reply with `approve TOKEN`."});
-        assert_eq!(
-            event_summary(&approval),
-            "waiting_for_operator · Waiting for approval of the reviewed repair."
-        );
-        let recovered = json!({"state":"recovered","impact":"x".repeat(200),"evidence":{"health":true,"user_request":true}});
-        assert!(
-            event_summary(&recovered).contains("Health check: true. Representative request: true.")
-        );
-    }
-}
-
 async fn close_notes(
     store: &Store,
     rule: &Service,
@@ -547,4 +523,28 @@ async fn close_notes(
         tokio::fs::write(rule.postmortem_directory.join(format!("{id}.md")), text).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ticket_timeline_uses_readable_evidence_and_omits_approval_challenges() {
+        let investigation = json!({"state":"investigated","evidence":{"cause":"Test catalogue failed","followups":[]}});
+        assert_eq!(
+            event_summary(&investigation),
+            "investigated · Test catalogue failed"
+        );
+        let approval =
+            json!({"state":"waiting_for_operator","details":"Reply with `approve TOKEN`."});
+        assert_eq!(
+            event_summary(&approval),
+            "waiting_for_operator · Waiting for approval of the reviewed repair."
+        );
+        let recovered = json!({"state":"recovered","impact":"x".repeat(200),"evidence":{"health":true,"user_request":true}});
+        assert!(
+            event_summary(&recovered).contains("Health check: true. Representative request: true.")
+        );
+    }
 }
