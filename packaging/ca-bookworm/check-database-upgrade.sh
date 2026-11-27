@@ -53,11 +53,27 @@ cleanup() {
 trap cleanup EXIT
 
 verify_digest() {
-  local package=$1 expected
-  [[ -f "$package.sha256" && ! -L "$package.sha256" ]]
-  read -r expected _ < "$package.sha256"
-  [[ $expected =~ ^[a-f0-9]{64}$ ]]
-  printf '%s  %s\n' "$expected" "$package" | sha256sum --check --status
+  local package=$1 expected=$2
+  if [[ ! $expected =~ ^[a-f0-9]{64}$ ]] ||
+    ! printf '%s  %s\n' "$expected" "$package" | sha256sum --check --status; then
+    echo "Invalid checksum for ${package##*/}" >&2
+    return 1
+  fi
+}
+
+verify_candidate() {
+  local receipt="${candidate%/*}/build-$arch.json" expected
+  if [[ ! -f $receipt || -L $receipt ]] ||
+    ! expected=$(jq -er --arg arch "$arch" --arg revision "${GITHUB_SHA:?}" \
+      --arg name "${candidate##*/}" '
+      select(.format == "codifix-linux-build-v1" and .architecture == $arch and
+        .application_version == "3.1.0" and .source_commit == $revision) |
+      .artifacts[$name]
+    ' "$receipt"); then
+    echo "Missing matching build receipt for ${candidate##*/}" >&2
+    return 1
+  fi
+  verify_digest "$candidate" "$expected"
 }
 
 request() {
@@ -181,13 +197,15 @@ check_upgrade() {
   local tag=$1 version=$2 prior_head=$3
   local repo='https://github.com/3vilM33pl3/codifix/releases/download'
   local package="$work/codifix_${version}_${arch}.deb"
-  local root="$work/prior-$version" before after
+  local root="$work/prior-$version" before after expected
   local asset
   for asset in "${package##*/}" "${package##*/}.sha256"; do
     curl --fail --silent --show-error --location --retry 3 --max-time 180 \
       --proto '=https' --proto-redir '=https' --output "$work/$asset" "$repo/$tag/$asset"
   done
-  verify_digest "$package"
+  [[ -f "$package.sha256" && ! -L "$package.sha256" ]]
+  read -r expected _ < "$package.sha256"
+  verify_digest "$package" "$expected"
   [[ $(dpkg-deb -f "$package" Package) == codifix ]]
   [[ $(dpkg-deb -f "$package" Architecture) == "$arch" ]]
   [[ $(dpkg-deb -f "$package" Version) == "${version/-/\~}" ]]
@@ -226,7 +244,7 @@ check_upgrade() {
   echo "PASS: native $arch packaged $version to 3.1.0 database upgrade ($prior_head to 105), migration history and application data preserved through restart"
 }
 
-verify_digest "$candidate"
+verify_candidate
 dpkg-deb -x "$candidate" "$work/candidate"
 port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 origin="http://127.0.0.1:$port"
