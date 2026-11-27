@@ -58,4 +58,4 @@ stops new authorized transfers but cannot recall bytes already delivered.
 - [Administer company access](https://codifix.dev/docs/team-setup/administration).
 
 The routing and onboarding details describe current source on `main`. The
-published `3.0.0` package is identified by its release inventory. Native onboarding remains separately scoped; see its guide.
+published `3.1.0` package is identified by its release inventory. Native onboarding remains separately scoped; see its guide.

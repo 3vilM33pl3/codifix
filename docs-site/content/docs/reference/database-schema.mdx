@@ -7,8 +7,8 @@ description: "Read the storage model at a high level without depending on unstab
 
 Codifix stores durable state in PostgreSQL. This page explains the stable storage concepts and table groups; exact columns and indexes are implementation details owned by the migrations in `migrations/`.
 
-The service runs append-only migrations at startup. The published Codifix
-candidate embeds migrations through 0085. PostgreSQL must have pgvector
+The service runs append-only migrations at startup. Codifix 3.1.0 embeds
+migrations through 0105. PostgreSQL must have pgvector
 installed; the schema-owner setup must permit its extension and migrations.
 Do not infer application-version compatibility from an early table definition.
 
@@ -32,6 +32,9 @@ Do not infer application-version compatibility from an early table definition.
 | `0053`–`0061`, `0065` | Supervisor policy/accounting/private interactions and reviewed area-import/reconciliation receipts. |
 | `0066`–`0069`, `0071`–`0084` | Company/device onboarding, delegated delivery, agent grants, owner projections, curated contributions and sync health. |
 | `0085` | Codifix federation retirement and recorded local laptop binding transitions. |
+| `0086`–`0094` | Native desktop sessions, specialist tasks, prepared plans, usage and delegation leases. |
+| `0095`–`0100` | Private Inbox, conversation artifacts, disclosure and observation provenance, moderation. |
+| `0103`–`0105` | Incident records, SSH renewal events and companion upgrade evidence. |
 
 ## Table groups
 

@@ -20,9 +20,14 @@ search other areas.
 [v3.1.0](docs/releases/3.1.0.md) is the current stable release.
 The release inventory identifies the exact source commit and package bytes. The
 macOS packages are unsigned and not notarized; Windows remains a preview.
-Windows packages remain a preview of client/operator functionality, not a
-complete native server stack. Use `codifix urls` to inspect the configured
-application URLs.
+Use `codifix urls` to inspect the configured application URLs.
+
+## What’s new in 3.1
+
+Connect the separately distributed [Linux Desktop](https://codifix.dev/docs/desktop)
+app to a knowledge area, then choose a project. With [Network and Inbox](https://codifix.dev/docs/network-inbox)
+enabled, you can find enrolled specialists and follow a private task through to its receipt.
+Operators can [set up specialists](https://codifix.dev/docs/specialists) for reviewed Linear work, incident recovery and certificate operations.
 
 ## Start here
 
@@ -58,8 +63,10 @@ and verification, start with the
 [Install guide](https://codifix.dev/docs/install) or download the
 [v3.1.0](https://github.com/3vilM33pl3/codifix/releases/tag/v3.1.0).
 Upgrading an existing installation? Read the
-[Update guide](https://codifix.dev/docs/install/update) first: the v3 transition
-requires a breaking reinstall, not an in-place upgrade.
+[Update guide](https://codifix.dev/docs/install/update) first. From 3.0.0, back up
+PostgreSQL and the instance configuration before applying the additive 3.1 migrations.
+Upgrades from the older v2 product require a separate reinstall procedure.
+
 The setup wizard configures the machine once and the project you are working
 in:
 
