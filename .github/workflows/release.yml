@@ -231,6 +231,17 @@ jobs:
     name: Install Linux ${{ matrix.arch }} package
     needs: [contract, linux-release]
     runs-on: ${{ matrix.runner }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: codifix_release
+          POSTGRES_PASSWORD: disposable-only
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U codifix_release -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -255,6 +266,14 @@ jobs:
           debian_version="${VERSION/-/\~}"
           package="$(realpath "target/linux-package/codifix_${debian_version}_${ARCH}.deb")"
           sudo --preserve-env=GITHUB_ACTIONS,RUNNER_OS,RUNNER_ENVIRONMENT env CODIFIX_HOSTED_INSTALL_TEST=yes bash packaging/ca-bookworm/install-test.sh "$package"
+      - name: Verify PostgreSQL upgrades from published packages
+        if: needs.contract.outputs.version == '3.1.0'
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          bash packaging/ca-bookworm/check-database-upgrade.sh "$(realpath "target/linux-package/codifix_3.1.0_${ARCH}.deb")"
 
   macos-release:
     name: Build and install macOS ${{ matrix.arch }} variants
