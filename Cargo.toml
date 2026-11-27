@@ -44,6 +44,8 @@ resolver = "2"
 [patch.crates-io]
 # Preserve the pinned Atrium API/repository baseline while fixing its WASM cache.
 atrium-common = { path = "vendor/atrium-common" }
+# Keep the ATProto wire format while using maintained RustCrypto primitives.
+atrium-crypto = { path = "vendor/atrium-crypto" }
 
 [workspace.package]
 version = "3.1.0"
