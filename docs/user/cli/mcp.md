@@ -4,7 +4,7 @@
 
 Ordinary memory tools are read-only: query, resume, inspect overview data, list memories and activities, read memory details/history, and list pending replacement proposals. They do not expose remember, capture, curate, archive, delete, reindex, or embedding mutations. The current source also defines loop control-plane tools and separate private expertise tools; do not describe the entire adapter as read-only.
 
-This guide describes the current source tree, whose workspace version is `3.0.0`. That version alone does not establish which later source increments a packaged release contains. Check the selected binary's `--version`, `mcp status`, and release evidence before relying on an optional surface.
+The Codifix 3.1.0 adapter declares MCP revision `2025-11-25`. Check the selected binary with `codifix --version` and inspect its capabilities with `codifix mcp status`. See [Agent interoperability](https://codifix.dev/docs/how-it-works/agent-interoperability) for the tested stdio exchange and newer protocol revisions.
 
 ## Tools
 

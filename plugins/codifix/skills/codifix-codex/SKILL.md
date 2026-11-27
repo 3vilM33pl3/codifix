@@ -1,16 +1,16 @@
 ---
 name: codifix-codex
-description: Use Codifix MCP tools and the installed memory CLI to retrieve project context, resume work safely, and preserve completed work in Codex.
+description: Use Codifix MCP tools and the installed codifix CLI to retrieve project context, resume work safely, and preserve completed work in Codex.
 ---
 
 # Codifix for Codex
 
-Use this skill for project-specific questions, interruption recovery, Memory
-Layer setup, or durable work capture in a repository that uses Codifix.
+Use this skill for project-specific questions, interruption recovery, Codifix
+setup, or durable work capture in a repository that uses Codifix.
 
 ## Prerequisites
 
-This plugin requires the `memory` CLI on `PATH` and a reachable Codifix
+This plugin requires the `codifix` CLI on `PATH` and a reachable Codifix
 service. It does not install the CLI, change service configuration, or manage
 credentials. If a tool or CLI command reports a missing binary, unavailable
 service, or authentication error, explain the prerequisite and stop before
