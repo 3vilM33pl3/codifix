@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 OBJECT = re.compile(r"codifix-releases/ca/[0-9A-Za-z.-]+/tui-companion-footer-[0-9A-Za-z.-]+")
@@ -24,7 +25,7 @@ def fetch(config, key, staged):
     require(OBJECT.fullmatch(key), "invalid CA TUI object key")
     subprocess.run(
         ["/usr/bin/rclone", "--config", config, "copyto", "release:" + key, staged,
-         "--max-transfer", "128Mi", "--cutoff-mode", "hard"],
+         "--max-transfer", "128Mi", "--cutoff-mode", "hard", "--s3-no-check-bucket"],
         check=True,
     )
 
@@ -73,14 +74,21 @@ def launched_in_pane(pid, installed):
     return False
 
 
-def verify(launcher, installed, release):
+def verify(launcher, health_url, installed, release):
     require(os.geteuid() != 0, "verify as the operator who uses the TUI")
     require(VERSION.fullmatch(release), "invalid client version")
     output = subprocess.check_output([installed, "--version"], text=True, timeout=5)
     require(output.strip() == "codifix " + release, "installed client version mismatch")
+    address = urlsplit(health_url)
+    require(address.scheme == "http" and address.hostname in {"127.0.0.1", "::1"}
+            and address.port and address.path == "/health" and not address.query
+            and not address.fragment and address.username is None and address.password is None,
+            "invalid reviewed companion health URL")
     client = build_opener(ProxyHandler({}), NoRedirect())
-    with client.open("http://127.0.0.1:8153/health", timeout=5) as response:
-        health = json.load(response)
+    with client.open(health_url, timeout=5) as response:
+        body = response.read(65537)
+        require(len(body) <= 65536, "companion health response too large")
+        health = json.loads(body)
     companion = health["version"]
     require(health["status"] == "ok" and VERSION.fullmatch(companion), "worker health mismatch")
 
@@ -111,7 +119,7 @@ def main():
     for action, parameters in {
         "fetch": ["config", "key", "staged"],
         "install": ["destination", "staged"],
-        "verify": ["launcher", "installed", "release"],
+        "verify": ["launcher", "health_url", "installed", "release"],
     }.items():
         command = sub.add_parser(action)
         for parameter in parameters:

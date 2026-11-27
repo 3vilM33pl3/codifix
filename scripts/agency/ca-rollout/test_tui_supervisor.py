@@ -33,16 +33,39 @@ class TuiSupervisorTest(unittest.TestCase):
     def test_requires_one_admitted_release_effect(self):
         release = {"sha256":"1" * 64, "version":"3.1.0-rc.3"}
         db = Mock()
+        settings = {"instance_id": "instance", "mandate_id": "mandate",
+                    "specialist_id": "installer", "publisher_peer": "publisher"}
         for result in ([], [release, release]):
             db.rows.return_value = result
             with self.assertRaises(ValueError):
-                supervisor.release_for_effect(db, "instance", "mandate", "specialist")
+                supervisor.release_for_effect(db, settings, "tui_installation")
         db.rows.return_value = [release]
-        self.assertEqual(supervisor.release_for_effect(db, "instance", "mandate", "specialist"), release)
+        self.assertEqual(supervisor.release_for_effect(db, settings, "tui_installation"), release)
         sql = db.rows.call_args.args[0]
         self.assertIn("e.status='pending'", sql)
         self.assertIn("t.execution_lease_until > clock_timestamp()", sql)
-        self.assertIn("t.requester='homelab'", sql)
+        self.assertIn("t.requester='publisher'", sql)
+        self.assertIn("e.host_id='instance'", sql)
+        self.assertIn("t.payload#>>'{resource,id}'='instance'", sql)
+        self.assertIn("e.resource='tui-upgrade:'", sql)
+        supervisor.release_for_effect(db, settings, "installation")
+        self.assertIn("e.resource='upgrade:'", db.rows.call_args.args[0])
+
+    def test_rclone_endpoint_is_root_reviewed_https_origin(self):
+        origin = "https://objects.example.test:8443/"
+        config = b"[release]\ntype = s3\nendpoint = https://objects.example.test:8443\n"
+        supervisor.validate_rclone(config, origin)
+        for changed in (
+            config.replace(b":8443", b":443"),
+            config.replace(b"https://", b"http://"),
+            config.replace(b"objects.example.test", b"other.example.test"),
+            config + b"force_path_style = false\n",
+            config + b"env_auth = true\n",
+            config + b"[other]\ntype = s3\n",
+            b"malformed synthetic access key",
+        ):
+            with self.assertRaises(ValueError):
+                supervisor.validate_rclone(changed, origin)
 
     @unittest.skipUnless(os.geteuid() == 0, "requires disposable Linux root to change worker UID")
     def test_broker_serves_the_worker_child_after_dropping_root(self):
