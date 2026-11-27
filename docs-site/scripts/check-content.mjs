@@ -11,6 +11,22 @@ import {
 const { records, errors } = collectDocsContent();
 
 const sharedGuidePairs = [
+  ['content/docs/agents.mdx', 'docs/user/agents.md'],
+  ['content/docs/desktop.mdx', 'docs/user/desktop.md'],
+  ['content/docs/network-inbox.mdx', 'docs/user/network-inbox.md'],
+  ['content/docs/how-it-works/agent-interoperability.mdx', 'docs/developer/agent-interoperability.md'],
+  ...[
+    ['index', 'specialist-workflows'],
+    ['enrollment', 'autonomous-specialists'],
+    ['linear', 'cli/linear'],
+    ['linear-review', 'cli/linear-tui'],
+    ['incidents', 'incident-response'],
+    ['ssh-renewal', 'ssh-host-renewal'],
+    ['openbao', 'openbao-ceremonies'],
+    ['companion-upgrades', 'companion-release-rollout'],
+  ].map(([route, guide]) => [
+    `content/docs/specialists/${route}.mdx`, `docs/user/${guide}.md`,
+  ]),
   ['content/docs/tui/index.mdx', 'docs/user/tui/README.md'],
   ...[
     'activity',
