@@ -1,0 +1,15 @@
+{
+  "title": "Specialists and operator workflows",
+  "collapsible": true,
+  "defaultOpen": false,
+  "pages": [
+    "index",
+    "enrollment",
+    "linear",
+    "linear-review",
+    "incidents",
+    "ssh-renewal",
+    "openbao",
+    "companion-upgrades"
+  ]
+}
